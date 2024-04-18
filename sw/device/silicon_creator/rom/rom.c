@@ -38,47 +38,14 @@
 #include "sw/device/silicon_creator/lib/drivers/watchdog.h"
 #include "sw/device/silicon_creator/lib/error.h"
 #include "sw/device/silicon_creator/lib/shutdown.h"
-#include "sw/device/silicon_creator/lib/sigverify/sigverify.h"
 #include "sw/device/silicon_creator/rom/boot_policy.h"
 #include "sw/device/silicon_creator/rom/bootstrap.h"
+#include "sw/device/silicon_creator/rom/rom_cfi.h"
 #include "sw/device/silicon_creator/rom/rom_epmp.h"
-#include "sw/device/silicon_creator/rom/sigverify_keys_rsa.h"
-#include "sw/device/silicon_creator/rom/sigverify_keys_spx.h"
-#include "sw/device/silicon_creator/rom/sigverify_otp_keys.h"
+#include "sw/device/silicon_creator/rom/rom_verify.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "otp_ctrl_regs.h"
-
-/**
- * Table of forward branch Control Flow Integrity (CFI) counters.
- *
- * Columns: Name, Initital Value.
- *
- * Each counter is indexed by Name. The Initial Value is used to initialize the
- * counters with unique values with a good hamming distance. The values are
- * restricted to 11-bit to be able use immediate load instructions.
-
- * Encoding generated with
- * $ ./util/design/sparse-fsm-encode.py -d 6 -m 6 -n 11 \
- *     -s 1630646358 --language=c
- *
- * Minimum Hamming distance: 6
- * Maximum Hamming distance: 8
- * Minimum Hamming weight: 5
- * Maximum Hamming weight: 8
- */
-// clang-format off
-#define ROM_CFI_FUNC_COUNTERS_TABLE(X) \
-  X(kCfiRomMain,         0x14b) \
-  X(kCfiRomInit,         0x7dc) \
-  X(kCfiRomVerify,       0x5a7) \
-  X(kCfiRomTryBoot,      0x235) \
-  X(kCfiRomPreBootCheck, 0x43a) \
-  X(kCfiRomBoot,         0x2e2)
-// clang-format on
-
-// Define counters and constant values required by the CFI counter macros.
-CFI_DEFINE_COUNTERS(rom_counters, ROM_CFI_FUNC_COUNTERS_TABLE);
 
 // Life cycle state of the chip.
 lifecycle_state_t lc_state = (lifecycle_state_t)0;
@@ -195,106 +162,6 @@ static rom_error_t rom_init(void) {
 
   CFI_FUNC_COUNTER_INCREMENT(rom_counters, kCfiRomInit, 2);
   return kErrorOk;
-}
-
-/**
- * Verifies a ROM_EXT.
- *
- * This function performs bounds checks on the fields of the manifest, checks
- * its `identifier` and `security_version` fields, and verifies its signature.
- *
- * @param Manifest of the ROM_EXT to be verified.
- * @param[out] flash_exec Value to write to the flash_ctrl EXEC register.
- * @return Result of the operation.
- */
-OT_WARN_UNUSED_RESULT
-static rom_error_t rom_verify(const manifest_t *manifest,
-                              uint32_t *flash_exec) {
-  // Used for invalidating signatures if the security version of the manifest is
-  // smaller than the minimum required security version.
-  const uint32_t extra_word = UINT32_MAX;
-  const uint32_t *anti_rollback = NULL;
-  size_t anti_rollback_len = 0;
-  if (launder32(manifest->security_version) <
-      boot_data.min_security_version_rom_ext) {
-    anti_rollback = &extra_word;
-    anti_rollback_len = sizeof(extra_word);
-  }
-
-  sigverify_otp_key_ctx_t sigverify_ctx;
-  HARDENED_RETURN_IF_ERROR(sigverify_otp_keys_init(&sigverify_ctx));
-
-  CFI_FUNC_COUNTER_INCREMENT(rom_counters, kCfiRomVerify, 1);
-  *flash_exec = 0;
-  HARDENED_RETURN_IF_ERROR(boot_policy_manifest_check(manifest, &boot_data));
-
-  const sigverify_rsa_key_t *rsa_key;
-  HARDENED_RETURN_IF_ERROR(sigverify_rsa_key_get(
-      sigverify_rsa_key_id_get(&manifest->rsa_modulus), lc_state, &rsa_key));
-
-  const sigverify_spx_key_t *spx_key = NULL;
-  const sigverify_spx_signature_t *spx_signature = NULL;
-  uint32_t sigverify_spx_en = sigverify_spx_verify_enabled(lc_state);
-  if (launder32(sigverify_spx_en) != kSigverifySpxDisabledOtp) {
-    const manifest_ext_spx_key_t *ext_spx_key;
-    HARDENED_RETURN_IF_ERROR(manifest_ext_get_spx_key(manifest, &ext_spx_key));
-    HARDENED_RETURN_IF_ERROR(sigverify_spx_key_get(
-        &sigverify_ctx, sigverify_spx_key_id_get(&ext_spx_key->key), lc_state,
-        &spx_key));
-
-    const manifest_ext_spx_signature_t *ext_spx_signature;
-    HARDENED_RETURN_IF_ERROR(
-        manifest_ext_get_spx_signature(manifest, &ext_spx_signature));
-    spx_signature = &ext_spx_signature->signature;
-  } else {
-    HARDENED_CHECK_EQ(sigverify_spx_en, kSigverifySpxDisabledOtp);
-  }
-
-  memset(boot_measurements.rom_ext.data, (int)rnd_uint32(),
-         sizeof(boot_measurements.rom_ext.data));
-
-  hmac_sha256_init();
-  hmac_sha256_update(anti_rollback, anti_rollback_len);
-  HARDENED_CHECK_GE(manifest->security_version,
-                    boot_data.min_security_version_rom_ext);
-
-  // Hash usage constraints.
-  manifest_usage_constraints_t usage_constraints_from_hw;
-  sigverify_usage_constraints_get(manifest->usage_constraints.selector_bits,
-                                  &usage_constraints_from_hw);
-  hmac_sha256_update(&usage_constraints_from_hw,
-                     sizeof(usage_constraints_from_hw));
-  // Hash the remaining part of the image.
-  manifest_digest_region_t digest_region = manifest_digest_region_get(manifest);
-
-  hmac_sha256_update(digest_region.start, digest_region.length);
-  // Verify signature
-  hmac_digest_t act_digest;
-  hmac_sha256_final(&act_digest);
-
-  static_assert(sizeof(boot_measurements.rom_ext) == sizeof(act_digest),
-                "Unexpected ROM_EXT digest size.");
-  memcpy(&boot_measurements.rom_ext, &act_digest,
-         sizeof(boot_measurements.rom_ext));
-
-  CFI_FUNC_COUNTER_INCREMENT(rom_counters, kCfiRomVerify, 2);
-  // Swap the order of signature verifications randomly.
-  *flash_exec = 0;
-  if (rnd_uint32() < 0x80000000) {
-    HARDENED_RETURN_IF_ERROR(sigverify_rsa_verify(
-        &manifest->rsa_signature, rsa_key, &act_digest, lc_state, flash_exec));
-    return sigverify_spx_verify(
-        spx_signature, spx_key, lc_state, &usage_constraints_from_hw,
-        sizeof(usage_constraints_from_hw), anti_rollback, anti_rollback_len,
-        digest_region.start, digest_region.length, flash_exec);
-  } else {
-    HARDENED_RETURN_IF_ERROR(sigverify_spx_verify(
-        spx_signature, spx_key, lc_state, &usage_constraints_from_hw,
-        sizeof(usage_constraints_from_hw), anti_rollback, anti_rollback_len,
-        digest_region.start, digest_region.length, flash_exec));
-    return sigverify_rsa_verify(&manifest->rsa_signature, rsa_key, &act_digest,
-                                lc_state, flash_exec);
-  }
 }
 
 /* These symbols are defined in
@@ -519,7 +386,8 @@ static rom_error_t rom_try_boot(void) {
   uint32_t flash_exec = 0;
 
   CFI_FUNC_COUNTER_PREPCALL(rom_counters, kCfiRomTryBoot, 2, kCfiRomVerify);
-  rom_error_t error = rom_verify(manifests.ordered[0], &flash_exec);
+  rom_error_t error =
+      rom_verify(manifests.ordered[0], lc_state, &boot_data, &flash_exec);
   CFI_FUNC_COUNTER_INCREMENT(rom_counters, kCfiRomTryBoot, 4);
 
   // Initialize boot_log
@@ -545,7 +413,8 @@ static rom_error_t rom_try_boot(void) {
   boot_log_digest_update(boot_log);
 
   CFI_FUNC_COUNTER_PREPCALL(rom_counters, kCfiRomTryBoot, 5, kCfiRomVerify);
-  HARDENED_RETURN_IF_ERROR(rom_verify(manifests.ordered[1], &flash_exec));
+  HARDENED_RETURN_IF_ERROR(
+      rom_verify(manifests.ordered[1], lc_state, &boot_data, &flash_exec));
   CFI_FUNC_COUNTER_INCREMENT(rom_counters, kCfiRomTryBoot, 7);
   CFI_FUNC_COUNTER_CHECK(rom_counters, kCfiRomVerify, 3);
 

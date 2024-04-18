@@ -104,6 +104,39 @@ cc_library(
 )
 
 cc_library(
+    name = "rom_cfi",
+    srcs = ["rom_cfi.c"],
+    hdrs = ["rom_cfi.h"],
+    deps = [
+        "//sw/device/silicon_creator/lib:cfi",
+    ],
+)
+
+cc_library(
+    name = "rom_verify",
+    srcs = ["rom_verify.c"],
+    hdrs = ["rom_verify.h"],
+    deps = [
+        ":boot_policy",
+        ":rom_cfi",
+        ":sigverify_keys",
+        ":sigverify_keys_rsa",
+        ":sigverify_keys_spx",
+        ":sigverify_otp_keys",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/base:memory",
+        "//sw/device/silicon_creator/lib/base:static_critical",
+        "//sw/device/silicon_creator/lib:cfi",
+        "//sw/device/silicon_creator/lib:chip_info",
+        "//sw/device/silicon_creator/lib/drivers:lifecycle",
+        "//sw/device/silicon_creator/lib/drivers:rnd",
+        "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib:manifest",
+        "//sw/device/silicon_creator/lib/sigverify",
+    ],
+)
+
+cc_library(
     name = "rom_common",
     srcs = [
         "rom.c",
@@ -112,11 +145,9 @@ cc_library(
     deps = [
         ":boot_policy",
         ":bootstrap",
+        ":rom_cfi",
         ":rom_epmp",
-        ":sigverify_keys",
-        ":sigverify_keys_rsa",
-        ":sigverify_keys_spx",
-        ":sigverify_otp_keys",
+        ":rom_verify",
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:bitfield",
@@ -151,7 +182,6 @@ cc_library(
         "//sw/device/silicon_creator/lib/drivers:rstmgr",
         "//sw/device/silicon_creator/lib/drivers:uart",
         "//sw/device/silicon_creator/lib/drivers:watchdog",
-        "//sw/device/silicon_creator/lib/sigverify",
     ],
 )
 
