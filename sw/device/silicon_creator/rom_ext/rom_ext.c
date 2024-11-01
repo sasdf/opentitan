@@ -99,23 +99,41 @@ const epmp_region_t kFlashRegion = {
 };
 
 // Certificate data.
-static uint8_t dice_certs_page[FLASH_CTRL_PARAM_BYTES_PER_PAGE];
-static hardened_bool_t dice_certs_page_dirty = kHardenedBoolFalse;
-static size_t dice_certs_page_offset = 0;
-static hmac_digest_t uds_pubkey_id;
-static hmac_digest_t cdi_0_pubkey_id;
-static hmac_digest_t cdi_1_pubkey_id;
-static cert_key_id_pair_t cdi_0_key_ids = {
-    .endorsement = &uds_pubkey_id,
-    .cert = &cdi_0_pubkey_id,
-};
-static cert_key_id_pair_t cdi_1_key_ids = {
-    .endorsement = &cdi_0_pubkey_id,
-    .cert = &cdi_1_pubkey_id,
-};
-static ecdsa_p256_public_key_t curr_attestation_pubkey = {.x = {0}, .y = {0}};
-static uint8_t cdi_0_cert[kCdi0MaxCertSizeBytes] = {0};
-static uint8_t cdi_1_cert[kCdi1MaxCertSizeBytes] = {0};
+typedef struct dice_chain {
+  uint8_t data[FLASH_CTRL_PARAM_BYTES_PER_PAGE];
+  hardened_bool_t data_dirty;
+  size_t tail_offset;
+
+  hmac_digest_t uds_pubkey_id;
+  hmac_digest_t cdi_0_pubkey_id;
+  hmac_digest_t cdi_1_pubkey_id;
+
+  ecdsa_p256_public_key_t curr_attestation_pubkey;
+} dice_chain_t;
+
+static dice_chain_t dice_chain;
+
+// Get the size of the remaining tail space that is not processed yet.
+OT_WARN_UNUSED_RESULT
+static size_t dice_chain_get_tail_size(dice_chain_t *dice_chain) {
+  HARDENED_CHECK_GE(sizeof(dice_chain->data), dice_chain->tail_offset);
+  return sizeof(dice_chain->data) - dice_chain->tail_offset;
+}
+
+// Get the pointer to the remaining tail space that is not processed yet.
+OT_WARN_UNUSED_RESULT
+static uint8_t *dice_chain_get_tail_buffer(dice_chain_t *dice_chain) {
+  return &dice_chain->data[dice_chain->tail_offset];
+}
+
+// Mark that the flash data needs to be updated, and invalidate remaining
+// certificates in the tail buffer.
+static void dice_chain_mark_dirty(dice_chain_t *dice_chain) {
+  dice_chain->data_dirty = kHardenedBoolTrue;
+  // Invalidate remaining certificates in the tail buffer.
+  memset(dice_chain_get_tail_buffer(dice_chain), UINT8_MAX,
+         dice_chain_get_tail_size(dice_chain));
+}
 
 OT_WARN_UNUSED_RESULT
 static rom_error_t rom_ext_irq_error(void) {
@@ -310,21 +328,27 @@ static uintptr_t owner_vma_get(const manifest_t *manifest, uintptr_t lma_addr) {
 }
 
 /**
- * Increments the DICE cert page offset (ensuring to round up to the 64-bit
+ * Increments the DICE cert buffer offset (ensuring to round up to the 64-bit
  * flash word offset to prevent potential ECC issues).
  */
-static void rom_ext_attestation_increment_cert_offset(size_t cert_size) {
-  HARDENED_CHECK_GE(cert_size, 4);
-  dice_certs_page_offset += util_size_to_words(cert_size) * sizeof(uint32_t);
-  dice_certs_page_offset = util_round_up_to(dice_certs_page_offset, 3);
+static void dice_chain_increase_offset(dice_chain_t *dice_chain,
+                                       size_t cert_size) {
+  HARDENED_CHECK_GE(cert_size, 4);  // 4 is the minimum ASN.1 header size.
+  cert_size = util_size_to_words(cert_size) * sizeof(uint32_t);
+  cert_size = util_round_up_to(cert_size, 3);
+  HARDENED_CHECK_LE(cert_size, dice_chain_get_tail_size(dice_chain));
+  dice_chain->tail_offset += cert_size;
 }
 
 OT_WARN_UNUSED_RESULT
-static rom_error_t rom_ext_buffer_dice_certs_into_ram(void) {
+static rom_error_t dice_chain_load_flash(dice_chain_t *dice_chain) {
+  dice_chain->tail_offset = 0;
+  static_assert(sizeof(dice_chain->data) == FLASH_CTRL_PARAM_BYTES_PER_PAGE,
+                "Invalid dice_chain buffer size");
   rom_error_t err = flash_ctrl_info_read(
       &kFlashCtrlInfoPageDiceCerts, /*offset=*/0,
       /*word_count=*/FLASH_CTRL_PARAM_BYTES_PER_PAGE / sizeof(uint32_t),
-      dice_certs_page);
+      dice_chain->data);
   if (err != kErrorOk) {
     flash_ctrl_error_code_t flash_ctrl_err_code;
     flash_ctrl_error_code_get(&flash_ctrl_err_code);
@@ -333,8 +357,7 @@ static rom_error_t rom_ext_buffer_dice_certs_into_ram(void) {
       // has been corrupted or is not provisioned yet. In this case, we mark the
       // page as "dirty" and set the buffer to all 1s, which are the values read
       // from a freshly erased flash page.
-      memset(dice_certs_page, UINT8_MAX, FLASH_CTRL_PARAM_BYTES_PER_PAGE);
-      dice_certs_page_dirty = true;
+      dice_chain_mark_dirty(dice_chain);
       return kErrorOk;
     }
   }
@@ -342,7 +365,7 @@ static rom_error_t rom_ext_buffer_dice_certs_into_ram(void) {
 }
 
 OT_WARN_UNUSED_RESULT
-static rom_error_t rom_ext_attestation_silicon(void) {
+rom_error_t dice_chain_attestation_silicon(dice_chain_t *dice_chain) {
   // Initialize the entropy complex and KMAC for key manager operations.
   // Note: `OTCRYPTO_OK.value` is equal to `kErrorOk` but we cannot add a static
   // assertion here since its definition is not an integer constant expression.
@@ -364,16 +387,17 @@ static rom_error_t rom_ext_attestation_silicon(void) {
 
   // Generate UDS keys.
   sc_keymgr_advance_state();
-  HARDENED_RETURN_IF_ERROR(otbn_boot_cert_ecc_p256_keygen(
-      kDiceKeyUds, &uds_pubkey_id, &curr_attestation_pubkey));
+  HARDENED_RETURN_IF_ERROR(
+      otbn_boot_cert_ecc_p256_keygen(kDiceKeyUds, &dice_chain->uds_pubkey_id,
+                                     &dice_chain->curr_attestation_pubkey));
   HARDENED_RETURN_IF_ERROR(otbn_boot_attestation_key_save(
       kDiceKeyUds.keygen_seed_idx, kDiceKeyUds.type,
       *kDiceKeyUds.keymgr_diversifier));
   hardened_bool_t cert_valid = kHardenedBoolFalse;
-  uint32_t cert_size = 0;
+  size_t cert_size = 0;
   HARDENED_RETURN_IF_ERROR(cert_x509_asn1_check_serial_number(
-      dice_certs_page, dice_certs_page_offset, (uint8_t *)uds_pubkey_id.digest,
-      &cert_valid, &cert_size));
+      dice_chain->data, dice_chain->tail_offset,
+      (uint8_t *)dice_chain->uds_pubkey_id.digest, &cert_valid, &cert_size));
   if (launder32(cert_valid) == kHardenedBoolFalse) {
     // The UDS key ID (and cert itself) should never change unless:
     // 1. there is a hardware issue, or
@@ -388,25 +412,27 @@ static rom_error_t rom_ext_attestation_silicon(void) {
     // fully, we expect the cert to be missing. In this case, we write a
     // 0-length (invalid) ASN.1 certificate header blob to avoid breaking tests
     // that run on these platforms.
-    if (cert_size == 0) {
+    if (launder32(cert_size) == 0) {
+      HARDENED_CHECK_EQ(cert_size, 0);
       dbg_printf("Writing empty UDS certificate ASN.1 blob.\r\n");
-      dice_certs_page[0] = 0x30;
-      dice_certs_page[1] = 0x82;
-      dice_certs_page[2] = 0x00;
-      dice_certs_page[3] = 0x00;
-      cert_size = 4;
-      dice_certs_page_dirty = kHardenedBoolTrue;
+      HARDENED_CHECK_GE(dice_chain_get_tail_size(dice_chain), 4);
+      memcpy(dice_chain_get_tail_buffer(dice_chain), "\x30\x82\x00\x00", 4);
+      dice_chain_increase_offset(dice_chain, 4);
+      dice_chain_mark_dirty(dice_chain);
+      return kErrorOk;
     }
+  } else {
+    HARDENED_CHECK_EQ(cert_valid, kHardenedBoolTrue);
   }
 
-  rom_ext_attestation_increment_cert_offset(cert_size);
+  dice_chain_increase_offset(dice_chain, cert_size);
 
   return kErrorOk;
 }
 
 OT_WARN_UNUSED_RESULT
-static rom_error_t rom_ext_attestation_creator(
-    const manifest_t *rom_ext_manifest) {
+rom_error_t dice_chain_attestation_creator(dice_chain_t *dice_chain,
+                                           const manifest_t *rom_ext_manifest) {
   // Generate CDI_0 attestation keys and (potentially) update certificate.
   keymgr_binding_value_t seal_binding_value = {
       .data = {rom_ext_manifest->identifier, 0}};
@@ -416,38 +442,40 @@ static rom_error_t rom_ext_attestation_creator(
       sc_keymgr_owner_int_advance(/*sealing_binding=*/&seal_binding_value,
                                   /*attest_binding=*/&boot_measurements.rom_ext,
                                   rom_ext_manifest->max_key_version));
-  HARDENED_RETURN_IF_ERROR(otbn_boot_cert_ecc_p256_keygen(
-      kDiceKeyCdi0, &cdi_0_pubkey_id, &curr_attestation_pubkey));
+  HARDENED_RETURN_IF_ERROR(
+      otbn_boot_cert_ecc_p256_keygen(kDiceKeyCdi0, &dice_chain->cdi_0_pubkey_id,
+                                     &dice_chain->curr_attestation_pubkey));
   hardened_bool_t cert_valid = kHardenedBoolFalse;
-  uint32_t cert_size = 0;
+  size_t cert_size = 0;
   HARDENED_RETURN_IF_ERROR(cert_x509_asn1_check_serial_number(
-      dice_certs_page, dice_certs_page_offset,
-      (uint8_t *)cdi_0_pubkey_id.digest, &cert_valid, &cert_size));
+      dice_chain->data, dice_chain->tail_offset,
+      (uint8_t *)dice_chain->cdi_0_pubkey_id.digest, &cert_valid, &cert_size));
   if (launder32(cert_valid) == kHardenedBoolFalse) {
     HARDENED_CHECK_EQ(cert_valid, kHardenedBoolFalse);
     dbg_printf("CDI_0 certificate not valid. Updating it ...\r\n");
-    uint32_t updated_cert_size = kCdi0MaxCertSizeBytes;
+    // Update the cert page buffer.
+    uint8_t *cdi_0_cert = dice_chain_get_tail_buffer(dice_chain);
+    size_t updated_cert_size = dice_chain_get_tail_size(dice_chain);
+    cert_key_id_pair_t cdi_0_key_ids = {
+        .endorsement = &dice_chain->uds_pubkey_id,
+        .cert = &dice_chain->cdi_0_pubkey_id,
+    };
     HARDENED_RETURN_IF_ERROR(dice_cdi_0_cert_build(
         (hmac_digest_t *)boot_measurements.rom_ext.data,
         rom_ext_manifest->security_version, &cdi_0_key_ids,
-        &curr_attestation_pubkey, cdi_0_cert, &updated_cert_size));
-    // Update the cert page buffer.
-    memcpy(&dice_certs_page[dice_certs_page_offset], cdi_0_cert,
-           updated_cert_size);
-    dice_certs_page_dirty = kHardenedBoolTrue;
-    rom_ext_attestation_increment_cert_offset(updated_cert_size);
-    // If the CDI_0 cert is updated, it could overrun the CDI_1 cert, so we make
-    // sure to update that as well by erasing the existing cert from the buffer.
-    memset(&dice_certs_page[dice_certs_page_offset], UINT8_MAX,
-           FLASH_CTRL_PARAM_BYTES_PER_PAGE - dice_certs_page_offset);
+        &dice_chain->curr_attestation_pubkey, cdi_0_cert, &updated_cert_size));
+    dice_chain_increase_offset(dice_chain, updated_cert_size);
+    dice_chain_mark_dirty(dice_chain);
   } else {
-    rom_ext_attestation_increment_cert_offset(cert_size);
+    HARDENED_CHECK_EQ(cert_valid, kHardenedBoolTrue);
+    dice_chain_increase_offset(dice_chain, cert_size);
   }
   return kErrorOk;
 }
 
 OT_WARN_UNUSED_RESULT
-static rom_error_t rom_ext_attestation_owner(const manifest_t *owner_manifest) {
+rom_error_t dice_chain_attestation_owner(dice_chain_t *dice_chain,
+                                         const manifest_t *owner_manifest) {
   keymgr_binding_value_t zero_binding_value = {.data = {0}};
   // Generate CDI_1 attestation keys and (potentially) update certificate.
   SEC_MMIO_WRITE_INCREMENT(kScKeymgrSecMmioSwBindingSet +
@@ -458,34 +486,35 @@ static rom_error_t rom_ext_attestation_owner(const manifest_t *owner_manifest) {
       sc_keymgr_owner_advance(/*sealing_binding=*/&zero_binding_value,
                               /*attest_binding=*/&boot_measurements.bl0,
                               owner_manifest->max_key_version));
-  HARDENED_RETURN_IF_ERROR(otbn_boot_cert_ecc_p256_keygen(
-      kDiceKeyCdi1, &cdi_1_pubkey_id, &curr_attestation_pubkey));
+  HARDENED_RETURN_IF_ERROR(
+      otbn_boot_cert_ecc_p256_keygen(kDiceKeyCdi1, &dice_chain->cdi_1_pubkey_id,
+                                     &dice_chain->curr_attestation_pubkey));
   hardened_bool_t cert_valid = kHardenedBoolFalse;
-  uint32_t cert_size = 0;
+  size_t cert_size = 0;
   HARDENED_RETURN_IF_ERROR(cert_x509_asn1_check_serial_number(
-      dice_certs_page, dice_certs_page_offset,
-      (uint8_t *)cdi_1_pubkey_id.digest, &cert_valid, &cert_size));
+      dice_chain->data, dice_chain->tail_offset,
+      (uint8_t *)dice_chain->cdi_1_pubkey_id.digest, &cert_valid, &cert_size));
   if (launder32(cert_valid) == kHardenedBoolFalse) {
     HARDENED_CHECK_EQ(cert_valid, kHardenedBoolFalse);
     dbg_printf("CDI_1 certificate not valid. Updating it ...\r\n");
-    uint32_t updated_cert_size = kCdi1MaxCertSizeBytes;
+    // Update the cert page buffer.
+    uint8_t *cdi_1_cert = dice_chain_get_tail_buffer(dice_chain);
+    size_t updated_cert_size = dice_chain_get_tail_size(dice_chain);
+    cert_key_id_pair_t cdi_1_key_ids = {
+        .endorsement = &dice_chain->cdi_0_pubkey_id,
+        .cert = &dice_chain->cdi_1_pubkey_id,
+    };
     // TODO(#19596): add owner configuration block measurement to CDI_1 cert.
     HARDENED_RETURN_IF_ERROR(dice_cdi_1_cert_build(
         (hmac_digest_t *)boot_measurements.bl0.data,
         (hmac_digest_t *)zero_binding_value.data,
         owner_manifest->security_version, &cdi_1_key_ids,
-        &curr_attestation_pubkey, cdi_1_cert, &updated_cert_size));
-    // Update the cert page buffer.
-    memcpy(&dice_certs_page[dice_certs_page_offset], cdi_1_cert,
-           updated_cert_size);
-    dice_certs_page_dirty = kHardenedBoolTrue;
-    rom_ext_attestation_increment_cert_offset(updated_cert_size);
-    // If the CDI_1 cert is updated, it could be smaller than the previous CDI_1
-    // cert, so we make sure to clear out the rest of the buffer.
-    memset(&dice_certs_page[dice_certs_page_offset], UINT8_MAX,
-           FLASH_CTRL_PARAM_BYTES_PER_PAGE - dice_certs_page_offset);
+        &dice_chain->curr_attestation_pubkey, cdi_1_cert, &updated_cert_size));
+    dice_chain_increase_offset(dice_chain, updated_cert_size);
+    dice_chain_mark_dirty(dice_chain);
   } else {
-    rom_ext_attestation_increment_cert_offset(cert_size);
+    HARDENED_CHECK_EQ(cert_valid, kHardenedBoolTrue);
+    dice_chain_increase_offset(dice_chain, cert_size);
   }
 
   // TODO: elimiate this call when we've fully programmed keymgr and lock it.
@@ -494,22 +523,33 @@ static rom_error_t rom_ext_attestation_owner(const manifest_t *owner_manifest) {
   return kErrorOk;
 }
 
+// Write the DICE certs to flash if they have been updated.
 OT_WARN_UNUSED_RESULT
-static rom_error_t rom_ext_boot(const manifest_t *manifest) {
-  // Generate CDI_1 attestation keys and certificate.
-  HARDENED_RETURN_IF_ERROR(rom_ext_attestation_owner(manifest));
-
-  // Write the DICE certs to flash if they have been updated.
-  if (launder32(dice_certs_page_dirty) == kHardenedBoolTrue) {
-    HARDENED_CHECK_EQ(dice_certs_page_dirty, kHardenedBoolTrue);
+rom_error_t dice_chain_update_flash(dice_chain_t *dice_chain) {
+  if (launder32(dice_chain->data_dirty) == kHardenedBoolTrue) {
+    HARDENED_CHECK_EQ(dice_chain->data_dirty, kHardenedBoolTrue);
     HARDENED_RETURN_IF_ERROR(flash_ctrl_info_erase(&kFlashCtrlInfoPageDiceCerts,
                                                    kFlashCtrlEraseTypePage));
+    static_assert(sizeof(dice_chain->data) == FLASH_CTRL_PARAM_BYTES_PER_PAGE,
+                  "Invalid dice_chain buffer size");
     HARDENED_RETURN_IF_ERROR(flash_ctrl_info_write(
         &kFlashCtrlInfoPageDiceCerts,
         /*offset=*/0,
         /*word_count=*/FLASH_CTRL_PARAM_BYTES_PER_PAGE / sizeof(uint32_t),
-        dice_certs_page));
+        dice_chain->data));
+  } else {
+    HARDENED_CHECK_EQ(dice_chain->data_dirty, kHardenedBoolFalse);
   }
+  return kErrorOk;
+}
+
+OT_WARN_UNUSED_RESULT
+static rom_error_t rom_ext_boot(const manifest_t *manifest) {
+  // Generate CDI_1 attestation keys and certificate.
+  HARDENED_RETURN_IF_ERROR(dice_chain_attestation_owner(&dice_chain, manifest));
+
+  // Write the DICE certs to flash if they have been updated.
+  HARDENED_RETURN_IF_ERROR(dice_chain_update_flash(&dice_chain));
 
   // Remove write and erase access to the certificate pages before handing over
   // execution to the owner firmware (owner firmware can still read).
@@ -837,20 +877,32 @@ static rom_error_t rom_ext_try_next_stage(boot_data_t *boot_data,
   return error;
 }
 
+OT_WARN_UNUSED_RESULT
+rom_error_t dice_chain_init(dice_chain_t *dice_chain) {
+  memset(dice_chain->data, UINT8_MAX, sizeof(dice_chain->data));
+  dice_chain->data_dirty = kHardenedBoolFalse;
+  dice_chain->tail_offset = 0;
+  dice_chain->curr_attestation_pubkey =
+      (ecdsa_p256_public_key_t){.x = {0}, .y = {0}};
+
+  // Configure DICE certificate flash info page and buffer it into RAM.
+  flash_ctrl_cert_info_page_creator_cfg(&kFlashCtrlInfoPageAttestationKeySeeds);
+  flash_ctrl_cert_info_page_creator_cfg(&kFlashCtrlInfoPageDiceCerts);
+  HARDENED_RETURN_IF_ERROR(dice_chain_load_flash(dice_chain));
+
+  return kErrorOk;
+}
+
 static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   HARDENED_RETURN_IF_ERROR(rom_ext_init(boot_data));
   const manifest_t *self = rom_ext_manifest();
   dbg_printf("Starting ROM_EXT %u.%u\r\n", self->version_major,
              self->version_minor);
 
-  // Configure DICE certificate flash info page and buffer it into RAM.
-  flash_ctrl_cert_info_page_creator_cfg(&kFlashCtrlInfoPageAttestationKeySeeds);
-  flash_ctrl_cert_info_page_creator_cfg(&kFlashCtrlInfoPageDiceCerts);
-  HARDENED_RETURN_IF_ERROR(rom_ext_buffer_dice_certs_into_ram());
-
   // Establish our identity.
-  HARDENED_RETURN_IF_ERROR(rom_ext_attestation_silicon());
-  HARDENED_RETURN_IF_ERROR(rom_ext_attestation_creator(self));
+  HARDENED_RETURN_IF_ERROR(dice_chain_init(&dice_chain));
+  HARDENED_RETURN_IF_ERROR(dice_chain_attestation_silicon(&dice_chain));
+  HARDENED_RETURN_IF_ERROR(dice_chain_attestation_creator(&dice_chain, self));
 
   // Initialize the boot_log in retention RAM.
   const chip_info_t *rom_chip_info = (const chip_info_t *)_rom_chip_info_start;
