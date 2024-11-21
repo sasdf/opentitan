@@ -6,6 +6,7 @@
 
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/macros.h"
+#include "sw/device/silicon_creator/imm_rom_ext/imm_rom_ext_epmp.h"
 #include "sw/device/silicon_creator/lib/base/boot_measurements.h"
 #include "sw/device/silicon_creator/lib/base/sec_mmio.h"
 #include "sw/device/silicon_creator/lib/cert/dice_chain.h"
@@ -30,11 +31,14 @@ static rom_error_t imm_rom_ext_start(void) {
 
   // Initialize Immutable ROM EXT.
   sec_mmio_next_stage_init();
+  HARDENED_RETURN_IF_ERROR(imm_rom_ext_epmp_reconfigure());
+
   // Configure UART0 as stdout.
   pinmux_init_uart0_tx();
   uart_init(kUartNCOValue);
 
   dbg_printf("IMM_ROM_EXT v0.1\r\n");
+  dbg_print_epmp();
 
   // Establish our identity.
   const manifest_t *rom_ext = rom_ext_manifest();
@@ -46,6 +50,9 @@ static rom_error_t imm_rom_ext_start(void) {
 
   // Write the DICE certs to flash if they have been updated.
   HARDENED_RETURN_IF_ERROR(dice_chain_flush_flash());
+
+  // Make mutable part executable.
+  HARDENED_RETURN_IF_ERROR(imm_rom_ext_epmp_mutable_rx(rom_ext));
 
   return kErrorOk;
 }
