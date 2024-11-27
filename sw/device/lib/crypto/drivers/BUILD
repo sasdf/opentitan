@@ -17,8 +17,9 @@ load(
     "@bazel_skylib//lib:dicts.bzl",
     "dicts",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
 
-cc_library(
+cc_library_with_bindgen(
     name = "aes",
     srcs = ["aes.c"],
     hdrs = ["aes.h"],
@@ -51,7 +52,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keymgr",
     srcs = ["keymgr.c"],
     hdrs = [
@@ -94,12 +95,11 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "kmac",
     srcs = ["kmac.c"],
     hdrs = [
         "kmac.h",
-        "//sw/device/lib/crypto/include:datatypes.h",
     ],
     deps = [
         ":entropy",
@@ -110,10 +110,11 @@ cc_library(
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/crypto/impl:status",
+        "//sw/device/lib/crypto/include:datatypes",
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "entropy",
     srcs = ["entropy.c"],
     hdrs = ["entropy.h"],
@@ -132,7 +133,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "entropy_kat",
     srcs = ["entropy_kat.c"],
     hdrs = ["entropy_kat.h"],
@@ -170,7 +171,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "hmac",
     srcs = ["hmac.c"],
     hdrs = ["hmac.h"],
@@ -187,7 +188,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otbn",
     srcs = ["otbn.c"],
     hdrs = ["otbn.h"],

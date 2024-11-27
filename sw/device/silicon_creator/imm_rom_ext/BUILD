@@ -2,17 +2,18 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "ot_rust_library")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+ot_rust_library(
     name = "main_lib",
-    srcs = ["imm_rom_ext.c"],
+    srcs = ["imm_rom_ext.rs"],
     hdrs = ["imm_rom_ext.h"],
     deps = [
-        ":imm_rom_ext_epmp",
-        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//sw/device/lib/arch:device",
-        "//sw/device/lib/base:macros",
+        "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/imm_rom_ext:imm_rom_ext_epmp",
         "//sw/device/silicon_creator/lib:dbg_print",
         "//sw/device/silicon_creator/lib:epmp_state",
         "//sw/device/silicon_creator/lib:error",
@@ -20,7 +21,6 @@ cc_library(
         "//sw/device/silicon_creator/lib:shutdown",
         "//sw/device/silicon_creator/lib/base:boot_measurements",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
-        "//sw/device/silicon_creator/lib/base:static_critical",
         "//sw/device/silicon_creator/lib/cert:dice_chain",
         "//sw/device/silicon_creator/lib/drivers:pinmux",
         "//sw/device/silicon_creator/lib/drivers:rnd",
@@ -29,7 +29,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "imm_rom_ext_epmp",
     srcs = ["imm_rom_ext_epmp.c"],
     hdrs = ["imm_rom_ext_epmp.h"],

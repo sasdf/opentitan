@@ -11,10 +11,11 @@ load(
     "dual_cc_library",
     "dual_inputs",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "datatypes",
     hdrs = ["datatypes.h"],
     deps = [
@@ -25,7 +26,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ecdsa",
     srcs = ["ecdsa.c"],
     hdrs = ["ecdsa.h"],
@@ -63,7 +64,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "ownership_key",
     srcs = dual_inputs(
         device = ["ownership_key.c"],
@@ -93,7 +94,7 @@ dual_cc_library(
     ),
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ownership",
     srcs = ["ownership.c"],
     hdrs = ["ownership.h"],
@@ -102,14 +103,16 @@ cc_library(
         ":ecdsa",
         ":owner_block",
         ":ownership_key",
+        "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:hardened_memory",
         "//sw/device/silicon_creator/lib:boot_data",
         "//sw/device/silicon_creator/lib:dbg_print",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "owner_block",
     srcs = ["owner_block.c"],
     hdrs = ["owner_block.h"],
@@ -118,6 +121,7 @@ cc_library(
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:hardened",
         "//sw/device/silicon_creator/lib:boot_data",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
     ],
 )
@@ -139,7 +143,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ownership_unlock",
     srcs = ["ownership_unlock.c"],
     hdrs = ["ownership_unlock.h"],
@@ -173,7 +177,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ownership_activate",
     srcs = ["ownership_activate.c"],
     hdrs = ["ownership_activate.h"],
@@ -206,7 +210,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "test_owner",
     testonly = True,
     srcs = ["test_owner.c"],

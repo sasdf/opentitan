@@ -8,6 +8,8 @@
 #ifndef OPENTITAN_SW_DEVICE_SILICON_CREATOR_LIB_SIGVERIFY_SPHINCSPLUS_PARAMS_H_
 #define OPENTITAN_SW_DEVICE_SILICON_CREATOR_LIB_SIGVERIFY_SPHINCSPLUS_PARAMS_H_
 
+#include <stdint.h>
+
 /**
  * This file represents the SPHINCS+ parameter set shake-128s, meaning:
  * - The hash function is SHA2-256

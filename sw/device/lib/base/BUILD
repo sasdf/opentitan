@@ -12,10 +12,13 @@ load(
     "verilator_params",
 )
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
+load("//rules:host.bzl", "cc_library_host_only")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen", "ot_rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_test")
 
 package(default_visibility = ["//visibility:public"])
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "crc32",
     srcs = dual_inputs(
         device = ["crc32.c"],
@@ -86,7 +89,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_host_only(
     name = "global_mock",
     hdrs = ["global_mock.h"],
 )
@@ -112,11 +115,13 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "stdasm",
     hdrs = ["stdasm.h"],
 )
 
+# Included in rust global deps due to circular deps
+# Imported by //sw/device/silicon_creator/lib:chip_info
 cc_library(
     name = "macros",
     hdrs = [
@@ -125,7 +130,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "math_polyfills",
     srcs = ["math_builtins.c"],
 
@@ -145,7 +150,7 @@ alias(
     visibility = ["//visibility:private"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "math",
     srcs = ["math.c"],
     hdrs = ["math.h"],
@@ -164,7 +169,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "bitfield",
     srcs = ["bitfield.c"],
     hdrs = ["bitfield.h"],
@@ -174,7 +179,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "memory",
     srcs = ["memory.c"],
     hdrs = ["memory.h"],
@@ -210,13 +215,14 @@ cc_test(
     ],
 )
 
-cc_library(
+ot_rust_library(
     name = "hardened",
-    srcs = ["hardened.c"],
+    srcs = ["hardened.rs"],
     hdrs = [
         "hardened.h",
         "hardened_asm.h",
     ],
+    cccs = ["hardened.c"],
     deps = [
         ":macros",
         ":memory",
@@ -233,6 +239,12 @@ cc_test(
     ],
 )
 
+rust_test(
+    name = "hardened_unittest_rust",
+    srcs = ["hardened_unittest.rs"],
+    deps = [":hardened"],
+)
+
 opentitan_test(
     name = "hardened_functest",
     srcs = ["hardened_functest.c"],
@@ -247,14 +259,14 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "random_order",
     srcs = ["random_order.c"],
     hdrs = ["random_order.h"],
     deps = [":bitfield"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "hardened_memory",
     srcs = ["hardened_memory.c"],
     hdrs = ["hardened_memory.h"],
@@ -276,7 +288,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "csr",
     srcs = dual_inputs(
         host = ["//sw/device/silicon_creator/lib/base:mock_csr.cc"],
@@ -311,7 +323,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "multibits",
     hdrs = [
         "multibits.h",
@@ -319,7 +331,7 @@ cc_library(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "mmio",
     srcs = dual_inputs(
         host = ["mock_mmio.cc"],
@@ -354,7 +366,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "abs_mmio",
     srcs = dual_inputs(
         device = ["abs_mmio.c"],
@@ -378,7 +390,7 @@ dual_cc_library(
     ),
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "status",
     srcs = ["status.c"],
     hdrs = ["status.h"],
@@ -400,7 +412,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "status_report_unittest_c",
     srcs = ["status_report_unittest_c.c"],
     hdrs = ["status_report_unittest_c.h"],
@@ -419,4 +431,14 @@ cc_test(
         ":status_report_unittest_c",
         "@googletest//:gtest_main",
     ],
+)
+
+ot_rust_library(
+    name = "static_assert_rust",
+    srcs = ["static_assert.rs"],
+)
+
+ot_rust_library(
+    name = "panic",
+    srcs = ["panic.rs"],
 )
