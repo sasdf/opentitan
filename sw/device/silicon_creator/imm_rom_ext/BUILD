@@ -2,31 +2,34 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("//rules/opentitan:bindgen.bzl", "cc_library_with_bindgen", "ot_rust_library")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "ot_rust_library")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
-    name = "main_lib",
-    deps = [
-        ":rust_lib_cc",
-    ],
-)
-
 ot_rust_library(
-    name = "rust_lib",
-    hdrs = ["imm_rom_ext.h"],
+    name = "main_lib",
     srcs = ["imm_rom_ext.rs"],
+    hdrs = ["imm_rom_ext.h"],
     deps = [
-        "//sw/device/silicon_creator/imm_rom_ext/rust:ot_bindgen",
-        "//sw/device/silicon_creator/imm_rom_ext/rust:panic",
-        "//sw/device/silicon_creator/imm_rom_ext/rust:dbg_print",
-        "//sw/device/silicon_creator/imm_rom_ext/rust/base:hardened",
-        "//sw/device/silicon_creator/imm_rom_ext/rust/base:error",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/imm_rom_ext:imm_rom_ext_epmp",
+        "//sw/device/silicon_creator/lib:dbg_print",
+        "//sw/device/silicon_creator/lib:epmp_state",
+        "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib:manifest",
+        "//sw/device/silicon_creator/lib:shutdown",
+        "//sw/device/silicon_creator/lib/base:boot_measurements",
+        "//sw/device/silicon_creator/lib/base:sec_mmio",
+        "//sw/device/silicon_creator/lib/cert:dice_chain",
+        "//sw/device/silicon_creator/lib/drivers:pinmux",
+        "//sw/device/silicon_creator/lib/drivers:rnd",
+        "//sw/device/silicon_creator/lib/drivers:uart",
+        "//sw/device/silicon_creator/rom_ext:rom_ext_manifest",
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "imm_rom_ext_epmp",
     srcs = ["imm_rom_ext_epmp.c"],
     hdrs = ["imm_rom_ext_epmp.h"],

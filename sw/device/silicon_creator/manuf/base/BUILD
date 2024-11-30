@@ -31,10 +31,12 @@ load(
     "//sw/device/silicon_creator/rom_ext/e2e:defs.bzl",
     "OWNER_SLOTS",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
+load("//rules/opentitan:rust.bzl", "ot_rust_library")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "flash_info_permissions",
     srcs = ["flash_info_permissions.h"],
     deps = ["//sw/device/lib/dif:flash_ctrl"],
@@ -223,12 +225,21 @@ filegroup(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "personalize_ext",
     hdrs = ["personalize_ext.h"],
+    deps = [
+        "//sw/device/lib/base:status",
+        "//sw/device/lib/dif:flash_ctrl",
+        "//sw/device/lib/testing/json:provisioning_data",
+        "//sw/device/lib/ujson",
+        "//sw/device/silicon_creator/lib/cert",
+        "//sw/device/silicon_creator/lib/drivers:hmac",
+        "//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_key",
+    ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "tpm_perso_fw_ext",
     srcs = ["tpm_personalize_ext.c"],
     deps = [
@@ -250,11 +261,24 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "perso_tlv_data",
+cc_library_with_bindgen(
+    name = "perso_tlv_data_",
     srcs = ["perso_tlv_data.c"],
+    hdrs = ["perso_tlv_data.h"],
     deps = [
-        ":perso_tlv_headers",
+        "//sw/device/lib/testing/json:provisioning_data",
+        "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib/cert",
+    ],
+)
+
+ot_rust_library(
+    name = "perso_tlv_data",
+    srcs = ["perso_tlv_data.rs"],
+    hdrs = ["perso_tlv_data.h"],
+    cccs = ["perso_tlv_data.c"],
+    deps = [
+        "//sw/device/lib/testing/json:provisioning_data",
         "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/cert",
     ],
@@ -264,7 +288,7 @@ cc_library(
 #//sw/device/silicon_creator/lib/cert required by perso_tlv_data above causes
 # bindgen failures due to otbn (which is a cert dependency) requiring risc32
 # environment.
-cc_library(
+cc_library_with_bindgen(
     name = "perso_tlv_headers",
     hdrs = ["perso_tlv_data.h"],
     deps = [

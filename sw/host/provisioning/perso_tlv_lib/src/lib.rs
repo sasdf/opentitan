@@ -3,15 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
+pub use ot_sw_device_silicon_creator_manuf_base_perso_tlv_data as perso_tlv_objects;
 
 // Types of objects which can come from the device in the perso blob.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ObjType {
-    UnendorsedX509Cert = perso_tlv_objects::perso_tlv_object_type_kPersoObjectTypeX509Tbs as isize,
-    EndorsedX509Cert = perso_tlv_objects::perso_tlv_object_type_kPersoObjectTypeX509Cert as isize,
-    DevSeed = perso_tlv_objects::perso_tlv_object_type_kPersoObjectTypeDevSeed as isize,
-    EndorsedCwtCert = perso_tlv_objects::perso_tlv_object_type_kPersoObjectTypeCwtCert as isize,
+    UnendorsedX509Cert = perso_tlv_objects::kPersoObjectTypeX509Tbs as isize,
+    EndorsedX509Cert = perso_tlv_objects::kPersoObjectTypeX509Cert as isize,
+    DevSeed = perso_tlv_objects::kPersoObjectTypeDevSeed as isize,
+    EndorsedCwtCert = perso_tlv_objects::kPersoObjectTypeCwtCert as isize,
 }
 
 impl ObjType {
@@ -54,23 +55,23 @@ macro_rules! perso_tlv_get_field {
         let input = $intv as u32;
         let v = match ($type, $name) {
             ("obj", "size") => {
-                (input >> perso_tlv_objects::perso_tlv_obj_header_fields_kObjhSizeFieldShift)
-                    & perso_tlv_objects::perso_tlv_obj_header_fields_kObjhSizeFieldMask
+                (input >> $crate::perso_tlv_objects::kObjhSizeFieldShift)
+                    & $crate::perso_tlv_objects::kObjhSizeFieldMask
             }
 
             ("obj", "type") => {
-                (input >> perso_tlv_objects::perso_tlv_obj_header_fields_kObjhTypeFieldShift)
-                    & perso_tlv_objects::perso_tlv_obj_header_fields_kObjhTypeFieldMask
+                (input >> $crate::perso_tlv_objects::kObjhTypeFieldShift)
+                    & $crate::perso_tlv_objects::kObjhTypeFieldMask
             }
 
             ("crth", "size") => {
-                (input >> perso_tlv_objects::perso_tlv_cert_header_fields_kCrthSizeFieldShift)
-                    & perso_tlv_objects::perso_tlv_cert_header_fields_kCrthSizeFieldMask
+                (input >> $crate::perso_tlv_objects::kCrthSizeFieldShift)
+                    & $crate::perso_tlv_objects::kCrthSizeFieldMask
             }
 
             ("crth", "name") => {
-                (input >> perso_tlv_objects::perso_tlv_cert_header_fields_kCrthNameSizeFieldShift)
-                    & perso_tlv_objects::perso_tlv_cert_header_fields_kCrthNameSizeFieldMask
+                (input >> $crate::perso_tlv_objects::kCrthNameSizeFieldShift)
+                    & $crate::perso_tlv_objects::kCrthNameSizeFieldMask
             }
             (&_, _) => bail!("Unexpected macro invocation"),
         };
@@ -80,39 +81,31 @@ macro_rules! perso_tlv_get_field {
 
 // Helper functions used to pack LTV object and Certificate payload headers.
 pub fn make_obj_header(size: usize, otype: ObjType) -> Result<ObjHeaderType> {
-    if size as u32 > perso_tlv_objects::perso_tlv_obj_header_fields_kObjhSizeFieldMask {
+    if size as u32 > perso_tlv_objects::kObjhSizeFieldMask {
         bail!("Can't create object of size {size}")
     }
 
-    Ok(
-        (((size as u32 & perso_tlv_objects::perso_tlv_obj_header_fields_kObjhSizeFieldMask)
-            << perso_tlv_objects::perso_tlv_obj_header_fields_kObjhSizeFieldShift)
-            + (((otype as u32)
-                & perso_tlv_objects::perso_tlv_obj_header_fields_kObjhTypeFieldMask)
-                << perso_tlv_objects::perso_tlv_obj_header_fields_kObjhTypeFieldShift))
-            as u16,
-    )
+    Ok((((size as u32 & perso_tlv_objects::kObjhSizeFieldMask)
+        << perso_tlv_objects::kObjhSizeFieldShift)
+        + (((otype as u32) & perso_tlv_objects::kObjhTypeFieldMask)
+            << perso_tlv_objects::kObjhTypeFieldShift)) as u16)
 }
 
 pub fn make_cert_wrapper_header(cert_size: usize, cert_name: &str) -> Result<CertHeaderType> {
-    if cert_size as u32 > perso_tlv_objects::perso_tlv_cert_header_fields_kCrthSizeFieldMask {
+    if cert_size as u32 > perso_tlv_objects::kCrthSizeFieldMask {
         bail!("Can't create a certificate wraper of size {cert_size}")
     }
 
     let name_len = cert_name.len();
-    if name_len as u32 > perso_tlv_objects::perso_tlv_cert_header_fields_kCrthNameSizeFieldMask {
+    if name_len as u32 > perso_tlv_objects::kCrthNameSizeFieldMask {
         bail!(
             "Can't create certificate wrapper for name \"{}\"",
             cert_name
         )
     }
     let wrapped_size = (cert_size + name_len + std::mem::size_of::<CertHeaderType>()) as u32;
-    Ok(
-        (((wrapped_size & perso_tlv_objects::perso_tlv_cert_header_fields_kCrthSizeFieldMask)
-            << perso_tlv_objects::perso_tlv_cert_header_fields_kCrthSizeFieldShift)
-            + ((name_len as u32
-                & perso_tlv_objects::perso_tlv_cert_header_fields_kCrthNameSizeFieldMask)
-                << perso_tlv_objects::perso_tlv_cert_header_fields_kCrthNameSizeFieldShift))
-            as u16,
-    )
+    Ok((((wrapped_size & perso_tlv_objects::kCrthSizeFieldMask)
+        << perso_tlv_objects::kCrthSizeFieldShift)
+        + ((name_len as u32 & perso_tlv_objects::kCrthNameSizeFieldMask)
+            << perso_tlv_objects::kCrthNameSizeFieldShift)) as u16)
 }

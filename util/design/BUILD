@@ -4,6 +4,8 @@
 
 load("@ot_python_deps//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("//rules/opentitan:rust.bzl", "ot_rust_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -97,4 +99,41 @@ py_test(
     name = "sparse-fsm-encode-test",
     srcs = ["sparse-fsm-encode-test.py"],
     deps = [":sparse-fsm-encode"],
+)
+
+ot_rust_library(
+    name = "rust_bindgen_util",
+    srcs = ["rust_bindgen_util.rs"],
+    rustc_flags = ["-Copt-level=3"],
+    deps = [
+        "@crate_index//:quote",
+        "@crate_index//:syn",
+    ],
+)
+
+rust_binary(
+    name = "rust_bindgen_diff",
+    srcs = ["rust_bindgen_diff.rs"],
+    rustc_flags = ["-Copt-level=3"],
+    deps = [
+        ":rust_bindgen_util",
+        "@crate_index//:clap",
+        "@crate_index//:quote",
+        "@crate_index//:syn",
+    ],
+)
+
+rust_binary(
+    name = "rust_bindgen_filter",
+    srcs = ["rust_bindgen_filter.rs"],
+    rustc_flags = ["-Copt-level=3"],
+    deps = [
+        ":rust_bindgen_util",
+        "@crate_index//:clap",
+        "@crate_index//:quote",
+        "@crate_index//:regex",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
+        "@crate_index//:syn",
+    ],
 )

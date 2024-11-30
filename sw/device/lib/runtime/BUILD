@@ -4,17 +4,18 @@
 
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
 load("//rules:cross_platform.bzl", "dual_cc_library", "dual_inputs")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "epmp",
     srcs = ["epmp.c"],
     hdrs = ["epmp.h"],
     target_compatible_with = [OPENTITAN_CPU],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "hart",
     srcs = dual_inputs(
         device = ["hart.c"],
@@ -34,7 +35,7 @@ dual_cc_library(
     ),
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ibex",
     srcs = ["ibex.c"],
     hdrs = ["ibex.h"],
@@ -48,7 +49,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "irq",
     srcs = ["irq.c"],
     hdrs = ["irq.h"],
@@ -58,7 +59,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "log",
     srcs = ["log.c"],
     hdrs = ["log.h"],
@@ -72,7 +73,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pmp",
     srcs = ["pmp.c"],
     hdrs = ["pmp.h"],
@@ -84,7 +85,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "print",
     srcs = ["print.c"],
     hdrs = ["print.h"],

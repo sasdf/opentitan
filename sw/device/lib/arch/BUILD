@@ -2,32 +2,34 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_stage",
     hdrs = ["boot_stage.h"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_stage_rom",
     srcs = ["boot_stage_rom.c"],
     deps = [":boot_stage"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_stage_rom_ext",
     srcs = ["boot_stage_rom_ext.c"],
     deps = [":boot_stage"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_stage_owner",
     srcs = ["boot_stage_owner.c"],
     deps = [":boot_stage"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "device",
     hdrs = ["device.h"],
     deps = [
@@ -35,7 +37,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "fpga_cw305",
     srcs = ["device_fpga_cw305.c"],
     deps = [
@@ -47,7 +49,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "fpga_cw310",
     srcs = ["device_fpga_cw310.c"],
     deps = [
@@ -59,7 +61,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "fpga_cw340",
     srcs = ["device_fpga_cw340.c"],
     deps = [
@@ -71,7 +73,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "silicon",
     srcs = ["device_silicon.c"],
     deps = [
@@ -82,7 +84,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sim_dv",
     srcs = ["device_sim_dv.c"],
     deps = [
@@ -93,7 +95,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sim_verilator",
     srcs = ["device_sim_verilator.c"],
     deps = [

@@ -17,7 +17,6 @@ package(default_visibility = ["//visibility:public"])
             "//sw/host/ot_certs",
             "//sw/host/provisioning/cert_lib",
             "//sw/host/provisioning/perso_tlv_lib",
-            "//sw/host/provisioning/perso_tlv_lib:perso_tlv_objects",
             "//sw/host/provisioning/ujson_lib",
             "//sw/host/provisioning/util_lib",
             "@crate_index//:anyhow",

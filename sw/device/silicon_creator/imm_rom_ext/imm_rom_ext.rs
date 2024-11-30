@@ -1,58 +1,89 @@
 #![no_std]
 
-use __sw_device_silicon_creator_imm_rom_ext_rust_dbg_print::dbg_printf;
-use __sw_device_silicon_creator_imm_rom_ext_rust_base_error::*;
-use __sw_device_silicon_creator_imm_rom_ext_rust_base_hardened::*;
-use __sw_device_silicon_creator_imm_rom_ext_rust_ot_bindgen as ot;
+use ot_sw_device_lib_arch_device::kUartNCOValue;
+use ot_sw_device_lib_base_hardened::*;
+use ot_sw_device_silicon_creator_imm_rom_ext_imm_rom_ext_epmp::imm_rom_ext_epmp_mutable_rx;
+use ot_sw_device_silicon_creator_imm_rom_ext_imm_rom_ext_epmp::imm_rom_ext_epmp_reconfigure;
+use ot_sw_device_silicon_creator_lib_base_boot_measurements::boot_measurements;
+use ot_sw_device_silicon_creator_lib_base_sec_mmio::*;
+use ot_sw_device_silicon_creator_lib_cert_dice_chain::dice_chain_attestation_creator;
+use ot_sw_device_silicon_creator_lib_cert_dice_chain::dice_chain_attestation_silicon;
+use ot_sw_device_silicon_creator_lib_cert_dice_chain::dice_chain_flush_flash;
+use ot_sw_device_silicon_creator_lib_cert_dice_chain::dice_chain_init;
+use ot_sw_device_silicon_creator_lib_dbg_print::dbg_print_epmp;
+use ot_sw_device_silicon_creator_lib_dbg_print::dbg_printf;
+use ot_sw_device_silicon_creator_lib_drivers_pinmux::pinmux_init_uart0_tx;
+use ot_sw_device_silicon_creator_lib_drivers_rnd::rnd_uint32;
+use ot_sw_device_silicon_creator_lib_drivers_uart::uart_init;
+use ot_sw_device_silicon_creator_lib_epmp_state::epmp_state_check;
+use ot_sw_device_silicon_creator_lib_error::*;
+use ot_sw_device_silicon_creator_lib_shutdown::shutdown_finalize;
+use ot_sw_device_silicon_creator_rom_ext_rom_ext_manifest::rom_ext_manifest;
 
 #[no_mangle]
-pub extern "C" fn imm_rom_ext_start() -> ot::rom_error_t {
+pub extern "C" fn imm_rom_ext_start() -> HardenedError {
     // Check the ePMP state.
-    hardened_return_if_error!(unsafe { ot::epmp_state_check() });
+    // Safety: porting WIP.
+    HardenedError(unsafe { epmp_state_check() })?;
 
     // Check sec_mmio expectations.
     // We don't check the counters since we don't want to tie ROM_EXT to a
     // specific ROM version.
-    unsafe { ot::sec_mmio_check_values(ot::rnd_uint32()) };
+    // Safety: porting WIP.
+    unsafe { sec_mmio_check_values(rnd_uint32()) };
 
     // Initialize Immutable ROM EXT.
-    unsafe { ot::sec_mmio_next_stage_init() };
-    hardened_return_if_error!(unsafe { ot::imm_rom_ext_epmp_reconfigure() });
+    // Safety: porting WIP.
+    unsafe { sec_mmio_next_stage_init() };
+    // Safety: porting WIP.
+    HardenedError(unsafe { imm_rom_ext_epmp_reconfigure() })?;
 
     // Configure UART0 as stdout.
-    unsafe { ot::pinmux_init_uart0_tx() };
-    unsafe { ot::uart_init(ot::kUartNCOValue) };
+    // Safety: porting WIP.
+    unsafe { pinmux_init_uart0_tx() };
+    // Safety: porting WIP.
+    unsafe { uart_init(kUartNCOValue) };
 
-    dbg_printf!("IMM_ROM_EXT v0.1\r\n", 0);
-    unsafe { ot::dbg_print_epmp() };
+    unsafe { dbg_printf!("IMM_ROM_EXT v0.1\r\n") };
+    // Safety: porting WIP.
+    unsafe { dbg_print_epmp() };
 
     // Establish our identity.
-    let rom_ext = unsafe { ot::rom_ext_manifest() };
-    hardened_return_if_error!(unsafe { ot::dice_chain_init() });
+    // Safety: porting WIP.
+    let rom_ext = unsafe { rom_ext_manifest() };
+    // Safety: porting WIP.
+    HardenedError(unsafe { dice_chain_init() })?;
     // TODO: Move UDS cert check to mutable ROM_EXT.
-    hardened_return_if_error!(unsafe { ot::dice_chain_attestation_silicon() });
-    hardened_return_if_error!(unsafe {
-        ot::dice_chain_attestation_creator(&mut ot::boot_measurements.rom_ext, rom_ext)
-    });
+    // Safety: porting WIP.
+    HardenedError(unsafe { dice_chain_attestation_silicon() })?;
+    // Safety: porting WIP.
+    HardenedError(unsafe {
+        dice_chain_attestation_creator(&mut boot_measurements.rom_ext, rom_ext)
+    })?;
 
     // Write the DICE certs to flash if they have been updated.
-    hardened_return_if_error!(unsafe { ot::dice_chain_flush_flash() });
+    // Safety: porting WIP.
+    HardenedError(unsafe { dice_chain_flush_flash() })?;
 
     // Make mutable part executable.
-    hardened_return_if_error!(unsafe { ot::imm_rom_ext_epmp_mutable_rx(rom_ext) });
+    // Safety: porting WIP.
+    HardenedError(unsafe { imm_rom_ext_epmp_mutable_rx(rom_ext) })?;
 
-    ot::kErrorOk
+    OkError()
 }
 
 #[no_mangle]
 pub extern "C" fn imm_rom_ext_main() {
-  let error = imm_rom_ext_start();
+    let error = imm_rom_ext_start();
 
-  dbg_printf!("Hello Rust %d !!\r\n", error);
+    unsafe { dbg_printf!("Hello Rust %d !!\r\n", error.code()) };
 
-  if launder32!(error) != ot::kErrorOk {
-    unsafe { ot::shutdown_finalize(error); }
-    hardened_trap!();
-  }
-  hardened_check_eq!(error, ot::kErrorOk);
+    if error.is_err() {
+        // Safety: porting WIP.
+        unsafe {
+            shutdown_finalize(error.code());
+        }
+        hardened_trap!();
+    }
+    error.unwrap();
 }

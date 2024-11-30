@@ -2,23 +2,25 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "command",
     srcs = ["command.c"],
     hdrs = ["command.h"],
     deps = ["//sw/device/lib/ujson"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "chip_specific_startup",
     srcs = ["chip_specific_startup.c"],
     hdrs = ["chip_specific_startup.h"],
     deps = ["//sw/device/lib/ujson"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "gpio",
     srcs = ["gpio.c"],
     hdrs = ["gpio.h"],
@@ -29,14 +31,14 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "i2c_target",
     srcs = ["i2c_target.c"],
     hdrs = ["i2c_target.h"],
     deps = ["//sw/device/lib/ujson"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "mem",
     srcs = ["mem.c"],
     hdrs = ["mem.h"],
@@ -46,7 +48,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pinmux",
     srcs = ["pinmux.c"],
     hdrs = ["pinmux.h"],
@@ -56,7 +58,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pinmux_config",
     srcs = ["pinmux_config.c"],
     hdrs = ["pinmux_config.h"],
@@ -71,21 +73,21 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "spi_passthru",
     srcs = ["spi_passthru.c"],
     hdrs = ["spi_passthru.h"],
     deps = ["//sw/device/lib/ujson"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "provisioning_data",
     srcs = ["provisioning_data.c"],
     hdrs = ["provisioning_data.h"],
     deps = ["//sw/device/lib/ujson"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ottf",
     srcs = ["ottf.c"],
     hdrs = ["ottf.h"],

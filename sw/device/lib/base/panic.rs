@@ -4,11 +4,12 @@
 use core::intrinsics;
 use core::panic::PanicInfo;
 
-use __sw_device_silicon_creator_imm_rom_ext_rust_base_hardened::hardened_trap;
+use ot_sw_device_lib_base_hardened::hardened_trap;
 
-
+#[inline]
 #[panic_handler]
+#[allow(unreachable_code)]
 fn panic(_info: &PanicInfo) -> ! {
-  hardened_trap!();
-  intrinsics::abort()
+    hardened_trap!();
+    intrinsics::abort()
 }

@@ -4,6 +4,7 @@
 
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,7 +14,7 @@ exports_files([
     "mock_csr_test.cc",
 ])
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "sec_mmio",
     srcs = dual_inputs(
         device = ["sec_mmio.c"],
@@ -48,7 +49,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "static_critical_sec_mmio",
     srcs = ["static_critical_sec_mmio.c"],
     deps = [
@@ -61,7 +62,7 @@ cc_library(
     alwayslink = True,
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_measurements",
     srcs = ["boot_measurements.c"],
     hdrs = ["boot_measurements.h"],
@@ -71,7 +72,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "static_critical_epmp_state",
     srcs = ["static_critical_epmp_state.c"],
     deps = [
@@ -83,7 +84,7 @@ cc_library(
     alwayslink = True,
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "static_critical_boot_measurements",
     srcs = ["static_critical_boot_measurements.c"],
     deps = [
@@ -95,7 +96,7 @@ cc_library(
     alwayslink = True,
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "static_critical_version",
     srcs = ["static_critical_version.c"],
     hdrs = ["static_critical_version.h"],
@@ -113,7 +114,7 @@ ld_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "static_critical",
     deps = [
         ":static_critical_boot_measurements",
@@ -124,12 +125,12 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "chip",
     hdrs = ["chip.h"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "util",
     srcs = ["util.c"],
     hdrs = ["util.h"],

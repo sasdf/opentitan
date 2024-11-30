@@ -9,6 +9,7 @@
 
 #include "sw/device/silicon_creator/lib/attestation.h"
 #include "sw/device/silicon_creator/lib/cert/cert.h"
+#include "sw/device/silicon_creator/lib/cert/dice_keys.h"
 #include "sw/device/silicon_creator/lib/drivers/hmac.h"
 #include "sw/device/silicon_creator/lib/drivers/keymgr.h"
 #include "sw/device/silicon_creator/lib/error.h"
@@ -24,12 +25,6 @@ enum {
 };
 
 extern const dice_cert_format_t kDiceCertFormat;
-/**
- * DICE ECC key descriptors.
- */
-extern const sc_keymgr_ecc_key_t kDiceKeyUds;
-extern const sc_keymgr_ecc_key_t kDiceKeyCdi0;
-extern const sc_keymgr_ecc_key_t kDiceKeyCdi1;
 
 /**
  * Generates the UDS attestation keypair and (unendorsed) X.509 TBS certificate.

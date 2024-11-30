@@ -7,6 +7,10 @@
 
 #include "sw/device/silicon_creator/lib/drivers/keymgr.h"
 
+/**
+ * DICE ECC key descriptors.
+ */
+
 extern const sc_keymgr_ecc_key_t kDiceKeyUds;
 extern const sc_keymgr_ecc_key_t kDiceKeyCdi0;
 extern const sc_keymgr_ecc_key_t kDiceKeyCdi1;

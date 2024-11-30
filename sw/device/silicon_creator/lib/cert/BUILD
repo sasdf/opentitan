@@ -6,6 +6,7 @@ load(
     "//rules:certificates.bzl",
     "certificate_template",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -63,13 +64,14 @@ certificate_template(
     template = "tpm_ek.hjson",
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "asn1",
     srcs = ["asn1.c"],
     hdrs = ["asn1.h"],
     deps = [
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:status",
+        "//sw/device/silicon_creator/lib:error",
     ],
 )
 
@@ -82,7 +84,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "cert",
     srcs = ["cert.c"],
     hdrs = ["cert.h"],
@@ -111,16 +113,18 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "dice",
     srcs = ["dice.c"],
     hdrs = ["dice.h"],
     deps = [
         ":cert",
+        "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:status",
         "//sw/device/lib/testing/test_framework:check",
         "//sw/device/silicon_creator/lib:attestation",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:otbn_boot_services",
         "//sw/device/silicon_creator/lib/base:util",
         "//sw/device/silicon_creator/lib/cert:cdi_0_template_library",
@@ -135,7 +139,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "cbor",
     hdrs = ["cbor.h"],
     deps = [
@@ -145,7 +149,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "cwt_template",
     deps = [
         ":cbor",
@@ -157,7 +161,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "dice_cwt",
     srcs = ["dice_cwt.c"],
     hdrs = ["dice.h"],
@@ -176,7 +180,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "dice_keys",
     srcs = ["dice_keys.c"],
     hdrs = ["dice_keys.h"],
@@ -186,7 +190,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "tpm",
     srcs = ["tpm.c"],
     hdrs = ["tpm.h"],
@@ -194,6 +198,7 @@ cc_library(
         ":cert",
         "//sw/device/lib/base:status",
         "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/cert:tpm_ek_template_library",
         "//sw/device/silicon_creator/lib/drivers:keymgr",
         "//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_key",
@@ -201,7 +206,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "dice_chain",
     srcs = ["dice_chain.c"],
     hdrs = ["dice_chain.h"],
@@ -211,6 +216,7 @@ cc_library(
         "//sw/device/lib/base:memory",
         "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/silicon_creator/lib:dbg_print",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:keymgr_binding",
         "//sw/device/silicon_creator/lib:manifest",
         "//sw/device/silicon_creator/lib/base:boot_measurements",

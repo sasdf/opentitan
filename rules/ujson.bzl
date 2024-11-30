@@ -32,6 +32,7 @@ def _ujson_rust(ctx):
     # 3. Substitute all `rust_attr` for `#`, thus creating rust attributes.
     # 4. Format it with `rustfmt` so it looks nice and can be inspected.
     command = """
+        set -euo pipefail;
         {preprocessor} -nostdinc -I{ujson_lib_root_includes} \
         -DRUST_PREPROCESSOR_EMIT=1 -DNOSTDINC=1 {defines} $@ \
         | grep -v '#' \

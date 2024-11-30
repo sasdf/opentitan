@@ -5,6 +5,8 @@
 #ifndef OPENTITAN_SW_DEVICE_SILICON_CREATOR_LIB_ATTESTATION_H_
 #define OPENTITAN_SW_DEVICE_SILICON_CREATOR_LIB_ATTESTATION_H_
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
