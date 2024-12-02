@@ -481,9 +481,9 @@ cc_library_with_bindgen(
     hdrs = ["attestation.h"],
 )
 
-cc_library_with_bindgen(
+ot_rust_library(
     name = "nonce",
-    srcs = ["nonce.c"],
+    srcs = ["nonce.rs"],
     hdrs = ["nonce.h"],
     deps = ["//sw/device/silicon_creator/lib/drivers:rnd"],
 )
