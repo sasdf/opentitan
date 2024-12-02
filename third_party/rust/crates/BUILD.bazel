@@ -284,6 +284,12 @@ alias(
 )
 
 alias(
+    name = "mockall",
+    actual = "@crate_index__mockall-0.13.1//:mockall",
+    tags = ["manual"],
+)
+
+alias(
     name = "num-bigint-dig",
     actual = "@crate_index__num-bigint-dig-0.8.4//:num_bigint_dig",
     tags = ["manual"],

@@ -41,3 +41,12 @@ host_tools_transition = transition(
         "//hw/bitstream/universal:env",
     ],
 )
+
+def cc_library_host_only(target_compatible_with = [], **kwargs):
+    native.cc_library(
+        target_compatible_with = select({
+            "@platforms//cpu:riscv32": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        **kwargs
+    )

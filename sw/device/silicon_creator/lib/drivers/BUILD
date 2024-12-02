@@ -19,6 +19,7 @@ load(
     "opentitan_test",
     "verilator_params",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -36,7 +37,7 @@ filegroup(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "alert",
     srcs = dual_inputs(
         device = ["alert.c"],
@@ -102,7 +103,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ast",
     srcs = ["ast.c"],
     hdrs = ["ast.h"],
@@ -135,7 +136,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "flash_ctrl",
     srcs = dual_inputs(
         device = ["flash_ctrl.c"],
@@ -180,7 +181,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "hmac",
     srcs = dual_inputs(
         device = ["hmac.c"],
@@ -240,7 +241,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "ibex",
     srcs = dual_inputs(
         host = ["ibex_host.c"],
@@ -274,7 +275,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keymgr",
     srcs = ["keymgr.c"],
     hdrs = ["keymgr.h"],
@@ -340,7 +341,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "kmac",
     srcs = ["kmac.c"],
     hdrs = ["kmac.h"],
@@ -380,7 +381,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "lifecycle",
     srcs = dual_inputs(
         device = ["lifecycle.c"],
@@ -421,7 +422,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otbn",
     srcs = ["otbn.c"],
     hdrs = ["otbn.h"],
@@ -446,7 +447,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "otp",
     srcs = dual_inputs(
         device = ["otp.c"],
@@ -471,6 +472,7 @@ dual_cc_library(
             "//sw/device/lib/base:macros",
             "//sw/device/silicon_creator/lib/base:sec_mmio",
             "//sw/device/lib/base:abs_mmio",
+            "//sw/device/silicon_creator/lib:error",
         ],
     ),
 )
@@ -485,7 +487,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pinmux",
     srcs = ["pinmux.c"],
     hdrs = ["pinmux.h"],
@@ -519,7 +521,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "retention_sram",
     srcs = ["retention_sram.c"],
     hdrs = ["retention_sram.h"],
@@ -564,7 +566,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "rnd",
     srcs = dual_inputs(
         device = ["rnd.c"],
@@ -598,6 +600,17 @@ dual_cc_library(
             "//sw/device/silicon_creator/lib:error",
         ],
     ),
+)
+
+load("@rules_rust//rust:defs.bzl", "rust_test")
+
+rust_test(
+    name = "mock_rnd_unittest_rust",
+    srcs = ["mock_rnd_unittest.rs"],
+    deps = [
+        ":rnd",
+        ":rnd_automock",
+    ],
 )
 
 cc_test(
@@ -642,7 +655,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "rstmgr",
     srcs = dual_inputs(
         device = ["rstmgr.c"],
@@ -699,7 +712,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "uart",
     srcs = ["uart.c"],
     hdrs = ["uart.h"],
@@ -740,7 +753,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "watchdog",
     srcs = ["watchdog.c"],
     hdrs = ["watchdog.h"],
@@ -751,6 +764,7 @@ cc_library(
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:hardened",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
         "//sw/device/silicon_creator/lib/drivers:lifecycle",
         "//sw/device/silicon_creator/lib/drivers:otp",
@@ -793,7 +807,7 @@ opentitan_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "spi_device",
     srcs = dual_inputs(
         device = ["spi_device.c"],
@@ -839,7 +853,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pwrmgr",
     srcs = ["pwrmgr.c"],
     hdrs = ["pwrmgr.h"],
@@ -852,7 +866,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sensor_ctrl",
     srcs = ["sensor_ctrl.c"],
     hdrs = ["sensor_ctrl.h"],
@@ -865,6 +879,7 @@ cc_library(
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
     ],
 )
@@ -881,7 +896,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "epmp",
     srcs = ["epmp.c"],
     hdrs = ["epmp.h"],

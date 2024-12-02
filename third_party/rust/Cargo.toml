@@ -114,6 +114,9 @@ elf = "0.7.1"
 ring = "0.16.20"
 rsa-der = "0.3.0"
 
+# device-side rust testing dependencies
+mockall = "0.13.1"
+
 [dev-dependencies]
 base64ct = "1.6.0"
 indoc = "2.0.4"

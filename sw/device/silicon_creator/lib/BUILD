@@ -9,6 +9,7 @@ load(
 load("//rules:autogen.bzl", "autogen_chip_info")
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
+load("//rules:host.bzl", "cc_library_host_only")
 load(
     "//rules/opentitan:defs.bzl",
     "EARLGREY_TEST_ENVS",
@@ -16,10 +17,12 @@ load(
     "opentitan_test",
     "verilator_params",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen", "ot_rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_test")
 
 package(default_visibility = ["//visibility:public"])
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "boot_data",
     srcs = dual_inputs(
         device = ["boot_data.c"],
@@ -29,6 +32,11 @@ dual_cc_library(
         host = ["mock_boot_data.h"],
         shared = ["boot_data.h"],
     ),
+    bindgen = {
+        "blocklist": [
+            "pub const kBootDataValidEntry",
+        ],
+    },
     deps = dual_inputs(
         device = [
             "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -89,7 +97,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_log",
     srcs = ["boot_log.c"],
     hdrs = ["boot_log.h"],
@@ -115,7 +123,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "cfi",
     hdrs = [
         "cfi.h",
@@ -125,14 +133,14 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "epmp_defs",
     hdrs = [
         "epmp_defs.h",
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "epmp_state",
     srcs = ["epmp_state.c"],
     hdrs = [
@@ -156,7 +164,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "epmp_test_unlock",
     srcs = ["epmp_test_unlock.c"],
     hdrs = ["epmp_test_unlock.h"],
@@ -168,9 +176,15 @@ cc_library(
     ],
 )
 
-cc_library(
+ot_rust_library(
     name = "error",
+    srcs = ["error.rs"],
     hdrs = ["error.h"],
+    bindgen = {
+        "exports": [
+            "//sw/device/lib/base/internal:status",
+        ],
+    },
     deps = [
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:hardened",
@@ -178,7 +192,16 @@ cc_library(
     ],
 )
 
-cc_library(
+rust_test(
+    name = "error_unittest_rust",
+    srcs = ["error_unittest.rs"],
+    deps = [
+        ":error",
+        "//sw/device/lib/base:hardened",
+    ],
+)
+
+cc_library_host_only(
     name = "error_unittest_util",
     hdrs = ["error_unittest_util.h"],
 )
@@ -193,7 +216,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "irq_asm",
     srcs = ["irq_asm.S"],
     target_compatible_with = [OPENTITAN_CPU],
@@ -227,14 +250,20 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keymgr_binding",
     hdrs = ["keymgr_binding_value.h"],
+    deps = [
+        "//sw/device/lib/base:macros",
+    ],
 )
 
-cc_library(
+ot_rust_library(
     name = "dbg_print",
-    srcs = ["dbg_print.c"],
+    srcs = [
+        "dbg_print.c",
+        "dbg_print.rs",
+    ],
     hdrs = ["dbg_print.h"],
     deps = [
         ":epmp_defs",
@@ -257,7 +286,7 @@ cc_test(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "manifest",
     srcs = dual_inputs(
         device = ["manifest.c"],
@@ -290,7 +319,7 @@ dual_cc_library(
     ),
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "manifest_def",
     srcs = dual_inputs(device = ["manifest_def.c"]),
     hdrs = ["manifest_def.h"],
@@ -334,7 +363,7 @@ filegroup(
 
 autogen_chip_info(name = "chip_info")
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "shutdown",
     srcs = dual_inputs(
         device = ["shutdown.c"],
@@ -392,7 +421,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "bootstrap",
     srcs = ["bootstrap.c"],
     hdrs = ["bootstrap.h"],
@@ -415,7 +444,7 @@ filegroup(
     ],
 )
 
-cc_library(
+cc_library_host_only(
     name = "bootstrap_fuzzer_util",
     srcs = ["bootstrap_fuzzer_util.cc"],
     hdrs = ["bootstrap_fuzzer_util.h"],
@@ -432,7 +461,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_host_only(
     name = "bootstrap_unittest_util",
     srcs = ["bootstrap_unittest_util.cc"],
     hdrs = ["bootstrap_unittest_util.h"],
@@ -442,23 +471,24 @@ cc_library(
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
         "//sw/device/silicon_creator/lib/base:chip",
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "attestation",
     hdrs = ["attestation.h"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "nonce",
     srcs = ["nonce.c"],
     hdrs = ["nonce.h"],
     deps = ["//sw/device/silicon_creator/lib/drivers:rnd"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otbn_boot_services",
     srcs = ["otbn_boot_services.c"],
     hdrs = ["otbn_boot_services.h"],
@@ -507,7 +537,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "xmodem",
     srcs = ["xmodem.c"],
     hdrs = ["xmodem.h"],
@@ -518,7 +548,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "xmodem_testlib",
     srcs = [
         "xmodem.c",
@@ -532,7 +562,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "stack_utilization",
     srcs = ["stack_utilization.c"],
     hdrs = [

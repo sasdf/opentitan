@@ -5,18 +5,44 @@
 load("@rules_rust//bindgen:repositories.bzl", "rust_bindgen_dependencies")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
 load("@rules_rust//tools/rust_analyzer:deps.bzl", "rust_analyzer_dependencies")
+load("//third_party/rust/toolchain:stdlib.bzl", "rust_stdlib_repo")
+load("//third_party/rust/toolchain:flags.bzl", "RUSTC_FLAGS")
+
+# The dates need to be sequential so that the stdlibs are built
+# using the previous beta rustc
+OPENTITAN_TRIPLE = "riscv32imc-unknown-none-elf"
+OPENTITAN_RUST_TOOLS = "@rust_linux_x86_64__" + OPENTITAN_TRIPLE + "__nightly_tools"
 
 def rust_deps():
     rules_rust_dependencies()
+
+    # Register the opentitan toolchain variant.
+    # This variant is aware of bazel enviroments, corrsponding rustc flags
+    # will be populated automatically.
+    # These targets need to be registered before rust_register_toolchains to
+    # have higher priority when the variant constraint is satisfied.
+    for env in [OPENTITAN_TRIPLE, "x86_64-unknown-linux-gnu"]:
+        native.register_toolchains(
+            "//third_party/rust/toolchain:toolchain_" + env,
+        )
+
+    # This rule creates @ot_rust_stdlib repo with rust sources.
+    rust_stdlib_repo(
+        name = "ot_rust_stdlib",
+        channel = "nightly",
+        date = "2023-07-30",
+        build_template = "//third_party/rust/toolchain:stdlib.BUILD",
+    )
+
+    # Register default stock toolchains.
     rust_register_toolchains(
         # TODO(#15300): set this to `True` to support rust-analyzer, after fixing
         # upstream `rules_rust`.
         #include_rustc_srcs = False,
         edition = "2021",
         versions = ["1.71.1", "nightly/2023-07-30"],
-        extra_target_triples = [
-            "riscv32imc-unknown-none-elf",
-        ],
+        rustfmt_version = "nightly/2024-07-25",
+        extra_target_triples = [OPENTITAN_TRIPLE],
         sha256s = {
             "2023-07-30/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz": "ecdee8821a57efbb699b7e3aa4cbfbd60b7970bce89a8cfb9bc7d65b9058ee42",
             "2023-07-30/clippy-nightly-x86_64-unknown-linux-gnu.tar.xz": "76ee5aac81d1348bfebd3d94d5fb65c3f4ea0cf5fc2de834926f93772547380c",

@@ -185,6 +185,7 @@ tock_image = rv_rule(
             executable = True,
             cfg = "exec",
         ),
+        "rust_toolchain_variant": attr.string(default = "stock"),
     },
     toolchains = ["@rules_cc//cc:toolchain_type"],
 )

@@ -12,10 +12,11 @@ load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
     "ROM_EXT_VERSION",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "rescue",
     srcs = ["rescue.c"],
     hdrs = ["rescue.h"],
@@ -29,11 +30,12 @@ cc_library(
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/lib/drivers:retention_sram",
         "//sw/device/silicon_creator/lib/drivers:rstmgr",
+        "//sw/device/silicon_creator/lib/ownership:datatypes",
         "//sw/device/silicon_creator/lib/ownership:owner_block",
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "rom_ext_boot_policy_ptrs",
     srcs = dual_inputs(
         host = ["mock_rom_ext_boot_policy_ptrs.cc"],
@@ -57,7 +59,7 @@ dual_cc_library(
     ),
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rom_ext_boot_policy",
     srcs = ["rom_ext_boot_policy.c"],
     hdrs = ["rom_ext_boot_policy.h"],
@@ -82,7 +84,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "bootstrap",
     srcs = ["bootstrap.c"],
     hdrs = ["bootstrap.h"],
@@ -171,7 +173,7 @@ ld_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sigverify_keys",
     srcs = ["sigverify_keys.c"],
     hdrs = ["sigverify_keys.h"],

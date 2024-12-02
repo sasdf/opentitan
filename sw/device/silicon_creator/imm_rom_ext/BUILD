@@ -4,7 +4,9 @@
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
+
+cc_library_with_bindgen(
     name = "main_lib",
     srcs = ["imm_rom_ext.c"],
     hdrs = ["imm_rom_ext.h"],

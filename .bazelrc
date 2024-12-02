@@ -39,13 +39,30 @@ build --workspace_status_command=util/get_workspace_status.sh
 # --config=riscv32
 build:riscv32 --platforms=@crt//platforms/riscv32:opentitan
 
-# These options are required to build `cc_fuzz_test` targets. Enable with
-# --config=asan-libfuzzer
-build:asan-libfuzzer --action_env=CC=clang
-build:asan-libfuzzer --action_env=CXX=clang++
-build:asan-libfuzzer --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:libfuzzer
-build:asan-libfuzzer --@rules_fuzzing//fuzzing:cc_engine_instrumentation=libfuzzer
+# Common settings for `cc_fuzz_test` targets.
+# Please use one of the variants below:
+#   * --config=asan-libfuzzer
+#   * --config=msan-libfuzzer
+build:libfuzzer --action_env=CC=clang
+build:libfuzzer --action_env=CXX=clang++
+build:libfuzzer --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:libfuzzer
+build:libfuzzer --@rules_fuzzing//fuzzing:cc_engine_instrumentation=libfuzzer
+
+# Configuration for source-level fuzzing coverage.
+coverage:libfuzzer --config='ot_coverage_off_target'
+coverage:libfuzzer --instrumentation_filter="^//sw/"
+coverage:libfuzzer --instrument_test_targets
+coverage:libfuzzer --experimental_generate_llvm_lcov
+
+# Fuzzing with address sanitizer
+build:asan-libfuzzer --config='libfuzzer'
 build:asan-libfuzzer --@rules_fuzzing//fuzzing:cc_engine_sanitizer=asan
+coverage:asan-libfuzzer --config='libfuzzer'
+
+# Fuzzing with memory sanitizer
+build:msan-libfuzzer --config='libfuzzer'
+build:msan-libfuzzer --@rules_fuzzing//fuzzing:cc_engine_sanitizer=msan
+coverage:msan-libfuzzer --config='libfuzzer'
 
 # Shared configuration for clang's source-based coverage instrumentation.
 # Bazel seems to support this only partially, thus we have to perform some
@@ -135,6 +152,8 @@ build:ubsan --linkopt -fsanitize=undefined
 
 # Enable the rust nightly toolchain
 build --@rules_rust//rust/toolchain/channel=nightly
+build --@rules_rust//rust/settings:experimental_toolchain_generated_sysroot=True
+build --@lowrisc_opentitan//third_party/rust/toolchain:variant=opentitan
 
 # Configure the rust 'clippy' linter.
 build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect

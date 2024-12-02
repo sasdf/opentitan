@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "boot_svc_header",
     srcs = dual_inputs(
         device = ["boot_svc_header.c"],
@@ -25,6 +26,7 @@ dual_cc_library(
         shared = [
             "//sw/device/silicon_creator/lib/base:chip",
             "//sw/device/silicon_creator/lib/drivers:hmac",
+            "//sw/device/silicon_creator/lib:error",
         ],
     ),
 )
@@ -40,7 +42,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_empty",
     srcs = ["boot_svc_empty.c"],
     hdrs = ["boot_svc_empty.h"],
@@ -51,7 +53,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_min_bl0_sec_ver",
     srcs = ["boot_svc_min_bl0_sec_ver.c"],
     hdrs = ["boot_svc_min_bl0_sec_ver.h"],
@@ -86,7 +88,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_msg",
     hdrs = ["boot_svc_msg.h"],
     deps = [
@@ -100,7 +102,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_next_boot_bl0_slot",
     srcs = ["boot_svc_next_boot_bl0_slot.c"],
     hdrs = ["boot_svc_next_boot_bl0_slot.h"],
@@ -123,7 +125,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_ownership_unlock",
     srcs = ["boot_svc_ownership_unlock.c"],
     hdrs = ["boot_svc_ownership_unlock.h"],
@@ -148,7 +150,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "boot_svc_ownership_activate",
     srcs = ["boot_svc_ownership_activate.c"],
     hdrs = ["boot_svc_ownership_activate.h"],

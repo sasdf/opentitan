@@ -19,10 +19,11 @@ load(
     "@bazel_skylib//lib:dicts.bzl",
     "dicts",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen", "dual_cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "ecdsa_p256_key",
     srcs = ["ecdsa_p256_key.c"],
     hdrs = ["ecdsa_p256_key.h"],
@@ -31,7 +32,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rsa_key",
     srcs = ["rsa_key.c"],
     hdrs = ["rsa_key.h"],
@@ -40,7 +41,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "spx_key",
     srcs = ["spx_key.c"],
     hdrs = ["spx_key.h"],
@@ -50,7 +51,7 @@ cc_library(
     ],
 )
 
-dual_cc_library(
+dual_cc_library_with_bindgen(
     name = "mod_exp_ibex",
     srcs = dual_inputs(
         device = ["mod_exp_ibex.c"],
@@ -131,13 +132,14 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ecdsa_p256_verify",
     srcs = ["ecdsa_p256_verify.c"],
     hdrs = ["ecdsa_p256_verify.h"],
     deps = [
         ":ecdsa_p256_key",
         "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:otbn_boot_services",
         "//sw/device/silicon_creator/lib/drivers:hmac",
     ],
@@ -159,7 +161,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rsa_verify",
     srcs = ["rsa_verify.c"],
     hdrs = ["rsa_verify.h"],
@@ -168,6 +170,7 @@ cc_library(
         ":rsa_key",
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/drivers:hmac",
         "//sw/device/silicon_creator/lib/drivers:lifecycle",
         "//sw/device/silicon_creator/lib/drivers:otp",
@@ -195,7 +198,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "spx_verify",
     srcs = ["spx_verify.c"],
     hdrs = ["spx_verify.h"],
@@ -203,6 +206,7 @@ cc_library(
         ":spx_key",
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/drivers:hmac",
         "//sw/device/silicon_creator/lib/drivers:lifecycle",
         "//sw/device/silicon_creator/lib/drivers:otp",
@@ -226,7 +230,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "usage_constraints",
     srcs = ["usage_constraints.c"],
     hdrs = ["usage_constraints.h"],
@@ -239,7 +243,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "flash_exec",
     hdrs = ["flash_exec.h"],
     deps = [
@@ -259,7 +263,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sigverify",
     hdrs = ["sigverify.h"],
     deps = [

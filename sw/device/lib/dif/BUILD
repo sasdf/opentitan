@@ -2,12 +2,20 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
+load("//rules:host.bzl", "cc_library_host_only")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+cc_library_with_bindgen(
     name = "base",
     srcs = ["dif_base.c"],
     hdrs = ["dif_base.h"],
+    bindgen = {
+        "exports": [
+            "//sw/device/lib/base/internal:status",
+        ],
+    },
     deps = [
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:multibits",
@@ -15,7 +23,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_host_only(
     name = "test_base",
     testonly = True,
     hdrs = ["dif_test_base.h"],
@@ -25,7 +33,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "adc_ctrl",
     srcs = [
         "autogen/dif_adc_ctrl_autogen.c",
@@ -60,7 +68,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "aes",
     srcs = [
         "autogen/dif_aes_autogen.c",
@@ -94,7 +102,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "alert_handler",
     srcs = [
         "autogen/dif_alert_handler_autogen.c",
@@ -128,7 +136,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "aon_timer",
     srcs = [
         "autogen/dif_aon_timer_autogen.c",
@@ -162,7 +170,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "clkmgr",
     srcs = [
         "autogen/dif_clkmgr_autogen.c",
@@ -194,7 +202,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "csrng_shared",
     srcs = [
         "autogen/dif_csrng_autogen.h",
@@ -216,7 +224,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "csrng",
     srcs = [
         "autogen/dif_csrng_autogen.c",
@@ -251,7 +259,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "dma",
     srcs = [
         "autogen/dif_dma_autogen.c",
@@ -285,7 +293,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "edn",
     srcs = [
         "autogen/dif_edn_autogen.c",
@@ -320,7 +328,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "entropy_src",
     srcs = [
         "autogen/dif_entropy_src_autogen.c",
@@ -354,7 +362,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "flash_ctrl",
     srcs = [
         "autogen/dif_flash_ctrl_autogen.c",
@@ -386,7 +394,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "gpio",
     srcs = [
         "autogen/dif_gpio_autogen.c",
@@ -420,7 +428,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "hmac",
     srcs = [
         "autogen/dif_hmac_autogen.c",
@@ -454,7 +462,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "i2c",
     srcs = [
         "autogen/dif_i2c_autogen.c",
@@ -488,7 +496,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keymgr",
     srcs = [
         "autogen/dif_keymgr_autogen.c",
@@ -522,7 +530,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keymgr_dpe",
     srcs = [
         "autogen/dif_keymgr_dpe_autogen.c",
@@ -555,7 +563,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "kmac",
     srcs = [
         "autogen/dif_kmac_autogen.c",
@@ -589,7 +597,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "lc_ctrl",
     srcs = [
         "autogen/dif_lc_ctrl_autogen.c",
@@ -623,7 +631,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "mbx",
     srcs = [
         "autogen/dif_mbx_autogen.c",
@@ -658,7 +666,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otbn",
     srcs = [
         "autogen/dif_otbn_autogen.c",
@@ -692,7 +700,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otp_ctrl",
     srcs = [
         "autogen/dif_otp_ctrl_autogen.c",
@@ -726,7 +734,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pattgen",
     srcs = [
         "autogen/dif_pattgen_autogen.c",
@@ -760,7 +768,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pinmux",
     srcs = [
         "autogen/dif_pinmux_autogen.c",
@@ -795,7 +803,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pwm",
     srcs = [
         "autogen/dif_pwm_autogen.c",
@@ -828,7 +836,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "pwrmgr",
     srcs = [
         "autogen/dif_pwrmgr_autogen.c",
@@ -862,7 +870,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rom_ctrl",
     srcs = [
         "autogen/dif_rom_ctrl_autogen.c",
@@ -895,14 +903,17 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rstmgr_intf",
     srcs = ["autogen/dif_rstmgr_autogen.h"],
     hdrs = ["dif_rstmgr.h"],
-    deps = [":base"],
+    deps = [
+        ":base",
+        "//sw/device/lib/base:mmio",
+    ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rstmgr",
     srcs = [
         "autogen/dif_rstmgr_autogen.c",
@@ -933,7 +944,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rv_core_ibex",
     srcs = [
         "autogen/dif_rv_core_ibex_autogen.c",
@@ -965,7 +976,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rv_dm",
     srcs = [
         "autogen/dif_rv_dm_autogen.c",
@@ -997,7 +1008,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rv_plic",
     srcs = [
         "autogen/dif_rv_plic_autogen.c",
@@ -1031,7 +1042,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rv_timer",
     srcs = [
         "autogen/dif_rv_timer_autogen.c",
@@ -1066,7 +1077,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "spi_device",
     srcs = [
         "autogen/dif_spi_device_autogen.c",
@@ -1100,7 +1111,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "spi_host",
     srcs = [
         "autogen/dif_spi_host_autogen.c",
@@ -1135,7 +1146,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sram_ctrl",
     srcs = [
         "autogen/dif_sram_ctrl_autogen.c",
@@ -1169,7 +1180,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sensor_ctrl",
     srcs = [
         "autogen/dif_sensor_ctrl_autogen.c",
@@ -1201,7 +1212,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sysrst_ctrl",
     srcs = [
         "autogen/dif_sysrst_ctrl_autogen.c",
@@ -1235,7 +1246,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "uart",
     srcs = [
         "autogen/dif_uart_autogen.c",
@@ -1268,7 +1279,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "usbdev",
     srcs = [
         "autogen/dif_usbdev_autogen.c",

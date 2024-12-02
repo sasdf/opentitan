@@ -4,12 +4,13 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 
 # Export all headers.
 exports_files(glob(["*.h"]))
 
-cc_library(
+cc_library_with_bindgen(
     name = "datatypes",
     hdrs = ["datatypes.h"],
     defines = ["OTCRYPTO_IN_REPO=1"],
@@ -20,7 +21,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "crypto_hdrs",
     hdrs = [
         "aes.h",
@@ -44,7 +45,7 @@ cc_library(
 
 # Create a library that makes the headers available as though we've been
 # exported from the repo (ie: OTCRYPTO_IN_REPO is not set).
-cc_library(
+cc_library_with_bindgen(
     name = "exported_headers_for_test",
     hdrs = [
         "aes.h",

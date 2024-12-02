@@ -5,6 +5,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
 
 config_setting(
     name = "crypto_status_debug",
@@ -13,13 +14,14 @@ config_setting(
     },
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "aes",
     srcs = ["aes.c"],
     hdrs = ["//sw/device/lib/crypto/include:aes.h"],
     deps = [
         ":integrity",
         ":keyblob",
+        "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:hardened_memory",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/crypto/drivers:aes",
@@ -29,7 +31,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "drbg",
     srcs = ["drbg.c"],
     hdrs = ["//sw/device/lib/crypto/include:drbg.h"],
@@ -42,13 +44,14 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ecc",
     srcs = ["ecc.c"],
     hdrs = ["//sw/device/lib/crypto/include:ecc.h"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":keyblob",
+        "//sw/device/lib/base:hardened",
         "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/crypto/drivers:hmac",
         "//sw/device/lib/crypto/impl/ecc:p256",
@@ -57,7 +60,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "hash",
     srcs = ["hash.c"],
     hdrs = [
@@ -74,7 +77,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "integrity",
     srcs = ["integrity.c"],
     hdrs = ["integrity.h"],
@@ -84,7 +87,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "kdf",
     srcs = ["kdf.c"],
     hdrs = ["//sw/device/lib/crypto/include:kdf.h"],
@@ -99,7 +102,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "keyblob",
     srcs = ["keyblob.c"],
     hdrs = ["keyblob.h"],
@@ -122,7 +125,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "key_transport",
     srcs = ["key_transport.c"],
     hdrs = ["//sw/device/lib/crypto/include:key_transport.h"],
@@ -144,13 +147,14 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "rsa",
     srcs = ["rsa.c"],
     hdrs = ["//sw/device/lib/crypto/include:rsa.h"],
     deps = [
         ":integrity",
         ":status",
+        "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:hardened_memory",
         "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/crypto/impl/rsa:rsa_encryption",
@@ -160,11 +164,16 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "status",
     hdrs = [
         "status.h",
     ],
+    bindgen = {
+        "exports": [
+            "//sw/device/lib/base:status",
+        ],
+    },
     # Turn debugging on only if the `crypto_status_debug` command-line option
     # is set.
     defines = select({
@@ -197,7 +206,7 @@ cc_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "mac",
     srcs = ["mac.c"],
     hdrs = [
@@ -211,5 +220,6 @@ cc_library(
         "//sw/device/lib/base:hardened_memory",
         "//sw/device/lib/crypto/drivers:hmac",
         "//sw/device/lib/crypto/drivers:kmac",
+        "//sw/device/lib/crypto/include:datatypes",
     ],
 )

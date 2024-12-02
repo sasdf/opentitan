@@ -27,9 +27,10 @@ environment variables:
 outputs:
   The build process produces multiple files inside the output directory.
 
-  <src_file>.o            the compiled source files
-  <app_name>.elf          the compiled and linked application targeting OTBN
-  <app_name>.rv32embed.o  the application as embeddable object for RV32
+  <src_file>.o               the compiled source files
+  <app_name>.elf             the compiled and linked application targeting OTBN
+  <app_name>.rv32embed.o     the application as embeddable object for RV32
+  lib<app_name>.rv32embed.a  the application as embeddable archive for RV32
 
 """
 
@@ -334,7 +335,7 @@ def main() -> int:
             emb_file.write(b'\1\0')
 
         if archive:
-            out_embedded_a = out_dir / (app_name + '.rv32embed.a')
+            out_embedded_a = out_dir / ('lib' + app_name + '.rv32embed.a')
             call_rv32_ar(['rcs', out_embedded_a, out_embedded_obj])
 
     except subprocess.CalledProcessError as e:

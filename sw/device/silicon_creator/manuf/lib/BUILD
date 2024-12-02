@@ -13,6 +13,7 @@ load(
     "//sw/device/silicon_creator/manuf/base:provisioning_inputs.bzl",
     "EARLGREY_OTP_CFGS",
 )
+load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -30,12 +31,12 @@ ld_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sram_start_headers",
     hdrs = ["sram_start.h"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sram_start",
     srcs = ["sram_start.S"],
     target_compatible_with = [OPENTITAN_CPU],
@@ -51,7 +52,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "sram_start_no_ast_init",
     srcs = ["sram_start_no_ast_init.S"],
     target_compatible_with = [OPENTITAN_CPU],
@@ -67,7 +68,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "flash_info_fields",
     srcs = ["flash_info_fields.c"],
     hdrs = ["flash_info_fields.h"],
@@ -82,7 +83,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otp_fields",
     srcs = ["otp_fields.c"],
     hdrs = ["otp_fields.h"],
@@ -92,12 +93,12 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "otp_img_types",
     hdrs = ["otp_img_types.h"],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "util",
     srcs = ["util.c"],
     hdrs = ["util.h"],
@@ -112,7 +113,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "individualize",
     srcs = ["individualize.c"],
     hdrs = ["individualize.h"],
@@ -164,7 +165,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "individualize_sw_cfg",
     srcs = [
         "individualize_sw_cfg.c",
@@ -190,7 +191,7 @@ cc_library(
 # As more SKUs are created with different OTP configurations, libraries can be
 # added by updating EARLGREY_OTP_CFGS accordingly.
 [
-    cc_library(
+    cc_library_with_bindgen(
         name = "individualize_sw_cfg_{}".format(cfg),
         deps = [
             ":individualize_sw_cfg",
@@ -235,7 +236,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "personalize",
     srcs = ["personalize.c"],
     hdrs = ["personalize.h"],
@@ -246,11 +247,6 @@ cc_library(
         "//sw/device/lib/base:multibits",
         "//sw/device/lib/base:status",
         "//sw/device/lib/crypto/drivers:entropy",
-        "//sw/device/lib/crypto/impl:aes",
-        "//sw/device/lib/crypto/impl:ecc",
-        "//sw/device/lib/crypto/impl:hash",
-        "//sw/device/lib/crypto/impl:keyblob",
-        "//sw/device/lib/crypto/include:datatypes",
         "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/dif:lc_ctrl",
         "//sw/device/lib/dif:otp_ctrl",
@@ -306,7 +302,7 @@ opentitan_test(
     ],
 )
 
-cc_library(
+cc_library_with_bindgen(
     name = "ast_program",
     srcs = ["ast_program.c"],
     deps = [

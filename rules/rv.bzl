@@ -19,6 +19,10 @@ PER_DEVICE_DEPS = {
 }
 
 def _opentitan_transition_impl(settings, attr):
+    rust_toolchain_variant = attr.rust_toolchain_variant
+    if rust_toolchain_variant == "unchanged":
+        rust_toolchain_variant = settings.get("//third_party/rust/toolchain:variant", "stock")
+
     return {
         "//command_line_option:platforms": attr.platform,
         "//command_line_option:copt": settings["//command_line_option:copt"],
@@ -26,6 +30,7 @@ def _opentitan_transition_impl(settings, attr):
         "//hw/bitstream/universal:rom": "//hw/bitstream/universal:none",
         "//hw/bitstream/universal:otp": "//hw/bitstream/universal:none",
         "//hw/bitstream/universal:env": "//hw/bitstream/universal:none",
+        "//third_party/rust/toolchain:variant": rust_toolchain_variant,
     }
 
 opentitan_transition = transition(
@@ -38,6 +43,7 @@ opentitan_transition = transition(
     inputs = [
         "//command_line_option:copt",
         "//command_line_option:features",
+        "//third_party/rust/toolchain:variant",
     ],
     outputs = [
         "//command_line_option:platforms",
@@ -46,6 +52,7 @@ opentitan_transition = transition(
         "//hw/bitstream/universal:rom",
         "//hw/bitstream/universal:otp",
         "//hw/bitstream/universal:env",
+        "//third_party/rust/toolchain:variant",
     ],
 )
 
@@ -58,6 +65,8 @@ def rv_rule(**kwargs):
     attrs = kwargs.pop("attrs", {})
     if "platform" not in attrs:
         attrs["platform"] = attr.string(default = OPENTITAN_PLATFORM)
+    if "rust_toolchain_variant" not in attrs:
+        attrs["rust_toolchain_variant"] = attr.string(default = "unchanged")
     attrs["_allowlist_function_transition"] = attr.label(
         default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
     )

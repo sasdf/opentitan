@@ -16,7 +16,10 @@ def dual_cc_device_library_of(label):
     """
     return "{}_on_device_do_not_use_directly".format(label)
 
-def _merge_and_split_inputs(inputs):
+def dual_cc_host_library_of(name):
+    return "{}_on_host_do_not_use_directly".format(name)
+
+def merge_and_split_inputs(inputs):
     inputs = inputs if type(inputs) != "list" else dual_inputs(shared = inputs)
     return inputs.shared + inputs.device, inputs.shared + inputs.host
 
@@ -63,11 +66,11 @@ def dual_cc_library(
       alias         named: <name>
     """
 
-    hdrs_d, hdrs_h = _merge_and_split_inputs(hdrs)
-    srcs_d, srcs_h = _merge_and_split_inputs(srcs)
-    copts_d, copts_h = _merge_and_split_inputs(copts)
-    deps_d, deps_h = _merge_and_split_inputs(deps)
-    tgts_d, tgts_h = _merge_and_split_inputs(target_compatible_with)
+    hdrs_d, hdrs_h = merge_and_split_inputs(hdrs)
+    srcs_d, srcs_h = merge_and_split_inputs(srcs)
+    copts_d, copts_h = merge_and_split_inputs(copts)
+    deps_d, deps_h = merge_and_split_inputs(deps)
+    tgts_d, tgts_h = merge_and_split_inputs(target_compatible_with)
 
     native.cc_library(
         name = dual_cc_device_library_of(name),
