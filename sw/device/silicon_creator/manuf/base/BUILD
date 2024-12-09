@@ -32,6 +32,7 @@ load(
     "OWNER_SLOTS",
 )
 load("//rules/opentitan:rust.bzl", "cc_library_with_bindgen")
+load("//rules/opentitan:rust.bzl", "ot_rust_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -260,9 +261,12 @@ cc_library_with_bindgen(
     ],
 )
 
-cc_library_with_bindgen(
+ot_rust_library(
     name = "perso_tlv_data",
-    srcs = ["perso_tlv_data.c"],
+    srcs = [
+        "perso_tlv_data.c",
+        "perso_tlv_data.rs",
+    ],
     hdrs = ["perso_tlv_data.h"],
     deps = [
         "//sw/device/lib/testing/json:provisioning_data",
