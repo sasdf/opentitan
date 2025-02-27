@@ -120,6 +120,9 @@ SECTIONS {
     *(.data)
     *(.data.*)
 
+    /* Sections for LLVM profiling. */
+    KEEP(*(__llvm_prf_cnts))
+
     /* Ensure section end is word-aligned. */
     . = ALIGN(4);
     _data_end = .;

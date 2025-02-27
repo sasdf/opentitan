@@ -65,12 +65,15 @@ coverage:ot_coverage_off_target --repo_env='BAZEL_LLVM_COV=/usr/bin/llvm-cov'
 # Configuration for measuring on-target coverage. Enable with
 # `--config=ot_coverage_on_target`.
 build:ot_coverage_on_target --config='ot_coverage'
-build:ot_coverage_on_target --platforms="@crt//platforms/riscv32:opentitan"
+build:ot_coverage_on_target --platforms=@crt//platforms/riscv32:opentitan
 build:ot_coverage_on_target --define='measure_coverage_on_target=true'
+build:ot_coverage_on_target --copt -Wno-error
 # Instrument selectively to limit size overhead when measuring on-target coverage.
 # Note: We have to disable optimizations until the corresponding item in #16761 is
 # resolved.
-build:ot_coverage_on_target --per_file_copt='//sw/device/silicon_creator[/:].*,//sw/device/lib/base:.*@-fprofile-instr-generate,-fcoverage-mapping,-O0'
+build:ot_coverage_on_target --per_file_copt='//sw/device/silicon_creator[/:].*,//sw/device/lib/base:.*@-fprofile-instr-generate,-fcoverage-mapping,-Os,-mllvm,--debug-info-correlate'
+# build:ot_coverage_on_target --per_file_copt='//sw/device/tests[/:].*@-fprofile-instr-generate,-fcoverage-mapping,-Os'
+build:ot_coverage_on_target --features=-guards --copt=-DOT_DISABLE_HARDENING=1
 # Needed to be able to build host binaries while collecting coverage.
 coverage:ot_coverage_on_target --platforms=""
 

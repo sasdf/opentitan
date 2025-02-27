@@ -9,14 +9,14 @@ source util/sh/lib/error.sh
 source util/sh/lib/traps.sh
 
 readonly BAZEL="./bazelisk.sh"
-readonly BITSTREAM_TARGET="//hw/bitstream:gcp_spliced_test_rom"
-readonly WORKSPACE_PATH
+readonly BITSTREAM_TARGET="//hw/bitstream/cw340:test_rom"
 WORKSPACE_PATH=$(${BAZEL} info workspace)
-readonly BITSTREAM_PATH
+readonly WORKSPACE_PATH
 BITSTREAM_PATH=${WORKSPACE_PATH}/$(${BAZEL} cquery --output=starlark --starlark:expr "target.files.to_list()[0].path" "${BITSTREAM_TARGET}")
-readonly COVERAGE_TEST_TARGET="//sw/device/tests:coverage_test_fpga_cw310_test_rom"
+readonly BITSTREAM_PATH
+readonly COVERAGE_TEST_TARGET="//sw/device/tests:coverage_test_sim_verilator"
+COVERAGE_TEST_LOG="$(${BAZEL} info bazel-testlogs)/sw/device/tests/coverage_test_sim_verilator/test.log"
 readonly COVERAGE_TEST_LOG
-COVERAGE_TEST_LOG="$(${BAZEL} info bazel-testlogs)/sw/device/tests/coverage_test_fpga_cw310_test_rom/test.log"
 
 # Build and program bitstream with uninstrumented ROM
 log "Bitstream target: ${BITSTREAM_TARGET}"
@@ -24,10 +24,10 @@ log "Bitstream path: ${BITSTREAM_PATH}"
 log "Building bitstream..."
 ${BAZEL} build "${BITSTREAM_TARGET}"
 log "Programming the FPGA..."
-${BAZEL} run //sw/host/opentitantool -- --uarts=/dev/opentitan/cw_310_uart_0,/dev/opentitan/cw_310_uart_1 fpga load-bitstream "${BITSTREAM_PATH}"
+# ${BAZEL} run //sw/host/opentitantool -- --uarts=/dev/opentitan/cw_310_uart_0,/dev/opentitan/cw_310_uart_1 fpga load-bitstream "${BITSTREAM_PATH}"
 # Measure coverage
 log "Measuring coverage..."
-${BAZEL} coverage --define bitstream=skip --test_output=streamed --config=ot_coverage_on_target "${COVERAGE_TEST_TARGET}"
+${BAZEL} test --define bitstream=skip --test_output=streamed --config=ot_coverage_on_target "${COVERAGE_TEST_TARGET}" --sandbox_debug
 # Check log
 log "Test log: ${COVERAGE_TEST_LOG}"
 raw_profile_buffer_size=$(grep length "${COVERAGE_TEST_LOG}" | sed "s/.*length: \([0-9]*\) bytes.*/\1/" || echo "UNKNOWN")
