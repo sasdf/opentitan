@@ -57,6 +57,8 @@
 #include "otp_ctrl_regs.h"
 #include "rstmgr_regs.h"
 
+int __llvm_profile_runtime;
+
 /**
  * Table of forward branch Control Flow Integrity (CFI) counters.
  *

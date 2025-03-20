@@ -26,8 +26,10 @@ cc_library(
     ],
     hdrs = ["imm_section.h"],
     target_compatible_with = [OPENTITAN_CPU],
+    linkopts = ["-lgcc"],
     deps = [
         ":imm_section_epmp",
+        "//third_party/llvm_compiler_rt",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:hardened",

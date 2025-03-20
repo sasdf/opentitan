@@ -38,6 +38,7 @@ opentitan_binary(
     linker_script = ":linker_script",
     deps = [
         ":test_rom_lib",
+        "//third_party/llvm_compiler_rt",
     ],
 )
 

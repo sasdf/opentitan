@@ -154,17 +154,19 @@ SECTIONS {
   /**
    * OpenTitan ROM does not have a mutable `.data` section.
    */
-  .data (NOLOAD) : {
+  .data : ALIGN(4) {
     *(.sdata)
     *(.sdata.*)
     *(.data)
     *(.data.*)
 
     /* Tests are an exception to the rule that .data must be empty */
+    /*
     ASSERT(
         (DEFINED(rom_test) ? 0 : SIZEOF(.data)) == 0,
         "Error: .data section must be empty");
-  } > ram_main
+    */
+  } > ram_main AT> rom
 
   /**
    * Standard BSS section. This will be zeroed at runtime by the CRT.

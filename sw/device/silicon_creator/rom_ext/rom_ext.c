@@ -55,6 +55,8 @@
 #include "otp_ctrl_regs.h"                            // Generated.
 #include "sram_ctrl_regs.h"                           // Generated.
 
+int __llvm_profile_runtime;
+
 // Useful constants for flash sizes and ROM_EXT locations.
 enum {
   kFlashBankSize = FLASH_CTRL_PARAM_REG_PAGES_PER_BANK,

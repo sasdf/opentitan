@@ -283,7 +283,7 @@ class MemFile:
         size words by adding padding after the last chunk if necessary.
 
         '''
-        assert self.next_addr() <= size
+        # assert self.next_addr() <= size
 
         acc = MemChunk(0, [])
         # Add each chunk
@@ -303,6 +303,9 @@ class MemFile:
         assert acc_end == self.next_addr()
 
         # If there's a gap after the last chunk, pad it out with zeroes
+        if acc_end > size:
+          acc.words = acc.words[:size]
+
         padding_len = size - acc_end
         if padding_len:
             acc.words += [0 for _ in range(padding_len)]

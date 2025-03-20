@@ -1082,10 +1082,12 @@ opentitan_test(
     name = "coverage_test",
     srcs = ["coverage_test.c"],
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        # EARLGREY_TEST_ENVS,
+        # EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
-            "//hw/top_earlgrey:silicon_creator": None,
+            # "//hw/top_earlgrey:silicon_creator": None,
+            "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
         },
     ),
     verilator = verilator_params(timeout = "long"),

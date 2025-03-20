@@ -123,7 +123,9 @@ ld_library(
         ],
         hdrs = ["rom_ext.h"],
         target_compatible_with = [OPENTITAN_CPU],
+        linkopts = ["-lgcc"],
         deps = [
+            "//third_party/llvm_compiler_rt",
             ":rom_ext_boot_policy",
             ":rom_ext_boot_policy_ptrs",
             ":rom_ext_manifest",

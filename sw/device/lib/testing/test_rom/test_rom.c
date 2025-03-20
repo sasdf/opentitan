@@ -34,6 +34,8 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"  // Generated.
 #include "otp_ctrl_regs.h"
 
+int __llvm_profile_runtime;
+
 /* These symbols are defined in
  * `opentitan/sw/device/lib/testing/test_rom/test_rom.ld`, and describes the
  * location of the flash header.

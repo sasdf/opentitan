@@ -124,7 +124,9 @@ cc_library(
         "rom.c",
         "rom.h",
     ],
+    linkopts = ["-lgcc"],
     deps = [
+        "//third_party/llvm_compiler_rt",
         ":boot_policy",
         ":boot_policy_ptrs",
         ":bootstrap",
@@ -199,6 +201,27 @@ opentitan_binary(
         "//hw/top_earlgrey:silicon_creator",
     ],
     kind = "rom",
+    linker_script = ":linker_script",
+    deps = [
+        ":mask_rom_lib",
+        # We depend on rom_isrs here rather than in mask_rom_lib so that the
+        # `rom_exception_handler` symbol remains unresolved and can be supplied
+        # by tests such as `rom_epmp_test`.
+        ":rom_isrs",
+    ],
+)
+
+opentitan_binary(
+    name = "instrumented_mask_rom",
+    exec_env = [
+        "//hw/top_earlgrey:fpga_cw310",
+        "//hw/top_earlgrey:fpga_cw340",
+        # "//hw/top_earlgrey:sim_dv_base",
+        # "//hw/top_earlgrey:sim_verilator_base",
+        # "//hw/top_earlgrey:sim_qemu_base",
+        # "//hw/top_earlgrey:silicon_creator",
+    ],
+    manifest = "//hw/top_earlgrey:none_manifest",
     linker_script = ":linker_script",
     deps = [
         ":mask_rom_lib",

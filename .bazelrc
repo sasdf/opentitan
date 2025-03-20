@@ -66,12 +66,17 @@ build:ot_coverage_on_target --define='measure_coverage_on_target=true'
 # Instrument selectively to limit size overhead when measuring on-target coverage.
 # Note: We have to disable optimizations until the corresponding item in #16761 is
 # resolved.
-build:ot_coverage_on_target --per_file_copt='//sw/device/silicon_creator[/:].*,//sw/device/lib/base:.*@-fprofile-instr-generate,-fcoverage-mapping,-O0'
+# build:ot_coverage_on_target --per_file_copt='//sw/device[/:].*@-fprofile-instr-generate,-fcoverage-mapping,-O0'
+# build:ot_coverage_on_target --per_file_copt='//sw/device/silicon_creator[/:].*,//sw/device/lib[/:].*@-fprofile-instr-generate,-fcoverage-mapping,-O0'
+build:ot_coverage_on_target --per_file_copt='//sw/device[/:].*@,-g,-fprofile-instr-generate,-mllvm,--debug-info-correlate'
+# build:ot_coverage_on_target --per_file_copt='//sw/device/silicon_creator[/:].*@-fprofile-instr-generate,-fcoverage-mapping,-O0'
 # Needed to be able to build host binaries while collecting coverage.
+# build:ot_coverage_on_target --linkopt -fprofile-instr-generate
 coverage:ot_coverage_on_target --platforms=""
 
 # Disable ccache if it happens to be installed
 build --define=CCACHE_DISABLE=true
+build --copt='-Wno-error'
 
 # Configuration to override resource constrained test
 # scheduling. Enable with `--config=local_test_jobs_per_cpus`

@@ -19,6 +19,8 @@
 #include "sw/device/silicon_creator/rom_ext/imm_section/imm_section_epmp.h"
 #include "sw/device/silicon_creator/rom_ext/rom_ext_manifest.h"
 
+int __llvm_profile_runtime;
+
 OT_WARN_UNUSED_RESULT
 static rom_error_t imm_section_start(void) {
   // Check the ePMP state.
