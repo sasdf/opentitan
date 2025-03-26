@@ -17,6 +17,16 @@ _ROM_EXT_IMMUTABLE_SECTION_NAME = ".rom_ext_immutable"
 _PREFIX_FOR_HEX = "0x"
 
 
+def hash_imm_section(start_offset: int, contents: bytes) -> bytes:
+    # Prepend the start offset and length to section data
+    data_to_hash = b''.join([
+      start_offset.to_bytes(4, 'little'),
+      len(contents).to_bytes(4, 'little'),
+      contents,
+    ])
+    return SHA256.new(data_to_hash).digest()
+
+
 class ImmutableSectionProcessor:
 
     def __init__(self, rom_ext_elf, json_data):
@@ -54,14 +64,7 @@ class ImmutableSectionProcessor:
                                          self.manifest_offset)
                     self.size_in_bytes = int(section.header['sh_size'])
                     assert self.size_in_bytes == len(section.data())
-                    # Prepend the start offset and length to section data
-                    data_to_hash = bytearray()
-                    data_to_hash += self.start_offset.to_bytes(
-                        4, byteorder='little')
-                    data_to_hash += self.size_in_bytes.to_bytes(
-                        4, byteorder='little')
-                    data_to_hash += section.data()
-                    self.hash = bytearray(SHA256.new(data_to_hash).digest())
+                    self.hash = bytearray(hash_imm_section(self.start_offset, section.data()))
 
         if not self.immutable_section_idx:
             logging.error("Cannot find {} section in ROM_EXT ELF {}.".format(

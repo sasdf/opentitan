@@ -207,7 +207,7 @@ manifest(d = {
             "//sw/device/silicon_creator/lib:manifest_def",
             "//sw/device/silicon_creator/lib/ownership:test_owner",
             "//sw/device/silicon_creator/lib/ownership/keys/fake",
-            "//sw/device/silicon_creator/rom_ext/imm_section:main_section_{}_slot_{}".format(variation_name, slot),
+            "//sw/device/silicon_creator/rom_ext/imm_section/prebuilts/v1:test",
         ],
     )
     for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
@@ -236,7 +236,7 @@ opentitan_binary(
         "//sw/device/silicon_creator/lib:manifest_def",
         "//sw/device/silicon_creator/lib/ownership:test_owner_update_mode_newversion",
         "//sw/device/silicon_creator/lib/ownership/keys/fake",
-        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_x509_slot_a",
+        "//sw/device/silicon_creator/rom_ext/imm_section/prebuilts/v1:test",
     ],
 )
 
@@ -268,6 +268,6 @@ opentitan_binary(
         "//sw/device/silicon_creator/lib:manifest_def",
         "//sw/device/silicon_creator/lib/ownership:test_owner",
         "//sw/device/silicon_creator/lib/ownership/keys/fake",
-        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_x509_slot_a",
+        "//sw/device/silicon_creator/rom_ext/imm_section/prebuilts/v1:test",
     ],
 )

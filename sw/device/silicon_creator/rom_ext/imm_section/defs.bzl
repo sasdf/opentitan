@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules:const.bzl", "CONST", "hex")
+
 DEFAULT_EXEC_ENV = [
     "//hw/top_earlgrey:fpga_cw310",
     "//hw/top_earlgrey:fpga_cw340",
