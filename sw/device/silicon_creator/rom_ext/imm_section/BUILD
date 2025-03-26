@@ -18,6 +18,7 @@ load(
 load(
     "//sw/device/silicon_creator/rom_ext/imm_section:utils.bzl",
     "create_imm_section_targets",
+    "imm_section_bundle",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -120,3 +121,24 @@ ld_library(
     for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ]
+
+# To release a prebuilt imm_section, please run:
+#   $ bazel build //sw/device/silicon_creator/rom_ext/imm_section:release_bundle
+# which will produce a tar file release.
+#
+# The tar file contains the binaries and a generated BUILD file that can be
+# extracted to your folder to create prebuilt targets, such as
+#   $ tar xf \
+#       -C sw/device/silicon_creator/rom_ext/imm_section/prebuilts/
+#       bazel-bin/sw/device/silicon_creator/rom_ext/imm_section/release_bundle.tar
+# which creates prebuilt targets that can be linked to rom_ext deps:
+#   //sw/device/silicon_creator/rom_ext/imm_section/prebuilts/<version>:dice_x509
+#   //sw/device/silicon_creator/rom_ext/imm_section/prebuilts/<version>:dice_cwt
+#   ...
+imm_section_bundle(
+    name = "release_bundle",
+    variants = {
+        variation_name: ":main_binaries_{}_slot_virtual".format(variation_name)
+        for variation_name, _ in ROM_EXT_VARIATIONS.items()
+    },
+)
