@@ -40,6 +40,10 @@ load("@bazel_skylib//lib:new_sets.bzl", "sets")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//rules:const.bzl", "CONST", "hex")
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
+load(
+    "//rules/opentitan:providers.bzl",
+    "get_binary_files",
+)
 
 def get_otp_images():
     """Returns a list of (otp_name, img_target) tuples.
@@ -152,28 +156,32 @@ otp_json_rot_keys = rule(
 )
 
 def _otp_json_immutable_rom_ext_impl(ctx):
-    # TODO(#23425): refactor how the ELF file containing the immutable section
-    # is extracted since there could be multiple ELFs if the ROM_EXT input
-    # target is the output of an `opentitan_binary` rule.
-    rom_ext_deps = ctx.attr.rom_ext[DefaultInfo].files.to_list()
-    rom_ext_elf_file = None
-    for file in rom_ext_deps:
-        if file.extension == "elf":
-            rom_ext_elf_file = file
-            break
-    if rom_ext_elf_file == None:
-        fail("No ELF dependency for ROM_EXT target.")
+    args = ctx.actions.args()
+
     intput_file = _otp_json_builder(ctx, seed = None)
     output_file = ctx.actions.declare_file("{}.with_immutable_re_params.json".format(ctx.attr.name))
-    args = ctx.actions.args()
     args.add("--input", intput_file)
-    args.add("--elf", rom_ext_elf_file)
     args.add("--output", output_file)
+    inputs = [intput_file]
+
+    if ctx.attr.rom_ext:
+        files = get_binary_files([ctx.attr.rom_ext], field = "elf")
+        if len(files) == 0:
+            fail("No ELF files in ROM_EXT target.")
+        args.add("--rom_ext_elf", files[0])
+        inputs.append(files[0])
+
+    if ctx.attr.imm_section:
+        files = get_binary_files([ctx.attr.imm_section], field = "binary")
+        if len(files) == 0:
+            fail("No binary files in imm_section target.")
+        args.add("--imm_section", files[0])
+        inputs.append(files[0])
 
     tc = ctx.toolchains[LOCALTOOLS_TOOLCHAIN]
     ctx.actions.run(
         outputs = [output_file],
-        inputs = [intput_file, rom_ext_elf_file],
+        inputs = inputs,
         arguments = [args],
         executable = tc.tools.gen_otp_immutable_rom_ext_json,
     )
@@ -184,6 +192,7 @@ otp_json_immutable_rom_ext = rule(
     attrs = {
         "partitions": attr.string_list(doc = "A list of serialized partitions from otp_partition."),
         "rom_ext": attr.label(doc = "The ROM_EXT ELF file the immutable section is in."),
+        "imm_section": attr.label(doc = "The prebuilt immutable section BIN file."),
     },
     toolchains = [LOCALTOOLS_TOOLCHAIN],
 )

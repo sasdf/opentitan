@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("//rules:const.bzl", "CONST", "hex")
 load(
     "//rules/opentitan:providers.bzl",
     "SiliconBinaryInfo",
@@ -13,6 +14,12 @@ load("@lowrisc_opentitan//rules:rv.bzl", "rv_rule")
 load(
     "//sw/device/silicon_creator/rom_ext/imm_section:defs.bzl",
     "IMM_SECTION_VERSION",
+)
+load(
+    "//rules:otp.bzl",
+    "otp_hex",
+    "otp_json_immutable_rom_ext",
+    "otp_partition",
 )
 
 def _bin_to_imm_section_object_impl(ctx):
@@ -86,6 +93,8 @@ load(
 )
 
 package(default_visibility = ["//visibility:public"])
+
+VARIANTS = {variants}
 """
 
 _RELEASE_BUILD_TARGET = """
@@ -95,20 +104,33 @@ create_imm_section_targets(
 )
 """
 
+_RELEASE_BUILD_FILEGROUP = """
+filegroup(
+    name = "{name}",
+    srcs = ["{filename}"],
+)
+"""
+
 def _prepare_release_files(ctx):
-    build_contents = [_RELEASE_BUILD_HEADER]
     build_file = ctx.actions.declare_file("BUILD")
     version_file = ctx.actions.declare_file("version.txt")
 
+    build_contents = [
+        _RELEASE_BUILD_HEADER.format(variants = json.encode(ctx.attr.variants_keys)),
+    ]
     files = [build_file, version_file]
-    for name, target in zip(ctx.attr.variants_keys, ctx.attr.variants_values):
+    for name, target, otp in zip(ctx.attr.variants_keys, ctx.attr.variants_values, ctx.files.variants_otps):
         bin = get_one_binary_file(target, field = "binary", providers = [SiliconBinaryInfo])
         files.extend([
             bin,
             get_one_binary_file(target, field = "elf", providers = [SiliconBinaryInfo]),
             get_one_binary_file(target, field = "mapfile", providers = [SiliconBinaryInfo]),
+            otp,
         ])
         build_contents.append(_RELEASE_BUILD_TARGET.format(name = name, filename = bin.basename))
+
+        otp_name = "{}_otp".format(name)
+        build_contents.append(_RELEASE_BUILD_FILEGROUP.format(name = otp_name, filename = otp.basename))
 
     ctx.actions.write(build_file, "".join(build_contents))
     ctx.actions.write(version_file, IMM_SECTION_VERSION)
@@ -122,16 +144,37 @@ prepare_release_files = rule(
     attrs = {
         "variants_keys": attr.string_list(doc = "Name of the opentitan_binary to release"),
         "variants_values": attr.label_list(doc = "Target label of the opentitan_binary to release"),
+        "variants_otps": attr.label_list(doc = "Target label of the imm_section hash OTP overlay"),
     },
 )
 
 def imm_section_bundle(name, variants, **kwargs):
     files = "{}_files".format(name)
 
+    otp_overlays = []
+    for variant, target in variants.items():
+        otp_file = "{}_{}_otp".format(name, variant)
+        otp_json_immutable_rom_ext(
+            name = otp_file,
+            testonly = True,
+            partitions = [
+                otp_partition(
+                    name = "CREATOR_SW_CFG",
+                    items = {
+                        "CREATOR_SW_CFG_IMMUTABLE_ROM_EXT_EN": otp_hex(CONST.HARDENED_TRUE),
+                    },
+                ),
+            ],
+            imm_section = target,
+            visibility = ["//visibility:private"],
+        )
+        otp_overlays.append(otp_file)
+
     prepare_release_files(
         name = files,
         variants_keys = variants.keys(),
         variants_values = variants.values(),
+        variants_otps = otp_overlays,
         visibility = ["//visibility:private"],
         testonly = True,
         **kwargs

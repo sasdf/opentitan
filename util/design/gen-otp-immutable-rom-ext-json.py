@@ -24,8 +24,9 @@ _HARDENED_TRUE = 0x739
 
 class RomExtImmutableSectionOtpFields(ImmutableSectionProcessor):
 
-    def __init__(self, rom_ext_elf, json_data):
-        super().__init__(rom_ext_elf, json_data)
+    def __init__(self, json_data):
+        super().__init__()
+        self.json_data = json_data
 
     def insert_key_value(self, item_name: str, value: str) -> None:
         """Insert the value of the item if it does not exist.
@@ -92,28 +93,46 @@ def main() -> None:
     parser.add_argument('-i',
                         '--input',
                         type=str,
+                        required=True,
                         metavar='<path>',
-                        help='Input JSON file path.')
-    parser.add_argument('-e',
-                        '--elf',
+                        help='OTP JSON file to extend.')
+
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument('-e',
+                        '--rom_ext_elf',
                         type=str,
                         metavar='<path>',
-                        help='Input ELF file path.')
+                        help='Load imm_section from rom_ext ELF file.')
+    source.add_argument('-b',
+                        '--imm_section_bin',
+                        type=str,
+                        metavar='<path>',
+                        help='Load imm_section from prebuilt BIN file.')
+
+    parser.add_argument('--start_offset',
+                        type=int,
+                        default=1024,
+                        help='Start offset of imm_section_bin relative to '
+                             'rom_ext manifest.')
     parser.add_argument('-o',
                         '--output',
                         type=str,
+                        required=True,
                         metavar='<path>',
                         help='Output JSON file path.')
     args = parser.parse_args()
 
     # Read in the OTP fields (encoded in JSON) we will be updating.
-    json_in = None
     with open(args.input, 'r') as f:
         json_in = hjson.load(f)
 
     # Extract the immutable ROM_EXT section data, compute hash, and update OTP
     # CREATOR_SW_CFG partition fields.
-    imm_section_otp = RomExtImmutableSectionOtpFields(args.elf, json_in)
+    imm_section_otp = RomExtImmutableSectionOtpFields(json_in)
+    if args.rom_ext_elf:
+        imm_section_otp.load_from_rom_ext(args.rom_ext_elf)
+    else:
+        imm_section_otp.load_from_bin(args.start_offset, args.imm_section_bin)
 
     if imm_section_otp.immutable_rom_ext_enable():
         imm_section_otp.update_json_with_immutable_rom_ext_section_data()
