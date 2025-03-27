@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+IMM_SECTION_VERSION = "0.1"
+
 DEFAULT_EXEC_ENV = [
     "//hw/top_earlgrey:fpga_cw310",
     "//hw/top_earlgrey:fpga_cw340",

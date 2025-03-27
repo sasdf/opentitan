@@ -19,6 +19,19 @@
 #include "sw/device/silicon_creator/rom_ext/imm_section/imm_section_epmp.h"
 #include "sw/device/silicon_creator/rom_ext/rom_ext_manifest.h"
 
+#ifndef IMM_SECTION_VERSION
+#error "IMM_SECTION_VERSION string is not defined"
+#endif
+/*
+ * The version string is stored at the last 8 bytes of imm_section.
+ *
+ * The version is defined in the bazel file:
+ *   sw/device/silicon_creator/rom_ext/imm_section/defs.bzl
+ */
+OT_USED
+OT_SECTION(".imm_section_version")
+const char imm_section_version[8] = IMM_SECTION_VERSION;
+
 OT_WARN_UNUSED_RESULT
 static rom_error_t imm_section_start(void) {
   // Check the ePMP state.

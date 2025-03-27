@@ -21,6 +21,7 @@ load(
 )
 load(
     "//sw/device/silicon_creator/rom_ext/imm_section:defs.bzl",
+    "IMM_SECTION_VERSION",
     "IMMUTABLE_HASH_UNENFORCED_MSG",
 )
 
@@ -130,6 +131,14 @@ _POSITIONS = {
         "success": "rom_ext_slot = AA__\r\n",
         "failure": IMMUTABLE_HASH_UNENFORCED_MSG,
         "otp_img": ":otp_img_with_imm_romext_enabled",
+    },
+    "imm_section_virtual_a": {
+        "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
+        "romext_offset": "0",
+        "linker_script": "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_a",
+        "owner_offset": "0x10000",
+        "success": "IMM_SECTION:{}\r\n".format(IMM_SECTION_VERSION),
+        "otp_img": None,
     },
 }
 

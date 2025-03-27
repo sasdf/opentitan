@@ -78,6 +78,9 @@ SECTIONS {
     _rom_ext_immutable_start = .;
     KEEP(*(.rom_ext_immutable))
 
+    /* The version string is stored at the last 8 bytes of imm_section. */
+    _rom_ext_immutable_version = . - 8;
+
     /* TODO: Remove this fallback when rom_ext_immutable section is ready. */
     KEEP(*(.rom_ext_immutable.fallback))
 
