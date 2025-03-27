@@ -153,4 +153,16 @@ SECTIONS {
   } > ram_main
 
   INCLUDE sw/device/info_sections.ld
+
+  /**
+   * Store the immutable section version at the last 8 bytes.
+   *
+   * The version is defined in the bazel file:
+   *   sw/device/silicon_creator/rom_ext/imm_section/defs.bzl
+   */
+  .imm_section_version : ALIGN(8) {
+    . = ALIGN(8);
+    KEEP(*(.imm_section_version))
+    KEEP(*(.imm_section_version.*))
+  } > rom_ext_flash
 }
