@@ -5,7 +5,11 @@
 load("@lowrisc_opentitan//rules/opentitan:transform.bzl", "obj_transform")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load("//rules:linker.bzl", "ld_library")
-load("//sw/device/silicon_creator/rom_ext/imm_section:defs.bzl", "DEFAULT_EXEC_ENV")
+load(
+    "//sw/device/silicon_creator/rom_ext/imm_section:defs.bzl",
+    "DEFAULT_EXEC_ENV",
+    "IMM_SECTION_VERSION",
+)
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
     "ROM_EXT_VARIATIONS",
@@ -25,6 +29,9 @@ cc_library(
         "imm_section_start.S",
     ],
     hdrs = ["imm_section.h"],
+    defines = [
+        "IMM_SECTION_VERSION='{}'".format(json.encode(IMM_SECTION_VERSION)),
+    ],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":imm_section_epmp",
