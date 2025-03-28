@@ -17,18 +17,34 @@ _ROM_EXT_IMMUTABLE_SECTION_NAME = ".rom_ext_immutable"
 _PREFIX_FOR_HEX = "0x"
 
 
+def hash_section(start_offset: int, contents: bytes) -> bytes:
+    # Prepend the start offset and length to section data
+    data_to_hash = b''.join([
+        start_offset.to_bytes(4, 'little'),
+        len(contents).to_bytes(4, 'little'),
+        contents,
+    ])
+    return SHA256.new(data_to_hash).digest()
+
+
 class ImmutableSectionProcessor:
 
-    def __init__(self, rom_ext_elf, json_data):
-        self.rom_ext_elf = rom_ext_elf
-        self.json_data = json_data
-        self.immutable_section_idx = None
-        self.manifest_offset = None
+    def __init__(self):
         self.start_offset = None
         self.size_in_bytes = None
         self.hash = None
 
-        with open(self.rom_ext_elf, 'rb') as f:
+    def load_from_bin(self, start_offset, imm_section_bin):
+        with open(imm_section_bin, 'rb') as f:
+            contents = f.read()
+        self.start_offset = start_offset
+        self.size_in_bytes = len(contents)
+        self.hash = hash_section(self.start_offset, contents)
+
+    def load_from_rom_ext(self, rom_ext_elf):
+        manifest_offset = None
+        immutable_section_idx = None
+        with open(rom_ext_elf, 'rb') as f:
             elf = elffile.ELFFile(f)
             # Find the offset of the current slot we are in.
             for symbol in elf.get_section_by_name(".symtab").iter_symbols():
@@ -36,36 +52,29 @@ class ImmutableSectionProcessor:
                     _OTTF_START_OFFSET_SYMBOL_NAME,
                     _ROM_EXT_SATRT_OFFSET_SYMBOL_NAME,
                 ]:
-                    if self.manifest_offset is not None:
+                    if manifest_offset is not None:
                         raise ValueError(
                             f"More than one manifest start address exists. "
-                            f"Current offset: {self.manifest_offset}, "
+                            f"Current offset: {manifest_offset}, "
                             f"new offset: {symbol.entry['st_value']}"
                         )
-                    self.manifest_offset = symbol.entry["st_value"]
-            assert self.manifest_offset, "Manifest start address not found."
+                    manifest_offset = symbol.entry["st_value"]
+            assert manifest_offset, "Manifest start address not found."
 
             # Find the immutable section and compute the OTP values.
             for section_idx in range(elf.num_sections()):
                 section = elf.get_section(section_idx)
                 if section.name == _ROM_EXT_IMMUTABLE_SECTION_NAME:
-                    self.immutable_section_idx = section_idx
+                    immutable_section_idx = section_idx
                     self.start_offset = (int(section.header['sh_addr']) -
-                                         self.manifest_offset)
+                                         manifest_offset)
                     self.size_in_bytes = int(section.header['sh_size'])
                     assert self.size_in_bytes == len(section.data())
-                    # Prepend the start offset and length to section data
-                    data_to_hash = bytearray()
-                    data_to_hash += self.start_offset.to_bytes(
-                        4, byteorder='little')
-                    data_to_hash += self.size_in_bytes.to_bytes(
-                        4, byteorder='little')
-                    data_to_hash += section.data()
-                    self.hash = bytearray(SHA256.new(data_to_hash).digest())
+                    self.hash = hash_section(self.start_offset, section.data())
 
-        if not self.immutable_section_idx:
+        if not immutable_section_idx:
             logging.error("Cannot find {} section in ROM_EXT ELF {}.".format(
-                _ROM_EXT_IMMUTABLE_SECTION_NAME, self.rom_ext_elf))
+                _ROM_EXT_IMMUTABLE_SECTION_NAME, rom_ext_elf))
             sys.exit(1)
 
     def update_creator_manuf_state_data(self, im_ext_hash) -> None:
