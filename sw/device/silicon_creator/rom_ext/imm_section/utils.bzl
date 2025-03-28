@@ -84,6 +84,13 @@ load(
     "//sw/device/silicon_creator/rom_ext/imm_section:utils.bzl",
     "create_imm_section_targets",
 )
+load("//rules:const.bzl", "CONST")
+load(
+    "//rules:otp.bzl",
+    "otp_hex",
+    "otp_json_immutable_rom_ext",
+    "otp_partition",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -94,6 +101,20 @@ _RELEASE_BUILD_TARGET = """
 create_imm_section_targets(
     name = "{name}",
     src = "{filename}",
+)
+
+otp_json_immutable_rom_ext(
+    name = "{name}_otp",
+    testonly = True,
+    partitions = [
+        otp_partition(
+            name = "CREATOR_SW_CFG",
+            items = {{
+                "CREATOR_SW_CFG_IMMUTABLE_ROM_EXT_EN": otp_hex(CONST.HARDENED_TRUE),
+            }},
+        ),
+    ],
+    imm_section = "{filename}",
 )
 """
 
