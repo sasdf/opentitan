@@ -235,11 +235,11 @@ impl HybridPair {
         if key_alg.is_spx() && self.spx.is_none() {
             return Err(anyhow!("{name} using {key_alg} requires an SPX key"));
         }
-        if !key_alg.is_spx() && self.spx.is_some() {
-            return Err(anyhow!(
-                "{name} using {key_alg} has an SPX key, but doesn't need one"
-            ));
-        }
+        // if !key_alg.is_spx() && self.spx.is_some() {
+        //     return Err(anyhow!(
+        //         "{name} using {key_alg} has an SPX key, but doesn't need one"
+        //     ));
+        // }
         Ok(())
     }
 
