@@ -32,7 +32,7 @@ uint32_t lprofBufferWriter(ProfDataWriter *This, ProfDataIOVec *IOVecs,
     if (data) {
       coverage_compress(data, len);
     } else if (IOVecs[i].UseZeroPadding) {
-      coverage_compress_zeros(len);
+      coverage_compress_zeros(0x00, len);
     }
   }
   return 0;

@@ -72,11 +72,12 @@ extern char _build_id_end[];
 void coverage_printer_run(void) {
   crc32_init(&coverage_crc);
 
+
   if (_build_id_end - _build_id_start >= BUILD_ID_SIZE) {
     coverage_compress((unsigned char *)_build_id_end - BUILD_ID_SIZE,
                       BUILD_ID_SIZE);
   } else {
-    coverage_compress_zeros(BUILD_ID_SIZE);
+    coverage_compress_zeros(0x00, BUILD_ID_SIZE);
   }
 
   coverage_printer_contents();

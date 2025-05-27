@@ -12,7 +12,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-void coverage_compress_zeros(uint32_t size);
+void coverage_compress_zeros(uint8_t tag, uint32_t size);
 
 void coverage_compress(unsigned char *data, size_t size);
 

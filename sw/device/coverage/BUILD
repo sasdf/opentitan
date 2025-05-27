@@ -63,6 +63,7 @@ cc_library(
         ":common_printer",
         ":compress",
         ":printer_api",
+        "//sw/device/silicon_creator/lib/drivers:uart",
     ],
 )
 

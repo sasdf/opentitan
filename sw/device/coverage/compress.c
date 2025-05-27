@@ -11,14 +11,17 @@ void coverage_compress_zeros(uint8_t tag, uint32_t size) {
   uint32_t buf[2] = {0, size};
   if (size <= 0xfd) {
     // 00XX
+    // [tag][size]
     buf[0] = 0x00000000 | ((uint32_t)tag << 24);
     coverage_printer_sink_with_crc((uint8_t *)buf + 3, 2);
   } else if (size <= 0xffff) {
     // 00feXXXX
+    // [tag][fe][size]
     buf[0] = 0xfe000000 | ((uint32_t)tag << 16);
     coverage_printer_sink_with_crc((uint8_t *)buf + 2, 4);
   } else {
     // 00ffXXXXXXXX
+    // [tag][fe][size]
     buf[0] = 0xff000000 | ((uint32_t)tag << 16);
     coverage_printer_sink_with_crc((uint8_t *)buf + 2, 6);
   }
