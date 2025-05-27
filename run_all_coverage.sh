@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-COVERAGE_OUTPUT_DIR="/tmp/coverage/"
+COVERAGE_OUTPUT_DIR="/tmp/${USER}/all_coverage/"
 
 TARGETS=(
     # //sw/device/lib/base:crc32_functest_fpga_cw310_sival_rom_ext
