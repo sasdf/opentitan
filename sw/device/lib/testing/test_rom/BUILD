@@ -206,6 +206,7 @@ cc_library(
         "//sw/device/silicon_creator/lib:chip_info",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
         "//sw/device/silicon_creator/lib/base:static_critical",
+        "//sw/device/coverage:empty_runtime",
     ],
 )
 

@@ -13,6 +13,7 @@
 #include "otp_ctrl_regs.h"
 #include "sensor_ctrl_regs.h"
 #include "sram_ctrl_regs.h"
+#include "flash_ctrl_regs.h"
 
 /**
  * Test ROM interrupt vectors.
@@ -86,7 +87,21 @@ _test_rom_interrupt_vector:
   .balign 4
   .global _reset_start
   .type _reset_start, @function
+
 _reset_start:
+
+  li   t0, (0x9f << 24) // Locked NAPOT read-write-execute.
+  csrw pmpcfg3, t0
+  li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
+  csrw pmpaddr15, t0
+  csrw pmpcfg0, zero
+  csrw pmpcfg1, zero
+  csrw pmpcfg2, zero
+
+  li a0, 0x200e0080
+  lw t0, 0(a0)
+  li t1, 0x0
+  bne t0, t1, perform_jump
 
   // Set up the global pointer. This requires that we disable linker relaxations
   // (or it will be relaxed to `mv gp, gp`).
@@ -290,3 +305,9 @@ _test_rom_irq_handler:
   wfi
   j _test_rom_irq_handler
   .size _test_rom_irq_handler, .-_test_rom_irq_handler
+
+perform_jump:
+  li   a3, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
+  li   t1, 0xa26a38f7
+  sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
+  jalr ra, 0(a0)
