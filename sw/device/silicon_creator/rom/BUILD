@@ -62,12 +62,33 @@ cc_test(
 )
 
 ld_library(
-    name = "linker_script",
-    script = "rom.ld",
+    name = "ld_common",
+    includes = ["rom_common.ld"],
     deps = [
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
         "//sw/device:info_sections",
         "//sw/device/coverage:llvm_prf_cnts",
+    ],
+)
+
+ld_library(
+    name = "ld_rom",
+    script = "rom.ld",
+    deps = [
+        ":ld_common",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
+        #"//sw/device:info_sections",
+        #"//sw/device/coverage:llvm_prf_cnts",
+    ],
+)
+
+ld_library(
+    name = "ld_instrumented_rom",
+    script = "instrumented_rom.ld",
+    deps = [
+        ":ld_common",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
+        #"//sw/device:info_sections",
+        #"//sw/device/coverage:llvm_prf_cnts",
     ],
 )
 
@@ -85,6 +106,7 @@ cc_library(
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/coverage:runtime_api",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/silicon_creator/lib:error",
@@ -92,11 +114,9 @@ cc_library(
 )
 
 cc_library(
-    name = "mask_rom_lib",
-    srcs = ["rom_start.S"],
+    name = "common_mask_rom_lib",
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
-        ":linker_script",
         ":rom_common",
         ":rom_epmp",
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
@@ -115,9 +135,34 @@ cc_library(
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/coverage:runtime_api",
+        "//sw/device/coverage:uart_runtime",
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:multibits",
         "//sw/device/silicon_creator/lib/base:chip",
+    ],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "mask_rom_lib",
+    srcs = ["rom_start.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        ":ld_rom",
+        ":common_mask_rom_lib",
+    ],
+    alwayslink = True,
+)
+
+
+cc_library(
+    name = "instrumented_rom_lib",
+    srcs = ["rom_start.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        ":ld_instrumented_rom",
+        ":common_mask_rom_lib",
     ],
     alwayslink = True,
 )
@@ -137,6 +182,7 @@ cc_library(
         ":sigverify_keys_spx",
         ":sigverify_otp_keys",
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
+        "//sw/device/coverage:runtime_api",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
@@ -204,7 +250,7 @@ opentitan_binary(
         "//hw/top_earlgrey:silicon_creator",
     ],
     kind = "rom",
-    linker_script = ":linker_script",
+    linker_script = ":ld_rom",
     deps = [
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
@@ -224,10 +270,10 @@ opentitan_binary(
         # "//hw/top_earlgrey:sim_qemu_base",
         # "//hw/top_earlgrey:silicon_creator",
     ],
-    linker_script = ":linker_script",
+    linker_script = ":ld_instrumented_rom",
     manifest = "//hw/top_earlgrey:none_manifest",
     deps = [
-        ":mask_rom_lib",
+        ":instrumented_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
         # by tests such as `rom_epmp_test`.
@@ -293,7 +339,7 @@ opentitan_test(
         "//hw/top_earlgrey:sim_verilator": None,
     },
     kind = "rom",
-    linker_script = ":linker_script",
+    linker_script = ":ld_rom",
     linkopts = [
         "-Wl,--defsym=rom_test=1",
     ],
@@ -352,6 +398,7 @@ cc_library(
         "//sw/device/silicon_creator/lib/base:chip",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/lib/drivers:otp",
+        "//sw/device/silicon_creator/lib/drivers:uart",
     ],
 )
 
