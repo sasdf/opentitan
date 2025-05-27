@@ -4465,6 +4465,7 @@ opentitan_test(
         EARLGREY_CW340_TEST_ENVS,
         {
             "//hw/top_earlgrey:silicon_creator": None,
+            "//hw/top_earlgrey:fpga_cw340_instrumented_rom": None,
         },
     ),
     deps = [

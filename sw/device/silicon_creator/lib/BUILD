@@ -383,6 +383,7 @@ dual_cc_library(
             "//sw/device/lib/base:stdasm",
             "//sw/device/silicon_creator/lib/drivers:alert",
             "//sw/device/silicon_creator/lib/drivers:otp",
+            "//sw/device/coverage:runtime_api",
         ],
     ),
 )

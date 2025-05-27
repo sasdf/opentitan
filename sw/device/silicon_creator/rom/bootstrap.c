@@ -9,6 +9,7 @@
 #include "sw/device/silicon_creator/lib/base/chip.h"
 #include "sw/device/silicon_creator/lib/drivers/flash_ctrl.h"
 #include "sw/device/silicon_creator/lib/drivers/otp.h"
+#include "sw/device/silicon_creator/lib/drivers/uart.h"
 #include "sw/device/silicon_creator/lib/error.h"
 
 #include "flash_ctrl_regs.h"
@@ -17,6 +18,23 @@
 #include "otp_ctrl_regs.h"
 
 rom_error_t bootstrap_chip_erase(void) {
+#ifdef OT_COVERAGE_INSTRUMENTED
+  flash_ctrl_data_default_perms_set((flash_ctrl_perms_t) {
+    .read = kMultiBitBool4False,
+    .write = kMultiBitBool4False,
+    .erase = kMultiBitBool4True,
+  });
+  for (uint32_t addr = 0; addr < TOP_EARLGREY_EFLASH_SIZE_BYTES - 0x20000; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
+    HARDENED_RETURN_IF_ERROR(flash_ctrl_data_erase(addr, kFlashCtrlEraseTypePage));
+  }
+  flash_ctrl_data_default_perms_set((flash_ctrl_perms_t) {
+    .read = kMultiBitBool4False,
+    .write = kMultiBitBool4False,
+    .erase = kMultiBitBool4False,
+  });
+  return kErrorOk;
+
+#else
   flash_ctrl_bank_erase_perms_set(kHardenedBoolTrue);
   rom_error_t err_0 = flash_ctrl_data_erase(0, kFlashCtrlEraseTypeBank);
   rom_error_t err_1 = flash_ctrl_data_erase(FLASH_CTRL_PARAM_BYTES_PER_BANK,
@@ -25,14 +43,22 @@ rom_error_t bootstrap_chip_erase(void) {
 
   HARDENED_RETURN_IF_ERROR(err_0);
   return err_1;
+#endif
 }
 
 rom_error_t bootstrap_erase_verify(void) {
+#ifdef OT_COVERAGE_INSTRUMENTED
+  for (uint32_t addr = 0; addr < TOP_EARLGREY_EFLASH_SIZE_BYTES - 0x20000; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
+    HARDENED_RETURN_IF_ERROR(flash_ctrl_data_erase_verify(addr, kFlashCtrlEraseTypePage));
+  }
+  return kErrorOk;
+#else
   rom_error_t err_0 = flash_ctrl_data_erase_verify(0, kFlashCtrlEraseTypeBank);
   rom_error_t err_1 = flash_ctrl_data_erase_verify(
       FLASH_CTRL_PARAM_BYTES_PER_BANK, kFlashCtrlEraseTypeBank);
   HARDENED_RETURN_IF_ERROR(err_0);
   return err_1;
+#endif
 }
 
 hardened_bool_t bootstrap_requested(void) {

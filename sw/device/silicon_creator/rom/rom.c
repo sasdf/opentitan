@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sw/device/coverage/runtime.h"
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/csr.h"
@@ -677,7 +678,10 @@ static rom_error_t rom_boot(const manifest_t *manifest,
   stack_utilization_print();
 
   if (imm_section_entry_point != kHardenedBoolFalse) {
+    COVERAGE_REPORT();
     ((rom_ext_entry_point *)imm_section_entry_point)();
+  } else {
+    COVERAGE_REPORT();
   }
   // Jump to ROM_EXT.
   ((rom_ext_entry_point *)entry_point)();

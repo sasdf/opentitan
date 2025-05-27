@@ -16,9 +16,8 @@ INCLUDE hw/top_earlgrey/sw/autogen/top_earlgrey_memory.ld
 
 _rom_boot_address = ORIGIN(eflash) + LENGTH(eflash) - 0x20000;
 
-/* TODO(shihhanchang): understand the chip_info addr (copy from test_rom.ld) */
 _rom_digest_size = 32;
-_chip_info_start = ORIGIN(eflash) + LENGTH(eflash) - _rom_digest_size - _chip_info_size; 
+_chip_info_start = ORIGIN(eflash) + LENGTH(eflash) - _rom_digest_size - _chip_info_size;
 
 REGION_ALIAS("rom_region", eflash);
 

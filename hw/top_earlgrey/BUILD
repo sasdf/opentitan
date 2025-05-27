@@ -86,6 +86,7 @@ EARLGREY_SLOTS_COVERAGE = {
     "owner_slot_a": "0x40000",
     "owner_slot_b": "0xc0000",
     "rom_ext_size": "0x40000",
+    "instrumented_rom_slot": "0xe0000",
 }
 EARLGREY_SLOTS = select({
     "//sw/device:measure_coverage_on_target": EARLGREY_SLOTS_COVERAGE,
@@ -453,6 +454,35 @@ fpga_cw340(
     }),
 )
 
+fpga_cw340(
+    name = "fpga_cw340_instrumented_rom",
+    testonly = True,
+    base = ":fpga_cw340_test_rom",
+    ecdsa_key = select({
+        "//signing:test_keys": {"//sw/device/silicon_creator/lib/ownership/keys/fake:app_prod_ecdsa": "prod_key_0"},
+        # We choose key zero in the appkey's keyset, which should be app-key-prod-0.
+        "//conditions:default": {"//signing:appkey": "0"},
+    }),
+    exec_env = "fpga_cw340_instrumented_rom",
+    libs = [
+        "//sw/device/lib/arch:boot_stage_owner",
+        "//sw/device/lib/arch:fpga_cw340",
+    ],
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_a",
+    manifest = "//sw/device/silicon_owner:manifest",
+    otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
+    param = {
+        "interface": "hyper340",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
+    },
+    rom_ext = select({
+        "//signing:test_keys": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
+        "//conditions:default": "//sw/device/silicon_creator/rom_ext/sival/binaries:rom_ext_dice_x509_prod",
+    }),
+    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
+)
 # FPGA configuration used to emulate silicon targets. This rule can be used by
 # targets that require executing at the `rom_ext` stage level in flash, as well
 # as SRAM programs. Use the `fpga_cw340_sival_rom_ext` execution environment to

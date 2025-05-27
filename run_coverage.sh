@@ -1,10 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-COVERAGE_OUTPUT_DIR="/tmp/coverage/"
+COVERAGE_OUTPUT_DIR="/tmp/$USER/coverage/"
 
 TARGETS=(
     //sw/device/tests:uart_smoketest_fpga_cw340_test_rom
+    //sw/device/tests:uart_smoketest_fpga_cw340_instrumented_rom
     //sw/device/lib/crypto/drivers:aes_test_fpga_cw310_rom_with_fake_keys
     //sw/device/lib/base:crc32_unittest
     //sw/device/tests/crypto/cryptotest:hmac_sha256_kat_fpga_cw340_test_rom

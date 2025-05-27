@@ -22,6 +22,7 @@
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 #include "sw/device/silicon_creator/lib/epmp_defs.h"
 #include "sw/device/silicon_creator/lib/stack_utilization.h"
+#include "sw/device/coverage/runtime.h"
 
 #include "alert_handler_regs.h"
 #include "flash_ctrl_regs.h"
@@ -528,6 +529,7 @@ void shutdown_finalize(rom_error_t reason) {
   shutdown_keymgr_kill();
   // Reset before killing the flash to be able to use this also in flash.
   shutdown_reset();
+  COVERAGE_REPORT();
   shutdown_flash_kill();
   // If we get here, we'll wait for the watchdog to reset the chip.
   shutdown_hang();
