@@ -15,6 +15,7 @@ use crate::impl_serializable_error;
 use crate::io::gpio::GpioPin;
 use crate::io::spi::SpiParams;
 use crate::io::uart::UartParams;
+use crate::uart::console::UartConsole;
 use crate::transport::{Capability, ProgressIndicator};
 
 mod eeprom;
@@ -199,10 +200,14 @@ impl<'a> Bootstrap<'a> {
                 // control when the newly flashed image gets to boot the first time.
                 rom_boot_strapping.remove()?;
             } else {
-                log::info!("Releasing bootstrap pins, resetting device...");
+                log::info!("Releasing bootstrap pins");
                 rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
+                log::info!("Receiving report...");
+                let uart = transport.uart("console")?;
+                UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+                log::info!("Resetting device...");
                 transport.reset_target(self.reset_delay, false)?;
             }
         }
