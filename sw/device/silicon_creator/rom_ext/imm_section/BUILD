@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@lowrisc_opentitan//rules/opentitan:transform.bzl", "obj_transform")
+load("//rules/opentitan:coverage.bzl", "baseline_coverage_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load("//rules:linker.bzl", "ld_library")
 load(
@@ -134,6 +135,15 @@ ld_library(
             ":main_lib",
             "//sw/device/lib/crt",
         ] + variation_deps,
+    )
+    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for slot in SLOTS
+]
+
+[
+    baseline_coverage_test(
+        name = "main_binaries_{}_slot_{}_baseline_coverage".format(variation_name, slot),
+        elf = "main_binaries_{}_slot_{}".format(variation_name, slot),
     )
     for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
