@@ -204,9 +204,12 @@ impl<'a> Bootstrap<'a> {
                 rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
-                log::info!("Receiving report...");
-                let uart = transport.uart("console")?;
-                UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+                #[cfg(feature = "ot_coverage_build")]
+                {
+                    log::info!("Receiving report...");
+                    let uart = transport.uart("console")?;
+                    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+                }
                 log::info!("Resetting device...");
                 transport.reset_target(self.reset_delay, false)?;
             }
