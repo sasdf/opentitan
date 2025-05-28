@@ -66,7 +66,7 @@ void imm_section_main(void) {
   // in ROM to shutdown.
   HARDENED_CHECK_EQ(error, kErrorOk);
 
-  COVERAGE_REPORT();
+  coverage_report();
 
   // Go back to ROM / Mutable ROM_EXT.
   return;

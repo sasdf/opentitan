@@ -225,7 +225,10 @@ fn process_profraw(path: &PathBuf, profile_map: &HashMap<String, ProfileData>) -
             bail!("Missing profile with build-id {build_id:?}.");
         }
     };
-    eprintln!("Profile matched {build_id} -> {:?}", profile.file_name);
+    eprintln!("Profile:");
+    eprintln!("  Profraw:  {:?}", path);
+    eprintln!("  BuildID:  {}", build_id);
+    eprintln!("  Firmware: {:?}", profile.file_name);
     debug_log!("{:?}", profile.elf);
 
     if profile.cnts_size != cnts.len() as u64 {

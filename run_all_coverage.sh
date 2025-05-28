@@ -753,7 +753,6 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_enter_rescue_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_xmodem_fpga_hyper310_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_xmodem_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_xmodem_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_xmodem_fpga_hyper310_rom_ext
@@ -816,6 +815,9 @@ HYPER310_ROMEXT_TESTS=(
 
 # Timeout: the prebuilt protocol 0 uses an incompatible layout. (i.e. 64K boundary)
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_protocol_0_fpga_hyper310_rom_ext
+
+# Failed
+//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
 )
 
 CW310_ROMEXT_TESTS=(

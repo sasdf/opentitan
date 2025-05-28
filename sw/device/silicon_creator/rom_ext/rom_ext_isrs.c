@@ -20,7 +20,7 @@ static rom_error_t rom_ext_irq_error(void) {
   CSR_READ(CSR_REG_MEPC, &mepc);
   CSR_READ(CSR_REG_MTVAL, &mtval);
 
-  COVERAGE_REPORT();
+  coverage_report();
   dbg_printf("MCAUSE=%x MEPC=%x MTVAL=%x\r\n", mcause, mepc, mtval);
 
   // Shuffle the mcause bits into the uppermost byte of the word and report
@@ -40,7 +40,7 @@ static rom_error_t rom_ext_irq_error(void) {
 OT_USED
 void rom_ext_interrupt_handler(void) {
   register rom_error_t error asm("a0") = rom_ext_irq_error();
-  COVERAGE_REPORT();
+  coverage_report();
   asm volatile("tail shutdown_finalize;" ::"r"(error));
   OT_UNREACHABLE();
 }

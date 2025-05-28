@@ -1,6 +1,6 @@
 set -euxo pipefail
 
-BASELINE_TEST="rom_ext_dice_x509_slot_a_baseline_coverage"
+BASELINE_TEST="rom_ext_dice_x509_slot_virtual_baseline_coverage"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
 BASELINE_DAT="$(grep "${BASELINE_TEST}" "${LCOV_FILES}" | head -n 1 || true)"
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"

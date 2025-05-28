@@ -12,6 +12,7 @@
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/silicon_creator/lib/drivers/otp.h"
+#include "sw/device/coverage/runtime.h"
 
 #ifdef OT_PLATFORM_RV32
 #include "sw/device/lib/runtime/hart.h"
@@ -152,6 +153,7 @@ rom_error_t rstmgr_info_en_check(uint32_t reset_reasons) {
 }
 
 void rstmgr_reset(void) {
+  coverage_report();
   abs_mmio_write32(kBase + RSTMGR_RESET_REQ_REG_OFFSET, kMultiBitBool4True);
 #ifdef OT_PLATFORM_RV32
   // Wait until the chip resets.

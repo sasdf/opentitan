@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sw/device/coverage/printer.h"
-#include "sw/device/coverage/runtime.h"
 #include "sw/device/silicon_creator/lib/drivers/uart.h"
 
 void coverage_init(void) {
@@ -15,6 +14,9 @@ void coverage_init(void) {
 }
 
 void coverage_report(void) {
+  // Wait until idle.
+  while (!uart_tx_idle());
+
   // print("== COVERAGE PROFILE START ==\r\n")
   uart_write_imm(0x5245564f43203d3d);
   uart_write_imm(0x464f525020454741);
@@ -28,6 +30,9 @@ void coverage_report(void) {
   uart_write_imm(0x464f525020454741);
   uart_write_imm(0x20444e4520454c49);
   uart_write_imm(0xa0d3d3d);
+
+  // Wait until the report is sent.
+  while (!uart_tx_idle());
 }
 
 void coverage_printer_sink(const void *data, size_t size) {

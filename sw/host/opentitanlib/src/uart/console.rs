@@ -203,6 +203,14 @@ impl UartConsole {
     }
 
     fn process_buffer(&mut self) -> Result<Option<ExitStatus>> {
+        if self.buffer.ends_with(COVERAGE_START_ANCHOR) {
+            self.alt_buffer_enabled = true;
+            self.alt_buffer.clear();
+        }
+        if self.buffer.ends_with(COVERAGE_END_ANCHOR) {
+            self.alt_buffer_enabled = false;
+            self.process_coverage()?;
+        }
         if self
             .exit_success
             .as_ref()
@@ -218,14 +226,6 @@ impl UartConsole {
             == Some(true)
         {
             return Ok(Some(ExitStatus::ExitFailure));
-        }
-        if self.buffer.ends_with(COVERAGE_START_ANCHOR) {
-            self.alt_buffer_enabled = true;
-            self.alt_buffer.clear();
-        }
-        if self.buffer.ends_with(COVERAGE_END_ANCHOR) {
-            self.alt_buffer_enabled = false;
-            self.process_coverage()?;
         }
         Ok(None)
     }
@@ -386,5 +386,13 @@ impl UartConsole {
             ExitStatus::Timeout => Err(ConsoleError::GenericError("Timed Out".into()).into()),
             _ => Err(anyhow!("Impossible result: {:?}", result)),
         }
+    }
+
+    pub fn wait_for_coverage<T>(device: &T, timeout: Duration) -> Result<()>
+    where
+        T: ConsoleDevice + ?Sized,
+    {
+        Self::wait_for(device, &regex::escape(COVERAGE_END_ANCHOR), timeout)?;
+        Ok(())
     }
 }

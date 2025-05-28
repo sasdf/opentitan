@@ -136,7 +136,7 @@ static void report_test_status(bool result) {
     }
   }
 
-  COVERAGE_REPORT();
+  coverage_report();
   test_status_set(result ? kTestStatusPassed : kTestStatusFailed);
 }
 

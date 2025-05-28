@@ -75,7 +75,6 @@ alias(
 cc_library(
     name = "runtime_api",
     hdrs = ["runtime.h"],
-    features = ["-coverage"],
     target_compatible_with = [OPENTITAN_CPU],
 )
 

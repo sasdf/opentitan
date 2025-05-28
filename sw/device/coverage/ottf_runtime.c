@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 #include "sw/device/coverage/printer.h"
-#include "sw/device/coverage/runtime.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/runtime/print.h"
 

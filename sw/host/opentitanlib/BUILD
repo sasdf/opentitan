@@ -280,6 +280,9 @@ rust_library(
     ] + select({
         "//sw/device:is_english_breakfast": ["english_breakfast"],
         "//conditions:default": [],
+    }) + select({
+        "//sw/device:measure_coverage_on_target": ["ot_coverage_build"],
+        "//conditions:default": [],
     }),
     proc_macro_deps = [
         "//sw/host/opentitanlib/opentitantool_derive",
