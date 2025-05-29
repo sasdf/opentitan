@@ -124,13 +124,16 @@ def _test_dispatch(ctx, exec_env, firmware):
     # image.
     if "assemble" in param:
         assemble = param["assemble"]
+        if "instrumented_rom" in action_param and "instrumented_rom" not in assemble:
+          assemble += " {instrumented_rom}@{instrumented_rom_slot}"
+
         for _ in range(10):
           assemble = assemble.format(**action_param)
         assemble = ctx.expand_location(assemble, data_labels)
         image = assemble_for_test(
             ctx,
             name = ctx.attr.name,
-            spec = assemble.split(" "),
+            spec = assemble.strip().split(" "),
             data_files = data_files,
             opentitantool = exec_env._opentitantool,
         )

@@ -10,6 +10,7 @@ load("//rules:linker.bzl", "ld_library")
 load("//rules:opentitan_test.bzl", "manual_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "fpga_params", "opentitan_binary", "opentitan_test")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
+load("//rules/opentitan:coverage.bzl", "baseline_coverage_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -265,10 +266,7 @@ opentitan_binary(
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
-        # "//hw/top_earlgrey:sim_dv_base",
-        # "//hw/top_earlgrey:sim_verilator_base",
-        # "//hw/top_earlgrey:sim_qemu_base",
-        # "//hw/top_earlgrey:silicon_creator",
+        "//hw/top_earlgrey:silicon_creator",
     ],
     linker_script = ":ld_instrumented_rom",
     manifest = "//hw/top_earlgrey:none_manifest",
@@ -279,6 +277,11 @@ opentitan_binary(
         # by tests such as `rom_epmp_test`.
         ":rom_isrs",
     ],
+)
+
+baseline_coverage_test(
+    name = "instrumented_mask_rom_baseline_coverage",
+    elf = "instrumented_mask_rom",
 )
 
 # Create the legacy ROM target names so that existing splicing rules can find

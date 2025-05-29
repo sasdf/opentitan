@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-COVERAGE_OUTPUT_DIR="/tmp/${USER}/coverage/"
+COVERAGE_OUTPUT_DIR="/tmp/${USER}/all_coverage/"
 
 BASELINES=(
     "//sw/device/silicon_creator/rom_ext:rom_ext_dice_cwt_slot_virtual_baseline_coverage"
@@ -854,8 +854,10 @@ HYPER310_FAKE_KEYS_TESTS=(
 //sw/device/tests:ottf_console_with_gpio_tx_indicator_test_fpga_hyper310_rom_with_fake_keys
 )
 
+source rom_targets.sh
+
 TEST_GROUPS=(
-    # "TEST_ROM_TESTS"
+    "TEST_ROM_TESTS"
     "CW310_FAKE_KEYS_TESTS"
     "MANUF_TESTS"
     "CRYPTO_TESTS"
@@ -867,11 +869,12 @@ TEST_GROUPS=(
     "CW340_SIVAL_TESTS"
     "CW340_FAKE_KEYS_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"
+    "INS_ROM_TESTS"
 )
 
 TARGETS+=(
     "${UNIT_TESTS[@]}"
-    # "${TEST_ROM_TESTS[@]}"
+    "${TEST_ROM_TESTS[@]}"
     "${CW310_FAKE_KEYS_TESTS[@]}"
     "${MANUF_TESTS[@]}"
     "${CRYPTO_TESTS[@]}"
@@ -883,6 +886,7 @@ TARGETS+=(
     "${CW340_SIVAL_TESTS[@]}"
     "${CW340_FAKE_KEYS_TESTS[@]}"
     "${HYPER310_FAKE_KEYS_TESTS[@]}"
+    "${INS_ROM_TESTS[@]}"
 )
 
 BAZEL_ARGS=(
@@ -923,8 +927,6 @@ for baseline_label in "${BASELINES[@]}"; do
       exit 1
     fi
 done
-
-exit 0
 
 
 if [[ "${#TARGETS[@]}" == "0" ]]; then

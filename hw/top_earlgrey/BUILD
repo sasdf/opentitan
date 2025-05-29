@@ -475,7 +475,6 @@ fpga_cw340(
         "interface": "hyper340",
         "exit_success": DEFAULT_TEST_SUCCESS_MSG,
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
-        "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
     },
     rom_ext = select({
         "//signing:test_keys": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
