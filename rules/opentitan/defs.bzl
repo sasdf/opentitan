@@ -254,11 +254,12 @@ def opentitan_test(
     all_test_params = []
     all_other_test_params = []
     new_exec_env = dict(exec_env)
-    add_instrumented_rom = True
-    if silicon != _silicon_params():
-        add_instrumented_rom = False
-    if verilator != _verilator_params():
-        add_instrumented_rom = False
+    add_instrumented_rom = False
+    for (env, pname) in exec_env.items():
+        pname = _parameter_name(env, pname)
+        if pname == "fpga":
+            add_instrumented_rom = True
+
     if add_instrumented_rom:
         new_exec_env.update({"//hw/top_earlgrey:fpga_cw340_instrumented_rom": None})
     for (env, pname) in new_exec_env.items():

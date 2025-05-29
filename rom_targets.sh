@@ -111,8 +111,17 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_rma_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e:rom_ext_upgrade_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e:sigverify_key_auth_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e:rom_e2e_shutdown_exception_c_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e:rom_e2e_smoke_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e:rom_e2e_static_critical_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_rma_nodefault_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_rma_bigger_than_64k_fpga_cw340_instrumented_rom
+
+//sw/device/silicon_creator/rom/e2e/epmp_init:epmp_init_otp_rma_fpga_cw340_instrumented_rom
+
+//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_invalid_meas_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_meas_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_no_meas_fpga_cw340_instrumented_rom
 
 # exec env (?)
 #//sw/device/silicon_creator/rom/e2e/ate:ate_smoketest_fpga_cw340_instrumented_rom
