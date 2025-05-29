@@ -18,6 +18,7 @@ use crate::util::file;
 
 const COVERAGE_START_ANCHOR: &str = "== COVERAGE PROFILE START ==\r\n";
 const COVERAGE_END_ANCHOR: &str = "== COVERAGE PROFILE END ==\r\n";
+const COVERAGE_SKIP_ANCHOR: &str = "== COVERAGE PROFILE SKIP ==\r\n";
 
 #[derive(Default)]
 pub struct UartConsole {
@@ -392,7 +393,9 @@ impl UartConsole {
     where
         T: ConsoleDevice + ?Sized,
     {
-        Self::wait_for(device, &regex::escape(COVERAGE_END_ANCHOR), timeout)?;
+        let anchor = regex::escape(COVERAGE_END_ANCHOR) + "|" + &regex::escape(COVERAGE_SKIP_ANCHOR);
+
+        Self::wait_for(device, &anchor, timeout)?;
         Ok(())
     }
 }

@@ -7,6 +7,9 @@
 #include "sw/device/coverage/printer.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/runtime/print.h"
+#include "sw/device/lib/base/macros.h"
+
+#ifdef OT_COVERAGE_INSTRUMENTED
 
 extern char __llvm_prf_cnts_start[];
 extern char __llvm_prf_cnts_end[];
@@ -20,6 +23,9 @@ extern char _bss_end[];
 extern char _build_id_start[];
 extern char _build_id_end[];
 
+#endif  // OT_COVERAGE_INSTRUMENTED
+
+OT_NO_COVERAGE
 void coverage_init(void) {
   base_printf("COVERAGE:OTTF\r\n");
 
@@ -29,7 +35,10 @@ void coverage_init(void) {
 /**
  * Sends the given buffer as a hex string over dif console.
  */
+OT_NO_COVERAGE
 void coverage_report(void) {
+#if defined(OT_COVERAGE_INSTRUMENTED)
+
   LOG_INFO("version: %08x%08x", (uint32_t)(__llvm_profile_raw_version>>32), (uint32_t)__llvm_profile_raw_version);
   LOG_INFO("cnts: %08x - %08x", __llvm_prf_cnts_start, __llvm_prf_cnts_end);
   LOG_INFO("size: %u",
@@ -48,8 +57,16 @@ void coverage_report(void) {
   base_printf("== COVERAGE PROFILE START ==\r\n");
   coverage_printer_run();
   base_printf("== COVERAGE PROFILE END ==\r\n");
+
+#elif defined(OT_COVERAGE_ENABLED)
+
+  base_printf("== COVERAGE PROFILE SKIP ==\r\n");
+
+#endif
+
 }
 
+OT_NO_COVERAGE
 void coverage_printer_sink(const void *data, size_t size) {
   for (size_t i = 0; i < size; ++i) {
     base_printf("%02x", ((uint8_t *)data)[i]);

@@ -76,6 +76,10 @@ cc_library(
     name = "runtime_api",
     hdrs = ["runtime.h"],
     target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        ":empty_runtime",
+        "//sw/device/lib/base:macros",
+    ],
 )
 
 cc_library(
@@ -84,20 +88,20 @@ cc_library(
     features = ["-coverage"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
-        ":runtime_api",
+        "//sw/device/lib/base:macros",
     ],
 )
 
 cc_library(
     name = "uart_runtime_real",
     srcs = ["uart_runtime.c"],
-    features = ["-coverage"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":printer",
-        ":runtime_api",
         "//sw/device/silicon_creator/lib/drivers:uart",
+        "//sw/device/lib/base:macros",
     ],
+    alwayslink = True,
 )
 
 alias(
@@ -111,15 +115,15 @@ alias(
 cc_library(
     name = "ottf_runtime_real",
     srcs = ["ottf_runtime.c"],
-    features = ["-coverage"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":printer",
-        ":runtime_api",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/runtime:print",
+        "//sw/device/lib/base:macros",
     ],
+    alwayslink = True,
 )
 
 alias(

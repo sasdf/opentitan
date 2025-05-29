@@ -40,6 +40,7 @@ GENHTML_ARGS=(
     --ignore-errors inconsistent
     --ignore-errors category
     # --ignore-errors corrupt
+    --html-epilog sw/device/coverage/report_epilog.html
     --output "${COVERAGE_OUTPUT_DIR}"
     "${COVERAGE_DAT}"
 )

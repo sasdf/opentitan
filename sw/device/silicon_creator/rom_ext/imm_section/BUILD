@@ -37,6 +37,7 @@ cc_library(
         ":imm_section_epmp",
         ":imm_section_version_def",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//sw/device/coverage:runtime_api",
         "//sw/device/coverage:uart_runtime",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:hardened",
