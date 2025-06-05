@@ -25,6 +25,7 @@ if [[ "${#TARGETS[@]}" == "0" ]]; then
     for test_group_name in "${TEST_GROUPS[@]}"; do
         test_group_expr="${test_group_name}[@]"
         test_group=( "${!test_group_expr}" )
+        TARGETS+=( "${test_group[@]}" )
         if [[ "${#test_group[@]}" != "0" ]]; then
             echo "Running test group ${test_group_name}"
             rm -f "${COVERAGE_DAT}"
@@ -33,10 +34,11 @@ if [[ "${#TARGETS[@]}" == "0" ]]; then
             echo "Skip empty test group ${test_group_name}"
         fi
     done
-else
-    rm -f "${COVERAGE_DAT}"
-    ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 fi
+
+echo "Collect overall coverage"
+rm -f "${COVERAGE_DAT}"
+./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
 
 GENHTML_ARGS=(
@@ -60,16 +62,7 @@ else
         filtered_dis_dat="${BASELINE_CACHE_DIR}/${baseline_name}.dis.dat"
         echo "Filter with baseline '${baseline_name}'"
 
-        # python3 sw/device/coverage/coverage_filter/coverage_filter.py \
-        #   --baseline="${cached_zip}" \
-        #   --coverage="${COVERAGE_DAT}" \
-        #   --output="${filtered_dat}"
-
-        # genhtml "${GENHTML_ARGS[@]}" \
-        #     --output "${COVERAGE_OUTPUT_DIR}/${baseline_name}" \
-        #     "${filtered_dat}"
-
-        python3 sw/device/coverage/coverage_filter/coverage_filter.py \
+        python3 sw/device/coverage/util/coverage_filter.py \
           --baseline="${cached_zip}" \
           --coverage="${COVERAGE_DAT}" \
           --use_disassembly \
@@ -81,7 +74,7 @@ else
     done
 
     filtered_dis_dat="${BASELINE_CACHE_DIR}/all_baselines.dis.dat"
-    python3 sw/device/coverage/coverage_filter/coverage_filter.py \
+    python3 sw/device/coverage/util/coverage_filter.py \
       --baseline "${CACHED_BASELINES[@]}" \
       --coverage="${COVERAGE_DAT}" \
       --use_disassembly \

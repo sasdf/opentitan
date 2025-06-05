@@ -860,6 +860,7 @@ source rom_targets.sh
 source targets_skip_in_ci.sh
 
 TEST_GROUPS=(
+    "UNIT_TESTS"
     "TEST_ROM_TESTS"
     "CW310_FAKE_KEYS_TESTS"
     "MANUF_TESTS"
@@ -876,7 +877,7 @@ TEST_GROUPS=(
     "${EX_TEST_GROUPS[@]}"
 )
 
-TARGETS+=(
+_TARGETS+=(
     "${UNIT_TESTS[@]}"
     "${TEST_ROM_TESTS[@]}"
     "${CW310_FAKE_KEYS_TESTS[@]}"

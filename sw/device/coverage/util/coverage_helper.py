@@ -1,7 +1,5 @@
 import re
-import argparse
 import json
-import zipfile
 import bisect
 import itertools as it
 from collections import namedtuple, defaultdict
@@ -179,6 +177,8 @@ def parse_single_file(lines):
     else:
       raise ValueError(f'Unexpected line: {line}')
 
+  assert set(profile.fn) == set(profile.fnda)
+
   return profile
 
 def parse_lcov(lines):
@@ -266,9 +266,24 @@ def or_coverage(a, b):
     for sf in keys
   }
 
-def filter_coverage(baseline, coverage):
+def filter_dict(a, b):
+  return {k: a.get(k, 0) for k in b.keys()}
+
+def filter_coverage(a, b):
+  a = defaultdict(lambda: MISSING, a)
+  return {
+    sf: FileProfile(
+      sf=sf,
+      fn=b[sf].fn,
+      fnda=filter_dict(a[sf].fnda, b[sf].fnda),
+      da=filter_dict(a[sf].da, b[sf].da),
+    )
+    for sf in b.keys()
+  }
+
+def generate_lcov(coverage):
   output = []
-  for sf, base in baseline.items():
+  for sf, cov in coverage.items():
     # bazel doesn't collect coverages for generated files.
     if sf.startswith('SF:bazel-out/'):
       continue
@@ -281,80 +296,25 @@ def filter_coverage(baseline, coverage):
     if sf.startswith('SF:hw/top_earlgrey/sw/autogen/'):
       continue
 
-    cov = coverage.get(sf, MISSING)
     output.append(sf + '\n')
-    for name, lineno in base.fn.items():
+    for name, lineno in cov.fn.items():
       output.append(f'FN:{lineno},{name}\n')
 
     fnh = 0
-    for name in base.fnda.keys():
-      count = cov.fnda.get(name, 0)
+    for name, count in cov.fnda.items():
       if count > 0:
         fnh += 1
       output.append(f'FNDA:{count},{name}\n')
     output.append(f'FNH:{fnh}\n')
-    output.append(f'FNF:{len(base.fnda)}\n')
+    output.append(f'FNF:{len(cov.fnda)}\n')
 
     lh = 0
-    for lineno in base.da.keys():
-      count = cov.da.get(lineno, 0)
+    for lineno, count in cov.da.items():
       if count > 0:
         lh += 1
       output.append(f'DA:{lineno},{count}\n')
     output.append(f'LH:{lh}\n')
-    output.append(f'LF:{len(base.da)}\n')
+    output.append(f'LF:{len(cov.da)}\n')
 
     output.append('end_of_record\n')
   return output
-
-def main():
-  parser = argparse.ArgumentParser(description='Filter related coverage based on a baseline.')
-  parser.add_argument('--baseline', type=str, nargs='+', required=True, help='Path to the baseline coverage file.')
-  parser.add_argument('--coverage', type=str, help='Path to the coverage file to filter.')
-  parser.add_argument('--use_disassembly', action='store_true', help='Filter with disassembly.')
-  parser.add_argument('--output', type=str, help='Path to the output file.')
-  args = parser.parse_args()
-
-  all_baselines = {}
-  for zip_path in args.baseline:
-    print(f'Loading {zip_path}')
-    with zipfile.ZipFile(zip_path, 'r') as baseline_zip:
-      with baseline_zip.open('coverage.dat', 'r') as f:
-        baseline = parse_lcov(f.read().decode().splitlines())
-      # Ignore objects that are discarded in the final firmware
-      baseline = strip_discarded(baseline)
-
-      if args.use_disassembly:
-        with baseline_zip.open('test.dis', 'r') as f:
-          compiled = parse_dis_file(f.read().decode())
-        with baseline_zip.open('coverage.json', 'r') as f:
-          segments = parse_llvm_json(f.read().decode())
-        compiled = expand_dis_region(compiled, segments)
-
-        # Use normal baseline coverage for these files.
-        for sf in SKIP_DIS:
-          compiled[sf] = baseline[sf]
-
-        # Compiled functions lines includes comments,
-        # apply a and filter here to remove them.
-        baseline = and_coverage(compiled, baseline)
-    all_baselines = or_coverage(all_baselines, baseline)
-  baseline = all_baselines
-
-  # Read the coverage file to filter
-  with open(args.coverage, 'r') as f:
-    coverage = parse_lcov(f.readlines())
-
-  # Filter the coverage
-  baseline = merge_inlined_copies(baseline)
-  coverage = merge_inlined_copies(coverage)
-  filtered_coverage = filter_coverage(baseline, coverage)
-
-  # # Write the filtered coverage to the output file
-  with open(args.output, 'w') as f:
-    f.writelines(filtered_coverage)
-
-
-if __name__ == '__main__':
-  main()
-
