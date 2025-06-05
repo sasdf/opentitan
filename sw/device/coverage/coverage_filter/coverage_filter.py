@@ -1,9 +1,149 @@
 import re
 import argparse
-from collections import namedtuple
+import json
+import zipfile
+import bisect
+import itertools as it
+from collections import namedtuple, defaultdict
 
 
 FileProfile = namedtuple('FileProfile', ['sf', 'fn', 'fnda', 'da'])
+MISSING = FileProfile(sf='', fn={}, fnda={}, da={})
+
+def parse_dis_file(lines):
+  files = defaultdict(list)
+  for m in re.finditer(r'^/proc/self/cwd/(.*):(\d+)', lines, re.M):
+    path, lineno = m.groups()
+    lineno = int(lineno)
+    while path.startswith('./'):
+      path = path.removeprefix('./')
+    sf = 'SF:' + path
+    files[sf].append(lineno)
+
+  return {
+    sf: FileProfile(
+      sf=sf,
+      fn={},
+      fnda={},
+      da=dict.fromkeys(lines, 1),
+    )
+    for sf, lines in files.items()
+  }
+
+Region = namedtuple('Region', 'LineStart,ColumnStart,LineEnd,ColumnEnd,ExecutionCount,FileID,ExpandedFileID,Kind')
+Function = namedtuple('Function', 'sf,name,start,end,regions,files')
+
+def parse_llvm_json(lines):
+  cov = json.loads(lines)
+
+  # Group function regions by source file
+  function_by_sf = defaultdict(list)
+  for info in cov['data'][0]['functions']:
+    sf = 'SF:' + info['filenames'][0]
+    regions = [Region(*r) for r in info['regions']]
+    # Ensure the first region is the main function body.
+    assert regions[0].Kind == 0, regions[0]
+    assert regions[0].FileID == 0, regions[0]
+
+    if regions[0].ExecutionCount == 0:
+      # If the function is not reachable, all expansions should be unreachable
+      # too.
+      assert all(r.ExecutionCount == 0 for r in regions), regions
+      continue
+
+    assert all(r.Kind in {0, 1, 2, 3} for r in regions), regions
+    func = Function(
+      sf=sf,
+      name=info['name'],
+      start=regions[0].LineStart,
+      end=regions[0].LineEnd,
+      regions=regions,
+      files=info['filenames'],
+    )
+    function_by_sf[sf].append(func)
+
+  # Segment the source file by function regions
+  result = {}
+  for sf, funcs in function_by_sf.items():
+    # Collect all boundary of the segments
+    segments = []
+    boundaries = []
+    for i, f in enumerate(funcs):
+      # (line, closing, func_id)
+      boundaries.append((f.start, False, i))
+      boundaries.append((f.end+1, True, i))
+    boundaries.sort()
+
+    # Find the functions overlapped with each segment
+    last_line, active_funcs = -1, set()
+    for line, group in it.groupby(boundaries, key=lambda x: x[0]):
+      group = list(group)
+      segments.append((last_line, line, [funcs[i] for i in active_funcs]))
+      last_line = line
+      for _, close, func_id in group:
+        if close:
+          active_funcs.remove(func_id)
+        else:
+          active_funcs.add(func_id)
+    result[sf] = segments
+
+  return result
+
+# Use normal baseline coverage for the following files.
+# e.g.
+#   macro defined functions can't be detected by disassembly.
+SKIP_DIS = {
+  'SF:sw/device/silicon_creator/lib/manifest.h',
+}
+
+def expand_dis_region(dis, segments):
+  keys = set(dis.keys()) & set(segments.keys())
+  da_by_sf = defaultdict(set)
+  fn_by_sf = defaultdict(dict)
+  for sf in keys:
+    if sf in SKIP_DIS:
+      continue
+    segs = segments[sf]
+    for line in dis[sf].da:
+      line = int(line)
+
+      # Find the segment containing the `line`.
+      idx = bisect.bisect_right(segs, (line, float('inf'), [])) -1
+      if idx == -1:
+        print('NOT FOUND', sf, idx, line, segs)
+        continue
+      start, end, funcs = segs[idx]
+      if not (start <= line < end):
+        print('RangeError', sf, idx, line, segs[idx])
+        continue
+
+      # Each instr should belong to at least one function.
+      assert len(funcs) > 0, (sf, idx, line)
+
+      # Add these functions and their dependencies.
+      for func in funcs:
+        # Add the function for function coverage.
+        fn_by_sf[sf][func.name] = func.start
+
+        # Add all the lines for line coverage.
+        for r in func.regions:
+          if r.Kind != 0 or r.ExecutionCount == 0:
+            # Skip non-source or non-reachable regions
+            continue
+          assert r.ExpandedFileID == 0, 'ExpandedFileID with source region'
+          f = 'SF:' + func.files[r.FileID]
+          da_by_sf[f].update(range(r.LineStart, r.LineEnd+1))
+
+  all_sf = set(da_by_sf.keys()) | set(fn_by_sf.keys())
+  return {
+    sf: FileProfile(
+        sf=sf,
+        fn=fn_by_sf[sf],
+        fnda=dict.fromkeys(fn_by_sf[sf].keys(), 1),
+        da=dict.fromkeys(da_by_sf[sf], 1),
+    )
+    for sf in all_sf
+  }
 
 def parse_single_file(lines):
   path = lines.pop().strip()
@@ -11,7 +151,7 @@ def parse_single_file(lines):
 
   profile = FileProfile(
     sf=path,
-    fn=set(),
+    fn={},
     fnda={},
     da={},
   )
@@ -21,7 +161,7 @@ def parse_single_file(lines):
     tag, params, *_ = line.split(':', 1) + ['']
     if tag == 'FN':
       lineno, name = params.split(',')
-      profile.fn.add((int(lineno), name))
+      profile.fn[name] = int(lineno)
     elif tag == 'FNDA':
       count, name = params.split(',')
       profile.fnda[name] = int(count)
@@ -30,7 +170,7 @@ def parse_single_file(lines):
       # raise NotImplementedError('BRDA is not supported yet')
     elif tag == 'DA':
       lineno, count, *_ = params.split(',')
-      profile.da[lineno] = int(count)
+      profile.da[int(lineno)] = int(count)
     elif tag in {'LH', 'LF', 'BRH', 'BRF', 'FNH', 'FNF'}:
       # These are summary lines, we don't care.
       pass
@@ -54,7 +194,7 @@ def strip_discarded(baseline):
   for sf, base in baseline.items():
     # Keep functions that can be hit
     fnda = {n: c for n, c in base.fnda.items() if c > 0}
-    fn = {(l, n) for l, n in base.fn if n in fnda}
+    fn = {n: l for n, l in base.fn.items() if n in fnda}
 
     # Keep lines that can be hit
     da = {l: c for l, c in base.da.items() if c > 0}
@@ -69,32 +209,98 @@ def strip_discarded(baseline):
 
   return stripped
 
+def merge_inlined_copies(coverage):
+  """
+  Dedup static inlined copies
+
+  e.g. asn1.c:bitfield_bit32_copy and bitfield.c:bitfield_bit32_copy
+  """
+  coverage = coverage.copy()
+  for sf, cov in coverage.items():
+    fn = defaultdict(int)
+    for name, lineno in cov.fn.items():
+      name = name.split(':')[-1]
+      fn[name] = max(fn[name], lineno)
+    fn = dict(fn)
+
+    fnda = defaultdict(int)
+    for name, count in cov.fnda.items():
+      name = name.split(':')[-1]
+      fnda[name] = max(fnda[name], count)
+    fnda = dict(fnda)
+
+    coverage[sf] = cov._replace(fnda=fnda, fn=fn)
+  return coverage
+
+def and_dict(a, b):
+  keys = set(a.keys()) & set(b.keys())
+  return {k: a[k] for k in keys}
+
+def and_coverage(a, b):
+  keys = set(a.keys()) & set(b.keys())
+  return {
+    sf: FileProfile(
+      sf=sf,
+      fn=and_dict(a[sf].fn, b[sf].fn),
+      fnda=and_dict(a[sf].fnda, b[sf].fnda),
+      da=and_dict(a[sf].da, b[sf].da),
+    )
+    for sf in keys
+  }
+
+def or_dict(a, b):
+  keys = set(a.keys()) | set(b.keys())
+  return {k: a.get(k, b.get(k, None)) for k in keys}
+
+def or_coverage(a, b):
+  keys = set(a.keys()) | set(b.keys())
+  a = defaultdict(lambda: MISSING, a)
+  b = defaultdict(lambda: MISSING, b)
+  return {
+    sf: FileProfile(
+      sf=sf,
+      fn=or_dict(a[sf].fn, b[sf].fn),
+      fnda=or_dict(a[sf].fnda, b[sf].fnda),
+      da=or_dict(a[sf].da, b[sf].da),
+    )
+    for sf in keys
+  }
+
 def filter_coverage(baseline, coverage):
-  keys = set(baseline.keys()) & set(coverage.keys())
   output = []
-  for sf in keys:
-    base, cov = baseline[sf], coverage[sf]
+  for sf, base in baseline.items():
+    # bazel doesn't collect coverages for generated files.
+    if sf.startswith('SF:bazel-out/'):
+      continue
+
+    # skip coverage runtime.
+    if sf.startswith('SF:sw/device/coverage/'):
+      continue
+
+    # skip constant headers.
+    if sf.startswith('SF:hw/top_earlgrey/sw/autogen/'):
+      continue
+
+    cov = coverage.get(sf, MISSING)
     output.append(sf + '\n')
-    for lineno, name in base.fn:
+    for name, lineno in base.fn.items():
       output.append(f'FN:{lineno},{name}\n')
 
     fnh = 0
     for name in base.fnda.keys():
-      if name in cov.fnda:
-        count = cov.fnda[name]
-        if count > 0:
-          fnh += 1
-        output.append(f'FNDA:{count},{name}\n')
+      count = cov.fnda.get(name, 0)
+      if count > 0:
+        fnh += 1
+      output.append(f'FNDA:{count},{name}\n')
     output.append(f'FNH:{fnh}\n')
     output.append(f'FNF:{len(base.fnda)}\n')
 
     lh = 0
     for lineno in base.da.keys():
-      if lineno in cov.da:
-        count = cov.da[lineno]
-        if count > 0:
-          lh += 1
-        output.append(f'DA:{lineno},{count}\n')
+      count = cov.da.get(lineno, 0)
+      if count > 0:
+        lh += 1
+      output.append(f'DA:{lineno},{count}\n')
     output.append(f'LH:{lh}\n')
     output.append(f'LF:{len(base.da)}\n')
 
@@ -103,23 +309,45 @@ def filter_coverage(baseline, coverage):
 
 def main():
   parser = argparse.ArgumentParser(description='Filter related coverage based on a baseline.')
-  parser.add_argument('--baseline', type=str, required=True, help='Path to the baseline coverage file.')
+  parser.add_argument('--baseline', type=str, nargs='+', required=True, help='Path to the baseline coverage file.')
   parser.add_argument('--coverage', type=str, help='Path to the coverage file to filter.')
+  parser.add_argument('--use_disassembly', action='store_true', help='Filter with disassembly.')
   parser.add_argument('--output', type=str, help='Path to the output file.')
   args = parser.parse_args()
 
-  # Read the baseline coverage file
-  with open(args.baseline, 'r') as f:
-    baseline = parse_lcov(f.readlines())
+  all_baselines = {}
+  for zip_path in args.baseline:
+    print(f'Loading {zip_path}')
+    with zipfile.ZipFile(zip_path, 'r') as baseline_zip:
+      with baseline_zip.open('coverage.dat', 'r') as f:
+        baseline = parse_lcov(f.read().decode().splitlines())
+      # Ignore objects that are discarded in the final firmware
+      baseline = strip_discarded(baseline)
 
-  # Ignore parts that are discarded in the final firmware
-  baseline = strip_discarded(baseline)
+      if args.use_disassembly:
+        with baseline_zip.open('test.dis', 'r') as f:
+          compiled = parse_dis_file(f.read().decode())
+        with baseline_zip.open('coverage.json', 'r') as f:
+          segments = parse_llvm_json(f.read().decode())
+        compiled = expand_dis_region(compiled, segments)
+
+        # Use normal baseline coverage for these files.
+        for sf in SKIP_DIS:
+          compiled[sf] = baseline[sf]
+
+        # Compiled functions lines includes comments,
+        # apply a and filter here to remove them.
+        baseline = and_coverage(compiled, baseline)
+    all_baselines = or_coverage(all_baselines, baseline)
+  baseline = all_baselines
 
   # Read the coverage file to filter
   with open(args.coverage, 'r') as f:
     coverage = parse_lcov(f.readlines())
 
   # Filter the coverage
+  baseline = merge_inlined_copies(baseline)
+  coverage = merge_inlined_copies(coverage)
   filtered_coverage = filter_coverage(baseline, coverage)
 
   # # Write the filtered coverage to the output file

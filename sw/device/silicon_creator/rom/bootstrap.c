@@ -17,6 +17,9 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "otp_ctrl_regs.h"
 
+// Slot address defined in bazel
+extern char _instrumented_rom_slot[];
+
 rom_error_t bootstrap_chip_erase(void) {
 #ifdef OT_COVERAGE_INSTRUMENTED
   flash_ctrl_data_default_perms_set((flash_ctrl_perms_t) {
@@ -24,7 +27,7 @@ rom_error_t bootstrap_chip_erase(void) {
     .write = kMultiBitBool4False,
     .erase = kMultiBitBool4True,
   });
-  for (uint32_t addr = 0; addr < TOP_EARLGREY_EFLASH_SIZE_BYTES - 0x20000; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
+  for (uint32_t addr = 0; addr < (uint32_t) _instrumented_rom_slot; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
     HARDENED_RETURN_IF_ERROR(flash_ctrl_data_erase(addr, kFlashCtrlEraseTypePage));
   }
   flash_ctrl_data_default_perms_set((flash_ctrl_perms_t) {
@@ -48,7 +51,7 @@ rom_error_t bootstrap_chip_erase(void) {
 
 rom_error_t bootstrap_erase_verify(void) {
 #ifdef OT_COVERAGE_INSTRUMENTED
-  for (uint32_t addr = 0; addr < TOP_EARLGREY_EFLASH_SIZE_BYTES - 0x20000; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
+  for (uint32_t addr = 0; addr < (uint32_t) _instrumented_rom_slot; addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
     HARDENED_RETURN_IF_ERROR(flash_ctrl_data_erase_verify(addr, kFlashCtrlEraseTypePage));
   }
   return kErrorOk;

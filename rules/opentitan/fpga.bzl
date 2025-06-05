@@ -123,7 +123,7 @@ def _test_dispatch(ctx, exec_env, firmware):
     # assemble the image.  Replace the firmware param with the newly assembled
     # image.
     if "assemble" in param:
-        assemble = param["assemble"]
+        assemble = param.get("assemble")
         if "instrumented_rom" in action_param and "instrumented_rom" not in assemble:
           assemble += " {instrumented_rom}@{instrumented_rom_slot}"
 
@@ -140,11 +140,25 @@ def _test_dispatch(ctx, exec_env, firmware):
         param["firmware"] = image.short_path
         action_param["firmware"] = image.path
         data_files.append(image)
+    elif "instrumented_rom" in action_param:
+        fail("Got instrumented rom without assemble spec")
 
     # FIXME: maybe splice a bitstream here
 
     # Perform all relevant substitutions on the test_cmd.
     test_cmd = get_fallback(ctx, "attr.test_cmd", exec_env)
+
+    if "instrumented_rom" in action_param and 'bootstrap' not in test_cmd:
+        test_cmd_list = test_cmd.split('\n')
+        def find_bitstream_idx():
+            for i, e in list(enumerate(test_cmd_list)):
+                if 'load-bitstream' in e:
+                    return i
+            fail("Got instrumented rom without load-bitstream")
+        idx = find_bitstream_idx()
+        test_cmd_list.insert(idx+1, '--exec="bootstrap --clear-uart=true {firmware}"')
+        test_cmd = '\n'.join(test_cmd_list)
+
     test_cmd = test_cmd.format(**param)
     test_cmd = ctx.expand_location(test_cmd, data_labels)
 

@@ -287,7 +287,7 @@ fn merge_profraw(profraw_files: &Vec<PathBuf>, profdata_file: &PathBuf) {
     }
 }
 
-fn convert_to_lcov(profdata_file: &PathBuf, objects: &Vec<String>, coverage_output_file: &PathBuf) {
+fn llvm_cov_export(format: &str, profdata_file: &PathBuf, objects: &Vec<String>, output_file: &PathBuf) {
     let execroot = PathBuf::from(env::var("ROOT").unwrap());
     let llvm_cov = &env::var("LLVM_COV").unwrap();
     debug_log!("llvm_cov: {llvm_cov}");
@@ -298,7 +298,7 @@ fn convert_to_lcov(profdata_file: &PathBuf, objects: &Vec<String>, coverage_outp
     let mut llvm_cov_cmd = process::Command::new(llvm_cov);
     llvm_cov_cmd
         .arg("export")
-        .arg("-format=lcov")
+        .arg(format!("-format={format}"))
         .arg("-instr-profile")
         .arg(profdata_file)
         .arg("-ignore-filename-regex='.*external/.+'")
@@ -318,18 +318,14 @@ fn convert_to_lcov(profdata_file: &PathBuf, objects: &Vec<String>, coverage_outp
     debug_log!("Parsing llvm-cov output");
     let report_str = std::str::from_utf8(&output.stdout).expect("Failed to parse llvm-cov output");
 
-    debug_log!("Writing output to {}", coverage_output_file.display());
+    debug_log!("Writing output to {}", output_file.display());
     fs::write(
-        coverage_output_file,
+        output_file,
         report_str
             .replace("/proc/self/cwd/", "")
             .replace(&execroot.display().to_string(), ""),
     )
     .unwrap();
-
-    // Destroy the intermediate binary file so lcov_merger doesn't parse it twice.
-    debug_log!("Cleaning up {}", profdata_file.display());
-    fs::remove_file(profdata_file).unwrap();
 }
 
 fn collect_objects() -> Vec<String> {
@@ -362,7 +358,8 @@ fn main() -> Result<()> {
     debug_log!("ROOT: {}", execroot.display());
     debug_log!("RUNFILES_DIR: {}", runfiles_dir.display());
 
-    let coverage_output_file = coverage_dir.join("coverage.dat");
+    let lcov_output_file = coverage_dir.join("coverage.dat");
+    let json_output_file = coverage_dir.join("coverage.json");
     let profdata_file = coverage_dir.join("coverage.profdata");
 
 
@@ -407,7 +404,12 @@ fn main() -> Result<()> {
     }
 
     merge_profraw(&profraw_files, &profdata_file);
-    convert_to_lcov(&profdata_file, &objects, &coverage_output_file);
+    llvm_cov_export("lcov", &profdata_file, &objects, &lcov_output_file);
+    llvm_cov_export("text", &profdata_file, &objects, &json_output_file);
+
+    // Destroy the intermediate binary file so lcov_merger doesn't parse it twice.
+    debug_log!("Cleaning up {}", profdata_file.display());
+    fs::remove_file(profdata_file).unwrap();
 
     debug_log!("Success!");
     Ok(())

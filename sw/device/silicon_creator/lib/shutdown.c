@@ -522,6 +522,7 @@ SHUTDOWN_FUNC(noreturn, shutdown_hang(void)) {
 __attribute__((section(".shutdown")))
 #endif
 void shutdown_finalize(rom_error_t reason) {
+  coverage_report();
   shutdown_report_error(reason);
   // In a normal build, this function inlines to nothing.
   stack_utilization_print();
@@ -529,7 +530,6 @@ void shutdown_finalize(rom_error_t reason) {
   shutdown_keymgr_kill();
   // Reset before killing the flash to be able to use this also in flash.
   shutdown_reset();
-  COVERAGE_REPORT();
   shutdown_flash_kill();
   // If we get here, we'll wait for the watchdog to reset the chip.
   shutdown_hang();

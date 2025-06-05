@@ -23,6 +23,7 @@
 
 OT_WARN_UNUSED_RESULT
 static rom_error_t imm_section_start(void) {
+  dbg_printf("imm_start\r\n");
   // Check the ePMP state.
   HARDENED_RETURN_IF_ERROR(epmp_state_check());
   // Check sec_mmio expectations.
@@ -55,7 +56,7 @@ static rom_error_t imm_section_start(void) {
   // Make mutable part executable.
   HARDENED_RETURN_IF_ERROR(imm_section_epmp_mutable_rx(rom_ext));
 
-  dbg_printf("Done\r\n");
+  dbg_printf("imm_done\r\n");
   return kErrorOk;
 }
 

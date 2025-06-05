@@ -22,7 +22,7 @@ package(default_visibility = ["//visibility:public"])
 BOOT_POLICY_BIG_IMAGE_CASES = [
     {
         "suffix": "bigger_than_64k",
-        "array_size": 65000,
+        "array_size": 0x50000,
     },
 ]
 

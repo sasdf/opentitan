@@ -678,12 +678,16 @@ static rom_error_t rom_boot(const manifest_t *manifest,
   stack_utilization_print();
 
   if (imm_section_entry_point != kHardenedBoolFalse) {
-    COVERAGE_REPORT();
+    coverage_report();
+    // python3 sw/device/coverage/uart_hex.py 'j imm\r\n'
+    uart_write_imm(0x000a0d6d6d69206a);
     ((rom_ext_entry_point *)imm_section_entry_point)();
   } else {
-    COVERAGE_REPORT();
+    coverage_report();
   }
   // Jump to ROM_EXT.
+  // python3 sw/device/coverage/uart_hex.py 'j ext\r\n'
+  uart_write_imm(0x000a0d747865206a);
   ((rom_ext_entry_point *)entry_point)();
   return kErrorRomBootFailed;
 }

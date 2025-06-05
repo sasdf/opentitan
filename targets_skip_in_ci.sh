@@ -1,0 +1,1072 @@
+EX_CW310_TEST_ROM_TESTS=(
+//sw/device/lib/testing/test_framework:ottf_flow_control_functest_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/drivers:keymgr_functest_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_verify_functest_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify:rsa_verify_functest_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:fors_test_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:mgf1_test_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:thash_test_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat0_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat1_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat2_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat3_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat4_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat5_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat6_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat7_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat8_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat9_fpga_cw310_test_rom
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:wots_test_fpga_cw310_test_rom
+//sw/device/tests/autogen:alert_test_fpga_cw310_test_rom
+//sw/device/tests/autogen:plic_all_irqs_test_0_fpga_cw310_test_rom
+//sw/device/tests/autogen:plic_all_irqs_test_10_fpga_cw310_test_rom
+//sw/device/tests/autogen:plic_all_irqs_test_20_fpga_cw310_test_rom
+//sw/device/tests/crypto:ecdsa_p256_functest_fpga_cw310_test_rom
+//sw/device/tests/crypto:ecdsa_p384_functest_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:aes_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:cshake_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:drbg_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:ecdh_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:ecdsa_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha256_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha384_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha512_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha256_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha384_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_224_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_256_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_384_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_512_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sha512_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:shake128_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:shake256_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw310_test_rom
+
+# //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_test_rom
+# //sw/device/tests:usbdev_deep_reset_test_fpga_cw310_test_rom
+# //sw/device/tests:usbdev_deep_resume_test_fpga_cw310_test_rom
+# //sw/device/tests:usbdev_sleep_reset_test_fpga_cw310_test_rom
+# //sw/device/tests:usbdev_sleep_resume_test_fpga_cw310_test_rom
+# //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_test_rom
+
+# //sw/device/tests:power_virus_systemtest_fpga_cw310_test_rom
+# //sw/device/silicon_creator/lib/sigverify:mod_exp_ibex_functest_wycheproof_fpga_cw310_test_rom
+# //sw/device/silicon_creator/lib/sigverify:sigverify_dynamic_functest_wycheproof_fpga_cw310_test_rom
+
+# //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw310_test_rom
+)
+
+EX_CW340_TEST_ROM_TESTS=(
+//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_verify_functest_fpga_cw340_test_rom
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw340_test_rom
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw340_test_rom
+//sw/device/tests:spi_device_sleep_test_fpga_cw340_test_rom
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw340_test_rom
+//sw/device/tests:spi_host_config_test_fpga_cw340_test_rom
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw340_test_rom
+//sw/device/tests:uart_smoketest_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:aes_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:cshake_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:drbg_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:ecdh_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:ecdsa_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha256_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha384_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:hmac_sha512_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha256_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha384_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_224_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_256_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_384_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha3_512_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sha512_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:shake128_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:shake256_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw340_test_rom
+
+# //sw/device/tests:coverage_test_fpga_cw340_test_rom
+
+# //sw/device/silicon_creator/lib/sigverify/sigverify_tests:sigverify_cryptotest_fpga_cw340_test_rom
+# //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_test_rom
+)
+
+EX_CW310_FAKE_KEYS_TESTS=(
+//sw/device/lib/base:crc32_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/lib/base:hardened_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/lib/crypto/drivers:aes_test_fpga_cw310_rom_with_fake_keys
+//sw/device/lib/crypto/drivers:entropy_test_fpga_cw310_rom_with_fake_keys
+//sw/device/lib/testing/test_framework:ottf_flow_control_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib:boot_data_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib:irq_asm_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib:otbn_boot_services_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:alert_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:retention_sram_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:rstmgr_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:uart_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:watchdog_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_verify_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify:mod_exp_ibex_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify:rsa_verify_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify:sigverify_dynamic_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify:spx_verify_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:fors_test_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:mgf1_test_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:thash_test_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat0_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat1_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat2_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat3_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat4_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat5_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat6_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat7_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat8_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:verify_test_kat9_fpga_cw310_rom_with_fake_keys
+//sw/device/silicon_creator/lib/sigverify/sphincsplus/test:wots_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aes_entropy_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aes_force_prng_reseed_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aes_masking_off_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aes_prng_reseed_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aes_stall_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:alert_handler_escalation_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:alert_handler_lpg_clkoff_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:alert_handler_lpg_reset_toggle_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:alert_handler_ping_ok_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:alert_handler_ping_timeout_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aon_timer_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aon_timer_sleep_wdog_sleep_pause_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aon_timer_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aon_timer_wdog_bite_reset_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:aon_timer_wdog_lc_escalate_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:ast_clk_outs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:chip_power_idle_load_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:chip_power_sleep_load_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_jitter_frequency_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_jitter_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_off_aes_trans_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_off_hmac_trans_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_off_kmac_trans_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_off_otbn_trans_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_off_peri_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_reset_frequency_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_sleep_frequency_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:clkmgr_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:csrng_kat_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:csrng_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:edn_auto_mode_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:edn_boot_mode_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:edn_kat_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:edn_sw_mode_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_ast_rng_req_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_bypass_mode_health_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_csrng_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_edn_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_fw_observe_many_contiguous_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_fw_override_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_fw_ovr_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_kat_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:entropy_src_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:example_test_from_flash_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_idle_low_power_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_info_access_lc_dev_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_info_access_lc_prod_end_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_info_access_lc_prod_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_info_access_lc_rma_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_info_access_lc_test_unlocked0_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:flash_ctrl_write_clear_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:hmac_enc_idle_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:hmac_enc_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:hmac_secure_wipe_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:hmac_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_derive_attestation_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_derive_sealing_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_key_derivation_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_sideload_aes_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_sideload_kmac_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:keymgr_sideload_otbn_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_endianess_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_idle_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_kmac_key_sideload_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_mode_cshake_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_mode_kmac_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:kmac_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:lc_ctrl_otp_hw_cfg0_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otbn_ecdsa_op_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otbn_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otbn_isa_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otbn_randomness_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otbn_rsa_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otp_ctrl_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:plic_sw_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pmp_smoketest_napot_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pmp_smoketest_tor_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwm_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_all_reset_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_deep_sleep_all_reset_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_deep_sleep_all_wake_ups_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_deep_sleep_por_reset_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_lowpower_cancel_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_normal_sleep_all_reset_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_normal_sleep_all_wake_ups_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_normal_sleep_por_reset_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_random_sleep_all_reset_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_random_sleep_all_wake_ups_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_sleep_disabled_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_sleep_wake_5_bug_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_usb_clk_disabled_when_active_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_usbdev_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:pwrmgr_wdog_reset_reqs_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rstmgr_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rstmgr_sw_req_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rstmgr_sw_rst_ctrl_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_core_ibex_address_translation_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_core_ibex_icache_invalidate_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_core_ibex_nmi_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_core_ibex_rnd_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_plic_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_timer_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:rv_timer_systick_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sensor_ctrl_alert_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sensor_ctrl_wakeup_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sleep_pin_mio_dio_val_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sleep_pwm_pulses_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:spi_device_flash_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:spi_host_irq_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_execution_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_memset_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_readback_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_sleep_sram_ret_contents_no_scramble_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_sleep_sram_ret_contents_scramble_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_subword_access_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:uart_smoketest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/autogen:alert_test_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/autogen:plic_all_irqs_test_0_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/autogen:plic_all_irqs_test_10_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/autogen:plic_all_irqs_test_20_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_gcm_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_kwp_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_kwp_kat_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_kwp_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:aes_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:drbg_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdh_p256_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdh_p256_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdh_p384_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdh_p384_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdsa_p256_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdsa_p256_verify_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ecdsa_p384_sideload_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hkdf_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hmac_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hmac_multistream_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hmac_sha256_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hmac_sha384_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:hmac_sha512_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:kdf_hmac_ctr_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:kdf_kmac_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:kmac_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:kmac_sideload_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_2048_encryption_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_2048_key_from_cofactor_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_2048_keygen_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_2048_signature_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_3072_encryption_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_3072_signature_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_3072_verify_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_4096_encryption_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:rsa_4096_signature_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:sha256_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:sha384_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:sha512_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:symmetric_keygen_functest_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/tests:crt_test_fpga_cw310_rom_with_fake_keys
+
+# //third_party/coremark/top_earlgrey:coremark_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/penetrationtests/firmware:chip_pen_test_fi_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/penetrationtests/firmware:chip_pen_test_fi_otbn_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/penetrationtests/firmware:chip_pen_test_sca_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/tests:rv_core_ibex_isa_test_prod_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:rv_core_ibex_mem_test_prod_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/tests:usbdev_aon_pullup_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_config_host_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_deep_reset_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_deep_resume_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_iso_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_mem_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_mixed_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_pincfg_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_pullup_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_setuprx_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_sleep_reset_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_sleep_resume_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_stream_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_toggle_restore_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:usbdev_vbus_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/silicon_creator/lib/drivers:usb_functest_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/tests:uart_baud_rate_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:sigverify_parallel_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:csrng_edn_concurrency_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:example_concurrency_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/crypto:rsa_4096_keygen_functest_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/tests:otbn_smoketest_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:sleep_pin_wake_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/crypto:kdf_kmac_sideload_functest_hardcoded_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:rstmgr_cpu_info_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/silicon_creator/lib/sigverify:mod_exp_ibex_functest_wycheproof_fpga_cw310_rom_with_fake_keys
+# //sw/device/silicon_creator/lib/sigverify:sigverify_dynamic_functest_wycheproof_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:aes_idle_test_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:gpio_smoketest_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:spi_host_smoketest_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:spi_host_winbond_flash_test_fpga_cw310_rom_with_fake_keys
+
+# //sw/device/lib/base:memory_perftest_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests:spi_passthru_test_fpga_cw310_rom_with_fake_keys
+)
+
+EX_CW340_CRYPTO_TESTS=(
+//sw/device/tests/crypto/cryptotest:aes_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:cshake_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:drbg_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:ecdh_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:ecdsa_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:hmac_sha256_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:hmac_sha384_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:hmac_sha512_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha256_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha384_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha3_224_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha3_256_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha3_384_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha3_512_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sha512_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:shake128_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:shake256_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw340_sival_rom_ext
+
+# //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_sival_rom_ext
+)
+
+EX_CW310_SIVAL_TESTS=(
+//sw/device/tests:aes_entropy_test_fpga_cw310_sival
+//sw/device/tests:aes_force_prng_reseed_test_fpga_cw310_sival
+//sw/device/tests:aes_prng_reseed_test_fpga_cw310_sival
+//sw/device/tests:aes_stall_test_fpga_cw310_sival
+//sw/device/tests:alert_handler_escalation_test_fpga_cw310_sival
+//sw/device/tests:alert_handler_lpg_clkoff_test_fpga_cw310_sival
+//sw/device/tests:alert_handler_lpg_reset_toggle_test_fpga_cw310_sival
+//sw/device/tests:alert_handler_ping_ok_test_fpga_cw310_sival
+//sw/device/tests:aon_timer_wdog_bite_reset_test_fpga_cw310_sival
+//sw/device/tests:ast_clk_outs_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_external_clk_src_for_sw_fast_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_jitter_frequency_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_off_aes_trans_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_off_hmac_trans_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_off_kmac_trans_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_off_otbn_trans_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_off_peri_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_reset_frequency_test_fpga_cw310_sival
+//sw/device/tests:clkmgr_sleep_frequency_test_fpga_cw310_sival
+//sw/device/tests:entropy_src_bypass_mode_health_test_fpga_cw310_sival
+//sw/device/tests:entropy_src_csrng_test_fpga_cw310_sival
+//sw/device/tests:hmac_enc_idle_test_fpga_cw310_sival
+//sw/device/tests:hmac_secure_wipe_test_fpga_cw310_sival
+//sw/device/tests:hmac_smoketest_fpga_cw310_sival
+//sw/device/tests:keymgr_derive_attestation_test_fpga_cw310_sival
+//sw/device/tests:keymgr_derive_sealing_test_fpga_cw310_sival
+//sw/device/tests:kmac_idle_test_fpga_cw310_sival
+//sw/device/tests:kmac_kmac_key_sideload_test_fpga_cw310_sival
+//sw/device/tests:kmac_smoketest_fpga_cw310_sival
+//sw/device/tests:otbn_isa_test_fpga_cw310_sival
+//sw/device/tests:otbn_randomness_test_fpga_cw310_sival
+//sw/device/tests:pattgen_ios_test_fpga_cw310_sival
+//sw/device/tests:pwm_smoketest_fpga_cw310_sival
+//sw/device/tests:pwrmgr_deep_sleep_all_wake_ups_fpga_cw310_sival
+//sw/device/tests:pwrmgr_deep_sleep_por_reset_test_fpga_cw310_sival
+//sw/device/tests:pwrmgr_normal_sleep_all_wake_ups_fpga_cw310_sival
+//sw/device/tests:pwrmgr_normal_sleep_por_reset_test_fpga_cw310_sival
+//sw/device/tests:pwrmgr_random_sleep_all_wake_ups_fpga_cw310_sival
+//sw/device/tests:pwrmgr_sleep_disabled_test_fpga_cw310_sival
+//sw/device/tests:pwrmgr_sleep_wake_5_bug_test_fpga_cw310_sival
+//sw/device/tests:pwrmgr_smoketest_fpga_cw310_sival
+//sw/device/tests:pwrmgr_usb_clk_disabled_when_active_test_fpga_cw310_sival
+//sw/device/tests:pwrmgr_wdog_reset_reqs_test_fpga_cw310_sival
+//sw/device/tests:rstmgr_sw_req_test_fpga_cw310_sival
+//sw/device/tests:rstmgr_sw_rst_ctrl_test_fpga_cw310_sival
+//sw/device/tests:rv_core_ibex_nmi_irq_test_fpga_cw310_sival
+//sw/device/tests:rv_core_ibex_rnd_test_fpga_cw310_sival
+//sw/device/tests:sram_ctrl_sleep_sram_ret_contents_no_scramble_test_fpga_cw310_sival
+//sw/device/tests:sram_ctrl_sleep_sram_ret_contents_scramble_test_fpga_cw310_sival
+//sw/device/tests/autogen:alert_test_fpga_cw310_sival
+//sw/device/tests/autogen:plic_all_irqs_test_0_fpga_cw310_sival
+//sw/device/tests/autogen:plic_all_irqs_test_10_fpga_cw310_sival
+//sw/device/tests/autogen:plic_all_irqs_test_20_fpga_cw310_sival
+
+# //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival
+# //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_sival
+
+# //sw/device/tests:uart_parity_break_test_fpga_cw310_sival
+# //sw/device/tests:csrng_edn_concurrency_test_fpga_cw310_sival
+# //sw/device/tests:uart_tx_rx_test_fpga_cw310_sival
+
+# //sw/device/tests:gpio_intr_test_fpga_cw310_sival
+# //sw/device/tests:gpio_pinmux_test_fpga_cw310_sival
+# //sw/device/tests:otbn_smoketest_fpga_cw310_sival
+# //sw/device/tests:aes_idle_test_fpga_cw310_sival
+)
+
+EX_CW340_SIVAL_TESTS=(
+//sw/device/tests:aes_force_prng_reseed_test_fpga_cw340_sival
+//sw/device/tests:aes_prng_reseed_test_fpga_cw340_sival
+//sw/device/tests:aes_stall_test_fpga_cw340_sival
+//sw/device/tests:alert_handler_ping_ok_test_fpga_cw340_sival
+//sw/device/tests:entropy_src_bypass_mode_health_test_fpga_cw340_sival
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw340_sival
+//sw/device/tests:kmac_error_conditions_test_fpga_cw340_sival
+//sw/device/tests:sleep_pin_mio_dio_val_test_fpga_cw340_sival
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw340_sival
+//sw/device/tests:spi_device_sleep_test_fpga_cw340_sival
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw340_sival
+//sw/device/tests:spi_host_config_test_fpga_cw340_sival
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw340_sival
+//sw/device/tests:uart_smoketest_fpga_cw340_sival
+//sw/device/tests:rv_dm_lc_disabled_tl_dev_fpga_cw340_sival
+//sw/device/tests:rv_dm_lc_disabled_tl_prod_end_fpga_cw340_sival
+//sw/device/tests:rv_dm_lc_disabled_tl_prod_fpga_cw340_sival
+//sw/device/tests:rv_dm_lc_disabled_tl_rma_fpga_cw340_sival
+//sw/device/tests:rv_dm_lc_disabled_tl_test_unlocked1_fpga_cw340_sival
+
+# //sw/device/tests:rv_dm_csr_rw_dev_rv_dm_default_enabled_fpga_cw340_sival
+# //sw/device/tests:rv_dm_csr_rw_dev_rv_dm_delayed_enabled_fpga_cw340_sival
+# //sw/device/tests:rv_dm_csr_rw_rma_fpga_cw340_sival
+# //sw/device/tests:rv_dm_csr_rw_test_unlocked1_fpga_cw340_sival
+# //sw/device/tests:rv_dm_mem_access_dev_rv_dm_default_enabled_fpga_cw340_sival
+# //sw/device/tests:rv_dm_mem_access_dev_rv_dm_delayed_enabled_fpga_cw340_sival
+# //sw/device/tests:rv_dm_mem_access_rma_fpga_cw340_sival
+# //sw/device/tests:rv_dm_mem_access_test_unlocked1_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_dev_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_rma_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_tap_sel_dev_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_tap_sel_prod_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_tap_sel_rma_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_tap_sel_test_unlocked1_fpga_cw340_sival
+# //sw/device/tests:rv_dm_jtag_test_unlocked1_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_dev_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_prod_end_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_prod_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_rma_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_test_locked0_fpga_cw340_sival
+# //sw/device/tests:rv_dm_lc_disabled_jtag_test_unlocked1_fpga_cw340_sival
+)
+
+EX_IMM_TESTS=(
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_cw340_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_cw340_rom_ext
+)
+
+EX_CW340_ROM_EXT_TESTS=(
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_x509_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_manifest_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_prod_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_prod_hybrid_spx_pure_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_unauthorized_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_a_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_b_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_a_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_b_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_b_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_cw340_rom_ext
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw340_rom_ext
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw340_rom_ext
+//sw/device/tests:spi_device_sleep_test_fpga_cw340_rom_ext
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw340_rom_ext
+//sw/device/tests:spi_host_config_test_fpga_cw340_rom_ext
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw340_rom_ext
+//sw/device/tests:uart_smoketest_fpga_cw340_rom_ext
+
+# //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
+)
+
+EX_CW340_FAKE_KEYS_TESTS=(
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:variation_interop_cwt_first_test_fpga_cw340_rom_with_fake_keys
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:variation_interop_x509_first_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:spi_device_sleep_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:spi_host_config_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:uart_smoketest_fpga_cw340_rom_with_fake_keys
+)
+
+EX_CW340_SIVAL_ROM_EXT=(
+//sw/device/tests:example_mem_ujcmd_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:sleep_pin_mio_dio_val_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:spi_device_ottf_console_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:spi_device_sleep_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:spi_device_ujson_console_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:spi_host_config_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:sram_ctrl_scrambled_access_test_fpga_cw340_sival_rom_ext
+//sw/device/tests:uart_smoketest_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto:otcrypto_export_test_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto:otcrypto_hash_test_fpga_cw340_sival_rom_ext
+
+# //sw/device/tests/crypto:rsa_3072_verify_functest_wycheproof_fpga_cw340_sival_rom_ext
+)
+
+EX_INS_ROM_TESTS=(
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_dev_nodefault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_prod_default_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_prod_end_default_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_prod_end_nodefault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_prod_nodefault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_rma_nodefault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_data_recovery:boot_data_recovery_test_unlocked0_nodefault_fpga_cw340_instrumented_rom
+
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_bad_identifier_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_bad_identifier_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_end_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_end_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_in_manifest_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_in_manifest_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_outside_image_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_outside_image_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_start_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_code_start_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_empty_code_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_empty_code_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_at_code_end_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_at_code_end_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_before_code_start_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_before_code_start_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_entry_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_resizable_rom_ext_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_resizable_rom_ext_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_rollback_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_rollback_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_too_large_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_too_large_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_too_small_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_too_small_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_bad_identifier_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_bad_identifier_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_end_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_end_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_in_manifest_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_in_manifest_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_outside_image_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_outside_image_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_start_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_code_start_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_empty_code_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_empty_code_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_bad_identifier_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_bad_identifier_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_end_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_end_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_in_manifest_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_in_manifest_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_outside_image_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_outside_image_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_start_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_code_start_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_empty_code_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_empty_code_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_at_code_end_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_at_code_end_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_before_code_start_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_before_code_start_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_entry_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_resizable_rom_ext_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_resizable_rom_ext_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_rollback_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_rollback_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_too_large_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_too_large_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_too_small_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_end_too_small_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_at_code_end_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_at_code_end_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_before_code_start_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_before_code_start_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_entry_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_resizable_rom_ext_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_resizable_rom_ext_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_rollback_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_rollback_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_too_large_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_too_large_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_too_small_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_prod_too_small_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_bad_identifier_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_bad_identifier_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_end_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_end_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_in_manifest_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_in_manifest_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_outside_image_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_outside_image_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_start_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_start_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_empty_code_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_empty_code_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_at_code_end_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_at_code_end_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_before_code_start_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_before_code_start_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_resizable_rom_ext_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_resizable_rom_ext_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_too_large_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_too_large_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_too_small_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_too_small_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_bad_identifier_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_bad_identifier_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_end_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_end_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_in_manifest_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_in_manifest_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_outside_image_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_outside_image_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_start_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_code_start_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_empty_code_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_empty_code_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_at_code_end_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_at_code_end_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_before_code_start_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_before_code_start_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_unaligned_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_entry_unaligned_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_rollback_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_rollback_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_too_large_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_too_large_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_too_small_a_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_too_small_b_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_dev_bigger_than_64k_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_prod_bigger_than_64k_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_prod_end_bigger_than_64k_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_rma_bigger_than_64k_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_test_unlocked0_bigger_than_64k_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_dev_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_dev_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_dev_a_1_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_dev_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_a_1_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_1_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_rma_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_rma_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_rma_a_1_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_rma_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_test_unlocked0_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_test_unlocked0_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_test_unlocked0_a_1_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_test_unlocked0_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_dev_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_dev_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_dev_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_dev_a_2_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_a_2_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_end_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_end_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_end_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_prod_end_a_2_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_2_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_test_unlocked0_a_0_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_test_unlocked0_a_0_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_test_unlocked0_a_1_b_1_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_test_unlocked0_a_2_b_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_disabled_no_fault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_disabled_with_fault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_no_fault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_with_fault_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_uninitialized_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reasons_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/retention_ram:rom_e2e_ret_ram_init_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/retention_ram:rom_e2e_ret_ram_keep_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_ext_upgrade_interrupt:rom_ext_upgrade_interrupt_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_ext_upgrade_interrupt:rom_ext_upgrade_interrupt_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_ext_upgrade_interrupt:rom_ext_upgrade_interrupt_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_ext_upgrade_interrupt:rom_ext_upgrade_interrupt_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rom_ext_upgrade_interrupt:rom_ext_upgrade_interrupt_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:alert_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:alert_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:alert_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:alert_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:shutdown_alert_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:shutdown_alert_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:shutdown_alert_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_alert:shutdown_alert_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_output:shutdown_output_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_output:shutdown_output_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_output:shutdown_output_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_output:shutdown_output_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_output:shutdown_output_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_dev_all_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_dev_error_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_dev_invalid_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_dev_module_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_dev_none_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_all_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_end_all_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_end_error_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_end_invalid_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_end_module_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_end_none_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_error_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_invalid_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_module_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_prod_none_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_rma_all_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_rma_error_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_rma_invalid_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_rma_module_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_rma_none_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_test_unlocked0_all_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_test_unlocked0_error_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_test_unlocked0_invalid_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_test_unlocked0_module_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_redact:e2e_shutdown_redact_test_unlocked0_none_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_dev_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_dev_200000_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_prod_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_prod_200000_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_prod_end_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_prod_end_200000_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_rma_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_rma_200000_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_test_unlocked0_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/shutdown_watchdog:shutdown_watchdog_test_unlocked0_200000_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_ecdsa_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_ecdsa_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_ecdsa_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_ecdsa_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_ecdsa_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_ecdsa_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_ecdsa_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_ecdsa_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_rma_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_ecdsa_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_ecdsa_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_test_unlocked0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_dev_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_dev_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_prod_end_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_prod_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_rma_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_rma_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_rma_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_test_unlocked0_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_test_unlocked0_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_blank_test_unlocked0_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_dev_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_dev_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_prod_end_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_prod_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_rma_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_rma_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_rma_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_test_unlocked0_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_test_unlocked0_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_ecdsa_revoked_test_unlocked0_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_dev_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_dev_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_prod_end_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_prod_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_dev_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_dev_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_prod_end_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_prod_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_rma_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_rma_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_rma_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_test_unlocked0_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_test_unlocked0_fake_ecdsa_prod_key_0_fake_spx_prod_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_revoked_test_unlocked0_fake_ecdsa_test_key_0_fake_spx_test_key_0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_dev_bs_lc_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_dev_bs_lc_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_dev_bs_lc_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_dev_bs_lc_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_dev_bs_lc_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_bs_lc_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_bs_lc_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_bs_lc_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_bs_lc_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_bs_lc_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_end_bs_lc_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_end_bs_lc_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_end_bs_lc_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_end_bs_lc_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_prod_end_bs_lc_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_rma_bs_lc_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_rma_bs_lc_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_rma_bs_lc_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_rma_bs_lc_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_rma_bs_lc_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_test_bs_lc_dev_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_test_bs_lc_prod_end_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_test_bs_lc_prod_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_test_bs_lc_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_all_constraints_mf_lc_test_bs_lc_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_family_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_family_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_invalid_unselected_device_id_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_invalid_unselected_life_cycle_state_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_invalid_unselected_manuf_state_creator_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_invalid_unselected_manuf_state_owner_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_dev_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_dev_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_prod_end_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_prod_end_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_prod_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_prod_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_rma_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_rma_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_test_unlocked0_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_lc_state_test_unlocked0_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_manuf_state_creator_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_manuf_state_creator_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_manuf_state_owner_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_manuf_state_owner_no_match_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sram:sram_readback_default_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/sram:sram_readback_enabled_test_fpga_cw340_instrumented_rom
+
+
+
+
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_code_first_word_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_code_end_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_code_start_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_ecdsa_public_key_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_ecdsa_signature_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_entry_point_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_extension_spx_public_key_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_extension_spx_signature_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_identifier_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_length_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_manifest_version_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_security_version_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_signed_region_end_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_usage_constraints_selector_bits_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_code_first_word_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_code_end_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_code_start_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_ecdsa_public_key_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_ecdsa_signature_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_entry_point_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_extension_spx_public_key_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_extension_spx_signature_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_identifier_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_length_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_manifest_version_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_security_version_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_signed_region_end_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_valid_b_corrupt_manifest_usage_constraints_selector_bits_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:flash_exc_handler_disabled_test_fpga_cw340_instrumented_rom
+
+
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_dev_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_dev_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_dev_a_good_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_dev_a_good_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_a_good_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_a_good_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_end_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_end_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_end_a_good_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_prod_end_a_good_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_rma_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_rma_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_rma_a_good_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_rma_a_good_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_test_unlocked0_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_test_unlocked0_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_test_unlocked0_a_good_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/boot_policy_valid:boot_policy_valid_test_unlocked0_a_good_b_good_fpga_cw340_instrumented_rom
+
+
+
+
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_dev_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_dev_a_bad_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_dev_a_nothing_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_dev_a_nothing_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_a_bad_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_a_nothing_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_a_nothing_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_end_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_end_a_bad_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_end_a_nothing_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_prod_end_a_nothing_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_rma_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_rma_a_bad_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_rma_a_nothing_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_rma_a_nothing_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_test_unlocked0_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_test_unlocked0_a_bad_b_nothing_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_test_unlocked0_a_nothing_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_always:sigverify_always_test_unlocked0_a_nothing_b_nothing_fpga_cw340_instrumented_rom
+
+
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_a_bad_b_bad_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_a_bad_b_good_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_valid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_valid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_valid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_hash_valid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_length_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_length_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_length_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_length_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_start_offset_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_start_offset_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_start_offset_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_disabled_start_offset_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_valid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_valid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_valid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_empty_hash_valid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_length_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_length_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_length_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_length_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_virtual_a_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_virtual_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_invalid_ok_when_disabled_fpga_cw340_instrumented_rom
+
+# //sw/device/silicon_creator/rom/e2e/chip_specific_startup:e2e_chip_specific_startup_dev_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/chip_specific_startup:e2e_chip_specific_startup_prod_end_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/chip_specific_startup:e2e_chip_specific_startup_prod_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/chip_specific_startup:e2e_chip_specific_startup_rma_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/chip_specific_startup:e2e_chip_specific_startup_test_unlocked0_fpga_cw340_instrumented_rom
+
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_dev_disabled_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_dev_enabled_true_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_dev_enabled_zero_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prehashed_test_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_disabled_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_enabled_true_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_enabled_zero_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_end_disabled_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_end_enabled_true_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_prod_end_enabled_zero_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_disabled_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_enabled_true_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_enabled_zero_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_test_unlocked0_disabled_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_test_unlocked0_enabled_true_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_test_unlocked0_enabled_zero_fpga_cw340_instrumented_rom
+)
+
+EX_TEST_GROUPS=(
+    "EX_CW310_TEST_ROM_TESTS"
+    "EX_CW340_TEST_ROM_TESTS"
+    "EX_CW310_FAKE_KEYS_TESTS"
+    "EX_CW340_CRYPTO_TESTS"
+    "EX_CW310_SIVAL_TESTS"
+    "EX_CW340_SIVAL_TESTS"
+    "EX_IMM_TESTS"
+    "EX_CW340_ROM_EXT_TESTS"
+    "EX_CW340_FAKE_KEYS_TESTS"
+    "EX_CW340_SIVAL_ROM_EXT"
+    "EX_INS_ROM_TESTS"
+)

@@ -6,6 +6,13 @@
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/silicon_creator/lib/drivers/uart.h"
 
+enum {
+    kCoverageNotDumped = 0x19285721,
+};
+
+static uint32_t coverage_status;
+
+
 OT_NO_COVERAGE
 void coverage_init(void) {
   // python3 sw/device/coverage/uart_hex.py 'COVERAGE:UART\r\n'
@@ -13,6 +20,8 @@ void coverage_init(void) {
   uart_write_imm(0x000a0d545241553a);
 
   coverage_printer_init();
+
+  coverage_status = kCoverageNotDumped;
 }
 
 OT_NO_COVERAGE
@@ -22,19 +31,29 @@ void coverage_report(void) {
 
 #if defined(OT_COVERAGE_INSTRUMENTED)
 
-  // python3 sw/device/coverage/uart_hex.py '== COVERAGE PROFILE START ==\r\n'
-  uart_write_imm(0x5245564f43203d3d);
-  uart_write_imm(0x464f525020454741);
-  uart_write_imm(0x5241545320454c49);
-  uart_write_imm(0x00000a0d3d3d2054);
+  if (coverage_status != kCoverageNotDumped) {
+    // python3 sw/device/coverage/uart_hex.py '== COVERAGE PROFILE DUMPED ==\r\n'
+    uart_write_imm(0x5245564f43203d3d);
+    uart_write_imm(0x464f525020454741);
+    uart_write_imm(0x504d554420454c49);
+    uart_write_imm(0x000a0d3d3d204445);
+  } else {
+    coverage_status = 0;
 
-  coverage_printer_run();
+    // python3 sw/device/coverage/uart_hex.py '== COVERAGE PROFILE START ==\r\n'
+    uart_write_imm(0x5245564f43203d3d);
+    uart_write_imm(0x464f525020454741);
+    uart_write_imm(0x5241545320454c49);
+    uart_write_imm(0x00000a0d3d3d2054);
 
-  // python3 sw/device/coverage/uart_hex.py '== COVERAGE PROFILE END ==\r\n'
-  uart_write_imm(0x5245564f43203d3d);
-  uart_write_imm(0x464f525020454741);
-  uart_write_imm(0x20444e4520454c49);
-  uart_write_imm(0x000000000a0d3d3d);
+    coverage_printer_run();
+
+    // python3 sw/device/coverage/uart_hex.py '== COVERAGE PROFILE END ==\r\n'
+    uart_write_imm(0x5245564f43203d3d);
+    uart_write_imm(0x464f525020454741);
+    uart_write_imm(0x20444e4520454c49);
+    uart_write_imm(0x000000000a0d3d3d);
+  }
 
 #elif defined(OT_COVERAGE_ENABLED)
 

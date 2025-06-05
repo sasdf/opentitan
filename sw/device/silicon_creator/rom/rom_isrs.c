@@ -4,7 +4,6 @@
 
 #include "sw/device/silicon_creator/rom/rom_isrs.h"
 
-#include "sw/device/coverage/runtime.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/silicon_creator/lib/error.h"
@@ -24,14 +23,22 @@ static rom_error_t rom_irq_error(void) {
   // (we preserve 7 instead of 5 because the verilog hardcodes the unused bits
   // as zero and those would be the next bits used should the number of
   // interrupt causes increase).
-  COVERAGE_REPORT();
   mcause = (mcause & 0x80000000) | ((mcause & 0x7f) << 24);
   return kErrorInterrupt + mcause;
 }
 
 void rom_interrupt_handler(void) {
+#ifdef OT_COVERAGE_INSTRUMENTED
+  // Fix gp first in case it's modified by ROM_EXT imm_section.
+  asm volatile(
+    ".option push\n"
+    ".option norelax\n"
+    "la gp, __global_pointer$\n"
+    ".option pop\n"
+  );
+#endif
+
   register rom_error_t error asm("a0") = rom_irq_error();
-  COVERAGE_REPORT();
   asm volatile("tail shutdown_finalize;" ::"r"(error));
   OT_UNREACHABLE();
 }

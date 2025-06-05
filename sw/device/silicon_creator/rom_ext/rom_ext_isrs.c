@@ -4,7 +4,6 @@
 
 #include "sw/device/silicon_creator/rom_ext/rom_ext_isrs.h"
 
-#include "sw/device/coverage/runtime.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/silicon_creator/lib/dbg_print.h"
@@ -20,7 +19,6 @@ static rom_error_t rom_ext_irq_error(void) {
   CSR_READ(CSR_REG_MEPC, &mepc);
   CSR_READ(CSR_REG_MTVAL, &mtval);
 
-  coverage_report();
   dbg_printf("MCAUSE=%x MEPC=%x MTVAL=%x\r\n", mcause, mepc, mtval);
 
   // Shuffle the mcause bits into the uppermost byte of the word and report
@@ -39,8 +37,17 @@ static rom_error_t rom_ext_irq_error(void) {
 
 OT_USED
 void rom_ext_interrupt_handler(void) {
+#ifdef OT_COVERAGE_INSTRUMENTED
+  // Fix gp first in case it's modified by ROM_EXT imm_section.
+  asm volatile(
+    ".option push\n"
+    ".option norelax\n"
+    "la gp, __global_pointer$\n"
+    ".option pop\n"
+  );
+#endif
+
   register rom_error_t error asm("a0") = rom_ext_irq_error();
-  coverage_report();
   asm volatile("tail shutdown_finalize;" ::"r"(error));
   OT_UNREACHABLE();
 }

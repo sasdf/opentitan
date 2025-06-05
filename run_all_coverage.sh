@@ -4,13 +4,15 @@ set -euo pipefail
 COVERAGE_OUTPUT_DIR="/tmp/${USER}/all_coverage/"
 
 BASELINES=(
-    "//sw/device/silicon_creator/rom_ext:rom_ext_dice_cwt_slot_virtual_baseline_coverage"
+    "//sw/device/silicon_creator/rom_ext:rom_ext_prod_dice_cwt_spidfu_baseline_coverage"
     "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual_baseline_coverage"
     "//sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_cwt_slot_virtual_baseline_coverage"
     "//sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_x509_slot_virtual_baseline_coverage"
+    "//sw/device/silicon_creator/rom:instrumented_mask_rom_baseline_coverage"
 )
 
 TARGETS=(
+# //sw/device/silicon_creator/lib/cert:cdi_0_template_unittest
     # //sw/device/lib/base:crc32_functest_fpga_cw310_sival_rom_ext
     # //sw/device/tests:uart_smoketest_fpga_cw340_test_rom
     # //sw/device/tests:uart_smoketest_fpga_cw340_rom_with_fake_keys
@@ -855,6 +857,7 @@ HYPER310_FAKE_KEYS_TESTS=(
 )
 
 source rom_targets.sh
+source targets_skip_in_ci.sh
 
 TEST_GROUPS=(
     "TEST_ROM_TESTS"
@@ -870,6 +873,7 @@ TEST_GROUPS=(
     "CW340_FAKE_KEYS_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"
     "INS_ROM_TESTS"
+    "${EX_TEST_GROUPS[@]}"
 )
 
 TARGETS+=(
@@ -887,6 +891,17 @@ TARGETS+=(
     "${CW340_FAKE_KEYS_TESTS[@]}"
     "${HYPER310_FAKE_KEYS_TESTS[@]}"
     "${INS_ROM_TESTS[@]}"
+    "${EX_CW310_TEST_ROM_TESTS[@]}"
+    "${EX_CW340_TEST_ROM_TESTS[@]}"
+    "${EX_CW310_FAKE_KEYS_TESTS[@]}"
+    "${EX_CW340_CRYPTO_TESTS[@]}"
+    "${EX_CW310_SIVAL_TESTS[@]}"
+    "${EX_CW340_SIVAL_TESTS[@]}"
+    "${EX_IMM_TESTS[@]}"
+    "${EX_CW340_ROM_EXT_TESTS[@]}"
+    "${EX_CW340_FAKE_KEYS_TESTS[@]}"
+    "${EX_CW340_SIVAL_ROM_EXT[@]}"
+    "${EX_INS_ROM_TESTS[@]}"
 )
 
 BAZEL_ARGS=(
@@ -903,78 +918,4 @@ BAZEL_ARGS=(
     # --subcommands
 )
 
-COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
-LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
-
-rm -f "${COVERAGE_DAT}"
-
-
-for baseline_label in "${BASELINES[@]}"; do
-    baseline_name="${baseline_label##*:}"
-    cached_dat="bazel-out/_coverage/_coverage_${baseline_name}.dat"
-    echo "Calculate baseline ${baseline_name}"
-
-    rm -f "${COVERAGE_DAT}"
-    rm -f "${cached_dat}"
-    ./bazelisk.sh coverage "${baseline_label}" "${BAZEL_ARGS[@]}" "$@"
-
-    if [[ -s "${COVERAGE_DAT}" ]]; then
-      cp "${COVERAGE_DAT}" "${cached_dat}"
-      echo "INFO: Baseline coverage cached successfully."
-      echo "${cached_dat}"
-    else
-      echo "ERROR: Baseline coverage report not found!"
-      exit 1
-    fi
-done
-
-
-if [[ "${#TARGETS[@]}" == "0" ]]; then
-    for test_group_name in "${TEST_GROUPS[@]}"; do
-        test_group_expr="${test_group_name}[@]"
-        test_group=( "${!test_group_expr}" )
-        if [[ "${#test_group[@]}" != "0" ]]; then
-            echo "Running test group ${test_group_name}"
-            rm -f "${COVERAGE_DAT}"
-            ./bazelisk.sh coverage "${test_group[@]}" "${BAZEL_ARGS[@]}" "$@" || true
-        else
-            echo "Skip empty test group ${test_group_name}"
-        fi
-    done
-else
-    rm -f "${COVERAGE_DAT}"
-    ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
-fi
-
-
-
-GENHTML_ARGS=(
-    --prefix "${PWD}"
-    --ignore-errors unsupported
-    --ignore-errors inconsistent
-    --ignore-errors category
-    # --ignore-errors corrupt
-    --html-epilog sw/device/coverage/report_epilog.html
-)
-
-if [[ "${#BASELINES[@]}" == "0" ]]; then
-    genhtml "${GENHTML_ARGS[@]}" \
-        --output "${COVERAGE_OUTPUT_DIR}/no_baseline/" \
-        "${COVERAGE_DAT}"
-else
-    for baseline_label in "${BASELINES[@]}"; do
-        baseline_name="${baseline_label##*:}"
-        cached_dat="bazel-out/_coverage/_coverage_${baseline_name}.dat"
-        filtered_dat="bazel-out/_coverage/_coverage_filtered_${baseline_name}.dat"
-        echo "Calculate baseline ${baseline_name}"
-
-        python3 sw/device/coverage/coverage_filter/coverage_filter.py \
-          --baseline="${cached_dat}" \
-          --coverage="${COVERAGE_DAT}" \
-          --output="${filtered_dat}"
-
-        genhtml "${GENHTML_ARGS[@]}" \
-            --output "${COVERAGE_OUTPUT_DIR}/${baseline_name}" \
-            "${filtered_dat}"
-    done
-fi
+source ./run_all_coverage_impl.sh

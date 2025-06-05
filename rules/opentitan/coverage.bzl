@@ -15,30 +15,42 @@ load(
 _TEST_SCRIPT = """\
 env
 elf="$(realpath "{elf_file}")"
-ln -s "$elf" "${{COVERAGE_DIR}}/elf"
+ln -s "$elf" "${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.elf"
 ls -lah "$elf"
 echo "Linking"
 echo "  $elf"
 echo "To"
-echo "  ${{COVERAGE_DIR}}/elf"
+echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.elf"
+
+dis="$(realpath "{dis_file}")"
+ln -s "$dis" "${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.dis"
+ls -lah "$dis"
+echo "Linking"
+echo "  $dis"
+echo "To"
+echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.dis"
 """
 
 def _baseline_coverage_test(ctx):
     # Get the elf to be tested
-    elf = ctx.attr.elf
-    elf = get_one_binary_file(elf, field = "elf", providers = [SiliconBinaryInfo])
+    elf_label = ctx.attr.elf
+    elf = get_one_binary_file(elf_label, field = "elf", providers = [SiliconBinaryInfo])
     print(elf)
+
+    dis = get_one_binary_file(elf_label, field = "disassembly", providers = [SiliconBinaryInfo])
+    print(dis)
 
     # Nop test
     script = ctx.actions.declare_file(ctx.attr.name + ".bash")
     ctx.actions.write(script,
       _TEST_SCRIPT.format(
           elf_file = elf.short_path,
+          dis_file = dis.short_path,
       ),
       is_executable = True)
 
     # Propagate all runfiles from elf attr
-    runfiles = ctx.runfiles(files = ctx.files.elf + [elf])
+    runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis])
     runfiles = runfiles.merge(ctx.attr.elf[DefaultInfo].default_runfiles)
 
     return DefaultInfo(

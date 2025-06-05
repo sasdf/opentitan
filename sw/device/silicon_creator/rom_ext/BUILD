@@ -93,7 +93,6 @@ cc_library(
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:runtime_api",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/silicon_creator/lib:dbg_print",
@@ -279,6 +278,32 @@ manifest(d = {
     )
     for name, param in TEST_OWNER_CONFIGS.items()
 ]
+
+opentitan_binary(
+    name = "rom_ext_prod_dice_cwt_spidfu",
+    testonly = True,
+    exec_env = [
+        "//hw/top_earlgrey:silicon_creator",
+    ],
+    extra_bazel_features = [
+        "minsize",
+        "use_lld",
+    ],
+    linker_script = ":ld_slot_virtual",
+    manifest = ":manifest",
+    deps = [
+        ":rom_ext_dice_cwt",
+        "//sw/device/lib/crt",
+        "//sw/device/silicon_creator/lib:manifest_def",
+        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_cwt_slot_virtual",
+        "//sw/device/silicon_creator/lib/rescue:rescue_spidfu",
+    ],
+)
+
+baseline_coverage_test(
+    name = "rom_ext_prod_dice_cwt_spidfu_baseline_coverage",
+    elf = "rom_ext_prod_dice_cwt_spidfu",
+)
 
 manifest(d = {
     "name": "manifest_bad_address_translation",
