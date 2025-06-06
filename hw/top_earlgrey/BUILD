@@ -478,6 +478,28 @@ fpga_cw340(
     tags = ["cw340_sival"],
 )
 
+fpga_cw340(
+    name = "fpga_cw340_instrumented_rom_prod",
+    testonly = True,
+    base = ":fpga_cw340_sival",
+    exec_env = "fpga_cw340_instrumented_rom_prod",
+    rom = "//sw/device/lib/testing/test_rom:test_rom",
+    param = {
+        "interface": "hyper340",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
+    },
+    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
+    test_cmd = """
+        --exec="transport init"
+        --exec="fpga load-bitstream {bitstream}"
+        --exec="bootstrap --clear-uart=true {firmware}"
+        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+        no-op
+    """,
+)
+
 # FPGA configuration used to emulate silicon targets containing a `rom_ext`
 # stage.
 # See `fpga_cw340_sival` for more details.

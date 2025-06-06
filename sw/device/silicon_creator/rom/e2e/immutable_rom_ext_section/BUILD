@@ -198,6 +198,7 @@ IMMUTABLE_PARTITION_TEST_CASES = [
         srcs = ["immutable_rom_ext_section_test.c"],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_sival",
+            "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod",
         ],
         linker_script = s["linker_script"],
         deps = [
@@ -222,6 +223,7 @@ IMMUTABLE_PARTITION_TEST_CASES = [
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod": None,
         },
         fpga = fpga_params(
             assemble = "{firmware}@{offset}",
@@ -279,6 +281,7 @@ BAD_SECTION_BINS = {
         ],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_sival",
+            "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_virtual",
         deps = [
@@ -302,6 +305,7 @@ opentitan_test(
     name = "immutable_section_invalid_ok_when_disabled",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod": None,
     },
     fpga = fpga_params(
         assemble = "{invalid}@{rom_ext_slot_a}",
@@ -319,6 +323,7 @@ opentitan_test(
     name = "immutable_section_a_bad_b_good",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod": None,
     },
     fpga = fpga_params(
         assemble = "{invalid}@{rom_ext_slot_a} {valid}@{rom_ext_slot_b}",
@@ -338,6 +343,7 @@ opentitan_test(
     name = "immutable_section_a_bad_b_bad",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:fpga_cw340_instrumented_rom_prod": None,
     },
     fpga = fpga_params(
         assemble = "{invalid}@{rom_ext_slot_a} {invalid}@{rom_ext_slot_b}",

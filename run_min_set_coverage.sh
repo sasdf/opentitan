@@ -28,6 +28,10 @@ CW310_ROM_WITH_FAKE_KEYS_TESTS=(
   '//sw/device/tests:pwrmgr_normal_sleep_all_wake_ups_fpga_cw310_rom_with_fake_keys'
 )
 
+CW340_INSTRUMENTED_ROM_PROD_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_b_fpga_cw340_instrumented_rom_prod'
+)
+
 CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_v_flash_b_fpga_cw340_instrumented_rom'
@@ -105,6 +109,7 @@ TEST_GROUPS=(
   'EXTRA_TESTS'
   'CW310_ROM_EXT_TESTS'
   'CW310_ROM_WITH_FAKE_KEYS_TESTS'
+  'CW340_INSTRUMENTED_ROM_PROD_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
   'CW340_ROM_EXT_TESTS'
   'CW340_TEST_ROM_TESTS'
