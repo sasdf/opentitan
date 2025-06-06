@@ -12,6 +12,10 @@ BASELINES=(
 )
 
 TARGETS=()
+
+EXTRA_TESTS=(
+)
+
 CW310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_test_fpga_cw310_rom_ext'
 )
@@ -30,6 +34,7 @@ CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_rollback_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_test_unlocked0_bigger_than_64k_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_1_b_1_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_meas_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_with_fault_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/retention_ram:rom_e2e_ret_ram_keep_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/rom_e2e_bootstrap_entry:e2e_bootstrap_entry_test_unlocked0_fpga_cw340_instrumented_rom'
@@ -75,7 +80,6 @@ UNIT_TESTS=(
   '//sw/device/lib/base:memory_unittest'
   '//sw/device/lib/crypto/impl:status_unittest'
   '//sw/device/silicon_creator/lib/boot_svc:boot_svc_header_unittest'
-  '//sw/device/silicon_creator/lib/cert:tpm_ek_template_unittest'
   '//sw/device/silicon_creator/lib/drivers:alert_unittest'
   '//sw/device/silicon_creator/lib/drivers:ast_unittest'
   '//sw/device/silicon_creator/lib/drivers:flash_ctrl_unittest'
@@ -98,6 +102,7 @@ UNIT_TESTS=(
 
 
 TEST_GROUPS=(
+  'EXTRA_TESTS'
   'CW310_ROM_EXT_TESTS'
   'CW310_ROM_WITH_FAKE_KEYS_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
@@ -106,6 +111,7 @@ TEST_GROUPS=(
   'HYPER310_ROM_EXT_TESTS'
   'UNIT_TESTS'
 )
+
 
 BAZEL_ARGS=(
     --test_output=streamed

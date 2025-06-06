@@ -140,9 +140,10 @@ def main():
     assert '_unittest' in name
     return 'UNIT_TESTS', name
 
-  test_groups = []
+  test_groups = ['EXTRA_TESTS']
   group_with_names = sorted(map(label_group, pred_names))
   group_with_names = it.groupby(group_with_names, key=lambda x: x[0])
+  print(f'EXTRA_TESTS=(\n)\n')
   for group, names in group_with_names:
     print(f'{group}=(')
     for _, name in names:
