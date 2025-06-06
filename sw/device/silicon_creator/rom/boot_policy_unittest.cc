@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 #include "sw/device/silicon_creator/lib/base/chip.h"
 #include "sw/device/silicon_creator/lib/mock_manifest.h"
-#include "sw/device/silicon_creator/lib/mock_shutdown.h"
 #include "sw/device/silicon_creator/rom/mock_boot_policy_ptrs.h"
 #include "sw/device/silicon_creator/testing/rom_test.h"
 

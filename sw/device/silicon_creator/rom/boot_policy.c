@@ -9,7 +9,6 @@
 #include "sw/device/silicon_creator/lib/boot_data.h"
 #include "sw/device/silicon_creator/lib/drivers/lifecycle.h"
 #include "sw/device/silicon_creator/lib/error.h"
-#include "sw/device/silicon_creator/lib/shutdown.h"
 #include "sw/device/silicon_creator/rom/boot_policy_ptrs.h"
 
 boot_policy_manifests_t boot_policy_manifests_get(void) {

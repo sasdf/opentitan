@@ -34,7 +34,6 @@ CW340_INSTRUMENTED_ROM_PROD_TESTS=(
 
 CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_v_flash_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_dev_rollback_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_big_image:boot_policy_big_image_test_unlocked0_bigger_than_64k_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_prod_end_a_1_b_1_fpga_cw340_instrumented_rom'
@@ -77,7 +76,6 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_spidfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rate_test_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rom_ext_slot_b_update_slot_b_fpga_hyper310_rom_ext'
 )
 
 UNIT_TESTS=(
@@ -91,7 +89,6 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib/drivers:kmac_unittest'
   '//sw/device/silicon_creator/lib/drivers:lifecycle_unittest'
   '//sw/device/silicon_creator/lib/drivers:otbn_unittest'
-  '//sw/device/silicon_creator/lib/drivers:otp_unittest'
   '//sw/device/silicon_creator/lib/drivers:rnd_unittest'
   '//sw/device/silicon_creator/lib/drivers:spi_device_unittest'
   '//sw/device/silicon_creator/lib/drivers:watchdog_unittest'
@@ -102,6 +99,7 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib:dbg_print_unittest'
   '//sw/device/silicon_creator/lib:epmp_unittest'
   '//sw/device/silicon_creator/lib:manifest_unittest'
+  '//sw/device/silicon_creator/rom:boot_policy_unittest'
 )
 
 
@@ -116,7 +114,6 @@ TEST_GROUPS=(
   'HYPER310_ROM_EXT_TESTS'
   'UNIT_TESTS'
 )
-
 
 BAZEL_ARGS=(
     --test_output=streamed
