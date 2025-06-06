@@ -15,6 +15,7 @@ from coverage_helper import (
   parse_lcov,
   filter_coverage,
   merge_inlined_copies,
+  iter_lcov_files,
 )
 
 view_path = './bazel-out/_coverage/baseline/all_baselines.dis.dat'
@@ -49,24 +50,12 @@ def main():
   view_keys, view_values = collect_vector(view, sf_keys)
 
   tests = {}
-  with open(args.lcov_files) as files:
-    files = list(map(Path, files.read().splitlines()))#[:10]
-    files = [p for p in files if p.name == 'coverage.dat']
-    for i, path in enumerate(files):
-      # Get the path after the first parent named 'testlogs'
-      parts = path.parent.parts
-      testlogs_index = parts.index('testlogs')
-      test_dir = '/'.join(parts[testlogs_index + 1:-1])
-      test_name = f'//{test_dir}:{parts[-1]}'
-
-      print(f'Loading [{i+1} / {len(files)}] {test_name}', file=sys.stderr)
-      with open(path) as f:
-        coverage = parse_lcov(f.readlines())
-      coverage = merge_inlined_copies(coverage)
-      coverage = filter_coverage(coverage, view)
-      coverage_keys, coverage_values = collect_vector(coverage, sf_keys)
-      assert coverage_keys == view_keys
-      tests[test_name] = coverage_values
+  for test in iter_lcov_files(args.lcov_files):
+    coverage = test.coverage
+    coverage = filter_coverage(coverage, view)
+    coverage_keys, coverage_values = collect_vector(coverage, sf_keys)
+    assert coverage_keys == view_keys
+    tests[test.name] = coverage_values
 
   test_names, test_values = zip(*tests.items())
   test_values = np.stack(test_values)

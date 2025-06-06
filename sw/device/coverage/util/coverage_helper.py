@@ -2,7 +2,9 @@ import re
 import json
 import bisect
 import itertools as it
+import sys
 from collections import namedtuple, defaultdict
+from pathlib import Path
 
 
 FileProfile = namedtuple('FileProfile', ['sf', 'fn', 'fnda', 'da'])
@@ -318,3 +320,21 @@ def generate_lcov(coverage):
 
     output.append('end_of_record\n')
   return output
+
+TestLcov = namedtuple('TestLcov', 'name,path,coverage')
+def iter_lcov_files(lcov_files_path):
+  with open(lcov_files_path) as files:
+    files = list(map(Path, files.read().splitlines()))
+    files = [p for p in files if p.name == 'coverage.dat']
+    for i, path in enumerate(files):
+      # Get the path after the first parent named 'testlogs'
+      parts = path.parent.parts
+      testlogs_index = parts.index('testlogs')
+      test_dir = '/'.join(parts[testlogs_index + 1:-1])
+      test_name = f'//{test_dir}:{parts[-1]}'
+
+      print(f'Loading [{i+1} / {len(files)}] {test_name}', file=sys.stderr)
+      with open(path) as f:
+        coverage = parse_lcov(f.readlines())
+      coverage = merge_inlined_copies(coverage)
+      yield TestLcov(test_name, path, coverage)

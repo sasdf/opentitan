@@ -32,7 +32,7 @@ COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 
 rm -f "${COVERAGE_DAT}"
 
-./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" || true
+./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
 GENHTML_ARGS=(
     --prefix "${PWD}"

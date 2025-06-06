@@ -48,7 +48,6 @@ cc_library(
         "//hw/ip/entropy_src/data:entropy_src_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/coverage:runtime_api",
-        "//sw/device/coverage:uart_runtime",
         "//sw/device/lib/crt",
         "//sw/device/lib/testing/test_framework:ottf_isrs",
     ],

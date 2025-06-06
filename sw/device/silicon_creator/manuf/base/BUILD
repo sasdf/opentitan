@@ -56,6 +56,7 @@ device_id_header(
 opentitan_binary(
     name = "sram_cp_provision",
     testonly = True,
+    collect_code_coverage = 0, # No space for sram binaries
     srcs = ["sram_cp_provision.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
@@ -172,6 +173,7 @@ opentitan_test(
     opentitan_binary(
         name = "sram_ft_individualize_{}{}".format(sku, variant),
         testonly = True,
+        collect_code_coverage = 0, # No space for sram binaries
         srcs = ["sram_ft_individualize.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,

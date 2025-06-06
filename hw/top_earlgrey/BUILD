@@ -108,15 +108,16 @@ fpga_cw310(
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
     slot_addresses = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
-)
 
-alias(
-    name = "fpga_cw310_test_rom",
-    actual = ":fpga_cw340_test_rom",
+    param = {
+        "interface": "hyper340",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+    },
 )
 
 fpga_cw310(
-    name = "_fpga_cw310_test_rom",
+    name = "fpga_cw310_test_rom",
     testonly = True,
     args = [
         "--rcfile=",
@@ -127,13 +128,14 @@ fpga_cw310(
         "//conditions:default": [],
     }),
     base = ":fpga_cw310",
-    base_bitstream = "//hw/bitstream:bitstream",
+    # base_bitstream = "//hw/bitstream:bitstream",
     exec_env = "fpga_cw310_test_rom",
-    mmi = "//hw/bitstream:cw310_mmi",
+    # mmi = "//hw/bitstream:cw310_mmi",
     openocd_adapter_config = "//third_party/openocd:jtag_olimex_cfg",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     param = {
-        "interface": "cw310",
+        # "interface": "cw310",
+        "interface": "hyper340",
         "exit_success": DEFAULT_TEST_SUCCESS_MSG,
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
     },
@@ -145,15 +147,13 @@ fpga_cw310(
         --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
         no-op
     """,
-)
 
-alias(
-    name = "fpga_cw310_rom_with_fake_keys",
-    actual = ":fpga_cw340_rom_with_fake_keys",
+    base_bitstream = "//hw/bitstream/cw340:bitstream",
+    mmi = "//hw/bitstream/cw340:mmi",
 )
 
 fpga_cw310(
-    name = "_fpga_cw310_rom_with_fake_keys",
+    name = "fpga_cw310_rom_with_fake_keys",
     testonly = True,
     base = ":fpga_cw310_test_rom",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
@@ -186,13 +186,8 @@ sim_qemu(
     rom = "//sw/device/silicon_creator/rom:mask_rom",
 )
 
-alias(
-    name = "fpga_cw310_rom_ext",
-    actual = ":fpga_cw340_rom_ext",
-)
-
 fpga_cw310(
-    name = "_fpga_cw310_rom_ext",
+    name = "fpga_cw310_rom_ext",
     testonly = True,
     base = ":fpga_cw310_test_rom",
     ecdsa_key = select({
@@ -209,7 +204,8 @@ fpga_cw310(
     manifest = "//sw/device/silicon_owner:manifest",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
     param = {
-        "interface": "cw310",
+        # "interface": "cw310",
+        "interface": "hyper340",
         "exit_success": DEFAULT_TEST_SUCCESS_MSG,
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -221,13 +217,8 @@ fpga_cw310(
     }),
 )
 
-alias(
-    name = "fpga_hyper310_rom_with_fake_keys",
-    actual = ":fpga_cw340_rom_with_fake_keys",
-)
-
 fpga_cw310(
-    name = "_fpga_hyper310_rom_with_fake_keys",
+    name = "fpga_hyper310_rom_with_fake_keys",
     testonly = True,
     args = [
         "--rcfile=",
@@ -235,14 +226,15 @@ fpga_cw310(
         "--interface={interface}",
     ],
     base = ":fpga_cw310",
-    base_bitstream = "//hw/bitstream/hyperdebug:bitstream",
+    # base_bitstream = "//hw/bitstream/hyperdebug:bitstream",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_hyper310_rom_with_fake_keys",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
-    mmi = "//hw/bitstream/hyperdebug:mmi",
+    # mmi = "//hw/bitstream/hyperdebug:mmi",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     param = {
-        "interface": "hyper310",
+        # "interface": "hyper310",
+        "interface": "hyper340",
         "exit_success": DEFAULT_TEST_SUCCESS_MSG,
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
     },
@@ -254,15 +246,13 @@ fpga_cw310(
         --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
         no-op
     """,
-)
 
-alias(
-    name = "fpga_hyper310_rom_ext",
-    actual = ":fpga_cw340_rom_ext",
+    base_bitstream = "//hw/bitstream/cw340:bitstream",
+    mmi = "//hw/bitstream/cw340:mmi",
 )
 
 fpga_cw310(
-    name = "_fpga_hyper310_rom_ext",
+    name = "fpga_hyper310_rom_ext",
     testonly = True,
     base = ":fpga_hyper310_rom_with_fake_keys",
     ecdsa_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:app_prod_ecdsa": "prod_key_0"},
@@ -275,7 +265,8 @@ fpga_cw310(
     manifest = "//sw/device/silicon_owner:manifest",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
     param = {
-        "interface": "hyper310",
+        # "interface": "hyper310",
+        "interface": "hyper340",
         "exit_success": DEFAULT_TEST_SUCCESS_MSG,
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -288,13 +279,8 @@ fpga_cw310(
 # as SRAM programs. Use the `fpga_cw310_sival_rom_ext` execution environment to
 # emulate silicon targets containing a `rom_ext` stage.
 # See sw/device/tests/doc/sival/devguide.md for more details.
-alias(
-    name = "fpga_cw310_sival",
-    actual = ":fpga_cw340_sival",
-)
-
 fpga_cw310(
-    name = "_fpga_cw310_sival",
+    name = "fpga_cw310_sival",
     testonly = True,
     base = ":fpga_hyper310_rom_with_fake_keys",
 
@@ -312,13 +298,8 @@ fpga_cw310(
 # stage.
 # See `fpga_cw310_sival` for more details.
 # Also, see sw/device/tests/doc/sival/devguide.md.
-alias(
-    name = "fpga_cw310_sival_rom_ext",
-    actual = ":fpga_cw340_sival_rom_ext",
-)
-
 fpga_cw310(
-    name = "_fpga_cw310_sival_rom_ext",
+    name = "fpga_cw310_sival_rom_ext",
     testonly = True,
     base = ":fpga_hyper310_rom_ext",
     ecdsa_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:app_prod_ecdsa": "prod_key_0"},
