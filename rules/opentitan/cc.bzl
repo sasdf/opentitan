@@ -262,6 +262,7 @@ def _opentitan_binary(ctx):
         provides, signed = _build_binary(ctx, exec_env, name, deps, kind, linkopts = linkopts)
         providers.append(exec_env.provider(kind = kind, **provides))
         default_info.append(provides["default"])
+        default_info.append(provides["elf"])
         runfiles = runfiles.merge(ctx.runfiles(files = [
             provides["elf"],
             provides["disassembly"],
