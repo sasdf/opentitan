@@ -63,7 +63,6 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_test_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_length_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_entry_point_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:flash_exc_handler_disabled_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:bad_locked_update_no_exec_test_fpga_hyper310_rom_ext'
@@ -100,6 +99,7 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib:epmp_unittest'
   '//sw/device/silicon_creator/lib:manifest_unittest'
   '//sw/device/silicon_creator/rom:boot_policy_unittest'
+  '//sw/device/silicon_creator/rom_ext:rom_ext_boot_policy_unittest'
 )
 
 
