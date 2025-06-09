@@ -3,16 +3,12 @@
 import argparse
 import sys
 
-from coverage_helper import (
-  parse_lcov,
-  merge_inlined_copies,
-  iter_lcov_files,
-)
+from coverage_helper import iter_lcov_files
 
 lcov_files_path = './bazel-out/_coverage/lcov_files.tmp'
 
 def main():
-  parser = argparse.ArgumentParser(description='Find the minimum set of tests that produce full coverage.')
+  parser = argparse.ArgumentParser(description='Find the tests that covers a given line.')
   parser.add_argument('line_spec', type=str, help='The //file:line to be search.')
   parser.add_argument('--lcov_files', type=str, default=lcov_files_path, help='Path to the coverage file list.')
   args = parser.parse_args()
