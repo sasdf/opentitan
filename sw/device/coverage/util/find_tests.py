@@ -15,7 +15,9 @@ def main():
 
   label, line = args.line_spec.rsplit(':', 1)
   line = int(line)
-  sf = 'SF:' + label.rstrip('//')
+  label = label.removesuffix('.html')
+  label = label.removesuffix('.gcov')
+  sf = 'SF:' + label.lstrip('//')
   print(sf)
 
   tests = []

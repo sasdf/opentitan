@@ -46,7 +46,7 @@ def main():
     view = parse_lcov(f.readlines())
     view = merge_inlined_copies(view)
 
-  sf_keys = list(view.keys())
+  sf_keys = sorted(view.keys())
   view_keys, view_values = collect_vector(view, sf_keys)
 
   tests = {}
@@ -57,7 +57,7 @@ def main():
     assert coverage_keys == view_keys
     tests[test.name] = coverage_values
 
-  test_names, test_values = zip(*tests.items())
+  test_names, test_values = zip(*sorted(tests.items()))
   test_values = np.stack(test_values)
   expected_view = (test_values.sum(0) > 0).astype(int)
   assert (expected_view == view_values).all(), (expected_view != view_values).sum()
