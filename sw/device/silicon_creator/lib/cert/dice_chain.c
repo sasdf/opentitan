@@ -385,7 +385,10 @@ static rom_error_t dice_chain_attestation_check_cdi_0(void) {
   // Seek to skip previous objects.
   RETURN_IF_ERROR(dice_chain_skip_cert_obj("UDS", /*name_size=*/4));
 
-  // Refresh cdi 0 if regenerated.
+  // Set the endorsement key for the next cert.
+  dice_chain.endorsement_pubkey_id = static_dice_cdi_0.cdi_0_pubkey_id;
+
+  // Save cdi 0 to flash if regenerated.
   if (static_dice_cdi_0.cert_size != 0) {
     dbg_puts("warning: CDI_0 certificate not valid; updating\r\n");
     return dice_chain_push_cert("CDI_0", static_dice_cdi_0.cert_data,
