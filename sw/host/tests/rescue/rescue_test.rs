@@ -18,6 +18,8 @@ use opentitanlib::image::image::{self};
 use opentitanlib::rescue::{EntryMode, RescueParams};
 use opentitanlib::test_utils::init::InitializeTest;
 use opentitanlib::util::file::FromReader;
+use opentitanlib::uart::console::UartConsole;
+use opentitanlib::rescue::RescueProtocol;
 
 #[derive(Debug, Parser)]
 struct Opts {
@@ -73,6 +75,19 @@ fn get_device_id_test(
             e
         )
     })?;
+
+
+    #[cfg(feature = "ot_coverage_build")]
+    {
+        rescue.reboot()?;
+
+        if params.protocol != RescueProtocol::Xmodem {
+            let uart = transport.uart("console")?;
+            UartConsole::wait_for(&*uart, r"ok: receive device ID", Duration::from_secs(5))?;
+            UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+        }
+    }
+
     // This reversal is to swap the byte order of the entire decoded hex sequence
     // to match the endianness expectation of the DeviceId::read function.
     bytes_from_hex.reverse();
@@ -101,6 +116,18 @@ fn get_boot_log_test(
     let boot_log = rescue
         .get_boot_log()
         .context("Failed to get boot log from rescue")?;
+
+    #[cfg(feature = "ot_coverage_build")]
+    {
+        rescue.reboot()?;
+
+        if params.protocol != RescueProtocol::Xmodem {
+            let uart = transport.uart("console")?;
+            UartConsole::wait_for(&*uart, r"ok: receive boot_log", Duration::from_secs(5))?;
+            UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+        }
+    }
+
     let rom_ext_manifest = image
         .subimages()?
         .first()

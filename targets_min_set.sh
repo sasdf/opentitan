@@ -32,10 +32,6 @@ CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw340_instrumented_rom'
 )
 
-CW340_ROM_EXT_TESTS=(
-  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_rom_ext'
-)
-
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_hyper310_rom_ext'
@@ -52,10 +48,11 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_pq_to_pq_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_spidfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_spidfu_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_spidfu_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_xmodem_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rate_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rom_ext_slot_a_update_slot_a_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_hyper310_rom_ext'
 )
 
@@ -69,12 +66,10 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib/drivers:alert_unittest'
   '//sw/device/silicon_creator/lib/drivers:ast_unittest'
   '//sw/device/silicon_creator/lib/drivers:flash_ctrl_unittest'
-  '//sw/device/silicon_creator/lib/drivers:ibex_unittest'
   '//sw/device/silicon_creator/lib/drivers:keymgr_unittest'
   '//sw/device/silicon_creator/lib/drivers:kmac_unittest'
   '//sw/device/silicon_creator/lib/drivers:lifecycle_unittest'
   '//sw/device/silicon_creator/lib/drivers:otbn_unittest'
-  '//sw/device/silicon_creator/lib/drivers:otp_unittest'
   '//sw/device/silicon_creator/lib/drivers:rnd_unittest'
   '//sw/device/silicon_creator/lib/drivers:spi_device_unittest'
   '//sw/device/silicon_creator/lib/drivers:watchdog_unittest'
@@ -97,7 +92,6 @@ TEST_GROUPS=(
   'CW310_SIVAL_ROM_EXT_TESTS'
   'CW310_SIVAL_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
-  'CW340_ROM_EXT_TESTS'
   'HYPER310_ROM_EXT_TESTS'
   'UNIT_TESTS'
 )
