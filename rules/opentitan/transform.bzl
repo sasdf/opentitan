@@ -101,6 +101,37 @@ def obj_disassemble(ctx, **kwargs):
     )
     return output
 
+def obj_tarball(ctx, srcs, **kwargs):
+    """Tarball the given objects.
+
+    Args:
+      ctx: The context object for this rule.
+      kwargs: Overrides of values normally retrived from the context object.
+        output: The name of the output file.  Constructed from `name` if not
+                specified.
+        srcs: The sources File list.
+    Returns:
+      The tarball File.
+    """
+    cc_toolchain = find_cc_toolchain(ctx)
+    output = kwargs.get("output")
+    if not output:
+        name = get_override(ctx, "attr.name", kwargs)
+        output = "{}.objs.tar".format(name)
+
+    output = ctx.actions.declare_file(output)
+
+    ctx.actions.run_shell(
+        outputs = [output],
+        inputs = srcs,
+        arguments = [
+            output.path,
+        ] + [s.path for s in srcs],
+        command = 'tar --dereference --hard-dereference -cf "$@"',
+    )
+
+    return output
+
 def convert_to_vmem(ctx, **kwargs):
     """Transform a binary to a VMEM file.
 

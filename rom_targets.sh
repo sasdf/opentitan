@@ -166,6 +166,8 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_virtual_a_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_start_offset_invalid_virtual_b_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_invalid_ok_when_disabled_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_rma_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_enable_rma_fpga_cw340_instrumented_rom
 
 
 # exec env (?)

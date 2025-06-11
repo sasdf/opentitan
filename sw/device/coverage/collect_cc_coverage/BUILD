@@ -2,14 +2,28 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_doc", "rust_test", "rust_test_suite")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_doc", "rust_test", "rust_test_suite")
 
 package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "coverage_lib",
+    srcs = ["coverage_lib.rs"],
+    deps = [
+        "@crate_index//:anyhow",
+        "@crate_index//:hex",
+        "@crate_index//:object",
+        "@crate_index//:zerocopy",
+        "@crate_index//:tar",
+        "@crate_index//:rand",
+    ],
+)
 
 rust_binary(
     name = "collect_cc_coverage",
     srcs = ["collect_cc_coverage.rs"],
     deps = [
+        ":coverage_lib",
         "@crate_index//:anyhow",
         "@crate_index//:hex",
         "@crate_index//:object",
@@ -21,6 +35,7 @@ rust_binary(
     name = "baseline_coverage",
     srcs = ["baseline_coverage.rs"],
     deps = [
+        ":coverage_lib",
         "@crate_index//:anyhow",
         "@crate_index//:hex",
         "@crate_index//:object",

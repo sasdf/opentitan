@@ -3,6 +3,7 @@ import json
 import bisect
 import itertools as it
 import sys
+import numpy as np
 from collections import namedtuple, defaultdict
 from pathlib import Path
 
@@ -321,7 +322,7 @@ def generate_lcov(coverage):
     output.append('end_of_record\n')
   return output
 
-TestLcov = namedtuple('TestLcov', 'name,path,coverage')
+TestLcov = namedtuple('TestLcov', 'name,path,duration,coverage')
 def iter_lcov_files(lcov_files_path):
   with open(lcov_files_path) as files:
     files = list(map(Path, files.read().splitlines()))
@@ -337,4 +338,77 @@ def iter_lcov_files(lcov_files_path):
       with open(path) as f:
         coverage = parse_lcov(f.readlines())
       coverage = merge_inlined_copies(coverage)
-      yield TestLcov(test_name, path, coverage)
+
+      duration = 0
+      with open(path.parent / 'test.xml') as f:
+        for m in re.findall(r'status="run" duration="(\d+)"', f.read()):
+          duration += int(m)
+
+      yield TestLcov(test_name, path, duration, coverage)
+
+def collect_single_vector(coverage, sf_keys):
+  keys, values = [], []
+  for sf in sf_keys:
+    cov = coverage[sf]
+    for name, count in sorted(cov.fnda.items()):
+      keys.append(f'{sf}:fn:{name}')
+      values.append(1 if count > 0 else 0)
+    for lineno, count in sorted(cov.da.items()):
+      keys.append(f'{sf}:line:{lineno}')
+      values.append(1 if count > 0 else 0)
+  return keys, np.array(values, dtype=int)
+
+def collect_test_vectors(view_path, lcov_files_path):
+  print(f'Loading {view_path}', file=sys.stderr)
+  with open(view_path) as f:
+    view = parse_lcov(f.readlines())
+    view = merge_inlined_copies(view)
+
+  sf_keys = sorted(view.keys())
+  view_keys, view_values = collect_single_vector(view, sf_keys)
+
+  tests = {}
+  for test in iter_lcov_files(lcov_files_path):
+    coverage = test.coverage
+    coverage = filter_coverage(coverage, view)
+    coverage_keys, coverage_values = collect_single_vector(coverage, sf_keys)
+    assert coverage_keys == view_keys
+    tests[test.name] = coverage_values, test.duration
+
+  test_names, test_values = zip(*sorted(tests.items()))
+  test_values, test_durations = zip(*test_values)
+  test_values = np.stack(test_values)
+  test_durations = np.array(test_durations, dtype=float)
+  expected_view = (test_values.sum(0) > 0).astype(int)
+  assert (expected_view == view_values).all(), (expected_view != view_values).sum()
+
+  test_values = test_values[:, view_values > 0]
+  view_values = view_values[view_values > 0]
+  assert (view_values == 1).all()
+  assert (test_values.sum(0) > 0).all()
+
+  assert len(test_names) == len(test_values)
+
+  return test_names, test_values, test_durations
+
+def add_tests(dst, src):
+  for key, value in src.items():
+    if not dst.get(key, False):
+      dst[key] = value
+
+
+def extract_tests(path):
+  tests = {}
+  with open(path) as f:
+    for line in f:
+      line = line.strip()
+      enabled = True
+      if line.startswith('#'):
+        enabled = False
+        line = line.lstrip('#').strip()
+      for quote in ['"', "'"]:
+        if line.startswith(quote) and line.endswith(quote):
+          line = line[1:-1]
+      if line.startswith('//'):
+        tests[line] = enabled
+  return tests

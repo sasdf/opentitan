@@ -12,27 +12,6 @@ BASELINES=(
 )
 
 TARGETS=(
-# //sw/device/silicon_creator/lib/cert:cdi_0_template_unittest
-    # //sw/device/lib/base:crc32_functest_fpga_cw310_sival_rom_ext
-    # //sw/device/tests:uart_smoketest_fpga_cw340_test_rom
-    # //sw/device/tests:uart_smoketest_fpga_cw340_rom_with_fake_keys
-    # //sw/device/tests:uart_smoketest_fpga_cw340_rom_ext
-    # //sw/device/tests:uart_smoketest_fpga_cw310_sival_rom_ext
-
-    # //sw/device/lib/crypto/drivers:aes_test_fpga_cw310_rom_with_fake_keys
-    # //sw/device/lib/base:crc32_unittest
-    # //sw/device/tests/crypto/cryptotest:hmac_sha256_kat_fpga_cw340_test_rom
-    # //sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_x509_test_fpga_cw340_rom_ext
-    # //sw/device/tests:rv_core_ibex_isa_test_prod_fpga_cw310_rom_with_fake_keys
-
-    # //sw/device/silicon_creator/manuf/base:cp_provision_functest_fpga_cw340_rom_with_fake_keys
-    # //sw/device/tests:rv_core_ibex_epmp_test_functest_fpga_cw310_rom_with_fake_keys
-
-# //sw/device/silicon_creator/rom_ext/e2e/dice_chain:variation_interop_cwt_first_test_fpga_cw310_rom_with_fake_keys
-
-# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom:stack_utilization_test
-
 )
 
 # ./bazelisk.sh query 'tests(//sw/device/...) except attr("tags", "skip_in_ci|manual|broken|sim|silicon", //sw/device/...)'
@@ -207,6 +186,11 @@ MANUF_TESTS=(
 //sw/device/silicon_creator/manuf/lib:individualize_functest_fpga_hyper310_rom_with_fake_keys
 //sw/device/silicon_creator/manuf/lib:individualize_sw_cfg_functest_fpga_cw340_rom_with_fake_keys
 //sw/device/silicon_creator/manuf/lib:individualize_sw_cfg_functest_fpga_hyper310_rom_with_fake_keys
+
+//sw/device/silicon_creator/manuf/tests:ujson_msg_padding_functest_fpga_cw340_sival
+//sw/device/silicon_creator/manuf/tests:ujson_msg_padding_functest_fpga_hyper310_rom_with_fake_keys
+//sw/device/silicon_creator/manuf/tests:ujson_msg_size_functest_fpga_cw340_sival
+//sw/device/silicon_creator/manuf/tests:ujson_msg_size_functest_fpga_hyper310_rom_with_fake_keys
 
 # //sw/device/silicon_creator/manuf/base:cp_provision_functest_fpga_cw340_rom_with_fake_keys
 # //sw/device/silicon_creator/manuf/base:cp_provision_functest_fpga_hyper310_rom_with_fake_keys
@@ -563,6 +547,9 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/silicon_creator/lib/sigverify:spx_verify_functest_fpga_cw310_sival_rom_ext
 //sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw310_sival_rom_ext
 
+//sw/device/tests:flash_ctrl_clock_freqs_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:flash_ctrl_ops_test_fpga_cw310_sival_rom_ext
+
 # CE: OpenOCD
 # //sw/device/tests:crt_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
@@ -619,6 +606,9 @@ CW310_SIVAL_ROMEXT_TESTS=(
 # //sw/device/tests:gpio_smoketest_fpga_cw310_sival_rom_ext
 # //sw/device/tests:spi_host_smoketest_fpga_cw310_sival_rom_ext
 # //sw/device/tests:spi_host_winbond_flash_test_fpga_cw310_sival_rom_ext
+# //sw/device/tests:flash_ctrl_test_fpga_cw310_sival_rom_ext
+# //sw/device/tests:ottf_dual_console_test_fpga_cw310_sival_rom_ext
+
 
 # Perftest
 # //sw/device/lib/base:memory_perftest_fpga_cw310_sival_rom_ext
@@ -818,6 +808,38 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:rescue_limit_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:rescue_permission_test_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_bad_product_expr_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_bad_strike_mask_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_page_bad_erase_constraint_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_page_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_product_expr_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_unconstrained_test_fpga_hyper310_rom_ext
+
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_spidfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_xmodem_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_xmodem_fpga_hyper310_rom_ext
+
+//sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:isfb_boot_test_fpga_hyper310_rom_ext
+
+//sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:xmodem_protocol_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_restricted_commands_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_restricted_commands_fpga_hyper310_rom_ext
+
+# FAILED: usb dfu: found no usb device
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_usbdfu_fpga_hyper310_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
+
+# TIMEOUT: Looping
+# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_preserved_reset_reason_fpga_hyper310_rom_ext
+
 # Report regex
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_hyper310_rom_ext
 
@@ -827,6 +849,7 @@ HYPER310_ROMEXT_TESTS=(
 
 # Failed
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
+
 )
 
 CW310_ROMEXT_TESTS=(
@@ -856,8 +879,35 @@ HYPER310_FAKE_KEYS_TESTS=(
 //sw/device/tests:ottf_console_with_gpio_tx_indicator_test_fpga_hyper310_rom_with_fake_keys
 )
 
-source rom_targets.sh
-source targets_skip_in_ci.sh
+UNSUPPORTED_TESTS=(
+//sw/device/lib/base:global_mock_unittest
+//sw/device/tests/penetrationtests:fi_crypto_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_ibex_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_lc_ctrl_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_otbn_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_otp_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_rng_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:fi_rom_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_aes_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_edn_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_hmac_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_ibex_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_kmac_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_otbn_fpga_cw310_sival_rom_ext
+//sw/device/tests/penetrationtests:sca_sha3_fpga_cw310_sival_rom_ext
+//third_party/coremark/top_earlgrey:coremark_test_fpga_cw310_rom_with_fake_keys
+//third_party/coremark/top_earlgrey:coremark_test_fpga_cw310_sival_rom_ext
+//third_party/coremark/top_earlgrey:coremark_test_silicon_owner_sival_rom_ext
+//third_party/coremark/top_earlgrey:coremark_test_sim_dv
+//third_party/coremark/top_earlgrey:coremark_test_sim_qemu_rom_with_fake_keys
+//third_party/coremark/top_earlgrey:coremark_test_sim_verilator
+//sw/device/coverage/collect_cc_coverage:collect_cc_coverage_test
+//sw/device/tests:coverage_test_fpga_cw340_sival_rom_ext
+)
+
+source ./rom_targets.sh
+source ./targets_skip_in_ci.sh
+source ./targets_useful_extra.sh
 
 TEST_GROUPS=(
     "UNIT_TESTS"
@@ -874,36 +924,16 @@ TEST_GROUPS=(
     "CW340_FAKE_KEYS_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"
     "INS_ROM_TESTS"
-    "${EX_TEST_GROUPS[@]}"
+    "USEFUL_EXTRA_TESTS"
+    # "${EX_TEST_GROUPS[@]}"
 )
 
-_TARGETS+=(
-    "${UNIT_TESTS[@]}"
-    "${TEST_ROM_TESTS[@]}"
-    "${CW310_FAKE_KEYS_TESTS[@]}"
-    "${MANUF_TESTS[@]}"
-    "${CRYPTO_TESTS[@]}"
-    "${CW310_SIVAL_ROMEXT_TESTS[@]}"
-    "${CW310_SIVAL_TESTS[@]}"
-    "${IMM_TESTS[@]}"
-    "${HYPER310_ROMEXT_TESTS[@]}"
-    "${CW310_ROMEXT_TESTS[@]}"
-    "${CW340_SIVAL_TESTS[@]}"
-    "${CW340_FAKE_KEYS_TESTS[@]}"
-    "${HYPER310_FAKE_KEYS_TESTS[@]}"
-    "${INS_ROM_TESTS[@]}"
-    "${EX_CW310_TEST_ROM_TESTS[@]}"
-    "${EX_CW340_TEST_ROM_TESTS[@]}"
-    "${EX_CW310_FAKE_KEYS_TESTS[@]}"
-    "${EX_CW340_CRYPTO_TESTS[@]}"
-    "${EX_CW310_SIVAL_TESTS[@]}"
-    "${EX_CW340_SIVAL_TESTS[@]}"
-    "${EX_IMM_TESTS[@]}"
-    "${EX_CW340_ROM_EXT_TESTS[@]}"
-    "${EX_CW340_FAKE_KEYS_TESTS[@]}"
-    "${EX_CW340_SIVAL_ROM_EXT[@]}"
-    "${EX_INS_ROM_TESTS[@]}"
-)
+_TARGETS=()
+for test_group_name in "${TEST_GROUPS[@]}"; do
+    _TARGETS+=( "${test_group[@]}" )
+done
+
+# TARGETS=_TARGETS
 
 BAZEL_ARGS=(
     --test_output=streamed

@@ -51,6 +51,7 @@ PROVIDER_FIELDS = [
     "logs",
     "mapfile",
     "vmem",
+    "objects",
 ]
 
 def get_binary_files(attrs, field = "binary", providers = ALL_BINARY_PROVIDERS):
