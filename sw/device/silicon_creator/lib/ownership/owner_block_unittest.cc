@@ -30,21 +30,6 @@ using ::testing::Return;
 using ::testing::SetArgPointee;
 using ::testutil::BinaryBlob;
 
-class OwnerBlockTest : public rom_test::RomTest {
- protected:
-  MockFlashCtrl flash_ctrl_;
-  flash_ctrl_cfg_t default_config = {
-      .scrambling = kMultiBitBool4False,
-      .ecc = kMultiBitBool4False,
-      .he = kMultiBitBool4False,
-  };
-
-  void SetUp() override {
-    ON_CALL(flash_ctrl_, DataDefaultCfgGet)
-        .WillByDefault(Return(default_config));
-  }
-};
-
 // clang-format off
 // Create and "encrypt" the `access` word of a flash region config.
 #define FLASH_ACCESS(index, read, program, erase, pwp, lock) ( \
@@ -67,97 +52,138 @@ class OwnerBlockTest : public rom_test::RomTest {
   )
 // clang-format on
 
-const owner_flash_config_t simple_flash_config = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 4 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA FIRMWARE.
-                .start = 32,
-                .size = 192,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-            {
-                // SideA Filesystem.
-                .start = 224,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/1,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/1,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/true),
-            },
-            {
-                // SideB FIRMWARE.
-                .start = 256 + 32,
-                .size = 192,
-                .access = FLASH_ACCESS(
-                    /*index=*/2,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/2,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-            {
-                // SideB Filesystem.
-                .start = 256 + 224,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/3,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/3,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/true),
-            },
-        },
-};
+owner_flash_config_t *GetFlashConfig(uint16_t num) {
+  owner_flash_config_t *flash_config = (owner_flash_config *)malloc(
+      sizeof(owner_flash_config) + num * sizeof(owner_flash_region_t));
+  flash_config->header = {
+      .tag = kTlvTagFlashConfig,
+      .length = static_cast<uint16_t>(sizeof(owner_flash_config_t) +
+                                      num * sizeof(owner_flash_region_t)),
+  };
+  return flash_config;
+}
 
-const owner_flash_config_t flash_config_contains_rom_ext = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 2 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
+const owner_flash_config_t *GetSimpleFlashConfig() {
+  owner_flash_config_t *simple_flash_config = GetFlashConfig(/*num=*/4);
+  simple_flash_config->config[0] = {
+      // SideA FIRMWARE.
+      .start = 32,
+      .size = 192,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/true,
+          /*ecc=*/true,
+          /*he=*/false),
+  };
+  simple_flash_config->config[1] = {
+      // SideA Filesystem.
+      .start = 224,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/false,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/true),
+  };
+  simple_flash_config->config[2] = {
+      // SideB FIRMWARE.
+      .start = 256 + 32,
+      .size = 192,
+      .access = FLASH_ACCESS(
+          /*index=*/2,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/2,
+          /*scramble=*/true,
+          /*ecc=*/true,
+          /*he=*/false),
+  };
+  simple_flash_config->config[3] = {
+      // SideB Filesystem.
+      .start = 256 + 224,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/3,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/false,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/3,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/true),
+  };
+  return simple_flash_config;
+}
+
+const owner_flash_config_t *GetFlashConfigContainsRomExt() {
+  owner_flash_config_t *flash_config_contains_rom_ext =
+      GetFlashConfig(/*num=*/2);
+  flash_config_contains_rom_ext->config[0] = {
+      // SideA ROM_EXT.
+      .start = 0,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+
+  };
+  flash_config_contains_rom_ext->config[1] = {
+      // SideB ROM_EXT.
+      .start = 256 + 0,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/3,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/3,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config_contains_rom_ext;
+}
+
+const owner_flash_config_t *GetLegacyFlashConfig() {
+  owner_flash_config_t *legacy_flash_config =
+      GetFlashConfig(/*num=*/8);
+  legacy_flash_config->config[0] =
             {
-                // SideA ROM_EXT.
+                // SideA ROM_EXT.  This configuration should be skipped
+                // by flash_ apply.
                 .start = 0,
                 .size = 32,
                 .access = FLASH_ACCESS(
@@ -173,9 +199,47 @@ const owner_flash_config_t flash_config_contains_rom_ext = {
                     /*ecc=*/false,
                     /*he=*/false),
 
-            },
+            };
+  legacy_flash_config->config[1] =
             {
-                // SideB ROM_EXT.
+                // SideA FIRMWARE.
+                .start = 32,
+                .size = 192,
+                .access = FLASH_ACCESS(
+                    /*index=*/1,
+                    /*read=*/true,
+                    /*program=*/true,
+                    /*erase=*/true,
+                    /*pwp=*/true,
+                    /*lock=*/false),
+                .properties = FLASH_PROP(
+                    /*index=*/1,
+                    /*scramble=*/true,
+                    /*ecc=*/true,
+                    /*he=*/false),
+            };
+  legacy_flash_config->config[2] =
+            {
+                // SideA Filesystem.
+                .start = 224,
+                .size = 31,
+                .access = FLASH_ACCESS(
+                    /*index=*/2,
+                    /*read=*/true,
+                    /*program=*/true,
+                    /*erase=*/true,
+                    /*pwp=*/false,
+                    /*lock=*/false),
+                .properties = FLASH_PROP(
+                    /*index=*/2,
+                    /*scramble=*/false,
+                    /*ecc=*/false,
+                    /*he=*/true),
+            };
+  legacy_flash_config->config[3] =
+            {
+                // SideA ROM_EXT.  This configuration should be skipped
+                // by flash_ apply.
                 .start = 256 + 0,
                 .size = 32,
                 .access = FLASH_ACCESS(
@@ -190,72 +254,194 @@ const owner_flash_config_t flash_config_contains_rom_ext = {
                     /*scramble=*/false,
                     /*ecc=*/false,
                     /*he=*/false),
-            },
-        },
-};
-
-const owner_flash_info_config_t info_config = {
-    .header =
-        {
-            .tag = kTlvTagInfoConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 2 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
+            };
+  legacy_flash_config->config[4] =
             {
-                // User page
-                .bank = 0,
-                .page = 6,
+                // SideB FIRMWARE.
+                .start = 256 + 32,
+                .size = 192,
                 .access = FLASH_ACCESS(
-                    /*index=*/0,
+                    /*index=*/4,
                     /*read=*/true,
                     /*program=*/true,
                     /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/true),
+                    /*pwp=*/true,
+                    /*lock=*/false),
                 .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/true),
-
-            },
+                    /*index=*/4,
+                    /*scramble=*/true,
+                    /*ecc=*/true,
+                    /*he=*/false),
+            };
+  legacy_flash_config->config[5] =
             {
-                // Disallowed page
-                .bank = 0,
-                .page = 9,
+                // SideB Filesystem.
+                .start = 256 + 224,
+                .size = 31,
                 .access = FLASH_ACCESS(
-                    /*index=*/1,
+                    /*index=*/5,
                     /*read=*/true,
                     /*program=*/true,
                     /*erase=*/true,
                     /*pwp=*/false,
                     /*lock=*/false),
                 .properties = FLASH_PROP(
-                    /*index=*/1,
+                    /*index=*/5,
                     /*scramble=*/false,
                     /*ecc=*/false,
+                    /*he=*/true),
+            };
+  legacy_flash_config->config[6] =
+            {
+                // SideA Reserved last page.
+                .start = 255,
+                .size = 1,
+                .access = FLASH_ACCESS(
+                    /*index=*/6,
+                    /*read=*/true,
+                    /*program=*/true,
+                    /*erase=*/true,
+                    /*pwp=*/false,
+                    /*lock=*/false),
+                .properties = FLASH_PROP(
+                    /*index=*/6,
+                    /*scramble=*/true,
+                    /*ecc=*/true,
                     /*he=*/false),
-            },
-
-        },
+            };
+  legacy_flash_config->config[7] =
+            {
+                // SideB Reserved last page.
+                .start = 511,
+                .size = 1,
+                .access = FLASH_ACCESS(
+                    /*index=*/7,
+                    /*read=*/true,
+                    /*program=*/true,
+                    /*erase=*/true,
+                    /*pwp=*/false,
+                    /*lock=*/false),
+                .properties = FLASH_PROP(
+                    /*index=*/7,
+                    /*scramble=*/true,
+                    /*ecc=*/true,
+                    /*he=*/false),
+            };
+  return legacy_flash_config;
 };
 
-TEST_F(OwnerBlockTest, FlashConfigApplyBadRomExt) {
+const owner_flash_info_config_t *GetInfoConfig() {
+  owner_flash_info_config_t *info_config = (owner_flash_info_config_t *)malloc(
+      sizeof(owner_flash_info_config_t) + 2 * sizeof(owner_flash_region_t));
+  info_config->header = {
+      .tag = kTlvTagInfoConfig,
+      .length = sizeof(owner_flash_info_config_t) + 2 * sizeof(owner_flash_region_t),
+  };
+  info_config->config[0] = {
+      // User page
+      .bank = 0,
+      .page = 6,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/false,
+          /*lock=*/true),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/true),
+
+  };
+  info_config->config[1] = {
+      // Disallowed page
+      .bank = 0,
+      .page = 9,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/false,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return info_config;
+};
+
+class OwnerBlockTest : public rom_test::RomTest {
+ protected:
+  MockFlashCtrl flash_ctrl_;
+  flash_ctrl_cfg_t default_config = {
+      .scrambling = kMultiBitBool4False,
+      .ecc = kMultiBitBool4False,
+      .he = kMultiBitBool4False,
+  };
+
+  virtual void Init() {}
+  virtual void Destroy() {}
+
+  void SetUp() override {
+    ON_CALL(flash_ctrl_, DataDefaultCfgGet)
+        .WillByDefault(Return(default_config));
+    Init();
+  }
+  void TearDown() override { Destroy(); }
+};
+
+class FlashConfigTest : public OwnerBlockTest {
+ protected:
+  void Init() override {
+    flash_config_too_many_entries_ = GetFlashConfig(/*num=*/9);
+    simple_flash_config_ = GetSimpleFlashConfig();
+    flash_config_contains_rom_ext_ = GetFlashConfigContainsRomExt();
+    legacy_flash_config_ = GetLegacyFlashConfig();
+    info_config_ = GetInfoConfig();
+  }
+
+  void Destroy() override {
+    free((void *)flash_config_too_many_entries_);
+    free((void *)simple_flash_config_);
+    free((void *)flash_config_contains_rom_ext_);
+    free((void *)legacy_flash_config_);
+    free((void *)info_config_);
+  }
+
+  const owner_flash_config_t *flash_config_too_many_entries_;
+  const owner_flash_config_t *simple_flash_config_;
+  const owner_flash_config_t *flash_config_contains_rom_ext_;
+  const owner_flash_config_t *legacy_flash_config_;
+  const owner_flash_info_config_t *info_config_;
+};
+
+TEST_F(FlashConfigTest, FlashConfigTooManyEntries) {
+  uint32_t mp_index = 0;
+  rom_error_t error =
+      owner_block_flash_apply(flash_config_too_many_entries_, kBootSlotA,
+                              /*owner_lockdown=*/0, &mp_index);
+  EXPECT_EQ(error, kErrorOwnershipFlashConfigLength);
+}
+
+TEST_F(FlashConfigTest, FlashConfigApplyBadRomExt) {
   // There are no expectations because `owner_block_flash_apply` will ignore
   // regions that match the ROM_EXT.  This is intentional so pre-existing owner
   // configs that cover the ROM_EXT won't result in an error and boot-loop the
   // chip.
   uint32_t mp_index = 0;
   rom_error_t error =
-      owner_block_flash_apply(&flash_config_contains_rom_ext, kBootSlotA,
+      owner_block_flash_apply(flash_config_contains_rom_ext_, kBootSlotA,
                               /*owner_lockdown=*/0, &mp_index);
   EXPECT_EQ(error, kErrorOk);
 }
 
 // Tests that the flash parameters get applied for side A.
-TEST_F(OwnerBlockTest, FlashConfigApplySideA) {
+TEST_F(FlashConfigTest, FlashConfigApplySideA) {
   // The ROM_EXT always uses regions 0-1 to protect itself,  The items in
   // the flash config always get programmed in order starting at index 2.
   EXPECT_CALL(
@@ -276,7 +462,8 @@ TEST_F(OwnerBlockTest, FlashConfigApplySideA) {
                         kHardenedBoolFalse));
 
   uint32_t mp_index = 0;
-  rom_error_t error = owner_block_flash_apply(&simple_flash_config, kBootSlotA,
+  // printf("simple_config->start %d", simple_config->config[0].start);
+  rom_error_t error = owner_block_flash_apply(simple_flash_config_, kBootSlotA,
                                               /*owner_lockdown=*/0, &mp_index);
   EXPECT_EQ(error, kErrorOk);
 }
@@ -284,7 +471,7 @@ TEST_F(OwnerBlockTest, FlashConfigApplySideA) {
 // Tests that the flash parameters get applied for side A and the
 // ProtectWhenActive disables erase and program on the ROM_EXT and FIRMWARE
 // regions.
-TEST_F(OwnerBlockTest, FlashConfigApplySideA_Active) {
+TEST_F(FlashConfigTest, FlashConfigApplySideA_Active) {
   // The ROM_EXT always uses regions 0-1 to protect itself,  The items in
   // the flash config always get programmed in order starting at index 2.
   EXPECT_CALL(
@@ -306,7 +493,7 @@ TEST_F(OwnerBlockTest, FlashConfigApplySideA_Active) {
 
   uint32_t mp_index = 0;
   rom_error_t error =
-      owner_block_flash_apply(&simple_flash_config, kBootSlotA,
+      owner_block_flash_apply(simple_flash_config_, kBootSlotA,
                               /*owner_lockdown=*/kBootSlotA, &mp_index);
   EXPECT_EQ(error, kErrorOk);
 }
@@ -314,7 +501,7 @@ TEST_F(OwnerBlockTest, FlashConfigApplySideA_Active) {
 // Tests that the flash parameters get applied for side B when B is not the
 // active slot.  Check that ProtectWhenActive does not change the write/erase
 // permissions for slot B.
-TEST_F(OwnerBlockTest, FlashConfigApplySideB_NotActive) {
+TEST_F(FlashConfigTest, FlashConfigApplySideB_NotActive) {
   // The ROM_EXT always uses regions 0-1 to protect itself,  The items in
   // the flash config always get programmed in order starting at index 2.
   EXPECT_CALL(
@@ -336,167 +523,16 @@ TEST_F(OwnerBlockTest, FlashConfigApplySideB_NotActive) {
 
   uint32_t mp_index = 0;
   rom_error_t error =
-      owner_block_flash_apply(&simple_flash_config, kBootSlotB,
+      owner_block_flash_apply(simple_flash_config_, kBootSlotB,
                               /*owner_lockdown=*/kBootSlotA, &mp_index);
   EXPECT_EQ(error, kErrorOk);
 }
 
-const owner_flash_config_t legacy_flash_config = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 8 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA ROM_EXT.  This configuration should be skipped
-                // by flash_ apply.
-                .start = 0,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-
-            },
-            {
-                // SideA FIRMWARE.
-                .start = 32,
-                .size = 192,
-                .access = FLASH_ACCESS(
-                    /*index=*/1,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/1,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-            {
-                // SideA Filesystem.
-                .start = 224,
-                .size = 31,
-                .access = FLASH_ACCESS(
-                    /*index=*/2,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/2,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/true),
-            },
-            {
-                // SideA ROM_EXT.  This configuration should be skipped
-                // by flash_ apply.
-                .start = 256 + 0,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/3,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/3,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-            {
-                // SideB FIRMWARE.
-                .start = 256 + 32,
-                .size = 192,
-                .access = FLASH_ACCESS(
-                    /*index=*/4,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/4,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-            {
-                // SideB Filesystem.
-                .start = 256 + 224,
-                .size = 31,
-                .access = FLASH_ACCESS(
-                    /*index=*/5,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/5,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/true),
-            },
-            {
-                // SideA Reserved last page.
-                .start = 255,
-                .size = 1,
-                .access = FLASH_ACCESS(
-                    /*index=*/6,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/6,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-            {
-                // SideB Reserved last page.
-                .start = 511,
-                .size = 1,
-                .access = FLASH_ACCESS(
-                    /*index=*/7,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/false,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/7,
-                    /*scramble=*/true,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-
-        },
-};
 
 // Tests that the flash parameters get applied for side B when B is not the
 // active slot.  Check that ProtectWhenActive does not change the write/erase
 // permissions for slot B.
-TEST_F(OwnerBlockTest, FlashConfigApplyLegacy) {
+TEST_F(FlashConfigTest, FlashConfigApplyLegacy) {
   // The ROM_EXT always uses regions 0-1 to protect itself,  The items in
   // the flash config always get programmed in order starting at index 2.
 
@@ -563,15 +599,15 @@ TEST_F(OwnerBlockTest, FlashConfigApplyLegacy) {
 
   uint32_t mp_index = 0;
   rom_error_t error =
-      owner_block_flash_apply(&legacy_flash_config, kBootSlotA,
+      owner_block_flash_apply(legacy_flash_config_, kBootSlotA,
                               /*owner_lockdown=*/kBootSlotA, &mp_index);
   EXPECT_EQ(error, kErrorOk);
-  error = owner_block_flash_apply(&legacy_flash_config, kBootSlotB,
+  error = owner_block_flash_apply(legacy_flash_config_, kBootSlotB,
                                   /*owner_lockdown=*/kBootSlotA, &mp_index);
   EXPECT_EQ(error, kErrorOk);
 }
 
-TEST_F(OwnerBlockTest, FlashInfoApply) {
+TEST_F(FlashConfigTest, FlashInfoApply) {
   EXPECT_CALL(flash_ctrl_, InfoType0ParamsBuild(0, 6, _))
       .WillOnce(Return(kErrorOk));
   EXPECT_CALL(flash_ctrl_,
@@ -581,11 +617,11 @@ TEST_F(OwnerBlockTest, FlashInfoApply) {
               InfoPermsSet(_, FlashPerms(kMultiBitBool4True, kMultiBitBool4True,
                                          kMultiBitBool4True)));
 
-  rom_error_t error = owner_block_info_apply(&info_config);
+  rom_error_t error = owner_block_info_apply(info_config_);
   EXPECT_EQ(error, kErrorOk);
 }
 
-TEST_F(OwnerBlockTest, FlashInfoLock) {
+TEST_F(FlashConfigTest, FlashInfoLock) {
   flash_ctrl_info_page_t info_page{
       .base_addr = 999,
   };
@@ -593,7 +629,7 @@ TEST_F(OwnerBlockTest, FlashInfoLock) {
       .WillOnce(DoAll(SetArgPointee<2>(info_page), Return(kErrorOk)));
   EXPECT_CALL(flash_ctrl_, InfoCfgLock(FlashInfoPage(info_page)));
 
-  rom_error_t error = owner_block_info_lockdown(&info_config);
+  rom_error_t error = owner_block_info_lockdown(info_config_);
   EXPECT_EQ(error, kErrorOk);
 }
 
@@ -740,6 +776,45 @@ TEST_F(OwnerBlockTest, ParseBlockDupIsfb) {
   EXPECT_EQ(error, kErrorOwnershipDuplicateItem);
 }
 
+TEST_F(OwnerBlockTest, IsfbEraseEnableInvalidState) {
+  boot_data_t bootdata = {};
+  bootdata.ownership_state = kOwnershipStateUnlockedAny;
+  owner_config_t owner_config = {};
+  EXPECT_EQ(owner_block_info_isfb_erase_enable(&bootdata, &owner_config), kErrorOk);
+}
+
+TEST_F(OwnerBlockTest, NonExistIsfbConfig) {
+  boot_data_t bootdata = {};
+  bootdata.ownership_state = kOwnershipStateLockedOwner;
+  owner_config_t owner_config = {};
+  owner_config.isfb = (const owner_isfb_config_t *)kHardenedBoolFalse;
+  EXPECT_EQ(owner_block_info_isfb_erase_enable(&bootdata, &owner_config), kErrorOk);
+}
+
+TEST_F(OwnerBlockTest, NonExistInfoConfig) {
+  boot_data_t bootdata = {};
+  bootdata.ownership_state = kOwnershipStateLockedOwner;
+  owner_config_t owner_config = {};
+  owner_config.isfb = (const owner_isfb_config_t *)kHardenedBoolTrue;
+  owner_config.info = (const owner_flash_info_config_t *)kHardenedBoolFalse;
+  EXPECT_EQ(owner_block_info_isfb_erase_enable(&bootdata, &owner_config), kErrorOk);
+}
+
+TEST(OwnerBlockTransferTest, ValidTransfer) {
+  owner_page_valid[1] = kOwnerPageStatusSealed;
+  boot_data_t bootdata = {};
+  bootdata.ownership_state = kOwnershipStateLockedOwner;
+  EXPECT_EQ(owner_block_page1_valid_for_transfer(&bootdata), kHardenedBoolTrue);
+}
+
+const owner_isfb_config_t isfb_config_bad_length = {
+    .header =
+        {
+            .tag = kTlvTagIntegrationSpecificFirmwareBinding,
+            .length = 0,
+        },
+};
+
 const owner_isfb_config_t isfb_config_bad_page = {
     .header =
         {
@@ -780,7 +855,9 @@ TEST_P(OwnerBlockBadIsfbTest, ParseBlockBadIsfb) {
 
 INSTANTIATE_TEST_SUITE_P(
     AllCases, OwnerBlockBadIsfbTest,
-    testing::Values(IsfbError{isfb_config_bad_page, kErrorOwnershipISFBPage},
+    testing::Values(IsfbError{isfb_config_bad_length,
+                              kErrorOwnershipInvalidTagLength},
+                    IsfbError{isfb_config_bad_page, kErrorOwnershipISFBPage},
                     IsfbError{isfb_config_bad_product_word_count,
                               kErrorOwnershipISFBSize}));
 
@@ -820,385 +897,374 @@ INSTANTIATE_TEST_SUITE_P(
                              kErrorOwnershipISFBVersion}));
 
 // Flash region is the exact size of the ROM_EXT and has a bad ECC setting.
-const owner_flash_config_t invalid_flash_0 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 1 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA ROM_EXT.
-                .start = 0,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/true,
-                    /*he=*/false),
-            },
-        },
-};
+const owner_flash_config_t *GetFlashConfigBadEccSetting() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/1);
+  flash_config->config[0] = {
+      // SideA ROM_EXT.
+      .start = 0,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/true,
+          /*he=*/false),
+  };
+  return flash_config;
+}
 
 // Flash region overlaps ROM_EXT and APP.
-const owner_flash_config_t invalid_flash_1 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 1 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA ROM_EXT & APP.
-                .start = 0,
-                .size = 224,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-        },
+const owner_flash_config_t *GetFlashConfigOverlap() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/1);
+  flash_config->config[0] = {
+      // SideA ROM_EXT & APP.
+      .start = 0,
+      .size = 224,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
 };
 
 // Flash regions straddle ROM_EXT.
-const owner_flash_config_t invalid_flash_2 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 2 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA ROM_EXT.
-                .start = 0,
-                .size = 16,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-            {
-                // SideA APP
-                .start = 16,
-                .size = 240,
-                .access = FLASH_ACCESS(
-                    /*index=*/1,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/1,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-        },
+const owner_flash_config_t *GetFlashConfigStraddle() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/2);
+  flash_config->config[0] = {
+      // SideA ROM_EXT.
+      .start = 0,
+      .size = 16,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[1] = {
+      // SideA APP
+      .start = 16,
+      .size = 240,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
 };
 
 // Flash region is the exact size of the ROM_EXT.
-const owner_flash_config_t invalid_flash_3 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 2 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideA ROM_EXT.
-                .start = 0,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-            {
-                // SideB ROM_EXT.
-                .start = 256,
-                .size = 32,
-                .access = FLASH_ACCESS(
-                    /*index=*/1,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/1,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-        },
-
+const owner_flash_config_t *GetFlashConfigExactSize() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/2);
+  flash_config->config[0] = {
+      // SideA ROM_EXT.
+      .start = 0,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[1] = {
+      // SideB ROM_EXT.
+      .start = 256,
+      .size = 32,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
 };
 
 // Flash configuration has too many entries.
 // We don't have to include the entries because the length is checked first
 // and none of the non-existent entries will be accessed.
-const owner_flash_config_t invalid_flash_4 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 8 * sizeof(owner_flash_region_t),
-        },
-};
+owner_flash_config_t *GetFlashConfigTooManyEntries() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/8);
+  return flash_config;
+}
 
 // Flash configuration extends beyond end of flash
-const owner_flash_config_t invalid_flash_5 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 1 * sizeof(owner_flash_region_t),
-        },
-    .config =
-        {
-            {
-                // SideB APP
-                .start = 256 + 32,
-                .size = 256,
-                .access = FLASH_ACCESS(
-                    /*index=*/0,
-                    /*read=*/true,
-                    /*program=*/true,
-                    /*erase=*/true,
-                    /*pwp=*/true,
-                    /*lock=*/false),
-                .properties = FLASH_PROP(
-                    /*index=*/0,
-                    /*scramble=*/false,
-                    /*ecc=*/false,
-                    /*he=*/false),
-            },
-        },
-};
+owner_flash_config_t *GetFlashConfigBeyondEndOfFlash() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/1);
+  flash_config->config[0] = {
+      // SideB APP
+      .start = 256 + 32,
+      .size = 256,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
+}
 
 // Flash configuration has too many entries for Slot A.
-const owner_flash_config_t invalid_flash_6 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 4 * sizeof(owner_flash_region_t),
-        },
-    .config = {{
-                   // SideA APP
-                   .start = 32,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/0,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/0,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideA APP
-                   .start = 33,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/1,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/1,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideA APP
-                   .start = 34,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/2,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/2,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideA APP
-                   .start = 35,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/3,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/3,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               }},
+owner_flash_config_t *GetFlashConfigManyEntriesSlotA() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/4);
+  flash_config->config[0] = {
+      // SideA APP
+      .start = 32,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[1] = {
+      // SideA APP
+      .start = 33,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[2] = {
+      // SideA APP
+      .start = 34,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/2,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/2,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[3] = {
+      // SideA APP
+      .start = 35,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/3,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/3,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
 };
 
 // Flash configuration has too many entries for Slot B.
-const owner_flash_config_t invalid_flash_7 = {
-    .header =
-        {
-            .tag = kTlvTagFlashConfig,
-            .length =
-                sizeof(owner_flash_config_t) + 4 * sizeof(owner_flash_region_t),
-        },
-    .config = {{
-                   // SideB APP
-                   .start = 256 + 32,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/0,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/0,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideB APP
-                   .start = 256 + 33,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/1,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/1,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideB APP
-                   .start = 256 + 34,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/2,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/2,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               },
-               {
-                   // SideB APP
-                   .start = 256 + 35,
-                   .size = 1,
-                   .access = FLASH_ACCESS(
-                       /*index=*/3,
-                       /*read=*/true,
-                       /*program=*/true,
-                       /*erase=*/true,
-                       /*pwp=*/true,
-                       /*lock=*/false),
-                   .properties = FLASH_PROP(
-                       /*index=*/3,
-                       /*scramble=*/false,
-                       /*ecc=*/false,
-                       /*he=*/false),
-               }},
+owner_flash_config_t *GetFlashConfigManyEntriesSlotB() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/4);
+  flash_config->config[0] = {
+      // SideB APP
+      .start = 256 + 32,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/0,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/0,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[1] = {
+      // SideB APP
+      .start = 256 + 33,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/1,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/1,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[2] = {
+      // SideB APP
+      .start = 256 + 34,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/2,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/2,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  flash_config->config[3] = {
+      // SideB APP
+      .start = 256 + 35,
+      .size = 1,
+      .access = FLASH_ACCESS(
+          /*index=*/3,
+          /*read=*/true,
+          /*program=*/true,
+          /*erase=*/true,
+          /*pwp=*/true,
+          /*lock=*/false),
+      .properties = FLASH_PROP(
+          /*index=*/3,
+          /*scramble=*/false,
+          /*ecc=*/false,
+          /*he=*/false),
+  };
+  return flash_config;
+};
+
+// Flash configuration has a zero length.
+owner_flash_config_t *GetFlashConfigZeroLength() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/0);
+  flash_config->header.length = 0;
+  return flash_config;
+};
+
+// Flash configuration has mis-aligned length.
+owner_flash_config_t *GetFlashConfigMisalignedLength() {
+  owner_flash_config_t *flash_config = GetFlashConfig(/*num=*/1);
+  --flash_config->header.length;
+  return flash_config;
 };
 
 class RomExtFlashConfigTest
     : public OwnerBlockTest,
-      public testing::WithParamInterface<
-          std::tuple<const owner_flash_config_t *, rom_error_t>> {};
+      public testing::WithParamInterface<std::tuple<uint16_t, rom_error_t>> {
+ protected:
+  void Init() override {
+    invalid_flash_[0] = GetFlashConfigBadEccSetting();
+    invalid_flash_[1] = GetFlashConfigOverlap();
+    invalid_flash_[2] = GetFlashConfigStraddle();
+    invalid_flash_[3] = GetFlashConfigExactSize();
+    invalid_flash_[4] = GetFlashConfigTooManyEntries();
+    invalid_flash_[5] = GetFlashConfigBeyondEndOfFlash();
+    invalid_flash_[6] = GetFlashConfigManyEntriesSlotA();
+    invalid_flash_[7] = GetFlashConfigManyEntriesSlotB();
+    invalid_flash_[8] = GetFlashConfigZeroLength();
+    invalid_flash_[9] = GetFlashConfigMisalignedLength();
+  }
+
+  void Destroy() override {
+    for (int i = 0; i < 10; i++) {
+      free((void *)invalid_flash_[i]);
+    }
+  }
+  const owner_flash_config_t *invalid_flash_[10];
+};
 
 // Test bad ROM_EXT region configs with respect to the default config.
 TEST_P(RomExtFlashConfigTest, BadFlashConfig) {
   EXPECT_CALL(flash_ctrl_, DataDefaultCfgGet)
       .WillRepeatedly(Return(default_config));
-  const owner_flash_config_t *param;
   rom_error_t expected;
-  std::tie(param, expected) = GetParam();
+  const owner_flash_config_t *param;
+  uint16_t test_case;
+  std::tie(test_case, expected) = GetParam();
+  param = invalid_flash_[test_case];
   rom_error_t error = owner_block_flash_check(param);
   EXPECT_EQ(error, expected);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     AllCases, RomExtFlashConfigTest,
-    testing::Values(
-        std::make_tuple(&invalid_flash_0, kErrorOwnershipFlashConfigRomExt),
-        std::make_tuple(&invalid_flash_1, kErrorOwnershipFlashConfigRomExt),
-        std::make_tuple(&invalid_flash_2, kErrorOwnershipFlashConfigRomExt),
-        std::make_tuple(&invalid_flash_3, kErrorOwnershipFlashConfigRomExt),
-        std::make_tuple(&invalid_flash_4, kErrorOwnershipFlashConfigLength),
-        std::make_tuple(&invalid_flash_5, kErrorOwnershipFlashConfigBounds),
-        std::make_tuple(&invalid_flash_6, kErrorOwnershipFlashConfigSlots),
-        std::make_tuple(&invalid_flash_7, kErrorOwnershipFlashConfigSlots)));
+    testing::Values(std::make_tuple(0, kErrorOwnershipFlashConfigRomExt),
+                    std::make_tuple(1, kErrorOwnershipFlashConfigRomExt),
+                    std::make_tuple(2, kErrorOwnershipFlashConfigRomExt),
+                    std::make_tuple(3, kErrorOwnershipFlashConfigRomExt),
+                    std::make_tuple(4, kErrorOwnershipFlashConfigLength),
+                    std::make_tuple(5, kErrorOwnershipFlashConfigBounds),
+                    std::make_tuple(6, kErrorOwnershipFlashConfigSlots),
+                    std::make_tuple(7, kErrorOwnershipFlashConfigSlots),
+                    std::make_tuple(8, kErrorOwnershipInvalidTagLength),
+                    std::make_tuple(9, kErrorOwnershipInvalidTagLength)));
 
 struct FlashRegion {
   uint32_t start;
@@ -1221,6 +1287,17 @@ rom_error_t owner_block_application_key_check(
     const owner_application_key_t *key);
 rom_error_t owner_block_flash_info_check(const owner_flash_info_config_t *info);
 rom_error_t owner_block_rescue_check(const owner_rescue_config_t *rescue);
+}
+
+TEST_F(OwnerBlockTest, FlashInfoCheckInvalidLength) {
+  const owner_flash_info_config_t info = {
+      .header =
+          {
+              .length = 0,
+          },
+  };
+  EXPECT_EQ(owner_block_flash_info_check(&info),
+            kErrorOwnershipInvalidTagLength);
 }
 
 // Test the flash bounds checking functions.
@@ -1285,8 +1362,8 @@ INSTANTIATE_TEST_SUITE_P(AllCases, OwnerBlockConfigCheckTest,
 testing::Values(
     OwnerBlockLengths{kTlvTagApplicationKey, 40, kErrorOwnershipInvalidTagLength},
     OwnerBlockLengths{kTlvTagApplicationKey, 512, kErrorOwnershipInvalidTagLength},
-    OwnerBlockLengths{kTlvTagFlashConfig, 4, kErrorOwnershipInvalidTagLength},
-    OwnerBlockLengths{kTlvTagInfoConfig, 4, kErrorOwnershipInvalidTagLength},
+    OwnerBlockLengths{kTlvTagFlashConfig, 12, kErrorOwnershipInvalidTagLength},
+    OwnerBlockLengths{kTlvTagInfoConfig, 12, kErrorOwnershipInvalidTagLength},
     OwnerBlockLengths{kTlvTagRescueConfig, 12, kErrorOwnershipInvalidTagLength}
 ));
 // clang-format on

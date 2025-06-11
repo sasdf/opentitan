@@ -79,6 +79,7 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib/drivers:spi_device_unittest'
   '//sw/device/silicon_creator/lib/drivers:watchdog_unittest'
   '//sw/device/silicon_creator/lib/ownership:isfb_unittest'
+  '//sw/device/silicon_creator/lib/ownership:owner_block_unittest'
   '//sw/device/silicon_creator/lib/ownership:ownership_activate_unittest'
   '//sw/device/silicon_creator/lib/ownership:ownership_unlock_unittest'
   '//sw/device/silicon_creator/lib:boot_data_unittest'

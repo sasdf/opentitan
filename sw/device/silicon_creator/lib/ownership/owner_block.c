@@ -1,7 +1,6 @@
 // Copyright lowRISC contributors (OpenTitan project).
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
-
 #include "sw/device/silicon_creator/lib/ownership/owner_block.h"
 
 #include "sw/device/lib/base/bitfield.h"
@@ -33,6 +32,9 @@ enum {
   kFlashSlotBStart = kFlashBankSize,
   kFlashSlotBEnd = kFlashSlotBStart + kFlashBankSize,
 
+#ifdef OT_COVERAGE_ENABLED
+#define CHIP_ROM_EXT_SIZE_MAX 0x10000
+#endif  // OT_COVERAGE_ENABLED
   kRomExtSizeInPages = CHIP_ROM_EXT_SIZE_MAX / kFlashPageSize,
   kRomExtAStart = 0 / kFlashPageSize,
   kRomExtAEnd = kRomExtAStart + kRomExtSizeInPages,
