@@ -42,8 +42,15 @@ function cleanup {{
 trap cleanup EXIT
 
 TEST_CMD=({test_cmd})
-echo Invoking test: {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
-RUST_BACKTRACE=1 {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+if command -v qq >/dev/null 2>&1; then
+  echo Invoking test: qq {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+  echo
+  echo Wait until the FPGA becomes available...
+  RUST_BACKTRACE=1 qq {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+else
+  echo Invoking test: {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+  RUST_BACKTRACE=1 {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+fi
 """
 
 def _transform(ctx, exec_env, name, elf, binary, signed_bin, disassembly, mapfile):
