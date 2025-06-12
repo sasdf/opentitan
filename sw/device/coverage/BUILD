@@ -30,6 +30,7 @@ cc_library(
         ":printer_api",
         "//sw/device/lib/base:crc32",
     ],
+    alwayslink = True,
 )
 
 cc_library(
@@ -75,7 +76,6 @@ alias(
 cc_library(
     name = "runtime_api",
     hdrs = ["runtime.h"],
-    target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":empty_runtime",
         "//sw/device/lib/base:macros",
@@ -86,7 +86,6 @@ cc_library(
     name = "empty_runtime",
     srcs = ["empty_runtime.c"],
     features = ["-coverage"],
-    target_compatible_with = [OPENTITAN_CPU],
     deps = [
         "//sw/device/lib/base:macros",
     ],

@@ -143,14 +143,11 @@ UNIT_TESTS=(
 //sw/device/silicon_creator/rom:bootstrap_unittest
 //sw/device/silicon_creator/rom_ext:rom_ext_boot_policy_unittest
 
-# Flash Layout
-# //sw/device/silicon_creator/lib/ownership:owner_block_unittest
+//sw/device/silicon_creator/lib/ownership:owner_block_unittest
+//sw/device/lib/ujson/rust:roundtrip_test
 
-# Clang
+# CE: variable-sized object may not be initialized
 # //sw/device/lib/crypto/impl:keyblob_unittest
-
-# Segmentation fault
-# //sw/device/lib/ujson/rust:roundtrip_test
 
 # target platform (@local_config_platform//:host) didn't satisfy
 # //sw/device/silicon_creator/lib/sigverify:sigverify_unittest
@@ -550,7 +547,6 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests:flash_ctrl_clock_freqs_test_fpga_cw310_sival_rom_ext
 //sw/device/tests:flash_ctrl_ops_test_fpga_cw310_sival_rom_ext
 
-# CE: OpenOCD
 # //sw/device/tests:crt_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_sival_rom_ext
@@ -638,7 +634,7 @@ CW310_SIVAL_TESTS=(
 //sw/device/tests:rv_dm_lc_disabled_tl_rma_fpga_cw310_sival
 //sw/device/tests:rv_dm_lc_disabled_tl_test_unlocked1_fpga_cw310_sival
 
-# OpenOCD
+# OpenOCD: runnable but empty coverage
 # //sw/device/tests:rv_dm_lc_disabled_jtag_dev_fpga_cw310_sival
 # //sw/device/tests:rv_dm_lc_disabled_jtag_prod_end_fpga_cw310_sival
 # //sw/device/tests:rv_dm_lc_disabled_jtag_prod_fpga_cw310_sival
@@ -827,6 +823,9 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_restricted_commands_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_restricted_commands_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_preserved_reset_reason_fpga_hyper310_rom_ext
+
 # FAILED: usb dfu: found no usb device
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_usbdfu_fpga_hyper310_rom_ext
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_usbdfu_fpga_hyper310_rom_ext
@@ -837,19 +836,12 @@ HYPER310_ROMEXT_TESTS=(
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_usbdfu_fpga_hyper310_rom_ext
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
 
-# TIMEOUT: Looping
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_preserved_reset_reason_fpga_hyper310_rom_ext
-
 # Report regex
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_hyper310_rom_ext
 
 
 # Timeout: the prebuilt protocol 0 uses an incompatible layout. (i.e. 64K boundary)
 # //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_protocol_0_fpga_hyper310_rom_ext
-
-# Failed
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
-
 )
 
 CW310_ROMEXT_TESTS=(

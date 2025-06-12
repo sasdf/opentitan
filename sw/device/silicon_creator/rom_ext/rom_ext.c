@@ -470,6 +470,7 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   // Jump to OWNER entry point.
   dbg_printf("entry: 0x%x\r\n", (unsigned int)entry_point);
   coverage_report();
+  coverage_invalidate();
   ((owner_stage_entry_point *)entry_point)();
 
   return kErrorRomExtBootFailed;

@@ -20,8 +20,7 @@
  */
 int __llvm_profile_runtime;
 
-__attribute__((used))
-__attribute__((section("__prf_cnt_placeholder"))) static uint8_t cnts;
+static uint32_t coverage_status;
 
 uint32_t coverage_crc;
 
@@ -44,6 +43,10 @@ void coverage_printer_sink_with_crc(const void *buf, size_t size) {
 extern char __llvm_prf_cnts_start[];
 extern char __llvm_prf_cnts_end[];
 extern char __llvm_prf_cnts_values_end[];
+extern char _build_id_start[];
+extern char _build_id_end[];
+
+#define BUILD_ID ((uint8_t*)_build_id_end - BUILD_ID_SIZE)
 
 // The variable is defined as weak so that compiler can emit an override.
 // See also LLVM's `compiler-rt/lib/profile/InstrProfiling.h`.
@@ -61,21 +64,20 @@ void coverage_printer_init_cnts(void) {
     }
   }
 
+  // Set the report as valid.
+  coverage_status = *(uint32_t*) BUILD_ID;
+
   // Dry run the crc to bump their counters.
   // crc32_add(&coverage_crc, send_buf, 1);
   // crc32_add(&coverage_crc, send_buf, 4);
 }
-
-extern char _build_id_start[];
-extern char _build_id_end[];
 
 void coverage_printer_run(void) {
   crc32_init(&coverage_crc);
 
 
   if (_build_id_end - _build_id_start >= BUILD_ID_SIZE) {
-    coverage_compress((unsigned char *)_build_id_end - BUILD_ID_SIZE,
-                      BUILD_ID_SIZE);
+    coverage_compress((unsigned char *)BUILD_ID, BUILD_ID_SIZE);
   } else {
     coverage_compress_zeros(0x00, BUILD_ID_SIZE);
   }
@@ -84,4 +86,12 @@ void coverage_printer_run(void) {
 
   coverage_crc = crc32_finish(&coverage_crc);
   coverage_printer_sink(&coverage_crc, sizeof(coverage_crc));
+}
+
+void coverage_invalidate(void) {
+  coverage_status = 0x42;
+}
+
+int coverage_is_valid(void) {
+  return coverage_status == *(uint32_t*) BUILD_ID;
 }

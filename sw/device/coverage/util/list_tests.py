@@ -66,9 +66,11 @@ def main():
 
   test_groups = [fix_rom_e2e_env(g) for g in test_groups]
   test_groups = [filter_tests(g, 'baseline_coverage') for g in test_groups]
+  test_groups_en = [{k for k, v in g.items() if v} for g in test_groups]
   test_groups = [set(g.keys()) for g in test_groups]
 
   available, listed, minset, useful = test_groups
+  available_en, listed_en, minset_en, useful_en = test_groups_en
 
   print()
   print(f'Found {len(listed)} listed tests')
@@ -77,7 +79,7 @@ def main():
 
   print()
   print('Minset but not listed:')
-  print_tests(minset - listed - useful)
+  print_tests(minset_en - listed_en - useful_en)
 
   print()
   print('Listed but not available:')

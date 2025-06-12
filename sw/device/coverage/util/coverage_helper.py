@@ -153,8 +153,8 @@ def parse_single_file(lines):
   profile = FileProfile(
     sf=path,
     fn={},
-    fnda={},
-    da={},
+    fnda=defaultdict(int),
+    da=defaultdict(int),
   )
 
   while True:
@@ -165,13 +165,13 @@ def parse_single_file(lines):
       profile.fn[name] = int(lineno)
     elif tag == 'FNDA':
       count, name = params.split(',')
-      profile.fnda[name] = int(count)
+      profile.fnda[name] += int(count)
     elif tag == 'BRDA':
       pass
       # raise NotImplementedError('BRDA is not supported yet')
     elif tag == 'DA':
       lineno, count, *_ = params.split(',')
-      profile.da[int(lineno)] = int(count)
+      profile.da[int(lineno)] += int(count)
     elif tag in {'LH', 'LF', 'BRH', 'BRF', 'FNH', 'FNF'}:
       # These are summary lines, we don't care.
       pass

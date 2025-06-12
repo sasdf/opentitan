@@ -20,6 +20,9 @@ void coverage_printer_run(void);
 
 void coverage_printer_init(void);
 
+// Check if the report has been invalidated.
+int coverage_is_valid(void);
+
 /* Internal APIs */
 extern uint32_t coverage_crc;
 

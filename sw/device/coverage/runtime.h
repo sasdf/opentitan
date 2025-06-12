@@ -11,13 +11,13 @@
 
 void coverage_init(void);
 void coverage_report(void);
-#define COVERAGE_REPORT coverage_report
+void coverage_invalidate(void);
 
 #else  // OT_COVERAGE_ENABLED
 
 #define coverage_init(...)
 #define coverage_report(...)
-#define COVERAGE_REPORT(...)
+#define coverage_invalidate(...)
 
 #endif  // OT_COVERAGE_ENABLED
 

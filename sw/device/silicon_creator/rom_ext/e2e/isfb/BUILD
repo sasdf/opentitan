@@ -220,6 +220,7 @@ _ISFB_CONTRAINT_TESTS = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
         },
         fpga = fpga_params(
+            timeout = "long",
             binaries = {
                 ":isfb_page_init": "isfb_page_init",
             },

@@ -68,6 +68,7 @@ void imm_section_main(void) {
   HARDENED_CHECK_EQ(error, kErrorOk);
 
   coverage_report();
+  coverage_invalidate();
 
   // Go back to ROM / Mutable ROM_EXT.
   return;

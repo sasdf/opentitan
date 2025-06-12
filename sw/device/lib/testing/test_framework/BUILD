@@ -214,6 +214,7 @@ cc_library(
         ":ottf_isrs",
         ":test_framework_manifest_def",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/coverage:ottf_runtime",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/crt",

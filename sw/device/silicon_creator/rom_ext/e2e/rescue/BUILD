@@ -262,7 +262,7 @@ genrule(
                 --exec="bootstrap --clear-uart=true {firmware}"
                 {setup}
                 --exec="no-op --info='##### Set primary slot via the rescue protocol'"
-                --exec="rescue {params} boot-svc set-next-bl0-slot --primary=SlotB"
+                --exec="rescue {params} boot-svc set-next-bl0-slot --primary=SlotB --get-response=false"
                 --exec="no-op --info='##### Check for firmware execution in slot B'"
                 --exec="console --non-interactive --exit-success='bl0_slot = __BB\r\n' --exit-failure='{exit_failure}'"
                 --exec="no-op --info='##### Reset and observe continued execution in slot B'"
