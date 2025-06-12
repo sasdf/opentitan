@@ -9,8 +9,8 @@ index 29acf96..8cea6ed 100644
 -        url = "https://github.com/lowRISC/lowrisc-toolchains/releases/download/20240923-1/lowrisc-toolchain-rv32imcb-20240923-1.tar.xz",
 -        sha256 = "aeea1983553f4c81c6409abcf0d6ca33b5ed4716b2b694e7ff030523cf13486a",
 -        strip_prefix = "lowrisc-toolchain-rv32imcb-20240923-1",
-+        url = "https://github.com/lowRISC/lowrisc-toolchains/releases/download/20250507-1/lowrisc-toolchain-rv32imcb-x86_64-20250507-1.tar.xz",
-+        sha256 = "d3bd7bdf3f37445e2f1a06af4bfdbaa59267b377e7cdb3f47fb4d13f792b83b6",
-+        strip_prefix = "lowrisc-toolchain-rv32imcb-x86_64-20250507-1",
++        url = "https://github.com/lowRISC/lowrisc-toolchains/releases/download/20250611-1/lowrisc-toolchain-rv32imcb-x86_64-20250611-1.tar.xz",
++        sha256 = "162510b8017e62f9afa56fedeeb5aca12eafa78d593c501d510c49419327b8ea",
++        strip_prefix = "lowrisc-toolchain-rv32imcb-x86_64-20250611-1",
          build_file = Label("//toolchains:BUILD.export_all.bazel"),
      )
