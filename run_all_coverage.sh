@@ -547,26 +547,26 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests:flash_ctrl_clock_freqs_test_fpga_cw310_sival_rom_ext
 //sw/device/tests:flash_ctrl_ops_test_fpga_cw310_sival_rom_ext
 
+//sw/device/tests:usbdev_config_host_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_deep_reset_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_deep_resume_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_iso_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_mem_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_mixed_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_pincfg_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_pullup_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_sleep_reset_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_sleep_resume_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_stream_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_toggle_restore_test_fpga_cw310_sival_rom_ext
+//sw/device/silicon_creator/lib/drivers:usb_functest_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_aon_pullup_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_setuprx_test_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_vbus_test_fpga_cw310_sival_rom_ext
+
 # //sw/device/tests:crt_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_sival_rom_ext
-
-# ?: USBDEV
-# //sw/device/tests:usbdev_config_host_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_deep_reset_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_deep_resume_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_iso_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_mem_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_mixed_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_pincfg_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_pullup_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_sleep_reset_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_sleep_resume_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_stream_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_toggle_restore_test_fpga_cw310_sival_rom_ext
-# //sw/device/silicon_creator/lib/drivers:usb_functest_fpga_cw310_sival_rom_ext
 
 # Timeout
 # //sw/device/tests:power_virus_systemtest_fpga_cw310_sival_rom_ext
@@ -581,6 +581,8 @@ CW310_SIVAL_ROMEXT_TESTS=(
 
 
 # Failed
+# //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_sival_rom_ext
+# //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:gpio_intr_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:gpio_pinmux_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:otbn_smoketest_fpga_cw310_sival_rom_ext
@@ -591,9 +593,6 @@ CW310_SIVAL_ROMEXT_TESTS=(
 # //sw/device/tests:sysrst_ctrl_outputs_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:sysrst_ctrl_reset_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:sysrst_ctrl_ulp_z3_wakeup_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_aon_pullup_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_setuprx_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_vbus_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests/crypto:kdf_kmac_sideload_functest_hardcoded_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rstmgr_cpu_info_test_fpga_cw310_sival_rom_ext
 # //sw/device/silicon_creator/lib/sigverify:mod_exp_ibex_functest_wycheproof_fpga_cw310_sival_rom_ext
@@ -826,14 +825,15 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_preserved_reset_reason_fpga_hyper310_rom_ext
 
-# FAILED: usb dfu: found no usb device
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_usbdfu_fpga_hyper310_rom_ext
-# //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_usbdfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_usbdfu_fpga_hyper310_rom_ext
+
+# FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
 
 # Report regex
