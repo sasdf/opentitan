@@ -576,7 +576,7 @@ typedef struct manifest_ext_isfb_erase {
  * @return Result of the operation.
  */
 OT_WARN_UNUSED_RESULT
-inline rom_error_t manifest_check(const manifest_t *manifest) {
+static inline rom_error_t manifest_check(const manifest_t *manifest) {
   // Major version must be `kManifestVersionMajor2`.
   if (manifest->manifest_version.major != kManifestVersionMajor2) {
     return kErrorManifestBadVersionMajor;
@@ -625,7 +625,7 @@ inline rom_error_t manifest_check(const manifest_t *manifest) {
  * digest computation.
  */
 OT_WARN_UNUSED_RESULT
-inline manifest_digest_region_t manifest_digest_region_get(
+static inline manifest_digest_region_t manifest_digest_region_get(
     const manifest_t *manifest) {
   enum {
     kDigestRegionOffset = offsetof(manifest_t, usage_constraints) +
@@ -644,7 +644,7 @@ inline manifest_digest_region_t manifest_digest_region_get(
  * return Executable region of the image.
  */
 OT_WARN_UNUSED_RESULT
-inline epmp_region_t manifest_code_region_get(const manifest_t *manifest) {
+static inline epmp_region_t manifest_code_region_get(const manifest_t *manifest) {
   return (epmp_region_t){
       .start = (uintptr_t)manifest + manifest->code_start,
       .end = (uintptr_t)manifest + manifest->code_end,
@@ -663,14 +663,14 @@ inline epmp_region_t manifest_code_region_get(const manifest_t *manifest) {
  * return Entry point address.
  */
 OT_WARN_UNUSED_RESULT
-inline uintptr_t manifest_entry_point_get(const manifest_t *manifest) {
+static inline uintptr_t manifest_entry_point_get(const manifest_t *manifest) {
   return (uintptr_t)manifest + manifest->entry_point;
 }
 
 #define DEFINE_GETTER(index_, type_, name_, id_, _)                            \
   OT_WARN_UNUSED_RESULT                                                        \
                                                                                \
-  inline rom_error_t manifest_ext_get_##name_(const manifest_t *manifest,      \
+  static inline rom_error_t manifest_ext_get_##name_(const manifest_t *manifest,      \
                                               const type_ **name_) {           \
     enum {                                                                     \
       kMinSize = CHIP_MANIFEST_SIZE,                                           \
