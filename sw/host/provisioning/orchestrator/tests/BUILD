@@ -141,10 +141,14 @@ sh_test(
             ":orchestrator_{}_zip".format(fpga),
             "@rules_python//python:current_py_toolchain",
             cfg["orchestrator_cfg"],
+            cfg["rom_ext"],
+            cfg["owner_fw"],
+            "//sw/device/coverage/collect_cc_coverage",
         ],
         env = {
             "PYTHON": "$(PYTHON3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
+            "COLLECT_CC_COVERAGE": "$(location //sw/device/coverage/collect_cc_coverage)",
             "FPGA": "{}".format(fpga),
         },
         tags = [

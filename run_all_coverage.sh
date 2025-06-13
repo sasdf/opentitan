@@ -871,6 +871,12 @@ HYPER310_FAKE_KEYS_TESTS=(
 //sw/device/tests:ottf_console_with_gpio_tx_indicator_test_fpga_hyper310_rom_with_fake_keys
 )
 
+PROVISIONING_TESTS=(
+//sw/host/provisioning/orchestrator/tests:e2e_emulation_cw340_test
+//sw/host/provisioning/orchestrator/tests:e2e_emulation_dice_cwt_cw340_test
+//sw/host/provisioning/orchestrator/tests:e2e_emulation_tpm_cw340_test
+)
+
 UNSUPPORTED_TESTS=(
 //sw/device/lib/base:global_mock_unittest
 //sw/device/tests/penetrationtests:fi_crypto_fpga_cw310_sival_rom_ext
@@ -916,6 +922,7 @@ TEST_GROUPS=(
     "CW340_FAKE_KEYS_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"
     "INS_ROM_TESTS"
+    "PROVISIONING_TESTS"
     "USEFUL_EXTRA_TESTS"
     # "${EX_TEST_GROUPS[@]}"
 )

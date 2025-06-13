@@ -196,6 +196,7 @@ impl UartConsole {
         let path = path.replace("%h", "test.on.device");
         let path = path.replace("%p", &rand::thread_rng().gen::<u32>().to_string());
         let path = path.replace("%m", "0");
+        let path = path.replace(".profraw", ".xprofraw");
 
         println!("Saving coverage profile to {path}");
         std::fs::write(path, response)?;

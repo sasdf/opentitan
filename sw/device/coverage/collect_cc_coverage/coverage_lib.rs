@@ -87,6 +87,23 @@ pub fn search_by_extension(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+pub fn recursive_search_by_extension(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                paths.extend(recursive_search_by_extension(&path, extension));
+            } else if let Some(ext) = path.extension() {
+                if ext == extension {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+    paths
+}
+
 #[derive(AsBytes, Debug, Default)]
 #[repr(C)]
 pub struct ProfileHeader {
@@ -199,7 +216,12 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
                 // Any other value is the padding length itself.
                 _ => byte[0] as usize,
             };
-            cnts.resize(cnts.len() + pad, tag);
+            let new_size = cnts.len() + pad;
+            // Prevent excessive counter than what can be held on OpenTitan.
+            if new_size > 1024 * 1024 {
+                bail!("Decompressed counter is too large");
+            }
+            cnts.resize(new_size, tag);
         } else {
             // Regular data byte.
             cnts.push(byte[0]);
@@ -218,7 +240,8 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
     })
 }
 
-pub fn process_profraw<'a>(path: &PathBuf, profile_map: &'a HashMap<String, ProfileData>) -> Result<&'a ProfileData> {
+pub fn process_xprofraw<'a>(path: &PathBuf, output: &PathBuf,
+                           profile_map: &'a HashMap<String, ProfileData>) -> Result<&'a ProfileData> {
     let ProfileCounter { build_id, cnts } = decompress(path)?;
 
     if cnts.len() < 8 {
@@ -271,7 +294,7 @@ pub fn process_profraw<'a>(path: &PathBuf, profile_map: &'a HashMap<String, Prof
     assert_eq!(profile.data.len() as u64, header.NumData * PRF_DATA_ENTRY_SIZE);
     assert_eq!(profile.names.len() as u64, header.NamesSize);
 
-    let mut f = std::fs::File::create(path)?;
+    let mut f = std::fs::File::create(output)?;
     f.write_all(header.as_bytes())?;
     f.write_all(&profile.data)?;
     f.write_all(&cnts)?;

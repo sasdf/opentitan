@@ -32,9 +32,10 @@ use zerocopy::AsBytes;
 
 use coverage_lib::{
   search_by_extension,
+  recursive_search_by_extension,
   debug_log,
   process_elf,
-  process_profraw,
+  process_xprofraw,
   llvm_cov_export,
   llvm_profdata_merge,
   get_runfiles_dir,
@@ -46,26 +47,36 @@ fn main() -> Result<()> {
 
     let coverage_dir = PathBuf::from(env::var("COVERAGE_DIR").unwrap());
     let runfiles_dir = get_runfiles_dir();
+    debug_log!("runfiles_dir: {:?}", runfiles_dir);
 
-    let profraw_files = search_by_extension(&coverage_dir, "profraw");
-    debug_log!("profraw_files: {:?}", profraw_files);
+    let xprofraw_files = search_by_extension(&coverage_dir, "xprofraw");
+    debug_log!("xprofraw_files: {:?}", xprofraw_files);
 
     // Collect all elf files in the runfiles.
     let runfiles_manifest = runfiles_dir.join("MANIFEST");
-    let elf_files: Vec<PathBuf> = fs::read_to_string(&runfiles_manifest)
-        .unwrap()
-        .lines()
-        .filter_map(|path| {
-            let pair = path
-                .split_once(' ')
-                .expect("manifest file contained unexpected content");
-            if pair.0.ends_with(".elf") {
-                Some(PathBuf::from(pair.1))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let elf_files: Vec<PathBuf> = if runfiles_manifest.exists() {
+        debug_log!("runfiles_manifest: {:?}", runfiles_manifest);
+        fs::read_to_string(&runfiles_manifest)
+            .unwrap()
+            .lines()
+            .filter_map(|path| {
+                let pair = path
+                    .split_once(' ')
+                    .expect("manifest file contained unexpected content");
+                if pair.0.ends_with(".elf") {
+                    Some(PathBuf::from(pair.1))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    } else {
+        // RUNFILES_MANIFEST_FILE is unset inside the sandbox
+        // https://github.com/bazelbuild/bazel/issues/7994
+        debug_log!("search elf by extension");
+        recursive_search_by_extension(&runfiles_dir, "elf")
+    };
+
     debug_log!("elf_files: {:?}", elf_files);
 
     // Index elf profile data with build id.
@@ -79,14 +90,17 @@ fn main() -> Result<()> {
             Err(err) => eprintln!("Skip {path:?}: {err:?}"),
         }
     }
+    debug_log!("All elf files are loaded!");
 
     // Correlate profile data with counters from the device.
-    for path in &profraw_files {
-        let profile = process_profraw(path, &profile_map).unwrap();
+    for path in &xprofraw_files {
+        debug_log!("Processing {path:?}");
+        let profraw_file = path.with_extension("profraw");
+        let profile = process_xprofraw(path, &profraw_file, &profile_map).unwrap();
         // We use .xprofdata instead of .profdata to avoid lcov_merger from parsing it.
         let profdata_file = path.with_extension("xprofdata");
         let lcov_file = path.with_extension("dat");
-        llvm_profdata_merge(&path, &profdata_file);
+        llvm_profdata_merge(&profraw_file, &profdata_file);
         llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_file);
     }
 
