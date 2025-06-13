@@ -325,7 +325,7 @@ def generate_lcov(coverage):
 TestLcov = namedtuple('TestLcov', 'name,path,duration,coverage')
 def iter_lcov_files(lcov_files_path):
   with open(lcov_files_path) as files:
-    files = list(map(Path, files.read().splitlines()))
+    files = sorted(map(Path, files.read().splitlines()))
     files = [p for p in files if p.name == 'coverage.dat']
     for i, path in enumerate(files):
       # Get the path after the first parent named 'testlogs'
@@ -411,4 +411,4 @@ def extract_tests(path):
           line = line[1:-1]
       if line.startswith('//'):
         tests[line] = enabled
-  return tests
+  return dict(sorted(tests.items()))
