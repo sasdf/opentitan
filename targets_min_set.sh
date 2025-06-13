@@ -5,7 +5,6 @@ CW310_ROM_EXT_TESTS=(
 CW310_SIVAL_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/lib/sigverify:spx_verify_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests/crypto:drbg_functest_fpga_cw310_sival_rom_ext'
-  '//sw/device/tests:flash_ctrl_write_clear_test_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:kmac_smoketest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:pwrmgr_normal_sleep_all_wake_ups_fpga_cw310_sival_rom_ext'
 )
@@ -17,6 +16,7 @@ CW310_SIVAL_TESTS=(
 
 CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_entry_before_code_start_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_0_b_1_fpga_cw340_instrumented_rom'
@@ -59,12 +59,20 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_prod_hybrid_spx_pure_fpga_hyper310_rom_ext'
 )
 
+PROVISIONING_TESTS=(
+  '//sw/host/provisioning/orchestrator/tests:e2e_emulation_dice_cwt_cw340_test'
+)
+
 UNIT_TESTS=(
   '//sw/device/lib/base:crc32_unittest'
   '//sw/device/lib/base:memory_unittest'
   '//sw/device/lib/crypto/impl:status_unittest'
   '//sw/device/silicon_creator/lib/boot_svc:boot_svc_enter_rescue_unittest'
   '//sw/device/silicon_creator/lib/boot_svc:boot_svc_header_unittest'
+  '//sw/device/silicon_creator/lib/cert:cdi_0_template_unittest'
+  '//sw/device/silicon_creator/lib/cert:generic_template_unittest'
+  '//sw/device/silicon_creator/lib/cert:tpm_ek_template_unittest'
+  '//sw/device/silicon_creator/lib/cert:uds_template_unittest'
   '//sw/device/silicon_creator/lib/drivers:alert_unittest'
   '//sw/device/silicon_creator/lib/drivers:ast_unittest'
   '//sw/device/silicon_creator/lib/drivers:flash_ctrl_unittest'
@@ -100,5 +108,6 @@ TEST_GROUPS=(
   'CW310_SIVAL_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
   'HYPER310_ROM_EXT_TESTS'
+  'PROVISIONING_TESTS'
   'UNIT_TESTS'
 )

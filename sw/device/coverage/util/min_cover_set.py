@@ -93,9 +93,11 @@ def main():
       pred_names.append(name)
 
   def label_group(name):
+    if name.startswith('//sw/host/provisioning/'):
+      return 'PROVISIONING_TESTS', name
     if '_fpga_' in name:
       return name.rsplit('_fpga_')[-1].upper() + '_TESTS', name
-    assert '_unittest' in name
+    assert '_unittest' in name, name
     return 'UNIT_TESTS', name
 
   test_groups = ['EXTRA_TESTS']
