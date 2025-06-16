@@ -179,7 +179,7 @@ extern epmp_state_t epmp_state;
  * @param region The memory region to encode in the address registers.
  * @param perm The permissions to set for the entry.
  */
-inline void epmp_state_configure_tor(uint32_t entry, epmp_region_t region,
+static inline void epmp_state_configure_tor(uint32_t entry, epmp_region_t region,
                                      epmp_perm_t perm) {
   // Set address registers.
   if (entry > 0) {
@@ -202,7 +202,7 @@ inline void epmp_state_configure_tor(uint32_t entry, epmp_region_t region,
  * @param region The memory region to encode in the address registers.
  * @param perm The permissions to set for the entry.
  */
-inline void epmp_state_configure_na4(uint32_t entry, epmp_region_t region,
+static inline void epmp_state_configure_na4(uint32_t entry, epmp_region_t region,
                                      epmp_perm_t perm) {
   // Set address register.
   epmp_state.pmpaddr[entry] = region.start >> 2;
@@ -222,7 +222,7 @@ inline void epmp_state_configure_na4(uint32_t entry, epmp_region_t region,
  * @param region The memory region to encode in the address registers.
  * @param perm The permissions to set for the entry.
  */
-inline void epmp_state_configure_napot(uint32_t entry, epmp_region_t region,
+static inline void epmp_state_configure_napot(uint32_t entry, epmp_region_t region,
                                        epmp_perm_t perm) {
   // Set address register.
   uint32_t len = (region.end - region.start - 1) >> 3;

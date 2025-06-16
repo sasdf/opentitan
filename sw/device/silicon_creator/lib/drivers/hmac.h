@@ -115,7 +115,7 @@ static inline void hmac_sha256_init(void) {
 /**
  * Configures and starts HMAC in HMAC mode with little-endian output.
  */
-inline void hmac_hmac_sha256_init(hmac_key_t key, bool big_endian_digest) {
+static inline void hmac_hmac_sha256_init(hmac_key_t key, bool big_endian_digest) {
   hmac_hmac_sha256_configure(big_endian_digest, key);
   hmac_sha256_start();
 }

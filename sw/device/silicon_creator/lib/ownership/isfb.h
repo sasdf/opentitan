@@ -21,7 +21,7 @@ enum {
   kIsfbExpectedStrikeBitCount = 128,
 };
 
-inline uint32_t isfb_expected_count_get(const manifest_ext_isfb_t *ext) {
+static inline uint32_t isfb_expected_count_get(const manifest_ext_isfb_t *ext) {
   return ext->product_expr_count + kIsfbExpectedStrikeBitCount;
 }
 

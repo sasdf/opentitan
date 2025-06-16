@@ -272,7 +272,7 @@ rom_error_t sc_keymgr_sideload_clear(sc_keymgr_dest_t destination);
  * @return OK or error.
  */
 OT_WARN_UNUSED_RESULT
-inline rom_error_t sc_keymgr_generate_key_otbn(
+static inline rom_error_t sc_keymgr_generate_key_otbn(
     sc_keymgr_key_type_t key_type,
     sc_keymgr_diversification_t diversification) {
   return sc_keymgr_generate_key(kScKeymgrDestOtbn, key_type, diversification);
@@ -287,7 +287,7 @@ inline rom_error_t sc_keymgr_generate_key_otbn(
  * @return OK or error.
  */
 OT_WARN_UNUSED_RESULT
-inline rom_error_t sc_keymgr_sideload_clear_otbn(void) {
+static inline rom_error_t sc_keymgr_sideload_clear_otbn(void) {
   return sc_keymgr_sideload_clear(kScKeymgrDestOtbn);
 }
 

@@ -172,7 +172,7 @@ void kmac_kmac256_set_prefix(const void *prefix, size_t len);
  * @return Error code indicating if the operation succeeded.
  */
 OT_WARN_UNUSED_RESULT
-inline rom_error_t kmac_kmac256_start(void) { return kmac_shake256_start(); }
+static inline rom_error_t kmac_kmac256_start(void) { return kmac_shake256_start(); }
 
 /**
  * Absorb data into a KMAC-256.
@@ -180,7 +180,7 @@ inline rom_error_t kmac_kmac256_start(void) { return kmac_shake256_start(); }
  * @param data Data to absorb into the sponge.
  * @param len Length of the data.
  */
-inline void kmac_kmac256_absorb(const void *data, size_t len) {
+static inline void kmac_kmac256_absorb(const void *data, size_t len) {
   kmac_shake256_absorb((const uint8_t *)data, len);
 }
 
