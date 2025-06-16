@@ -49,7 +49,7 @@ static_assert(
     kSpxLeafBits <= 32,
     "For the given height, 32 bits is not large enough for a leaf index.");
 
-static inline rom_error_t spx_hash_initialize(spx_ctx_t *ctx) {
+rom_error_t spx_hash_initialize(spx_ctx_t *ctx) {
   hmac_sha256_configure(/*big_endian_digest=*/true);
 
   // Save state for the first part of `thash`: public key seed + padding.

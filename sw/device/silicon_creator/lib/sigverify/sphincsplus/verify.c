@@ -95,6 +95,6 @@ rom_error_t spx_verify(const uint32_t *sig, const uint8_t *msg_prefix_1,
   return kErrorOk;
 }
 
-static inline void spx_public_key_root(const uint32_t *pk, uint32_t *root) {
+void spx_public_key_root(const uint32_t *pk, uint32_t *root) {
   memcpy(root, pk + kSpxNWords, kSpxN);
 }
