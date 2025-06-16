@@ -7,7 +7,7 @@ use anyhow::Result;
 use std::io::{Read, Write};
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum XmodemError {
     #[error("Cancelled")]
     Cancelled,
