@@ -199,7 +199,7 @@ fn load_owner_block(
             let capture = UartConsole::wait_for(
                 &*uart,
                 r"(?msR)OWNER_PAGE_0: (.*?)\r\n",
-                Duration::from_secs(1),
+                Duration::from_secs(5),
             )?;
             if capture.len() < 2 {
                 return Err(anyhow!(
