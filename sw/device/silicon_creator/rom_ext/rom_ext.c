@@ -472,6 +472,7 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   coverage_report();
   coverage_invalidate();
   ((owner_stage_entry_point *)entry_point)();
+  coverage_init(); // re-init after invalidate.
 
   return kErrorRomExtBootFailed;
 }

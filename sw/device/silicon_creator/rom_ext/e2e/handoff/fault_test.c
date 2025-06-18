@@ -78,9 +78,13 @@ void fault_test_main(void) {
   dbg_printf("HARDWARE_INTERRUPT: FAIL!\r\n");
 #elif defined(NO_FAULT)
   dbg_printf("NO_FAULT: PASS!\r\n");
+#elif defined(RETURN_TO_ROM_EXT)
+  dbg_printf("Returning to ROM_EXT\r\n");
+  return;
 #else
   dbg_printf("Fault not defined. FAIL!\r\n");
 #endif
+
   while (true) {
   }
 }

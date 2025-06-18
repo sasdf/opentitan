@@ -62,6 +62,12 @@ _start_boot:
   la   sp, _stack_end
 
   /**
+   * Save registers.
+   */
+  addi sp, sp, -8
+  sw ra, 4(sp)
+
+  /**
    * Do NOT set interrupt/exception handlers.  We want to leave the ROM_EXT
    * handlers in place so we can verify them.
    *
@@ -109,6 +115,12 @@ _start_boot:
   li a5, 0x0
   li a6, 0x0
   li a7, 0x0
+
+  /**
+   * Restore registers.
+   */
+  lw ra, 4(sp)
+  addi sp, sp, 8
 
   /**
    * Jump to C Code
