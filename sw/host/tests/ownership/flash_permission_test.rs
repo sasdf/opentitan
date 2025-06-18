@@ -196,6 +196,7 @@ fn flash_permission_test(opts: &Opts, transport: &TransportWrapper) -> Result<()
             None
         },
         None,
+        false,
     )?;
 
     log::info!("###### Get Boot Log (2/2) ######");
