@@ -836,9 +836,13 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_xmodem_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_with_detached_sig_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_spx_pure_to_spx_prehash_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_unlock_signature_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_with_owner_recovery_key_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_detached_sig_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/handoff:fault_return_boot_failed_fpga_hyper310_rom_ext
 
 # FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
@@ -872,6 +876,10 @@ CW340_SIVAL_TESTS=(
 
 CW340_FAKE_KEYS_TESTS=(
 //sw/device/tests:ottf_console_with_gpio_tx_indicator_test_fpga_cw340_rom_with_fake_keys
+)
+
+CW340_ROM_EXT_TESTS=(
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:corrupted_digest_test_fpga_cw340_rom_ext
 )
 
 HYPER310_FAKE_KEYS_TESTS=(
@@ -927,6 +935,7 @@ TEST_GROUPS=(
     "CW310_ROMEXT_TESTS"
     "CW340_SIVAL_TESTS"
     "CW340_FAKE_KEYS_TESTS"
+    "CW340_ROM_EXT_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"
     "INS_ROM_TESTS"
     "PROVISIONING_TESTS"

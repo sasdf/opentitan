@@ -14,6 +14,12 @@ BASELINES=(
 TARGETS=()
 
 EXTRA_TESTS=(
+//sw/device/silicon_creator/lib/drivers:flash_ctrl_unittest
+//sw/device/lib/base:memory_unittest
+//sw/device/silicon_creator/rom_ext/e2e/handoff:fault_return_boot_failed_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_xmodem_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/dice_chain:corrupted_digest_test_fpga_cw340_rom_ext
 )
 
 source ./targets_min_set.sh
