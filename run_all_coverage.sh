@@ -142,9 +142,9 @@ UNIT_TESTS=(
 //sw/device/silicon_creator/rom:boot_policy_unittest
 //sw/device/silicon_creator/rom:bootstrap_unittest
 //sw/device/silicon_creator/rom_ext:rom_ext_boot_policy_unittest
-
 //sw/device/silicon_creator/lib/ownership:owner_block_unittest
 //sw/device/lib/ujson/rust:roundtrip_test
+//sw/device/silicon_creator/manuf/base:perso_tlv_data_unittest
 
 # CE: variable-sized object may not be initialized
 # //sw/device/lib/crypto/impl:keyblob_unittest
@@ -833,6 +833,10 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_usbdfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_usbdfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_usbdfu_fpga_hyper310_rom_ext
+
+//sw/device/silicon_creator/rom_ext/e2e/ownership:bad_unlock_signature_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_with_owner_recovery_key_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_detached_sig_test_fpga_hyper310_rom_ext
 
 # FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext

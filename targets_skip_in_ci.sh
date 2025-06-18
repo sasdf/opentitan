@@ -631,6 +631,10 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:isfb_boot_test_fpga_cw340_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/ownership:bad_unlock_signature_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_with_owner_recovery_key_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_detached_sig_test_fpga_cw340_rom_ext
+
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
 )
 
