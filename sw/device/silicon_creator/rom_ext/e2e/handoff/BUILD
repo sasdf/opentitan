@@ -135,3 +135,47 @@ opentitan_test(
         "//sw/device/silicon_creator/lib:dbg_print",
     ],
 )
+
+SRAM_EXEC_TESTCASES = [
+    {
+        "name": "enabled",
+        "rom_ext": "//sw/device/silicon_creator/rom_ext:rom_ext_owner_sram_exec_enabled",
+        "exit_success": "value = 00000006, 00000006, 00000001[\\s\\S]*PASS!",
+    },
+    {
+        "name": "disabled",
+        "rom_ext": "//sw/device/silicon_creator/rom_ext:rom_ext_owner_sram_exec_disabled",
+        "exit_success": "value = 00000009, 00000006, 00000001[\\s\\S]*PASS!",
+    },
+    {
+        "name": "disabled_locked",
+        "rom_ext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
+        "exit_success": "value = 00000009, 00000009, 00000000[\\s\\S]*MCAUSE=00000001",
+    },
+]
+
+[
+    opentitan_test(
+        name = "sram_exec_{}_test".format(test["name"]),
+        srcs = ["sram_exec_test.c"],
+        exec_env = {
+            "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
+            "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        },
+        fpga = fpga_params(
+            changes_otp = True,
+            exit_success = test["exit_success"],
+            rom_ext = test["rom_ext"],
+        ),
+        linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+        deps = [
+            "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
+            "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+            "//sw/device/lib/base:abs_mmio",
+            "//sw/device/lib/base:macros",
+            "//sw/device/lib/testing/test_framework:ottf_main",
+            "//sw/device/silicon_creator/lib:dbg_print",
+        ],
+    )
+    for test in SRAM_EXEC_TESTCASES
+]
