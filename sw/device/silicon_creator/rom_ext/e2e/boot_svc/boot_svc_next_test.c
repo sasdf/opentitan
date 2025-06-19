@@ -15,33 +15,56 @@ OTTF_DEFINE_TEST_CONFIG();
 
 static status_t initialize(retention_sram_t *retram, boot_svc_retram_t *state) {
   boot_svc_msg_t msg = {0};
-  boot_svc_next_boot_bl0_slot_req_init(
-      /*primary_slot=*/kBootSlotUnspecified,
-      /*next_slot=*/kBootSlotB, &msg.next_boot_bl0_slot_req);
+
+#if defined(TEST_SEQUENCE_ABA)
+  const uint32_t primary_slot = kBootSlotUnspecified;
+  const uint32_t next_slot = kBootSlotB;
+#elif defined(TEST_SEQUENCE_AAB)
+  const uint32_t primary_slot = kBootSlotB;
+  const uint32_t next_slot = kBootSlotA;
+#else
+#error "test sequence is not defined"
+#endif
+
+  boot_svc_next_boot_bl0_slot_req_init(primary_slot, next_slot,
+                                       &msg.next_boot_bl0_slot_req);
   retram->creator.boot_svc_msg = msg;
   state->state = kBootSvcTestStateNextSideB;
   rstmgr_reset();
   return INTERNAL();
 }
 
-static status_t check_side_b(retention_sram_t *retram,
-                             boot_svc_retram_t *state) {
+static status_t check_side_next(retention_sram_t *retram,
+                                boot_svc_retram_t *state) {
   boot_svc_msg_t msg = retram->creator.boot_svc_msg;
   TRY(boot_svc_header_check(&msg.header));
   TRY_CHECK(msg.header.type == kBootSvcNextBl0SlotResType);
   TRY_CHECK(msg.next_boot_bl0_slot_res.status == kErrorOk);
+
+#if defined(TEST_SEQUENCE_ABA)
   TRY_CHECK(state->current_side == 'B');
   TRY_CHECK(state->primary_side == 'A');
   TRY_CHECK(msg.next_boot_bl0_slot_res.primary_bl0_slot == kBootSlotA);
+#elif defined(TEST_SEQUENCE_AAB)
+  TRY_CHECK(state->current_side == 'A');
+  TRY_CHECK(state->primary_side == 'B');
+  TRY_CHECK(msg.next_boot_bl0_slot_res.primary_bl0_slot == kBootSlotB);
+#endif
+
   state->state = kBootSvcTestStateReturnSideA;
   rstmgr_reset();
   return INTERNAL();
 }
 
-static status_t check_return_side_a(retention_sram_t *retram,
-                                    boot_svc_retram_t *state) {
+static status_t check_return_side_primary(retention_sram_t *retram,
+                                          boot_svc_retram_t *state) {
+#if defined(TEST_SEQUENCE_ABA)
   TRY_CHECK(state->current_side == 'A');
   TRY_CHECK(state->primary_side == 'A');
+#elif defined(TEST_SEQUENCE_AAB)
+  TRY_CHECK(state->current_side == 'B');
+  TRY_CHECK(state->primary_side == 'B');
+#endif
   state->state = kBootSvcTestStateFinal;
   return OK_STATUS();
 }
@@ -59,10 +82,10 @@ static status_t next_bl0_slot_test(void) {
         TRY(initialize(retram, state));
         break;
       case kBootSvcTestStateNextSideB:
-        TRY(check_side_b(retram, state));
+        TRY(check_side_next(retram, state));
         break;
       case kBootSvcTestStateReturnSideA:
-        TRY(check_return_side_a(retram, state));
+        TRY(check_return_side_primary(retram, state));
         break;
       case kBootSvcTestStateFinal:
         LOG_INFO("FinalBootLog: %d:%s", state->boots, state->partition);
