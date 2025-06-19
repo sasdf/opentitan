@@ -485,6 +485,7 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_x509_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_manifest_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_prod_fpga_cw340_rom_ext
