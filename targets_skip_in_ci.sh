@@ -551,7 +551,8 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_enter_rescue_test_fpga_cw340_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_a_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_b_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aab_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aba_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_primary_test_fpga_cw340_rom_ext
@@ -635,6 +636,7 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_xmodem_fpga_cw340_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_key_alg_activate_request_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_with_detached_sig_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_spx_pure_to_spx_prehash_test_fpga_cw340_rom_ext

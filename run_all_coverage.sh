@@ -754,7 +754,8 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_xmodem_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_xmodem_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rate_test_fpga_hyper310_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_a_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_b_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/attestation:print_certs_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_code_first_word_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_code_end_fpga_hyper310_rom_ext
@@ -838,6 +839,7 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_xmodem_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_key_alg_activate_request_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_with_detached_sig_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_spx_pure_to_spx_prehash_test_fpga_hyper310_rom_ext
