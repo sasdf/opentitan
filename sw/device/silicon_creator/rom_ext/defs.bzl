@@ -57,6 +57,14 @@ TEST_OWNER_CONFIGS = {
         "owner_defines": ["TEST_OWNER_KEY_ALG_CORRUPTED=1"],
         "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
     },
+    "default_ownership_state_unlock": {
+        "owner_defines": [
+            "TEST_OWNER_UPDATE_MODE=kOwnershipUpdateModeNewVersion",
+            "TEST_OWNER_KEY_ALG_CORRUPTED=1",
+            "TEST_OWNERSHIP_STATE_UNLOCK_ANY=1",
+        ],
+        "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
+    },
     "owner_update_newversion": {
         # Enable the NewVersion update mode of ownership.
         "owner_defines": ["TEST_OWNER_UPDATE_MODE=kOwnershipUpdateModeNewVersion"],

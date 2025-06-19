@@ -10,6 +10,7 @@
 #include "sw/device/silicon_creator/lib/dbg_print.h"
 #include "sw/device/silicon_creator/lib/drivers/flash_ctrl.h"
 #include "sw/device/silicon_creator/lib/error.h"
+#include "sw/device/silicon_creator/lib/ownership/datatypes.h"
 #include "sw/device/silicon_creator/lib/ownership/keys/fake/activate_ecdsa_p256.h"
 #include "sw/device/silicon_creator/lib/ownership/keys/fake/activate_spx.h"
 #include "sw/device/silicon_creator/lib/ownership/keys/fake/app_dev_ecdsa_p256.h"
@@ -106,6 +107,14 @@
   (owner_keydata_t) { .ecdsa = ACTIVATE_ECDSA_P256 }
 #define UNLOCK_KEYDATA \
   (owner_keydata_t) { .ecdsa = UNLOCK_ECDSA_P256 }
+#endif
+
+#ifdef TEST_OWNERSHIP_STATE_UNLOCK_ANY
+#define TEST_OWNERSHIP_STATE kOwnershipStateUnlockedAny
+#endif
+
+#ifndef TEST_OWNERSHIP_STATE
+#define TEST_OWNERSHIP_STATE kOwnershipStateLockedOwner
 #endif
 
 // The following preprocessor symbols are only relevant when
@@ -331,7 +340,7 @@ rom_error_t sku_creator_owner_init(boot_data_t *bootdata) {
 
   // Since this module should only get linked in to FPGA builds, we can simply
   // thunk the ownership state to LockedOwner.
-  bootdata->ownership_state = kOwnershipStateLockedOwner;
+  bootdata->ownership_state = TEST_OWNERSHIP_STATE;
 
   // Write the configuration to both owner page 0.  The next boot of the ROM_EXT
   // will make a redundant copyh in page 1.
