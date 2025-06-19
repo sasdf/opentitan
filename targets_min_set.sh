@@ -34,9 +34,11 @@ CW340_INSTRUMENTED_ROM_TESTS=(
 
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_enter_rescue_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_min_sec_ver_test_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aab_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_code_start_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_manifest_version_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:flash_exc_handler_disabled_test_fpga_hyper310_rom_ext'
@@ -53,9 +55,9 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_spx_pure_to_spx_prehash_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_detached_sig_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_with_owner_recovery_key_test_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_spidfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_usbdfu_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_spidfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_usbdfu_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rate_test_fpga_hyper310_rom_ext'
