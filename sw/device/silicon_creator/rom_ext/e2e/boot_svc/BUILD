@@ -125,8 +125,9 @@ opentitan_test(
 )
 
 NEXT_TEST_SEQUENCES = [
-    "ABA",
     "AAB",
+    "ABA",
+    "ABB",
 ]
 
 [

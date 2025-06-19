@@ -13,29 +13,36 @@
 
 OTTF_DEFINE_TEST_CONFIG();
 
-static status_t initialize(retention_sram_t *retram, boot_svc_retram_t *state) {
+static status_t next(retention_sram_t *retram, uint32_t primary_slot,
+                     uint32_t next_slot) {
   boot_svc_msg_t msg = {0};
+  boot_svc_next_boot_bl0_slot_req_init(primary_slot, next_slot,
+                                       &msg.next_boot_bl0_slot_req);
+  retram->creator.boot_svc_msg = msg;
+  rstmgr_reset();
+  return INTERNAL();
+}
+
+static status_t initialize(retention_sram_t *retram, boot_svc_retram_t *state) {
+  state->state = kBootSvcTestStateNextSideB;
 
 #if defined(TEST_SEQUENCE_ABA)
-  const uint32_t primary_slot = kBootSlotUnspecified;
-  const uint32_t next_slot = kBootSlotB;
+  TRY(next(retram, kBootSlotUnspecified, kBootSlotB));
 #elif defined(TEST_SEQUENCE_AAB)
-  const uint32_t primary_slot = kBootSlotB;
-  const uint32_t next_slot = kBootSlotA;
+  TRY(next(retram, kBootSlotB, kBootSlotA));
+#elif defined(TEST_SEQUENCE_ABB)
+  TRY(next(retram, kBootSlotB, kBootSlotUnspecified));
 #else
 #error "test sequence is not defined"
 #endif
 
-  boot_svc_next_boot_bl0_slot_req_init(primary_slot, next_slot,
-                                       &msg.next_boot_bl0_slot_req);
-  retram->creator.boot_svc_msg = msg;
-  state->state = kBootSvcTestStateNextSideB;
-  rstmgr_reset();
   return INTERNAL();
 }
 
 static status_t check_side_next(retention_sram_t *retram,
                                 boot_svc_retram_t *state) {
+  state->state = kBootSvcTestStateReturnSideA;
+
   boot_svc_msg_t msg = retram->creator.boot_svc_msg;
   TRY(boot_svc_header_check(&msg.header));
   TRY_CHECK(msg.header.type == kBootSvcNextBl0SlotResType);
@@ -49,9 +56,13 @@ static status_t check_side_next(retention_sram_t *retram,
   TRY_CHECK(state->current_side == 'A');
   TRY_CHECK(state->primary_side == 'B');
   TRY_CHECK(msg.next_boot_bl0_slot_res.primary_bl0_slot == kBootSlotB);
+#elif defined(TEST_SEQUENCE_ABB)
+  TRY_CHECK(state->current_side == 'B');
+  TRY_CHECK(state->primary_side == 'B');
+  TRY_CHECK(msg.next_boot_bl0_slot_res.primary_bl0_slot == kBootSlotB);
+  TRY(next(retram, kBootSlotA, kBootSlotB));
 #endif
 
-  state->state = kBootSvcTestStateReturnSideA;
   rstmgr_reset();
   return INTERNAL();
 }
@@ -64,6 +75,9 @@ static status_t check_return_side_primary(retention_sram_t *retram,
 #elif defined(TEST_SEQUENCE_AAB)
   TRY_CHECK(state->current_side == 'B');
   TRY_CHECK(state->primary_side == 'B');
+#elif defined(TEST_SEQUENCE_ABB)
+  TRY_CHECK(state->current_side == 'B');
+  TRY_CHECK(state->primary_side == 'A');
 #endif
   state->state = kBootSvcTestStateFinal;
   return OK_STATUS();
