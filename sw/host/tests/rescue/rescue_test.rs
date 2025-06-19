@@ -68,6 +68,7 @@ enum Commands {
 pub enum RescueTestActions {
     GetDeviceId,
     GetBootLog,
+    GetOwnerPage,
     Disability,
 }
 
@@ -185,6 +186,43 @@ fn get_boot_log_test(
     }
 
     Ok(())
+}
+
+fn get_owner_page_test(
+    owner_block: &OwnerBlock,
+    params: &RescueParams,
+    transport: &TransportWrapper,
+) -> Result<()> {
+    let rescue = params.create(transport)?;
+    rescue.enter(transport, EntryMode::Reset)?;
+    let data = rescue
+        .get_raw(RescueMode::GetOwnerPage0)
+        .context("Failed to get owner page from rescue")?;
+
+    #[cfg(feature = "ot_coverage_build")]
+    {
+        rescue.reboot()?;
+
+        if params.protocol != RescueProtocol::Xmodem {
+            let uart = transport.uart("console")?;
+            UartConsole::wait_for(&*uart, r"ok: receive owner page", Duration::from_secs(5))?;
+            UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+        }
+    }
+
+    let mut cursor = std::io::Cursor::new(&data);
+    let header = TlvHeader::read(&mut cursor)?;
+    let owner_block_from_rescue = OwnerBlock::read(&mut cursor, header)?;
+
+    if *owner_block == owner_block_from_rescue {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Owner Page mismatch. Expected: {:?}, but got: {:?}",
+            owner_block,
+            owner_block_from_rescue
+        ))
+    }
 }
 
 fn load_owner_block(
@@ -488,6 +526,10 @@ fn main() -> Result<()> {
                     .as_ref()
                     .ok_or_else(|| anyhow!("No RV32 test binary provided"))?;
                 get_boot_log_test(binary, &rescue.params, &transport)?;
+            }
+            RescueTestActions::GetOwnerPage => {
+                let owner_block = load_owner_block(opts.owner_block.as_deref(), &transport)?;
+                get_owner_page_test(&owner_block, &rescue.params, &transport)?;
             }
             RescueTestActions::Disability => {
                 let mut owner_block = load_owner_block(opts.owner_block.as_deref(), &transport)?;
