@@ -704,6 +704,7 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aab_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aba_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_abb_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_primary_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_wakeup_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/handoff:fault_hardware_interrupt_fpga_hyper310_rom_ext
