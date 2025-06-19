@@ -635,6 +635,9 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:isfb_boot_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_spidfu_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_disability_xmodem_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_spidfu_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_usbdfu_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_xmodem_fpga_cw340_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_key_alg_activate_request_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_ownership_key_alg_test_fpga_cw340_rom_ext
@@ -643,7 +646,11 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_unlock_signature_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_with_owner_recovery_key_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_detached_sig_test_fpga_cw340_rom_ext
+
 //sw/device/silicon_creator/rom_ext/e2e/handoff:fault_return_boot_failed_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_disabled_locked_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_disabled_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_enabled_test_fpga_cw340_rom_ext
 
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
 )
