@@ -21,6 +21,11 @@
   .global _start_boot
   .type _start_boot, @function
 _start_boot:
+
+#ifdef RETURN_TO_ROM_EXT
+  ret
+#endif
+
   /**
    * Set up the global pointer `gp`.
    *
@@ -60,12 +65,6 @@ _start_boot:
    * memory at addresses below `sp`.
    */
   la   sp, _stack_end
-
-  /**
-   * Save registers.
-   */
-  addi sp, sp, -8
-  sw ra, 4(sp)
 
   /**
    * Do NOT set interrupt/exception handlers.  We want to leave the ROM_EXT
@@ -115,12 +114,6 @@ _start_boot:
   li a5, 0x0
   li a6, 0x0
   li a7, 0x0
-
-  /**
-   * Restore registers.
-   */
-  lw ra, 4(sp)
-  addi sp, sp, 8
 
   /**
    * Jump to C Code
