@@ -43,6 +43,8 @@ struct Opts {
     unlock_sig: Option<PathBuf>,
     #[arg(long, default_value_t = false, action = clap::ArgAction::Set, help = "Skip the ownership unlock request")]
     skip_unlock: bool,
+    #[arg(long, default_value = "SlotA", help = "Which bl0 slot to activate")]
+    activate_bl0_slot: BootSlot,
 
 
     #[arg(long, default_value_t = OwnershipKeyAlg::EcdsaP256, help = "Current Owner key algorithm")]
@@ -232,6 +234,7 @@ fn transfer_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
         opts.activate_key_spx
             .clone()
             .or_else(|| opts.next_activate_key_spx.clone()),
+        opts.activate_bl0_slot,
     )?;
 
     if let Some(fw) = &opts.rescue_after_activate {
