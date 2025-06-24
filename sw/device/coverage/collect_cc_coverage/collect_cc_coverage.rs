@@ -34,12 +34,14 @@ use coverage_lib::{
   search_by_extension,
   recursive_search_by_extension,
   debug_log,
+  decompress,
   process_elf,
-  process_xprofraw,
+  process_counter,
   llvm_cov_export,
   llvm_profdata_merge,
   get_runfiles_dir,
   debug_environ,
+  append_asm_coverage,
 };
 
 fn main() -> Result<()> {
@@ -96,12 +98,14 @@ fn main() -> Result<()> {
     for path in &xprofraw_files {
         debug_log!("Processing {path:?}");
         let profraw_file = path.with_extension("profraw");
-        let profile = process_xprofraw(path, &profraw_file, &profile_map).unwrap();
+        let counter = decompress(path).unwrap();
+        let profile = process_counter(path, &counter, &profraw_file, &profile_map).unwrap();
         // We use .xprofdata instead of .profdata to avoid lcov_merger from parsing it.
         let profdata_file = path.with_extension("xprofdata");
         let lcov_file = path.with_extension("dat");
         llvm_profdata_merge(&profraw_file, &profdata_file);
         llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_file);
+        append_asm_coverage(&counter, &lcov_file).unwrap();
     }
 
     debug_log!("Success!");

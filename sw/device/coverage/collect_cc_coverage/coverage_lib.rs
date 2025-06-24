@@ -41,6 +41,11 @@ pub const PRF_VERSION: u64 = 8;
 pub const PRF_DATA_ENTRY_SIZE: u64 = 40;
 pub const VARIANT_MASK_BYTE_COVERAGE: u64 = (0x1 << 60);
 
+pub const ASM_COUNTER_FILE: &str = "SF:sw/device/coverage/asm_counters.c";
+pub const ASM_COUNTER_SIZE: usize = 96;
+pub const ASM_COUNTER_OFFSET: usize = 16;
+
+
 #[macro_export]
 macro_rules! debug_log {
     ($($arg:tt)*) => {
@@ -240,9 +245,9 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
     })
 }
 
-pub fn process_xprofraw<'a>(path: &PathBuf, output: &PathBuf,
+pub fn process_counter<'a>(path: &PathBuf, counter: &ProfileCounter, output: &PathBuf,
                            profile_map: &'a HashMap<String, ProfileData>) -> Result<&'a ProfileData> {
-    let ProfileCounter { build_id, cnts } = decompress(path)?;
+    let ProfileCounter { build_id, cnts } = counter;
 
     if cnts.len() < 8 {
         bail!("Input profraw file is too short.");
@@ -260,7 +265,7 @@ pub fn process_xprofraw<'a>(path: &PathBuf, output: &PathBuf,
     let cnts_width = if (version & VARIANT_MASK_BYTE_COVERAGE != 0) {1} else {8};
 
     // Counters only, try to correlate with elf data.
-    let profile = match profile_map.get(&build_id) {
+    let profile = match profile_map.get(build_id) {
         Some(profile) => profile,
         None => {
             eprintln!("ERROR: Missing profile with build-id {build_id:?}.");
@@ -415,6 +420,7 @@ pub fn baseline_coverage(profile: &ProfileData) -> Result<()> {
     baseline_profraw(&profile, &profraw_file)?;
     llvm_profdata_merge(&profraw_file, &profdata_file);
     llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_output_file);
+    append_asm_baseline(&lcov_output_file)?;
     llvm_cov_export("text", &profdata_file, &profile.objects, &json_output_file);
     Ok(())
 }
@@ -456,4 +462,48 @@ pub fn load_object_list(path: &PathBuf) -> Result<Vec<String>> {
     //         ]
     //     })
     //     .collect()
+}
+
+pub fn append_asm_coverage(counter: &ProfileCounter, output_path: &PathBuf) -> Result<()> {
+    if counter.cnts.len() < ASM_COUNTER_SIZE + ASM_COUNTER_OFFSET {
+        bail!("Manual coverage counter is too short.");
+    }
+
+    let (_, cnts) = counter.cnts.split_at(ASM_COUNTER_OFFSET);
+    let (cnts, _) = cnts.split_at(ASM_COUNTER_SIZE);
+
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(output_path)?;
+
+    writeln!(f, "{ASM_COUNTER_FILE}")?;
+
+    for (i, byte) in cnts.iter().enumerate() {
+        let count = match byte {
+            0xff => 0, // Not executed
+            0x00 => 1, // Executed
+            _ => bail!("Invalid asm coverage counter value: {byte}"),
+        };
+        writeln!(f, "DA:{},{}", i + 1, count)?;
+    }
+
+    writeln!(f, "end_of_record")?;
+
+    Ok(())
+}
+
+pub fn append_asm_baseline(output_path: &PathBuf) -> Result<()> {
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(output_path)?;
+
+    writeln!(f, "{ASM_COUNTER_FILE}")?;
+
+    for i in 0..ASM_COUNTER_SIZE {
+        writeln!(f, "DA:{},{}", i + 1, 1)?;
+    }
+
+    writeln!(f, "end_of_record")?;
+
+    Ok(())
 }

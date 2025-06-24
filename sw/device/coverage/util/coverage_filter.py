@@ -55,14 +55,20 @@ def main():
   # Read the coverage file to filter
   with open(args.coverage, 'r') as f:
     coverage = parse_lcov(f.readlines())
+  original_coverage = coverage
 
   # Filter the coverage
   baseline = merge_inlined_copies(baseline)
   coverage = merge_inlined_copies(coverage)
   coverage = filter_coverage(coverage, baseline)
-  coverage = generate_lcov(coverage)
 
-  # # Write the filtered coverage to the output file
+  # Keep asm coverage unmodified
+  for key in original_coverage.keys():
+    if key.endswith('.S'):
+      coverage[key] = original_coverage[key]
+
+  # Write the filtered coverage to the output file
+  coverage = generate_lcov(coverage)
   with open(args.output, 'w') as f:
     f.writelines(coverage)
 

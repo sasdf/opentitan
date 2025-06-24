@@ -7,6 +7,7 @@ SECTIONS {
     FILL(0xa5a5a5a5);
 
     __llvm_prf_cnts_start = .;
+    KEEP(*(__llvm_prf_cnts_asm))
     KEEP(*(__llvm_prf_cnts))
     __llvm_prf_cnts_values_end = .;
     . = ALIGN(8);

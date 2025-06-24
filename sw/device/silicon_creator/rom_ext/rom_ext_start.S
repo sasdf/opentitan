@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
+#include "sw/device/coverage/runtime_asm.h"
 #include "sw/device/lib/base/hardened_asm.h"
 #include "otp_ctrl_regs.h"
 
@@ -87,6 +88,11 @@ _rom_ext_start_boot:
   .option push
   .option norelax
 
+  // Initialize the pre-C coverage counter.
+  // It's no-op when coverage mode is not enabled.
+  COVERAGE_ASM_COUNTER_INIT()
+  COVERAGE_ASM_MARK_MANUAL_REG(s10, 0)
+
   /**
    * Call the .rom_ext_immutable first if it's not called by ROM.
    */
@@ -96,6 +102,10 @@ _rom_ext_start_boot:
   li   t1, HARDENED_BOOL_TRUE
   beq  t0, t1, .L_mutable_start_boot
   call _rom_ext_immutable_start
+
+  // Re-initialize after returning from immutable section.
+  COVERAGE_ASM_COUNTER_INIT()
+  COVERAGE_ASM_MARK_MANUAL_REG(s10, 1)
 
   /**
    * Continue booting the mutable rom_ext.
@@ -160,6 +170,11 @@ _rom_ext_start_boot:
 
 #ifdef OT_COVERAGE_INSTRUMENTED
   call coverage_init
+
+  // Store the maunal counters to the prf_cnts region.
+  mv a0, s10
+  mv a1, s11
+  call coverage_save_asm_counters
 #endif
 
   // Re-clobber all of the temporary registers.

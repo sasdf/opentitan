@@ -687,9 +687,7 @@ CW310_SIVAL_TESTS=(
 
 IMM_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_hyper310_rom_ext
-
-# ???
-# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_hyper310_rom_ext
 
 # arch lib is not stripped
 # //sw/device/silicon_creator/rom_ext/imm_section/e2e/exec_env:env_independent_dice_cwt_slot_a_test

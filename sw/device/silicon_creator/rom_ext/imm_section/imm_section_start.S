@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
+#include "sw/device/coverage/runtime_asm.h"
 #include "sw/device/lib/base/hardened_asm.h"
 
   /**
@@ -38,6 +39,16 @@ _imm_section_start_boot:
   addi sp, sp, -8
   sw ra, 4(sp)
 
+#ifdef OT_COVERAGE_INSTRUMENTED
+  addi sp, sp, -8
+  sw s10, 0(sp)
+  sw s11, 4(sp)
+
+  COVERAGE_ASM_COUNTER_INIT()
+#endif
+
+  // PRAGMA_COVERAGE: start autogen with register bits
+
   /**
    * Disable Interrupts.
    *
@@ -64,7 +75,7 @@ _imm_section_start_boot:
   la   a0, _data_start
   la   a1, _data_end
   la   a2, _data_init_start
-  jal  ra, crt_section_copy
+  call crt_section_copy
 
   /**
    * Initialize the `.bss` section.
@@ -74,10 +85,19 @@ _imm_section_start_boot:
    */
   la   a0, _bss_start
   la   a1, _bss_end
-  jal  ra, crt_section_clear
+  call crt_section_clear
 
 #ifdef OT_COVERAGE_INSTRUMENTED
   call coverage_init
+
+  // Store the maunal counters to the prf_cnts region.
+  mv a0, s10
+  mv a1, s11
+  call coverage_save_asm_counters
+
+  lw s10, 0(sp)
+  lw s11, 4(sp)
+  addi sp, sp, 8
 #endif
 
   /**

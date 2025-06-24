@@ -47,13 +47,29 @@ GENHTML_ARGS=(
     --ignore-errors inconsistent
     --ignore-errors category
     # --ignore-errors corrupt
+    --exclude sw/device/coverage/
+    --ignore-errors unused
     --html-epilog sw/device/coverage/report_epilog.html
 )
+
+ASM_COVERAGE="${BASELINE_CACHE_DIR}/asm_coverage.dat"
+python3 sw/device/coverage/util/gen_asm_coverage.py \
+  --coverage="${COVERAGE_DAT}" \
+  --output="${ASM_COVERAGE}"
+genhtml "${GENHTML_ARGS[@]}" \
+    --output "${COVERAGE_OUTPUT_DIR}/asm_coverage/" \
+    "${ASM_COVERAGE}"
+
+COVERAGE_DAT_WITH_ASM="${BASELINE_CACHE_DIR}/coverage_report_asm.dat"
+python3 sw/device/coverage/util/gen_asm_coverage.py \
+  --coverage="${COVERAGE_DAT}" \
+  --append \
+  --output="${COVERAGE_DAT_WITH_ASM}"
 
 if [[ "${#CACHED_BASELINES[@]}" == "0" ]]; then
     genhtml "${GENHTML_ARGS[@]}" \
         --output "${COVERAGE_OUTPUT_DIR}/no_baseline/" \
-        "${COVERAGE_DAT}"
+        "${COVERAGE_DAT_WITH_ASM}"
 else
     for cached_zip in "${CACHED_BASELINES[@]}"; do
         baseline_name="${cached_zip##*/}"
@@ -64,7 +80,7 @@ else
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --baseline="${cached_zip}" \
-          --coverage="${COVERAGE_DAT}" \
+          --coverage="${COVERAGE_DAT_WITH_ASM}" \
           --use_disassembly \
           --output="${filtered_dis_dat}"
 
@@ -76,7 +92,7 @@ else
     filtered_dis_dat="${BASELINE_CACHE_DIR}/all_baselines.dis.dat"
     python3 sw/device/coverage/util/coverage_filter.py \
       --baseline "${CACHED_BASELINES[@]}" \
-      --coverage="${COVERAGE_DAT}" \
+      --coverage="${COVERAGE_DAT_WITH_ASM}" \
       --use_disassembly \
       --output="${filtered_dis_dat}"
 

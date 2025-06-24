@@ -5,6 +5,8 @@
 #ifndef OPENTITAN_SW_DEVICE_COVERAGE_RUNTIME_H_
 #define OPENTITAN_SW_DEVICE_COVERAGE_RUNTIME_H_
 
+#include <stdint.h>
+
 #include "sw/device/lib/base/macros.h"
 
 #ifdef OT_COVERAGE_ENABLED

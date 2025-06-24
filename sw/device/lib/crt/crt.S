@@ -14,6 +14,10 @@
  * what these functions
  */
 
+#include "sw/device/coverage/runtime_asm.h"
+
+  // PRAGMA_COVERAGE: start autogen with register bits
+
   // NOTE: The "ax" flag below is necessary to ensure that this section
   // is allocated space in ROM by the linker.
   .section .crt, "ax", @progbits

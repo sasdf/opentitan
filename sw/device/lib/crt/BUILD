@@ -10,4 +10,7 @@ cc_library(
     name = "crt",
     srcs = ["crt.S"],
     target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        "//sw/device/coverage:runtime_api_asm",
+    ],
 )

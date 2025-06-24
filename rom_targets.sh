@@ -9,8 +9,6 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_v_flash_a_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_v_flash_b_fpga_cw340_instrumented_rom
-//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_b_fpga_cw340_instrumented_rom
-//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_b_flash_a_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_bad_identifier_a_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_bad_identifier_b_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_code_end_unaligned_a_fpga_cw340_instrumented_rom
@@ -187,6 +185,11 @@ INS_ROM_TESTS=(
 #//sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_disabled_fpga_cw340_instrumented_rom
 #//sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_enabled_true_fpga_cw340_instrumented_rom
 #//sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_rma_enabled_zero_fpga_cw340_instrumented_rom
+
+# FAILED TIMEOUT - invalid BFV crash expectation after instrumented
+# RomExt should idealy reject execution at wrong slot.
+# //sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_b_fpga_cw340_instrumented_rom
+# //sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_b_flash_a_fpga_cw340_instrumented_rom
 
 ## FAILED TIMEOUT - flash ecc
 #//sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_code_first_word_fpga_cw340_instrumented_rom

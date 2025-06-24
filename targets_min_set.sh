@@ -80,6 +80,7 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_prod_hybrid_spx_pure_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_hyper310_rom_ext'
 )
 
 PROVISIONING_TESTS=(

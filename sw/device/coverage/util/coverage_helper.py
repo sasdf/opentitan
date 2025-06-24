@@ -95,6 +95,7 @@ def parse_llvm_json(lines):
 #   macro defined functions can't be detected by disassembly.
 SKIP_DIS = {
   'SF:sw/device/silicon_creator/lib/manifest.h',
+  'SF:sw/device/coverage/asm_counters.c',
 }
 
 def expand_dis_region(dis, segments):
@@ -289,10 +290,6 @@ def generate_lcov(coverage):
   for sf, cov in coverage.items():
     # bazel doesn't collect coverages for generated files.
     if sf.startswith('SF:bazel-out/'):
-      continue
-
-    # skip coverage runtime.
-    if sf.startswith('SF:sw/device/coverage/'):
       continue
 
     # skip constant headers.

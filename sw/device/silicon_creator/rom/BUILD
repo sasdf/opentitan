@@ -106,6 +106,7 @@ cc_library(
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/coverage:runtime_api_asm",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/silicon_creator/lib:error",
@@ -150,6 +151,7 @@ cc_library(
     deps = [
         ":ld_rom",
         ":common_mask_rom_lib",
+        "//sw/device/coverage:runtime_api_asm",
     ],
     alwayslink = True,
 )
@@ -162,6 +164,7 @@ cc_library(
     deps = [
         ":ld_instrumented_rom",
         ":common_mask_rom_lib",
+        "//sw/device/coverage:runtime_api_asm",
     ],
     alwayslink = True,
 )
@@ -319,6 +322,7 @@ cc_library(
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:memory",
+        "//sw/device/coverage:runtime_api_asm",
         "//sw/device/silicon_creator/lib:epmp_state",
         "//sw/device/silicon_creator/lib/drivers:lifecycle",
     ],

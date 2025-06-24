@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+#include "sw/device/coverage/runtime_asm.h"
 #include "sw/device/silicon_creator/lib/epmp_defs.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
@@ -29,6 +30,8 @@
 #define NAPOT(addr, len) (((addr) >> 2) | (((len) - 1) >> 3))
 
 // -----------------------------------------------------------------------------
+
+  // PRAGMA_COVERAGE: start autogen with register bits
 
   /**
    * The "ax" flag below is necessary to ensure that this section

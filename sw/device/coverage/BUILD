@@ -16,9 +16,26 @@ config_setting(
 )
 
 cc_library(
+    name = "runtime_api_asm",
+    hdrs = ["runtime_asm.h"],
+)
+
+cc_library(
     name = "printer_api",
     hdrs = ["printer.h"],
     features = ["-coverage"],
+)
+
+cc_library(
+    name = "asm_counters",
+    srcs = [
+        "asm_counters.c",
+        "asm_runtime.c",
+    ],
+    deps = [
+        "//sw/device/lib/base:macros",
+    ],
+    alwayslink = True,
 )
 
 cc_library(
@@ -78,6 +95,7 @@ cc_library(
     hdrs = ["runtime.h"],
     deps = [
         ":empty_runtime",
+        ":asm_counters",
         "//sw/device/lib/base:macros",
     ],
 )

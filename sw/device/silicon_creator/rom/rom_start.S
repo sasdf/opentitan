@@ -5,6 +5,7 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
 #include "sw/device/lib/base/hardened_asm.h"
 #include "sw/device/lib/base/multibits_asm.h"
+#include "sw/device/coverage/runtime_asm.h"
 #include "sw/device/silicon_creator/lib/base/chip.h"
 #include "sw/device/silicon_creator/lib/stack_utilization_asm.h"
 #include "aon_timer_regs.h"
@@ -146,6 +147,12 @@ _rom_start_boot:
   // Set up the global pointer and re-enable linker relaxations.
   la gp, __global_pointer$
   .option pop
+
+  // Initialize the pre-C coverage counter.
+  // It's no-op when coverage mode is not enabled.
+  COVERAGE_ASM_COUNTER_INIT()
+
+  // PRAGMA_COVERAGE: start autogen with register bits
 
 LABEL_FOR_TEST(kRomStartBootMaybeHalt)
   // Check if we should halt here.
@@ -423,6 +430,8 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // Depending on OTP, enable the SRAM readback feature.
   sw   t2, SRAM_CTRL_READBACK_REG_OFFSET(a0)
 
+  // PRAGMA_COVERAGE: stop autogen with register bits
+
   /**
    * Clean Device State Part 1 (Please refer to `boot.md` section "Cleaning Device
    * State").
@@ -453,8 +462,13 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   li x23, 0x0
   li x24, 0x0
   li x25, 0x0
+
+#ifndef OT_COVERAGE_INSTRUMENTED
+  /* Coverage counters are stored in s10/x26 and s11/x27 */
   li x26, 0x0
   li x27, 0x0
+#endif
+
   li x28, 0x0
   li x29, 0x0
   li x30, 0x0
@@ -481,6 +495,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // memory at addresses below `sp`.
   la sp, _stack_end
 
+  // PRAGMA_COVERAGE: start block skip
 #ifdef STACK_UTILIZATION_CHECK
   // Fill the stack with a known pattern
   // We configure a No-Access ePMP NA4 region at stack_start as a
@@ -494,6 +509,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   addi a0, a0, 4
   bltu a0, sp, .L_stack_clear_loop
 #endif
+  // PRAGMA_COVERAGE: stop block skip
 
   // Set up shadow stack pointer.
   //
@@ -512,7 +528,18 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   csrw mtvec, t0
 
 #ifdef OT_COVERAGE_INSTRUMENTED
-  call coverage_init
+  call coverage_init;
+
+  // Store the maunal counters to the prf_cnts region.
+  mv a0, s10
+  mv a1, s11
+  call coverage_save_asm_counters
+
+  // Clear the registers
+  li a0, 0x0
+  li a1, 0x0
+  li s10, 0x0
+  li s11, 0x0
 #endif
 
   /**
