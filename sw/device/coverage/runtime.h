@@ -23,4 +23,16 @@ void coverage_invalidate(void);
 
 #endif  // OT_COVERAGE_ENABLED
 
+
+#ifdef OT_COVERAGE_INSTRUMENTED
+
+void coverage_save_asm_counters(uint32_t, uint32_t);
+
+#else  // OT_COVERAGE_INSTRUMENTED
+
+#define coverage_save_asm_counters(...)
+
+#endif  // OT_COVERAGE_INSTRUMENTED
+
+
 #endif  // OPENTITAN_SW_DEVICE_COVERAGE_RUNTIME_H_

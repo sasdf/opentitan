@@ -24,8 +24,6 @@ void coverage_printer_init(void);
 int coverage_is_valid(void);
 
 /* Internal APIs */
-extern uint32_t coverage_crc;
-
 void coverage_printer_sink_with_crc(const void *data, size_t size);
 
 void coverage_printer_contents(void);

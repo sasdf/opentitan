@@ -1113,6 +1113,9 @@ opentitan_test(
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/coverage:asm_counters",
+        "//sw/device/coverage:runtime_api",
+        "//sw/device/coverage:ottf_runtime",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:stdasm",

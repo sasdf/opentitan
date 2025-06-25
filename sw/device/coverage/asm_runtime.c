@@ -25,10 +25,14 @@ uint8_t _prf_cnts_asm[96] = {
 OT_NO_COVERAGE
 void coverage_save_asm_counters(uint32_t a, uint32_t b) {
   for (int i=0; i<32; i++) {
-    _prf_cnts_asm[i] = ((a >> i) & 1) ? 0x00 : 0xff;
+    if ((a >> i) & 1) {
+      _prf_cnts_asm[i] = 0;
+    }
   }
   for (int i=0; i<32; i++) {
-    _prf_cnts_asm[i+32] = ((b >> i) & 1) ? 0x00 : 0xff;
+    if ((b >> i) & 1) {
+      _prf_cnts_asm[i+32] = 0;
+    }
   }
 }
 

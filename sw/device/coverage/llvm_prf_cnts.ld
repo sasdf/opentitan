@@ -1,6 +1,10 @@
 /* Sections for LLVM profiling. */
 
 SECTIONS {
+  __llvm_prf_noinit (NOLOAD) : ALIGN(8) {
+    KEEP(*(__llvm_prf_noinit))
+  } > ram_main
+
   . = ALIGN(8);
   __llvm_prf_cnts : AT(0x0) ALIGN(8) {
     /* Set gap fill pattern to 0xa5 */
