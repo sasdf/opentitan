@@ -58,6 +58,8 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:flash_error_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_device_id_request_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_key_alg_activate_request_test_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_nonce_request_test_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_badlock_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_noupdate_with_bad_owner_block_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_update_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/ownership:rescue_permission_test_fpga_hyper310_rom_ext'

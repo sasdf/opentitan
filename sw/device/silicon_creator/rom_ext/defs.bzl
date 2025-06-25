@@ -57,7 +57,21 @@ TEST_OWNER_CONFIGS = {
         "owner_defines": ["TEST_OWNER_KEY_ALG_CORRUPTED=1"],
         "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
     },
-    "default_ownership_state_unlock": {
+    "default_ownership_state_recovery": {
+        "owner_defines": [
+            "TEST_OWNER_UPDATE_MODE=kOwnershipUpdateModeNewVersion",
+            "TEST_OWNERSHIP_STATE_RECOVERY=1",
+        ],
+        "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
+    },
+    "default_ownership_state_unlock_any": {
+        "owner_defines": [
+            "TEST_OWNER_UPDATE_MODE=kOwnershipUpdateModeNewVersion",
+            "TEST_OWNERSHIP_STATE_UNLOCK_ANY=1",
+        ],
+        "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
+    },
+    "invalid_key_alg": {
         "owner_defines": [
             "TEST_OWNER_UPDATE_MODE=kOwnershipUpdateModeNewVersion",
             "TEST_OWNER_KEY_ALG_CORRUPTED=1",

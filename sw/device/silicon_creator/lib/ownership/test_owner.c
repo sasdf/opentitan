@@ -113,6 +113,10 @@
 #define TEST_OWNERSHIP_STATE kOwnershipStateUnlockedAny
 #endif
 
+#ifdef TEST_OWNERSHIP_STATE_RECOVERY
+#define TEST_OWNERSHIP_STATE kOwnershipStateRecovery
+#endif
+
 #ifndef TEST_OWNERSHIP_STATE
 #define TEST_OWNERSHIP_STATE kOwnershipStateLockedOwner
 #endif
