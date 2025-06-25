@@ -46,6 +46,7 @@ cc_library(
         ":compress",
         ":printer_api",
         "//sw/device/lib/base:crc32",
+        "//sw/device/lib/base:macros",
     ],
     alwayslink = True,
 )

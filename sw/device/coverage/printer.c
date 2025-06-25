@@ -8,6 +8,7 @@
 
 #include "sw/device/coverage/compress.h"
 #include "sw/device/lib/base/crc32.h"
+#include "sw/device/lib/base/macros.h"
 
 #define BUILD_ID_SIZE 20
 #define VARIANT_MASK_BYTE_COVERAGE (1ULL << 60)
@@ -20,11 +21,11 @@
  */
 int __llvm_profile_runtime;
 
-static uint32_t coverage_status;
-
-uint32_t coverage_crc;
-
-static char send_buf[0x100];
+OT_SET_BSS_SECTION("__llvm_prf_noinit",
+  static uint32_t coverage_status;
+  static uint32_t coverage_crc;
+  static char send_buf[0x100];
+);
 
 void coverage_printer_sink_with_crc(const void *buf, size_t size) {
   const uint8_t *ptr = (const uint8_t *)buf;

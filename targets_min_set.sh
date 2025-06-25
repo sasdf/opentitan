@@ -6,6 +6,7 @@ CW310_SIVAL_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/lib/ownership:owner_verify_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/silicon_creator/lib/sigverify:spx_verify_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests/crypto:drbg_functest_fpga_cw310_sival_rom_ext'
+  '//sw/device/tests:crt_test_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:kmac_smoketest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:pwrmgr_normal_sleep_all_wake_ups_fpga_cw310_sival_rom_ext'
 )
