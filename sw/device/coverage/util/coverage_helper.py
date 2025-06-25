@@ -362,6 +362,9 @@ def collect_test_vectors(view_path, lcov_files_path):
     view = merge_inlined_copies(view)
 
   sf_keys = sorted(view.keys())
+  # ASM coverage are expanded after bazel coverage, and should be ignored
+  # when calculate the min cover set.
+  sf_keys = [k for k in sf_keys if not k.endswith('.S')]
   view_keys, view_values = collect_single_vector(view, sf_keys)
 
   tests = {}
@@ -377,7 +380,12 @@ def collect_test_vectors(view_path, lcov_files_path):
   test_values = np.stack(test_values)
   test_durations = np.array(test_durations, dtype=float)
   expected_view = (test_values.sum(0) > 0).astype(int)
-  assert (expected_view == view_values).all(), (expected_view != view_values).sum()
+  if not (expected_view == view_values).all():
+    for k, v in zip(view_keys, expected_view != view_values):
+      if v:
+        print(k, file=sys.stderr)
+    print('View values mismatch', file=sys.stderr)
+    exit(-1)
 
   test_values = test_values[:, view_values > 0]
   view_values = view_values[view_values > 0]
