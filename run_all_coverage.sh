@@ -808,6 +808,8 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_pq_to_pq_update_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:rescue_limit_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:rescue_permission_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_nonce_request_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:unlock_when_recovery_state_test_fpga_hyper310_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_bad_product_expr_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/isfb:isfb_bad_strike_mask_test_fpga_hyper310_rom_ext
