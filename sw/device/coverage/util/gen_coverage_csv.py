@@ -15,6 +15,9 @@ def main():
     coverage = parse_lcov(f.read().splitlines())
 
   for sf, cov in sorted(coverage.items()):
+    if sf.endswith('/asm_counters.c'):
+      continue
+
     fn_hit = sum(1 for count in cov.fnda.values() if count > 0)
     fn_rate = (fn_hit / len(cov.fnda)) if len(cov.fnda) else 1.0
 
