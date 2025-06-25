@@ -57,6 +57,7 @@ _imm_section_start_boot:
    */
 
   // Clear `MIE` field of `mstatus` (disable interrupts globally).
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 17)
   csrci mstatus, 0x8
 
   /**

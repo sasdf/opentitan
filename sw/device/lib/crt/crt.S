@@ -42,9 +42,11 @@
 crt_section_clear:
 
   // Check that start is before end.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 2)
   bgeu a0, a1, .L_clear_nothing
 
   // Check that start and end are word aligned.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 3)
   or   t0, a0, a1
   andi t0, t0, 0x3
   bnez t0, .L_clear_error
@@ -52,18 +54,23 @@ crt_section_clear:
 .L_clear_loop:
   // Write zero into section memory word-by-word.
   // TODO: unroll
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 4)
   sw   zero, 0(a0)
   addi a0, a0, 4
   bltu a0, a1, .L_clear_loop
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 5)
   ret
 
 .L_clear_nothing:
   // If section length is 0 just return. Otherwise end is before start
   // which is invalid so trigger an error.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 6)
   bne a0, a1, .L_clear_error
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 7)
   ret
 
 .L_clear_error:
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 8)
   unimp
 
   // Set function size to allow disassembly.
@@ -96,9 +103,11 @@ crt_section_clear:
 crt_section_copy:
 
   // Check that start is before end.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 9)
   bgeu a0, a1, .L_copy_nothing
 
   // Check that start, end and src are word aligned.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 10)
   or   t0, a0, a1
   or   t0, t0, a2
   andi t0, t0, 0x3
@@ -119,6 +128,7 @@ crt_section_copy:
   //      start          end
   //
   // TODO: disallow all overlap since it indicates API misuse?
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 11)
   sub  t0, a0, a2           // (start - src) mod 2**32
   sub  t1, a1, a0           // end - start
   bltu t0, t1, .L_copy_error
@@ -126,19 +136,24 @@ crt_section_copy:
 .L_copy_loop:
   // Copy data from src into section word-by-word.
   // TODO: unroll
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 12)
   lw   t0, 0(a2)
   addi a2, a2, 4
   sw   t0, 0(a0)
   addi a0, a0, 4
   bltu a0, a1, .L_copy_loop
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 13)
   ret
 
 .L_copy_nothing:
   // If section length is 0 just return. Otherwise end is before start
   // which is invalid so trigger an error.
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 14)
   bne a0, a1, .L_copy_error
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 15)
   ret
 
 .L_copy_error:
+  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 16)
   unimp
   .size crt_section_copy, .-crt_section_copy
