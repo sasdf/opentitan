@@ -155,16 +155,32 @@ def _test_dispatch(ctx, exec_env, firmware):
     # Perform all relevant substitutions on the test_cmd.
     test_cmd = get_fallback(ctx, "attr.test_cmd", exec_env)
 
-    if "instrumented_rom" in action_param and 'bootstrap' not in test_cmd:
+    if "instrumented_rom" in action_param:
+        assemble = "{instrumented_rom}@{instrumented_rom_slot}"
+        for _ in range(10):
+          assemble = assemble.format(**action_param)
+        assemble = ctx.expand_location(assemble, data_labels)
+        image = assemble_for_test(
+            ctx,
+            name = ctx.attr.name + '_ins_rom',
+            spec = assemble.strip().split(" "),
+            data_files = data_files,
+            opentitantool = exec_env._opentitantool,
+        )
+        param["ins_rom_image"] = image.short_path
+        action_param["ins_rom_image"] = image.path
+        data_files.append(image)
+
         test_cmd_list = test_cmd.split('\n')
         def find_bitstream_idx():
             for i, e in list(enumerate(test_cmd_list)):
                 if 'load-bitstream' in e:
                     return i
-            fail("Got instrumented rom without load-bitstream")
+            return -1
         idx = find_bitstream_idx()
-        test_cmd_list.insert(idx+1, '--exec="bootstrap --clear-uart=true {firmware}"')
-        test_cmd = '\n'.join(test_cmd_list)
+        if idx != -1:
+            test_cmd_list.insert(idx+1, '--exec="bootstrap --clear-uart=true {ins_rom_image}"')
+            test_cmd = '\n'.join(test_cmd_list)
 
     test_cmd = test_cmd.format(**param)
     test_cmd = ctx.expand_location(test_cmd, data_labels)
