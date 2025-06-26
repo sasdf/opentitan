@@ -167,6 +167,13 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_rma_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/watchdog:watchdog_enable_rma_fpga_cw340_instrumented_rom
 
+//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_disabled_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_disabled_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_disabled_test_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom
+
 
 # exec env (?)
 #//sw/device/silicon_creator/rom/e2e/ate:ate_smoketest_fpga_cw340_instrumented_rom
