@@ -11,6 +11,7 @@ rust_library(
     srcs = ["coverage_lib.rs"],
     deps = [
         "@crate_index//:anyhow",
+        "@crate_index//:byteorder",
         "@crate_index//:hex",
         "@crate_index//:object",
         "@crate_index//:zerocopy",

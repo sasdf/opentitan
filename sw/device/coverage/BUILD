@@ -21,12 +21,6 @@ cc_library(
 )
 
 cc_library(
-    name = "printer_api",
-    hdrs = ["printer.h"],
-    features = ["-coverage"],
-)
-
-cc_library(
     name = "asm_counters",
     srcs = [
         "asm_counters.c",
@@ -39,56 +33,15 @@ cc_library(
 )
 
 cc_library(
-    name = "common_printer",
+    name = "printer",
+    hdrs = ["printer.h"],
     srcs = ["printer.c"],
     features = ["-coverage"],
     deps = [
-        ":compress",
-        ":printer_api",
         "//sw/device/lib/base:crc32",
         "//sw/device/lib/base:macros",
     ],
     alwayslink = True,
-)
-
-cc_library(
-    name = "compress",
-    srcs = ["compress.c"],
-    hdrs = ["compress.h"],
-    features = ["-coverage"],
-    deps = [
-        ":printer_api",
-    ],
-)
-
-cc_library(
-    name = "llvm_printer",
-    srcs = ["llvm_printer.c"],
-    features = ["-coverage"],
-    deps = [
-        ":common_printer",
-        ":compress",
-        ":printer_api",
-        "//sw/device/lib/base:macros",
-        "//third_party/llvm_compiler_rt",
-    ],
-)
-
-cc_library(
-    name = "compressed_printer",
-    srcs = ["compressed_printer.c"],
-    features = ["-coverage"],
-    deps = [
-        ":common_printer",
-        ":compress",
-        ":printer_api",
-        "//sw/device/silicon_creator/lib/drivers:uart",
-    ],
-)
-
-alias(
-    name = "printer",
-    actual = "compressed_printer",
 )
 
 cc_library(

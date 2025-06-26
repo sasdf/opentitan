@@ -19,6 +19,7 @@
 //! is placed in $COVERAGE_DIR as a `coverage.dat` file.
 
 use anyhow::{anyhow, bail, Context, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
 use object::{Object, ObjectSection, ObjectSymbol};
 use std::collections::HashMap;
 use std::env;
@@ -43,7 +44,6 @@ pub const VARIANT_MASK_BYTE_COVERAGE: u64 = (0x1 << 60);
 
 pub const ASM_COUNTER_FILE: &str = "SF:sw/device/coverage/asm_counters.c";
 pub const ASM_COUNTER_SIZE: usize = 96;
-pub const ASM_COUNTER_OFFSET: usize = 16;
 
 
 #[macro_export]
@@ -196,6 +196,16 @@ pub fn process_elf(path: &PathBuf) -> Result<ProfileData> {
 pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
     let mut f = std::fs::File::open(path)?;
 
+    // Check header
+    let magic_bytes = f.read_u64::<LittleEndian>()?;
+    if magic_bytes != OTC_MAGIC {
+        bail!("Unknown profraw file magic bytes.");
+    }
+
+    // Read build id
+    let mut build_id = [0u8; BUILD_ID_SIZE];
+    f.read_exact(&mut build_id)?;
+
     // Decompressed cnts
     let mut cnts: Vec<u8> = Vec::new();
 
@@ -215,7 +225,7 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
                 }
                 0xFF => {
                     let mut pad = [0u8; 4];
-                    f.read_exact(&mut pad)?;
+                    f.read_exact(&mut pad[..3])?;
                     u32::from_le_bytes(pad) as usize
                 }
                 // Any other value is the padding length itself.
@@ -228,16 +238,14 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
             }
             cnts.resize(new_size, tag);
         } else {
-            // Regular data byte.
-            cnts.push(byte[0]);
+            // Packed data byte.
+            for k in 0..8 {
+                let bit = (byte[0] >> k) & 1;
+                // If bit is 0, original value is 0xff. Otherwise 0x00.
+                cnts.push(if bit == 0 { 0xff } else { 0x00 });
+            }
         }
     }
-
-    if cnts.len() < BUILD_ID_SIZE {
-        bail!("Missing build id in the decompressed data");
-    }
-
-    let (build_id, cnts) = cnts.split_at(BUILD_ID_SIZE);
 
     Ok(ProfileCounter {
         build_id: hex::encode(build_id),
@@ -248,21 +256,6 @@ pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
 pub fn process_counter<'a>(path: &PathBuf, counter: &ProfileCounter, output: &PathBuf,
                            profile_map: &'a HashMap<String, ProfileData>) -> Result<&'a ProfileData> {
     let ProfileCounter { build_id, cnts } = counter;
-
-    if cnts.len() < 8 {
-        bail!("Input profraw file is too short.");
-    }
-
-    let (magic, cnts) = cnts.split_at(8);
-    let magic = u64::from_le_bytes(magic.try_into()?);
-
-    if magic != OTC_MAGIC {
-        bail!("Unknown profraw file magic bytes.");
-    }
-
-    let (version, cnts) = cnts.split_at(8);
-    let version = u64::from_le_bytes(version.try_into()?);
-    let cnts_width = if (version & VARIANT_MASK_BYTE_COVERAGE != 0) {1} else {8};
 
     // Counters only, try to correlate with elf data.
     let profile = match profile_map.get(build_id) {
@@ -286,13 +279,9 @@ pub fn process_counter<'a>(path: &PathBuf, counter: &ProfileCounter, output: &Pa
         bail!("cnts size mismatched");
     }
 
-    if cnts.len() % cnts_width != 0 {
-        bail!("Invalid __llvm_prf_cnts section size");
-    }
-
     let header = ProfileHeader{
-        Version: version,
-        NumCounters: (cnts.len() / cnts_width) as u64,
+        Version: PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE,
+        NumCounters: cnts.len() as u64,
         ..profile.header
     };
     debug_log!("{:#?}", header);
@@ -316,14 +305,11 @@ pub fn process_counter<'a>(path: &PathBuf, counter: &ProfileCounter, output: &Pa
 }
 
 pub fn baseline_profraw(profile: &ProfileData, output_path: &PathBuf) -> Result<()> {
-    let version = PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE;
-    let cnts_width = 1;
-
     let cnts = vec![0x00; profile.cnts_size as usize];
 
     let header = ProfileHeader{
-        Version: version,
-        NumCounters: (cnts.len() / cnts_width) as u64,
+        Version: PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE,
+        NumCounters: cnts.len() as u64,
         ..profile.header
     };
     debug_log!("{:#?}", header);
@@ -443,34 +429,19 @@ pub fn load_object_list(path: &PathBuf) -> Result<Vec<String>> {
         let path = tmp_dir.join(format!("{}.o", i));
         let path = path.to_str().unwrap().to_owned();
         entry.unpack(&path)?;
-        debug_log!("unpacked: {path:?}");
         results.push("-object".to_string());
         results.push(path);
     }
 
     return Ok(results);
-    // let runfiles_dir = get_runfiles_dir();
-
-    // debug_log!("Loading object lists for {path:?}");
-    // fs::read_to_string(path)
-    //     .unwrap()
-    //     .lines()
-    //     .flat_map(|path| {
-    //         [
-    //           "-object".to_string(),
-    //           runfiles_dir.join(path).into_os_string().into_string().unwrap(),
-    //         ]
-    //     })
-    //     .collect()
 }
 
 pub fn append_asm_coverage(counter: &ProfileCounter, output_path: &PathBuf) -> Result<()> {
-    if counter.cnts.len() < ASM_COUNTER_SIZE + ASM_COUNTER_OFFSET {
+    if counter.cnts.len() < ASM_COUNTER_SIZE {
         bail!("Manual coverage counter is too short.");
     }
 
-    let (_, cnts) = counter.cnts.split_at(ASM_COUNTER_OFFSET);
-    let (cnts, _) = cnts.split_at(ASM_COUNTER_SIZE);
+    let (cnts, _) = counter.cnts.split_at(ASM_COUNTER_SIZE);
 
     let mut f = std::fs::OpenOptions::new()
         .append(true)
