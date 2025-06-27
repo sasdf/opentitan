@@ -41,9 +41,10 @@ ALL_PRAGMA = {
   PRAGMA_SKIP_STOP,
 }
 
+FUNCTYPE_REGEX = r"\.type +(\w+), *@function"
 COUNTER_REGEX = r"COVERAGE_ASM_(AUTOGEN|MANUAL)_MARK_(REG|PRF)\((\w+),\s*(\d+)\)"
 
-Line = namedtuple("Line", ["text", "line_type", "continuation", "counter"])
+Line = namedtuple("Line", ["text", "line_type", "continuation", "args"])
 
 class LineType(enum.Enum):
   COMMENT = enum.auto()
@@ -52,6 +53,7 @@ class LineType(enum.Enum):
   TRAP = enum.auto()
   COUNTER = enum.auto()
   PRAGMA = enum.auto()
+  FUNCTYPE = enum.auto()
   OTHER = enum.auto()
 
 COLOR_RED = "\033[31m"
@@ -71,7 +73,14 @@ LINE_COLORS = {
   LineType.TRAP: COLOR_RED,
   LineType.COUNTER: COLOR_GREEN,
   LineType.PRAGMA: COLOR_MAGENTA,
+  LineType.FUNCTYPE: COLOR_MAGENTA,
   LineType.OTHER: COLOR_RESET,
+}
+
+COMMENT_TYPES = {
+  LineType.COMMENT,
+  LineType.FUNCTYPE,
+  LineType.PRAGMA
 }
 
 def parse_counter_mark(line):
@@ -97,7 +106,7 @@ def segment_basic_blocks(lines):
       assert '/*' not in line, line
 
     line_type = None
-    counter = None
+    args = None
 
     is_comment = line.strip().startswith('//')
     is_comment = is_comment or inside_comment_block
@@ -140,10 +149,14 @@ def segment_basic_blocks(lines):
       line_type = LineType.BRANCH
     elif line.strip().startswith('unimp'):
       line_type = LineType.TRAP
-    elif re.match(COUNTER_REGEX, line.strip()):
+    elif (m := re.match(COUNTER_REGEX, line.strip())):
       line_type = LineType.COUNTER
       counter = parse_counter_mark(line.strip())
       blocks[-1] = blocks[-1]._replace(counter=counter)
+      args = counter
+    elif (m := re.match(FUNCTYPE_REGEX, line.strip())):
+      line_type = LineType.FUNCTYPE
+      args = m.group(1).strip()
     elif line.strip().startswith('.'):
       line_type = LineType.COMMENT
     else:
@@ -166,7 +179,7 @@ def segment_basic_blocks(lines):
       text=line,
       line_type=line_type,
       continuation=is_continuation,
-      counter=counter,
+      args=args,
     ))
 
     # create new basic block after branch / pragma
@@ -242,8 +255,7 @@ def instrument_blocks(blocks):
       continue
 
     # skip the block if it only contains comments.
-    comment_types = {LineType.COMMENT, LineType.PRAGMA}
-    if all(line.line_type in comment_types for line in block.lines):
+    if all(line.line_type in COMMENT_TYPES for line in block.lines):
       instrumented.append(block)
       start_line += len(block.lines)
       continue
@@ -257,7 +269,7 @@ def instrument_blocks(blocks):
     # go over comments and labels
     insert_idx = 0
     for line in block.lines:
-      if line.line_type not in {LineType.COMMENT, LineType.LABEL}:
+      if line.line_type not in COMMENT_TYPES | {LineType.LABEL}:
         break
       insert_idx += 1
 

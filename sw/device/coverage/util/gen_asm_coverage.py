@@ -14,6 +14,7 @@ from asm_helper import (
   ASM_FILES,
   ASM_COUNTER_SIZE,
   LINE_COLORS,
+  COMMENT_TYPES,
   COLOR_RESET,
   segment_basic_blocks,
   propagate_counters
@@ -67,6 +68,7 @@ if __name__ == '__main__':
 
       lines = []
       lineno = 1
+      functions = {}
       for block in blocks:
         hit = da[block.counter]
         if args.print_blocks:
@@ -74,8 +76,25 @@ if __name__ == '__main__':
         for line in block.lines:
           if args.print_blocks:
             print(LINE_COLORS[line.line_type] + line.text + COLOR_RESET)
-          if line.line_type not in {LineType.COMMENT, LineType.PRAGMA}:
+          if line.line_type not in COMMENT_TYPES:
             dat.write(f'DA:{lineno},{hit}\n')
+          if line.line_type == LineType.FUNCTYPE:
+            func = line.args
+            if '_interrupt_vector' not in func:
+              functions[func] = (None, None)
+          if line.line_type == LineType.LABEL:
+            func = line.text.strip().rstrip(':')
+            if func in functions:
+              functions[func] = (hit, lineno)
           lineno += 1
+
+      if args.print_blocks:
+          print('=' * 20, block._replace(lines=hit), '=' * 20)
+          print('Function coverage')
+          print(functions)
+      for func, (hit, lineno) in functions.items():
+        assert hit is not None, f"Function label {func} not found"
+        dat.write(f'FN:{lineno},{func}\n')
+        dat.write(f'FNDA:{hit},{func}\n')
 
       dat.write("end_of_record\n")
