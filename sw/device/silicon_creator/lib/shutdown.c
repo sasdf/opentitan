@@ -524,10 +524,14 @@ __attribute__((section(".shutdown")))
 void shutdown_finalize(rom_error_t reason) {
   coverage_report();
   shutdown_report_error(reason);
+  coverage_report();
   // In a normal build, this function inlines to nothing.
   stack_utilization_print();
+  coverage_report();
   shutdown_software_escalate();
+  coverage_report();
   shutdown_keymgr_kill();
+  coverage_report();
   // Reset before killing the flash to be able to use this also in flash.
   shutdown_reset();
   shutdown_flash_kill();
