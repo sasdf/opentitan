@@ -2,22 +2,21 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+#include "sw/device/lib/arch/device.h"
 #include "sw/device/coverage/printer.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/silicon_creator/lib/drivers/uart.h"
-
-enum {
-    kCoverageNotDumped = 0x19285721,
-};
-
+#include "sw/device/silicon_creator/lib/drivers/pinmux.h"
 
 OT_NO_COVERAGE
-void coverage_init(void) {
+void coverage_transport_init(void) {
+  pinmux_init_uart0_tx();
+  uart_init(kUartNCOValue);
+
   // python3 sw/device/coverage/util/uart_hex.py 'COVERAGE:UART\r\n'
   uart_write_imm(0x4547415245564f43);
   uart_write_imm(0x000a0d545241553a);
-
-  coverage_printer_init();
+  while (!uart_tx_idle());
 }
 
 OT_NO_COVERAGE

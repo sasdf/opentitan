@@ -64,6 +64,7 @@ manifest({
 
 opentitan_binary(
     name = "bare_metal_slot_a",
+    collect_code_coverage = 0,
     testonly = True,
     srcs = ["bare_metal_start.S"],
     exec_env = [
@@ -80,6 +81,7 @@ opentitan_binary(
 
 opentitan_binary(
     name = "bare_metal_slot_b",
+    collect_code_coverage = 0,
     testonly = True,
     srcs = ["bare_metal_start.S"],
     exec_env = [
@@ -98,6 +100,7 @@ opentitan_binary(
 
 opentitan_binary(
     name = "bare_metal_slot_virtual",
+    collect_code_coverage = 0,
     testonly = True,
     srcs = ["bare_metal_start.S"],
     exec_env = [

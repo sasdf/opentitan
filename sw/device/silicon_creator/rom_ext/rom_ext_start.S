@@ -90,8 +90,9 @@ _rom_ext_start_boot:
 
   // Initialize the pre-C coverage counter.
   // It's no-op when coverage mode is not enabled.
-  COVERAGE_ASM_COUNTER_INIT()
-  COVERAGE_ASM_MARK_MANUAL_REG(s10, 0)
+  COVERAGE_ASM_INIT()
+  COVERAGE_ASM_TRANSPORT_INIT()
+  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 66)
 
   /**
    * Call the .rom_ext_immutable first if it's not called by ROM.
@@ -104,8 +105,9 @@ _rom_ext_start_boot:
   call _rom_ext_immutable_start
 
   // Re-initialize after returning from immutable section.
-  COVERAGE_ASM_COUNTER_INIT()
-  COVERAGE_ASM_MARK_MANUAL_REG(s10, 1)
+  COVERAGE_ASM_INIT()
+  COVERAGE_ASM_TRANSPORT_INIT()
+  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 67)
 
   /**
    * Continue booting the mutable rom_ext.
@@ -167,15 +169,6 @@ _rom_ext_start_boot:
   la   a0, _bss_start
   la   a1, _bss_end
   call crt_section_clear
-
-#ifdef OT_COVERAGE_INSTRUMENTED
-  call coverage_init
-
-  // Store the maunal counters to the prf_cnts region.
-  mv a0, s10
-  mv a1, s11
-  call coverage_save_asm_counters
-#endif
 
   // Re-clobber all of the temporary registers.
   li t0, 0x0

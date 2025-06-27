@@ -8,32 +8,49 @@
 #ifdef OT_COVERAGE_INSTRUMENTED
 
 
-#define COVERAGE_ASM_COUNTER_INIT() \
-  li s10, 0; \
-  li s11, 0;
+#define COVERAGE_ASM_INIT() \
+  call coverage_init; \
 
-#define COVERAGE_ASM_MARK_MANUAL_REG(kReg, kOffset) \
-  li s9, (1<<kOffset); \
-  or kReg, kReg, s9;
+#define COVERAGE_ASM_TRANSPORT_INIT() \
+  call coverage_transport_init; \
 
-#define COVERAGE_ASM_MARK_MANUAL_PRF(kTemp, kIndex) \
+#define COVERAGE_ASM_BACKUP_COUNTERS(kReg0, kReg1) \
+  li a0, 0; \
+  call coverage_backup_asm_counters; \
+  mv kReg0, a0; \
+  li a0, 32; \
+  call coverage_backup_asm_counters; \
+  mv kReg1, a0; \
+
+#define COVERAGE_ASM_RESTORE_COUNTERS(kReg0, kReg1) \
+  mv a0, kReg0; \
+  mv a1, kReg1; \
+  call coverage_restore_asm_counters; \
+
+#define COVERAGE_ASM_REPORT() \
+  call coverage_report; \
+
+#define COVERAGE_ASM_MANUAL_MARK_PRF(kTemp, kIndex) \
   lui kTemp, %hi(_prf_cnts_asm+kIndex); \
-  sb zero, %lo(_prf_cnts_asm+kIndex)(kTemp)
+  sb zero, %lo(_prf_cnts_asm+kIndex)(kTemp) \
 
-#define COVERAGE_ASM_MARK_AUTOGEN_REG(kReg, kOffset) \
-  COVERAGE_ASM_MARK_MANUAL_REG(kReg, kOffset)
-
-#define COVERAGE_ASM_MARK_AUTOGEN_PRF(kTemp, kIndex) \
-  COVERAGE_ASM_MARK_MANUAL_PRF(kTemp, kIndex)
+#define COVERAGE_ASM_MANUAL_MARK_REG COVERAGE_ASM_MANUAL_MARK_PRF
 
 #else // OT_COVERAGE_INSTRUMENTED
 
-#define COVERAGE_ASM_COUNTER_INIT(...)
-#define COVERAGE_ASM_MARK_MANUAL_PRF(...)
-#define COVERAGE_ASM_MARK_AUTOGEN_PRF(...)
-#define COVERAGE_ASM_MARK_MANUAL_REG(...)
-#define COVERAGE_ASM_MARK_AUTOGEN_REG(...)
+#define COVERAGE_ASM_INIT(...)
+#define COVERAGE_ASM_TRANSPORT_INIT(...)
+#define COVERAGE_ASM_BACKUP_COUNTERS(...)
+#define COVERAGE_ASM_RESTORE_COUNTERS(...)
+#define COVERAGE_ASM_REPORT(...)
+#define COVERAGE_ASM_MANUAL_MARK_PRF(...)
+#define COVERAGE_ASM_MANUAL_MARK_REG(...)
 
 #endif // OT_COVERAGE_INSTRUMENTED
+
+
+#define COVERAGE_ASM_AUTOGEN_MARK_REG COVERAGE_ASM_MANUAL_MARK_REG
+#define COVERAGE_ASM_AUTOGEN_MARK_PRF COVERAGE_ASM_MANUAL_MARK_PRF
+
 
 #endif  // OPENTITAN_SW_DEVICE_COVERAGE_RUNTIME_ASM_H_

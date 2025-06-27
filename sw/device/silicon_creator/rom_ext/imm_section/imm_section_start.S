@@ -39,13 +39,8 @@ _imm_section_start_boot:
   addi sp, sp, -8
   sw ra, 4(sp)
 
-#ifdef OT_COVERAGE_INSTRUMENTED
-  addi sp, sp, -8
-  sw s10, 0(sp)
-  sw s11, 4(sp)
-
-  COVERAGE_ASM_COUNTER_INIT()
-#endif
+  // NOTE: Coverage transport isn't re-initialized to reuse ROM's settings.
+  COVERAGE_ASM_INIT()
 
   // PRAGMA_COVERAGE: start autogen with register bits
 
@@ -57,7 +52,7 @@ _imm_section_start_boot:
    */
 
   // Clear `MIE` field of `mstatus` (disable interrupts globally).
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 17)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 45)
   csrci mstatus, 0x8
 
   /**
@@ -87,19 +82,6 @@ _imm_section_start_boot:
   la   a0, _bss_start
   la   a1, _bss_end
   call crt_section_clear
-
-#ifdef OT_COVERAGE_INSTRUMENTED
-  call coverage_init
-
-  // Store the maunal counters to the prf_cnts region.
-  mv a0, s10
-  mv a1, s11
-  call coverage_save_asm_counters
-
-  lw s10, 0(sp)
-  lw s11, 4(sp)
-  addi sp, sp, 8
-#endif
 
   /**
    * Restore registers.

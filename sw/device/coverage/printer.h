@@ -33,6 +33,14 @@ int coverage_is_valid(void);
  */
 void coverage_invalidate(void);
 
+/**
+ * @brief Initializes the coverage data.
+ *
+ * This function initializes the LLVM coverage counters to a uncovered (0xFF)
+ * and sets up the initial validity status for the coverage report.
+ */
+void coverage_init(void);
+
 
 /* Internal APIs for actual runtime */
 
@@ -56,14 +64,6 @@ extern void coverage_printer_sink(const void *data, size_t size);
  * `coverage_printer_sink`.
  */
 void coverage_printer_run(void);
-
-/**
- * @brief Initializes the coverage data.
- *
- * This function initializes the LLVM coverage counters to a uncovered (0xFF)
- * and sets up the initial validity status for the coverage report.
- */
-void coverage_printer_init(void);
 
 
 #ifdef __cplusplus

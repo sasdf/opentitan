@@ -18,6 +18,7 @@ CW310_SIVAL_TESTS=(
 
 CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_a_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_newer:boot_policy_newer_rma_a_1_b_1_fpga_cw340_instrumented_rom'

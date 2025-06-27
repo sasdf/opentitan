@@ -150,27 +150,29 @@ _rom_start_boot:
 
   // Initialize the pre-C coverage counter.
   // It's no-op when coverage mode is not enabled.
-  COVERAGE_ASM_COUNTER_INIT()
+  COVERAGE_ASM_INIT()
+  COVERAGE_ASM_TRANSPORT_INIT()
+
 
   // PRAGMA_COVERAGE: start autogen with register bits
 
 LABEL_FOR_TEST(kRomStartBootMaybeHalt)
   // Check if we should halt here.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 19)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 18)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_ROM_EXEC_EN_OFFSET(a0)
   bnez t0, .L_exec_en
 LABEL_FOR_TEST(kRomStartBootHalted)
 .L_halt_loop:
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 20)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 19)
   wfi
   j .L_halt_loop
 
 LABEL_FOR_TEST(kRomStartBootExecEn)
 .L_exec_en:
   // Enable NMIs from the watchdog timer.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 21)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 20)
   li t0, TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR
   li t1, (1 << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT)
   sw t1, RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET(t0)
@@ -193,7 +195,7 @@ LABEL_FOR_TEST(kRomStartBootExecEn)
   beq t0, t1, .L_skip_watchdog_init
 
   // Configure the watchdog's bark and bite thresholds.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 22)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 21)
   li t0, TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR
   li t1, WDOG_BARK_THOLD
   sw t1, AON_TIMER_WDOG_BARK_THOLD_REG_OFFSET(t0)
@@ -207,7 +209,7 @@ LABEL_FOR_TEST(kRomStartStoreT1ToBiteThold)
 .L_skip_watchdog_init:
 
   // Configure rstmgr alert and cpu info collection.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 23)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 22)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t0, OTP_CTRL_PARAM_OWNER_SW_CFG_ROM_RSTMGR_INFO_EN_OFFSET(a0)
@@ -216,16 +218,16 @@ LABEL_FOR_TEST(kRomStartStoreT1ToBiteThold)
   // Enable alert info collection if enabled in OTP.
   andi t2, t0, 0xff
   bne  t2, t1, .L_skip_rstmgr_alert_info_en
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 24)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 23)
   li   t2, (1 << RSTMGR_ALERT_INFO_CTRL_EN_BIT)
   sw   t2,  RSTMGR_ALERT_INFO_CTRL_REG_OFFSET(a0)
 .L_skip_rstmgr_alert_info_en:
   // Enable cpu info collection if enabled in OTP.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 25)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 24)
   srli t0, t0, 8
   andi t2, t0, 0xff
   bne  t2, t1, .L_skip_rstmgr_cpu_info_en
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 26)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 25)
   li   t2, (1 << RSTMGR_CPU_INFO_CTRL_EN_BIT)
   sw   t2,  RSTMGR_ALERT_INFO_CTRL_REG_OFFSET(a0)
 .L_skip_rstmgr_cpu_info_en:
@@ -233,7 +235,7 @@ LABEL_FOR_TEST(kRomStartStoreT1ToBiteThold)
 LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // Clear all the machine-defined interrupts, `MEIE`, `MTIE`, and `MSIE` fields
   // of `mie`.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 27)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 26)
   li   t0, 0x00000888
   csrc mie, t0
 
@@ -245,7 +247,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   bne  t0, t1, .L_ast_init_end
 
   // Copy the AST configuration from OTP.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 28)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 27)
   li   a0, (TOP_EARLGREY_AST_BASE_ADDR)
   li   a1, (TOP_EARLGREY_AST_BASE_ADDR + AST_REGAL_REG_OFFSET + 4)
   li   a2, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
@@ -261,7 +263,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   lw   t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_JITTER_EN_OFFSET(a0)
   li   t1, MULTIBIT_ASM_BOOL4_FALSE
   beq  t0, t1, .L_ast_init_end
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 29)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 28)
   li   a0, TOP_EARLGREY_CLKMGR_AON_BASE_ADDR
   li   t1, MULTIBIT_ASM_BOOL4_TRUE
   sw   t1, CLKMGR_JITTER_ENABLE_REG_OFFSET(a0)
@@ -271,19 +273,19 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // CREATOR_SW_CFG_RMA_SPIN_CYCLES to let the transition start and continue
   // looping while lc_ctrl is not ready. Reset if the CPU is still executing at
   // the end.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 30)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 29)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_RMA_SPIN_EN_OFFSET(a0)
   li   t6, HARDENED_BOOL_TRUE
   bne  t0, t6, .L_rma_spin_skip
 
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s10, 31)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 30)
   li   a1, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t1, OTP_CTRL_PARAM_CREATOR_SW_CFG_RMA_SPIN_EN_OFFSET(a1)
   beq  t1, t6, .L_rma_spin_check_straps
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 0)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 31)
   unimp
   unimp
   unimp
@@ -299,7 +301,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // |------------------+----------------+----------------+------------------|
   // | Configuration:   | Input          | Input          | Input            |
   // |                  | Pull-down      | Pull-down      | Pull-up          |
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 1)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 32)
   li   a0, (TOP_EARLGREY_PINMUX_AON_BASE_ADDR + \
             PINMUX_MIO_PAD_ATTR_0_REG_OFFSET)
   li   t0, (1 << PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT) | \
@@ -323,12 +325,12 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   csrw mcycle, zero
   li   t0, PINMUX_PAD_ATTR_PROP_CYCLES
 .L_rma_strap_pu_spin_cycles_loop:
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 2)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 33)
   csrr t1, mcycle
   bltu t1, t0, .L_rma_strap_pu_spin_cycles_loop
 
   // Read the strap GPIOs and check their value.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 3)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 34)
   li   a0, TOP_EARLGREY_GPIO_BASE_ADDR
   lw   t0, GPIO_DATA_IN_REG_OFFSET(a0)
   li   t5, SW_STRAP_MASK
@@ -338,14 +340,14 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   bne  t0, t6, .L_rma_spin_skip
 
   // Double-check the GPIO strap value.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 4)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 35)
   li   t6, HARDENED_BOOL_TRUE
   li   a1, TOP_EARLGREY_GPIO_BASE_ADDR
   lw   t1, GPIO_DATA_IN_REG_OFFSET(a1)
   and  t1, t1, t5
   xor  t1, t1, t4
   beq  t1, t6, .L_rma_spin_init
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 5)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 36)
   unimp
   unimp
   unimp
@@ -355,24 +357,24 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // the lifecycle transition request on JTAG.  Since this is a wait
   // loop, disable the watchdog.
 .L_rma_spin_init:
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 6)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 37)
   csrw mcycle, zero
   li   a0, TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR
   sw   zero, AON_TIMER_WDOG_CTRL_REG_OFFSET(a0)
 .L_rma_spin_cycles_loop:
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 7)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 38)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_RMA_SPIN_CYCLES_OFFSET(a0)
   csrr t1, mcycle
   bltu t1, t0, .L_rma_spin_cycles_loop
 .L_rma_spin_lc_ctrl_loop:
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 8)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 39)
   li   a0, TOP_EARLGREY_LC_CTRL_BASE_ADDR
   lw   t0, LC_CTRL_STATUS_REG_OFFSET(a0)
   andi t0, t0, (1 << LC_CTRL_STATUS_READY_BIT)
   beqz t0, .L_rma_spin_lc_ctrl_loop
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 9)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 40)
   unimp
   unimp
   unimp
@@ -382,14 +384,14 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // Skip the `entropy_src` health checks configuration if the
   // `RNG_HEALTH_CONFIG_DIGEST` is not programmed. The default digest value is
   // 0 given that it is stored in a software OTP partition.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 10)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 41)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_HEALTH_CONFIG_DIGEST_OFFSET(a0)
   beqz t0, .L_entropy_enable
 
   // Copy the entropy source health checks configuration thresholds from OTP.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 11)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 42)
   li   a0, (TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR + \
             ENTROPY_SRC_REPCNT_THRESHOLDS_REG_OFFSET)
   li   a1, (TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR + \
@@ -409,7 +411,7 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
 .L_entropy_enable:
   // The following sequence enables the minimum level of entropy required to
   // initialize memory scrambling, as well as the entropy distribution network.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 12)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 43)
   li a0, TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR
 
   // Note for BOOT_ROM initialization the FIPS_ENABLE bit is set to kMultiBitBool4False
@@ -443,20 +445,26 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // Memory accesses will stall until initialization is complete.
   // Set `SRAM_KEY_RENEW_EN` OTP item to `HARDENED_BOOL_FALSE` to disable and
   // any other value to enable.
+  COVERAGE_ASM_BACKUP_COUNTERS(s10, s11)
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
             OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET)
   lw   t2, OTP_CTRL_PARAM_OWNER_SW_CFG_ROM_SRAM_READBACK_EN_OFFSET(a0)
   lw   t0, OTP_CTRL_PARAM_CREATOR_SW_CFG_SRAM_KEY_RENEW_EN_OFFSET(a0)
   li   t1, HARDENED_BOOL_FALSE
   beq t0, t1, .L_sram_key_renew_skip
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 13)
+  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 44)
+  COVERAGE_ASM_BACKUP_COUNTERS(s10, s11)
   li a0, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
   li a1, (1 << SRAM_CTRL_CTRL_RENEW_SCR_KEY_BIT) | (1 << SRAM_CTRL_CTRL_INIT_BIT)
   sw a1, SRAM_CTRL_CTRL_REG_OFFSET(a0)
 .L_sram_key_renew_skip:
   // Depending on OTP, enable the SRAM readback feature.
-  COVERAGE_ASM_MARK_AUTOGEN_REG(s11, 14)
   sw   t2, SRAM_CTRL_READBACK_REG_OFFSET(a0)
+
+  // Re-initialize coverage counters after scramble
+  COVERAGE_ASM_INIT()
+  COVERAGE_ASM_RESTORE_COUNTERS(s10, s11)
+  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 0)
 
   // PRAGMA_COVERAGE: stop autogen with register bits
 
@@ -554,21 +562,6 @@ LABEL_FOR_TEST(kRomStartWatchdogEnabled)
   // mode setting.
   la   t0, (_rom_interrupt_vector_c + 1)
   csrw mtvec, t0
-
-#ifdef OT_COVERAGE_INSTRUMENTED
-  call coverage_init;
-
-  // Store the maunal counters to the prf_cnts region.
-  mv a0, s10
-  mv a1, s11
-  call coverage_save_asm_counters
-
-  // Clear the registers
-  li a0, 0x0
-  li a1, 0x0
-  li s10, 0x0
-  li s11, 0x0
-#endif
 
   /**
    * Jump to C Code

@@ -89,7 +89,7 @@ _test_rom_interrupt_vector:
   .type _reset_start, @function
 
 _reset_start:
-#if !OT_IS_ENGLISH_BREAKFAST
+#ifdef OT_COVERAGE_ENABLED
   // Remove address space protections by configuring entry 15 as
   // read-write-execute for the entire address space and then clearing
   // all other entries.
@@ -103,12 +103,9 @@ _reset_start:
   csrw pmpcfg0, zero
   csrw pmpcfg1, zero
   csrw pmpcfg2, zero
-#endif
 
   // Check if instrumented ROM is presented
-  la a0, _instrumented_rom_slot
-  li t0, 0x20000000
-  add a0, a0, t0
+  la a0, (_instrumented_rom_slot + 0x20000000)
   lw t0, 0x80(a0)
 
   // Continue if it's 0 or -1
@@ -116,11 +113,27 @@ _reset_start:
   add t0, t0, t1
   bleu t0, t1, continue_test_rom
 
+  // Set up the stack.
+  la sp, _stack_end
+
+  // Initialize main memory (main SRAM).
+  li    t1, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
+  li    t0, (1 << SRAM_CTRL_CTRL_INIT_BIT)
+  sw    t0, SRAM_CTRL_CTRL_REG_OFFSET(t1)
+
+  // Set exception/interrupt handlers.
+  //
+  // Note: the increment just sets the low bits to 0b01 which is the vectored
+  // mode setting.
+  addi  t0, a0, 1
+  csrw mtvec, t0
+
   // Jump to instrumented ROM
   li   a3, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
   li   t1, 0xa26a38f7
   sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
   jalr ra, 0x80(a0)
+#endif
 
 continue_test_rom:
   // Set up the global pointer. This requires that we disable linker relaxations

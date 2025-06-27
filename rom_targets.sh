@@ -175,6 +175,9 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom
 
 
+# Partially passed
+//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom
+
 # exec env (?)
 #//sw/device/silicon_creator/rom/e2e/ate:ate_smoketest_fpga_cw340_instrumented_rom
 
@@ -250,9 +253,6 @@ INS_ROM_TESTS=(
 # FAILED TO BUILD
 #//sw/device/silicon_creator/rom/e2e/jtag_inject:openocd_asm_interrupt_handler_otp_dev_fpga_cw340_instrumented_rom
 #//sw/device/silicon_creator/rom/e2e/jtag_inject:openocd_asm_interrupt_handler_otp_rma_fpga_cw340_instrumented_rom
-
-# jtag
-#//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom
 
 
 # firmware is empty???

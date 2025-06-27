@@ -4,11 +4,15 @@ import copy
 from collections import namedtuple
 
 ASM_FILES = [
+  # Pre crt initialization assembly
   "sw/device/lib/crt/crt.S",
-  "sw/device/silicon_creator/rom_ext/imm_section/imm_section_start.S",
-  "sw/device/silicon_creator/rom_ext/rom_ext_start.S",
   "sw/device/silicon_creator/rom/rom_epmp_init.S",
   "sw/device/silicon_creator/rom/rom_start.S",
+  "sw/device/silicon_creator/lib/irq_asm.S",
+
+  # Post crt initialization assembly
+  "sw/device/silicon_creator/rom_ext/imm_section/imm_section_start.S",
+  "sw/device/silicon_creator/rom_ext/rom_ext_start.S",
   "sw/device/silicon_creator/lib/flash_exc_handler.S",
 ]
 
@@ -37,7 +41,7 @@ ALL_PRAGMA = {
   PRAGMA_SKIP_STOP,
 }
 
-COUNTER_REGEX = r"COVERAGE_ASM_MARK_(AUTOGEN|MANUAL)_(REG|PRF)\((\w+),\s*(\d+)\)"
+COUNTER_REGEX = r"COVERAGE_ASM_(AUTOGEN|MANUAL)_MARK_(REG|PRF)\((\w+),\s*(\d+)\)"
 
 Line = namedtuple("Line", ["text", "line_type", "continuation", "counter"])
 
@@ -45,6 +49,7 @@ class LineType(enum.Enum):
   COMMENT = enum.auto()
   LABEL = enum.auto()
   BRANCH = enum.auto()
+  TRAP = enum.auto()
   COUNTER = enum.auto()
   PRAGMA = enum.auto()
   OTHER = enum.auto()
@@ -63,6 +68,7 @@ LINE_COLORS = {
   LineType.COMMENT: COLOR_MAGENTA,
   LineType.LABEL: COLOR_CYAN,
   LineType.BRANCH: COLOR_RED,
+  LineType.TRAP: COLOR_RED,
   LineType.COUNTER: COLOR_GREEN,
   LineType.PRAGMA: COLOR_MAGENTA,
   LineType.OTHER: COLOR_RESET,
@@ -133,8 +139,8 @@ def segment_basic_blocks(lines):
     elif line.strip().startswith('mret'):
       line_type = LineType.BRANCH
     elif line.strip().startswith('unimp'):
-      line_type = LineType.BRANCH
-    elif line.strip().startswith('COVERAGE_ASM_MARK_'):
+      line_type = LineType.TRAP
+    elif re.match(COUNTER_REGEX, line.strip()):
       line_type = LineType.COUNTER
       counter = parse_counter_mark(line.strip())
       blocks[-1] = blocks[-1]._replace(counter=counter)
@@ -164,31 +170,30 @@ def segment_basic_blocks(lines):
     ))
 
     # create new basic block after branch / pragma
-    if line_type == LineType.BRANCH:
+    if line_type in {LineType.BRANCH, LineType.TRAP}:
       blocks[-1] = blocks[-1]._replace(down=False)
       blocks.append(Block(lines=[], counter=None, up=False, down=True))
     if line_type == LineType.PRAGMA:
       blocks.append(Block(lines=[], counter=None, up=True, down=True))
 
-  # merge unimp chain
+  # merge trap chain
   blocks = [b for b in blocks if len(b.lines)]
-  last_unimp = None
+  last_trap = None
   for block in blocks:
     line = block.lines[-1]
-    is_unimp = line.line_type == LineType.BRANCH
-    is_unimp &= line.text.strip().startswith('unimp')
+    is_trap = line.line_type == LineType.TRAP
     code_lines = sum(l.line_type != LineType.COMMENT for l in block.lines)
-    if last_unimp is not None and code_lines == 1 and is_unimp:
-      last_unimp.lines.extend(block.lines)
+    if last_trap is not None and code_lines == 1 and is_trap:
+      last_trap.lines.extend(block.lines)
       block.lines.clear()
       continue
-    last_unimp = block if is_unimp else None
+    last_trap = block if is_trap else None
 
   blocks = [b for b in blocks if len(b.lines)]
   return blocks
 
 def is_autogen(line):
-  if line.strip().startswith('COVERAGE_ASM_MARK_AUTOGEN_'):
+  if line.strip().startswith('COVERAGE_ASM_AUTOGEN_'):
     return True
   return False
 
@@ -259,22 +264,13 @@ def instrument_blocks(blocks):
     # insert instrumentation
     counter = get_next_counter(mode)
     block = block._replace(counter=counter)
-    if mode == InstType.REGISTER_BITS:
-      reg = 's10' if counter < 32 else 's11'
-      offset = counter % 32
-      block.lines.insert(insert_idx, Line(
-        f"  COVERAGE_ASM_MARK_AUTOGEN_REG({reg}, {offset})",
-        LineType.COUNTER,
-        False,
-        counter,
-      ))
-    else:
-      block.lines.insert(insert_idx, Line(
-        f"  COVERAGE_ASM_MARK_AUTOGEN_PRF(t6, {counter})",
-        LineType.COUNTER,
-        False,
-        counter,
-      ))
+    kind = 'REG' if mode == InstType.REGISTER_BITS else 'PRF'
+    block.lines.insert(insert_idx, Line(
+      f"  COVERAGE_ASM_AUTOGEN_MARK_{kind}(t6, {counter})",
+      LineType.COUNTER,
+      False,
+      counter,
+    ))
 
     instrumented.append(block)
     start_line += len(block.lines)

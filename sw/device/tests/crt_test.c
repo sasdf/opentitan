@@ -61,49 +61,6 @@ static void init_uart(void) {
   base_uart_stdout(&uart0);
 }
 
-void crt_section_clear_wrapper(void *start, void *end) {
-#ifdef OT_COVERAGE_INSTRUMENTED
-  extern void crt_section_clear(void *start, void *end);
-  uint32_t a, b;
-  asm volatile(
-      "li s10, 0;"
-      "li s11, 0;"
-      "mv a0, %[start];"
-      "mv a1, %[end];"
-      "call crt_section_clear;"
-      "mv %[a], s10;"
-      "mv %[b], s11;"
-      : [a] "=r"(a), [b] "=r"(b)
-      : [start] "r"(start), [end] "r"(end)
-      : "s9", "s10", "s11", "a0", "a1", "memory");
-  coverage_save_asm_counters(a, b);
-#else
-  crt_section_clear(start, end);
-#endif
-}
-
-void crt_section_copy_wrapper(void *start, void *end, void *source) {
-#ifdef OT_COVERAGE_INSTRUMENTED
-  extern void crt_section_copy(void *start, void *end, void *source);
-  uint32_t a, b;
-  asm volatile(
-      "li s10, 0;"
-      "li s11, 0;"
-      "mv a0, %[start];"
-      "mv a1, %[end];"
-      "mv a2, %[source];"
-      "call crt_section_copy;"
-      "mv %[a], s10;"
-      "mv %[b], s11;"
-      : [a] "=r"(a), [b] "=r"(b)
-      : [start] "r"(start), [end] "r"(end), [source] "r"(source)
-      : "s9", "s10", "s11", "a0", "a1", "a2", "memory");
-  coverage_save_asm_counters(a, b);
-#else
-  crt_section_copy(start, end, source);
-#endif
-}
-
 /**
  * Test that crt_section_clear correctly zeros word aligned sections.
  *
@@ -113,6 +70,9 @@ void crt_section_copy_wrapper(void *start, void *end, void *source) {
  * Does not return if the test fails.
  */
 static void test_crt_section_clear(void) {
+  // Function to test (symbol in the CRT assembly library).
+  extern void crt_section_clear(void *start, void *end);
+
   // Maximum end index of target section.
   const size_t kLen = 32;
 
@@ -135,7 +95,7 @@ static void test_crt_section_clear(void) {
     // Clear section of target array.
     const size_t start = kTests[t].start;
     const size_t end = kTests[t].end;
-    crt_section_clear_wrapper(&section[start], &section[end]);
+    crt_section_clear(&section[start], &section[end]);
 
     // Check that section was cleared.
     for (size_t i = 0; i < kLen; ++i) {
@@ -157,6 +117,9 @@ static void test_crt_section_clear(void) {
  * Does not return if the test fails.
  */
 static void test_crt_section_copy(void) {
+  // Function to test (symbol in the CRT assembly library).
+  extern void crt_section_copy(void *start, void *end, void *source);
+
   // Maximum end index of target section.
   const size_t kLen = 32;
 
@@ -193,7 +156,7 @@ static void test_crt_section_copy(void) {
     const size_t start = kTests[t].start;
     const size_t end = kTests[t].end;
     const size_t source = kTests[t].source;
-    crt_section_copy_wrapper(&dst[start], &dst[end], &src[source]);
+    crt_section_copy(&dst[start], &dst[end], &src[source]);
 
     // First expected value.
     uint32_t val = (uint32_t)(source) + 1;
@@ -282,5 +245,6 @@ void _ottf_main(void) {
   test_crt_section_copy();
 
   coverage_report();
+
   test_status_set(kTestStatusPassed);
 }

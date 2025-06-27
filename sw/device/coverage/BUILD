@@ -16,20 +16,17 @@ config_setting(
 )
 
 cc_library(
-    name = "runtime_api_asm",
-    hdrs = ["runtime_asm.h"],
+    name = "asm_counters",
+    srcs = ["asm_counters.c"],
+    alwayslink = True,
 )
 
 cc_library(
-    name = "asm_counters",
-    srcs = [
-        "asm_counters.c",
-        "asm_runtime.c",
-    ],
+    name = "asm_runtime",
+    srcs = ["asm_runtime.c"],
     deps = [
         "//sw/device/lib/base:macros",
     ],
-    alwayslink = True,
 )
 
 cc_library(
@@ -48,9 +45,19 @@ cc_library(
     name = "runtime_api",
     hdrs = ["runtime.h"],
     deps = [
-        ":empty_runtime",
         ":asm_counters",
+        ":empty_runtime",
         "//sw/device/lib/base:macros",
+    ],
+)
+
+cc_library(
+    name = "runtime_api_asm",
+    hdrs = ["runtime_asm.h"],
+    deps = [
+        ":asm_counters",
+        ":asm_runtime",
+        ":runtime_api",
     ],
 )
 
@@ -69,6 +76,8 @@ cc_library(
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         ":printer",
+        "//sw/device/lib/arch:device",
+        "//sw/device/silicon_creator/lib/drivers:pinmux",
         "//sw/device/silicon_creator/lib/drivers:uart",
         "//sw/device/lib/base:macros",
     ],

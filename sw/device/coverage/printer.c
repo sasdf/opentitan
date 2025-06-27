@@ -100,20 +100,18 @@ void coverage_compress(unsigned char *data, size_t size) {
   }
 }
 
-void coverage_printer_init(void) {
-  // The linker script ensure the prf cnts section is aligned to 4-byte
-  // boundary.
-  uint32_t *ptr = (uint32_t *)__llvm_prf_cnts_start;
-  while (ptr < (uint32_t *)__llvm_prf_cnts_end) {
-    *ptr++ = 0xffffffff;
+void coverage_init(void) {
+  if (!coverage_is_valid()) {
+    // The linker script ensure the prf cnts section is aligned to 4-byte
+    // boundary.
+    uint32_t *ptr = (uint32_t *)__llvm_prf_cnts_start;
+    while (ptr < (uint32_t *)__llvm_prf_cnts_end) {
+      *ptr++ = 0xffffffff;
+    }
+
+    // Set the report as valid.
+    coverage_status = *(uint32_t*) BUILD_ID;
   }
-
-  // Set the report as valid.
-  coverage_status = *(uint32_t*) BUILD_ID;
-
-  // Dry run the crc to bump their counters.
-  // crc32_add(&coverage_crc, send_buf, 1);
-  // crc32_add(&coverage_crc, send_buf, 4);
 }
 
 void coverage_printer_run(void) {

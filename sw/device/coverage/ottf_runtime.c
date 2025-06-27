@@ -11,10 +11,8 @@
 
 
 OT_NO_COVERAGE
-void coverage_init(void) {
+void coverage_transport_init(void) {
   base_printf("COVERAGE:OTTF\r\n");
-
-  coverage_printer_init();
 }
 
 /**

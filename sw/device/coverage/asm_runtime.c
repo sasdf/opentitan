@@ -23,7 +23,17 @@ uint8_t _prf_cnts_asm[96] = {
 };
 
 OT_NO_COVERAGE
-void coverage_save_asm_counters(uint32_t a, uint32_t b) {
+uint32_t coverage_backup_asm_counters(uint32_t offset) {
+  uint32_t packed_byte = 0;
+  for (uint8_t k = 0; k < 32; ++k) {
+    uint32_t bit = _prf_cnts_asm[offset + k] == 0 ? 1 : 0;
+    packed_byte |= (bit << k);
+  }
+  return packed_byte;
+}
+
+OT_NO_COVERAGE
+void coverage_restore_asm_counters(uint32_t a, uint32_t b) {
   for (int i=0; i<32; i++) {
     if ((a >> i) & 1) {
       _prf_cnts_asm[i] = 0;
