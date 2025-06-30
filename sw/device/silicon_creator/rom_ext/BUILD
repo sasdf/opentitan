@@ -375,6 +375,31 @@ baseline_coverage_test(
     elf = "rom_ext_prod_dice_cwt_spidfu",
 )
 
+opentitan_binary(
+    name = "rom_ext_prod_dice_x509_xmodem",
+    exec_env = [
+        "//hw/top_earlgrey:silicon_creator",
+    ],
+    extra_bazel_features = [
+        "minsize",
+        "use_lld",
+    ],
+    linker_script = ":ld_slot_virtual",
+    manifest = ":manifest",
+    deps = [
+        ":rom_ext_dice_x509",
+        "//sw/device/lib/crt",
+        "//sw/device/silicon_creator/lib:manifest_def",
+        "//sw/device/silicon_creator/lib/rescue:rescue_xmodem",
+        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_x509_slot_virtual",
+    ],
+)
+
+baseline_coverage_test(
+    name = "rom_ext_prod_dice_x509_xmodem_baseline_coverage",
+    elf = "rom_ext_prod_dice_x509_xmodem",
+)
+
 manifest(d = {
     "name": "manifest_bad_address_translation",
     "address_translation": "0",

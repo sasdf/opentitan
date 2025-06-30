@@ -5,7 +5,7 @@ COVERAGE_OUTPUT_DIR="/tmp/${USER}/all_coverage/"
 
 BASELINES=(
     "//sw/device/silicon_creator/rom_ext:rom_ext_prod_dice_cwt_spidfu_baseline_coverage"
-    "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual_baseline_coverage"
+    "//sw/device/silicon_creator/rom_ext:rom_ext_prod_dice_x509_xmodem_baseline_coverage"
     "//sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_cwt_slot_virtual_baseline_coverage"
     "//sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_x509_slot_virtual_baseline_coverage"
     "//sw/device/silicon_creator/rom:instrumented_mask_rom_baseline_coverage"
