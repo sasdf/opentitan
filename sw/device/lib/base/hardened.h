@@ -212,11 +212,11 @@ static inline uint32_t launder32(uint32_t val) {
   // `LaunderPure(y)` (in this particular case, from bisecting the passes,
   // it appears to happen during register allocation).
   //
-  // We work around this by marking the static inline asm volatile.
+  // We work around this by marking the inline asm volatile.
   //
-  // Alternatively, we could add a "nonce" to the static inline asm that has
-  // been tainted by a volatile asm operation. This has the benefit that the
-  // input does not need to happen-before the volatile operation, and can be
+  // Alternatively, we could add a "nonce" to the inline asm that has been
+  // tainted by a volatile asm operation. This has the benefit that the input
+  // does not need to happen-before the volatile operation, and can be
   // arbitrarily reordered, while ensuring that no call of launder32() is
   // "pure" in the deduplication sense. I.e.:
   //
@@ -240,7 +240,7 @@ static inline uint32_t launder32(uint32_t val) {
   // > of statements.
 
   // When we're building for static analysis, reduce false positives by
-  // short-circuiting the static inline assembly block.
+  // short-circuiting the inline assembly block.
 #if OT_BUILD_FOR_STATIC_ANALYZER || OT_DISABLE_HARDENING
   return val;
 #endif
@@ -278,7 +278,7 @@ static inline uintptr_t launderw(uintptr_t val) {
  * instructions such that the intermediate `val` actually appears in a
  * register. Because it is impure, `barrier32()` operations will not be
  * reordered past each other or MMIO operations, although they can be reordered
- * past functions if LTO static inlines them.
+ * past functions if LTO inlines them.
  *
  * Most compilers will try to reorder arithmetic operations in such a way
  * that they form large basic blocks, since modern microarchitectures can

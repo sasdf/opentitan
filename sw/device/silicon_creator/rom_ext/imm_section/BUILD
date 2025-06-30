@@ -43,7 +43,6 @@ cc_library(
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:macros",
-        "//sw/device/silicon_creator/lib:dbg_print",
         "//sw/device/silicon_creator/lib:epmp_state",
         "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:manifest",

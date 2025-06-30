@@ -52,8 +52,11 @@ extern "C++" {
 /**
  * A directive to force the compiler to inline a function.
  */
-// #define OT_ALWAYS_INLINE __attribute__((always_inline)) inline static
+#ifndef OT_COVERAGE_ENABLED
+#define OT_ALWAYS_INLINE __attribute__((always_inline)) inline static
+#else
 #define OT_ALWAYS_INLINE inline static
+#endif
 
 /**
  * The `restrict` keyword is C specific, so we provide a C++-portable wrapper

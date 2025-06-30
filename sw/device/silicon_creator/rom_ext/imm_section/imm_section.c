@@ -11,7 +11,6 @@
 #include "sw/device/silicon_creator/lib/base/boot_measurements.h"
 #include "sw/device/silicon_creator/lib/base/sec_mmio.h"
 #include "sw/device/silicon_creator/lib/cert/dice_chain.h"
-#include "sw/device/silicon_creator/lib/dbg_print.h"
 #include "sw/device/silicon_creator/lib/drivers/flash_ctrl.h"
 #include "sw/device/silicon_creator/lib/drivers/rnd.h"
 #include "sw/device/silicon_creator/lib/epmp_state.h"
@@ -23,7 +22,6 @@
 
 OT_WARN_UNUSED_RESULT
 static rom_error_t imm_section_start(void) {
-  dbg_printf("imm_start\r\n");
   // Check the ePMP state.
   HARDENED_RETURN_IF_ERROR(epmp_state_check());
   // Check sec_mmio expectations.
@@ -56,7 +54,6 @@ static rom_error_t imm_section_start(void) {
   // Make mutable part executable.
   HARDENED_RETURN_IF_ERROR(imm_section_epmp_mutable_rx(rom_ext));
 
-  dbg_printf("imm_done\r\n");
   return kErrorOk;
 }
 
