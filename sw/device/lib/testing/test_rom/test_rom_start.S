@@ -100,7 +100,17 @@ _reset_start:
   csrw pmpcfg3, t0
   li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
   csrw pmpaddr15, t0
-  csrw pmpcfg0, zero
+
+  // Configure `pmpcfg0` in test ROM to enable instrumented ROM execution.
+  // Without this configuration, the instrumented ROM can not be executed due to
+  // ePMP reconfiguration in `rom_epmp_init`.
+  li   t0, (0x8f << 8)
+  csrw pmpcfg0, t0
+  li   t0, 0
+  csrw pmpaddr0, t0
+  li   t0, 0x10000000
+  csrw pmpaddr1, t0
+
   csrw pmpcfg1, zero
   csrw pmpcfg2, zero
 
