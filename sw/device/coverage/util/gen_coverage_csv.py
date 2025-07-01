@@ -22,10 +22,11 @@ def main():
     fn_rate = (fn_hit / len(cov.fnda)) if len(cov.fnda) else 1.0
 
     line_hit = sum(1 for count in cov.da.values() if count > 0)
+    line_miss = len(cov.da) - line_hit if len(cov.da) else 0
     line_rate = (line_hit / len(cov.da)) if len(cov.da) else 1.0
 
     name = '//' + sf[3:] + '.gcov.html'
-    print(f'{name},{line_rate*100:.2f},{fn_rate*100:.2f}')
+    print(f'{name},{line_miss},{line_rate*100:.2f},{fn_rate*100:.2f}')
 
 if __name__ == '__main__':
   main()

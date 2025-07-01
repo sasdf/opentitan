@@ -4,6 +4,18 @@ BASELINE_CACHE_DIR="bazel-out/_coverage/baseline/"
 
 rm -f "${COVERAGE_DAT}"
 
+if ! declare -p BASELINES &>/dev/null; then
+  BASELINES=()
+fi
+
+if [[ "${#BASELINES[@]}" == "0" ]]; then
+    BASELINES=()
+    for group_name in "${COVERAGE_VIEW_GROUPS[@]}"; do
+        group_expr="${group_name}[@]"
+        BASELINES+=( "${!group_expr}" )
+    done
+fi
+
 ./bazelisk.sh coverage "${BASELINES[@]}" "${BAZEL_ARGS[@]}" "$@"
 CACHED_BASELINES=()
 
@@ -75,28 +87,67 @@ else
         baseline_name="${cached_zip##*/}"
         baseline_name="${baseline_name%.zip}"
         filtered_dat="${BASELINE_CACHE_DIR}/${baseline_name}.dat"
-        filtered_dis_dat="${BASELINE_CACHE_DIR}/${baseline_name}.dis.dat"
+        output_dir="${COVERAGE_OUTPUT_DIR}/${baseline_name}"
         echo "Filter with baseline '${baseline_name}'"
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --baseline="${cached_zip}" \
           --coverage="${COVERAGE_DAT_WITH_ASM}" \
           --use_disassembly \
-          --output="${filtered_dis_dat}"
+          --output="${filtered_dat}"
 
         genhtml "${GENHTML_ARGS[@]}" \
-            --output "${COVERAGE_OUTPUT_DIR}/${baseline_name}_dis" \
-            "${filtered_dis_dat}"
+            --output "${output_dir}" \
+            "${filtered_dat}"
+
+        python3 sw/device/coverage/util/gen_coverage_csv.py \
+          --path="${filtered_dat}" \
+          > "${output_dir}/coverage.csv"
     done
 
-    filtered_dis_dat="${BASELINE_CACHE_DIR}/all_baselines.dis.dat"
+    for group_name in "${COVERAGE_VIEW_GROUPS[@]}"; do
+        group_expr="${group_name}[@]"
+        group=( "${!group_expr##*:}" )
+        group_zip=( "${group[@]/#/${BASELINE_CACHE_DIR}}" )
+        group_zip=( "${group_zip[@]/%/.zip}" )
+        filtered_dat="${BASELINE_CACHE_DIR}/${group_name,,}.dat"
+        output_dir="${COVERAGE_OUTPUT_DIR}/${group_name,,}"
+        echo "Filter with baseline group '${group_name,,}'"
+
+        python3 sw/device/coverage/util/coverage_filter.py \
+          --baseline "${group_zip[@]}" \
+          --coverage="${COVERAGE_DAT_WITH_ASM}" \
+          --use_disassembly \
+          --output="${filtered_dat}"
+
+        genhtml "${GENHTML_ARGS[@]}" \
+            --output "${output_dir}" \
+            "${filtered_dat}"
+
+        python3 sw/device/coverage/util/gen_coverage_csv.py \
+          --path="${filtered_dat}" \
+          > "${output_dir}/coverage.csv"
+    done
+
+    filtered_dat="${BASELINE_CACHE_DIR}/all_baselines.dis.dat"
+    output_dir="${COVERAGE_OUTPUT_DIR}/all_baselines_dis"
     python3 sw/device/coverage/util/coverage_filter.py \
       --baseline "${CACHED_BASELINES[@]}" \
       --coverage="${COVERAGE_DAT_WITH_ASM}" \
       --use_disassembly \
-      --output="${filtered_dis_dat}"
+      --output="${filtered_dat}"
 
     genhtml "${GENHTML_ARGS[@]}" \
-        --output "${COVERAGE_OUTPUT_DIR}/all_baselines_dis" \
-        "${filtered_dis_dat}"
+        --output "${output_dir}" \
+        "${filtered_dat}"
+
+    python3 sw/device/coverage/util/gen_coverage_csv.py \
+      --path="${filtered_dat}" \
+      > "${output_dir}/coverage.csv"
 fi
+
+echo "Save test target list"
+printf '%s\n' "${TARGETS[@]}" | sort | uniq > "${COVERAGE_OUTPUT_DIR}/test_targets.txt"
+
+echo "Save source diff"
+python3 sw/device/coverage/util/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
