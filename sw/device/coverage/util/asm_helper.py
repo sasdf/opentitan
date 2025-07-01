@@ -42,6 +42,7 @@ ALL_PRAGMA = {
 }
 
 FUNCTYPE_REGEX = r"\.type +(\w+), *@function"
+SECTION_REGEX = r"\.section +[\w\.]+(,.*)?"
 COUNTER_REGEX = r"COVERAGE_ASM_(AUTOGEN|MANUAL)_MARK_(REG|PRF)\((\w+),\s*(\d+)\)"
 
 Line = namedtuple("Line", ["text", "line_type", "continuation", "args"])
@@ -98,6 +99,7 @@ def segment_basic_blocks(lines):
   blocks = [Block(lines=[], counter=None, up=False, down=False)]
   inside_comment_block = False
   inside_skip_block = False
+  inside_code_section = False
   continuation_line_type = None
   for line in lines:
     if line.strip().startswith('/*'):
@@ -105,28 +107,33 @@ def segment_basic_blocks(lines):
     elif '*/' not in line:
       assert '/*' not in line, line
 
+    if line.strip() == PRAGMA_SKIP_START:
+      inside_skip_block = True
+    if line.strip() == PRAGMA_SKIP_STOP:
+      inside_skip_block = False
+
+    if (m := re.match(SECTION_REGEX, line.strip())):
+      inside_code_section = 'ax' in (m.group(1) or '')
+
     line_type = None
     args = None
 
     is_comment = line.strip().startswith('//')
     is_comment = is_comment or inside_comment_block
     is_comment = is_comment or inside_skip_block
+    is_comment = is_comment or not inside_code_section
 
     if continuation_line_type is not None:
       line_type = continuation_line_type
+    elif re.search(PRAGMA_REGEX, line.strip()):
+      assert line.strip() in ALL_PRAGMA, f'Unknown coverage pragma: {line.strip()}'
+      line_type = LineType.PRAGMA
     elif is_comment:
       if line.strip().endswith('*/'):
         inside_comment_block = False
       else:
         assert '*/' not in line
-      if line.strip() == PRAGMA_SKIP_START:
-        inside_skip_block = True
-      if line.strip() == PRAGMA_SKIP_STOP:
-        inside_skip_block = False
       line_type = LineType.COMMENT
-      if re.fullmatch(PRAGMA_REGEX, line.strip()):
-        assert line.strip() in ALL_PRAGMA, f'Unknown coverage pragma: {line.strip()}'
-        line_type = LineType.PRAGMA
     elif line.strip() == '':
       line_type = LineType.COMMENT
     elif line.strip().startswith('#'):
