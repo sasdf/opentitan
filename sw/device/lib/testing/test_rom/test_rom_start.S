@@ -104,11 +104,11 @@ _reset_start:
   // Configure `pmpcfg0` in test ROM to enable instrumented ROM execution.
   // Without this configuration, the instrumented ROM can not be executed due to
   // ePMP reconfiguration in `rom_epmp_init`.
-  li   t0, (0x8f << 8)
+  li   t0, (0x8f << 8) // Locked TOR read-write-execute.
   csrw pmpcfg0, t0
   li   t0, 0
   csrw pmpaddr0, t0
-  li   t0, 0x10000000
+  li   t0, 0x10000000 // TOR encoded region convering entire eFlash address space.
   csrw pmpaddr1, t0
 
   csrw pmpcfg1, zero
