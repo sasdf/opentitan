@@ -26,10 +26,22 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+KEY_TYPE_ECDSA = [
+    {
+        "name": "prod_key",
+        "ecdsa": {"//sw/device/silicon_creator/lib/ownership/keys/fake:app_prod_ecdsa": "prod_key_0"},
+    },
+    {
+        "name": "test_key",
+        "ecdsa": {"//sw/device/silicon_creator/lib/ownership/keys/fake:app_test_ecdsa": "test_key_0"},
+    }
+]
+
 [
     opentitan_test(
-        name = "no_refresh_{}_test".format(variation),
+        name = "no_refresh_{}_{}_test".format(variation, key_type["name"]),
         srcs = ["no_refresh_test.c"],
+        ecdsa_key = key_type["ecdsa"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
@@ -48,6 +60,7 @@ package(default_visibility = ["//visibility:public"])
             "//sw/device/silicon_creator/lib/drivers:rstmgr",
         ],
     )
+    for key_type in KEY_TYPE_ECDSA
     for variation in ROM_EXT_VARIATIONS.keys()
 ]
 

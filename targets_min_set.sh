@@ -1,5 +1,6 @@
 CW310_ROM_EXT_TESTS=(
-  '//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_test_fpga_cw310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_prod_key_test_fpga_cw310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/dice_chain:no_refresh_dice_cwt_test_key_test_fpga_cw310_rom_ext'
 )
 
 CW310_SIVAL_ROM_EXT_TESTS=(
