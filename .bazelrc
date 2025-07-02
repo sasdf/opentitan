@@ -49,10 +49,10 @@ build:ot_coverage --java_runtime_version='remotejdk_11'
 build:ot_coverage --copt='-Wno-error'
 
 # Set coverage mode indicators
+build:ot_coverage --define='ot_coverage_enabled=true'
 build:ot_coverage --define='measure_coverage_on_target=true'
 build:ot_coverage --//sw/device:measure_coverage_on_target_flag
 build:ot_coverage --copt='-DOT_COVERAGE_ENABLED=1'
-build:ot_coverage --linkopt='-Wl,--defsym=_ot_coverage_enabled=1'
 
 coverage:ot_coverage --repo_env='GCOV=llvm-profdata'
 coverage:ot_coverage --repo_env='BAZEL_LLVM_COV=llvm-cov'

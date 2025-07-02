@@ -43,11 +43,8 @@ def _coverage_view_test(ctx):
     # Get the elf to be tested
     elf_label = ctx.attr.elf
     elf = get_one_binary_file(elf_label, field = "elf", providers = [SiliconBinaryInfo])
-    print(elf)
     dis = get_one_binary_file(elf_label, field = "disassembly", providers = [SiliconBinaryInfo])
-    print(dis)
     tar = get_one_binary_file(elf_label, field = "objects", providers = [SiliconBinaryInfo])
-    print(tar)
 
     # Nop test
     script = ctx.actions.declare_file(ctx.attr.name + ".bash")

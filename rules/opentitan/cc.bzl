@@ -84,6 +84,7 @@ def ot_binary(ctx, **kwargs):
     # those out and passed them as private headers instead
     hdrs = [s for s in all_srcs if s.extension == "h"]
     srcs = [s for s in all_srcs if s.extension != "h"]
+
     cctx, cout = cc_common.compile(
         name = name,
         actions = ctx.actions,
@@ -113,6 +114,9 @@ def ot_binary(ctx, **kwargs):
         "-Wl,-Map={}".format(mapfile.path),
         "-nostdlib",
     ] + _expand(ctx, "linkopts", extra_linkopts)
+
+    if ctx.var.get('ot_coverage_enabled', 'false') == 'true':
+      linkopts.append("-Wl,--defsym=_ot_coverage_enabled=1")
 
     lout = cc_common.link(
         name = name + ".elf",
