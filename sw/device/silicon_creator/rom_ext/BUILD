@@ -6,7 +6,7 @@ load("//rules:const.bzl", "CONST", "hex")
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load("//rules/opentitan:coverage.bzl", "baseline_coverage_test")
+load("//rules/opentitan:coverage.bzl", "coverage_view_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
@@ -314,8 +314,8 @@ manifest(d = {
 ]
 
 [
-    baseline_coverage_test(
-        name = "rom_ext_{}_slot_{}_baseline_coverage".format(variation_name, slot),
+    coverage_view_test(
+        name = "rom_ext_{}_slot_{}_coverage_view".format(variation_name, slot),
         elf = "rom_ext_{}_slot_{}".format(variation_name, slot),
     )
     for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
@@ -370,8 +370,8 @@ opentitan_binary(
     ],
 )
 
-baseline_coverage_test(
-    name = "rom_ext_prod_dice_cwt_spidfu_baseline_coverage",
+coverage_view_test(
+    name = "rom_ext_prod_dice_cwt_spidfu_coverage_view",
     elf = "rom_ext_prod_dice_cwt_spidfu",
 )
 
@@ -395,8 +395,8 @@ opentitan_binary(
     ],
 )
 
-baseline_coverage_test(
-    name = "rom_ext_prod_dice_x509_xmodem_baseline_coverage",
+coverage_view_test(
+    name = "rom_ext_prod_dice_x509_xmodem_coverage_view",
     elf = "rom_ext_prod_dice_x509_xmodem",
 )
 

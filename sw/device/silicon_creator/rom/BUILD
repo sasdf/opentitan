@@ -10,7 +10,7 @@ load("//rules:linker.bzl", "ld_library")
 load("//rules:opentitan_test.bzl", "manual_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "fpga_params", "opentitan_binary", "opentitan_test")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
-load("//rules/opentitan:coverage.bzl", "baseline_coverage_test")
+load("//rules/opentitan:coverage.bzl", "coverage_view_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -280,8 +280,8 @@ opentitan_binary(
     ],
 )
 
-baseline_coverage_test(
-    name = "instrumented_mask_rom_baseline_coverage",
+coverage_view_test(
+    name = "instrumented_mask_rom_coverage_view",
     elf = "instrumented_mask_rom",
 )
 

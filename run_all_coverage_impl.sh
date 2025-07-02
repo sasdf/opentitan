@@ -1,34 +1,34 @@
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
-BASELINE_CACHE_DIR="bazel-out/_coverage/baseline/"
+VIEW_CACHE_DIR="bazel-out/_coverage/view/"
 
 rm -f "${COVERAGE_DAT}"
 
-if ! declare -p BASELINES &>/dev/null; then
-  BASELINES=()
+if ! declare -p COVERAGE_VIEWS &>/dev/null; then
+  COVERAGE_VIEWS=()
 fi
 
-if [[ "${#BASELINES[@]}" == "0" ]]; then
-    BASELINES=()
+if [[ "${#COVERAGE_VIEWS[@]}" == "0" ]]; then
+    COVERAGE_VIEWS=()
     for group_name in "${COVERAGE_VIEW_GROUPS[@]}"; do
         group_expr="${group_name}[@]"
-        BASELINES+=( "${!group_expr}" )
+        COVERAGE_VIEWS+=( "${!group_expr}" )
     done
 fi
 
-./bazelisk.sh coverage "${BASELINES[@]}" "${BAZEL_ARGS[@]}" "$@"
-CACHED_BASELINES=()
+./bazelisk.sh coverage "${COVERAGE_VIEWS[@]}" "${BAZEL_ARGS[@]}" "$@"
+CACHED_VIEWS=()
 
-rm -rf "${BASELINE_CACHE_DIR}"
-mkdir -p "${BASELINE_CACHE_DIR}"
+rm -rf "${VIEW_CACHE_DIR}"
+mkdir -p "${VIEW_CACHE_DIR}"
 
-baseline_files="$(cat "${LCOV_FILES}" | grep "/coverage.dat$")"
-for baseline_dat in $baseline_files; do
-    baseline_dir="${baseline_dat%/*}"
-    baseline_name="${baseline_dir##*/}"
-    cached_zip="${BASELINE_CACHE_DIR}/${baseline_name}.zip"
-    CACHED_BASELINES+=( "${cached_zip}" )
-    cp "${baseline_dir}/test.outputs/outputs.zip" "${cached_zip}"
+view_files="$(cat "${LCOV_FILES}" | grep "/coverage.dat$")"
+for view_dat in $view_files; do
+    view_dir="${view_dat%/*}"
+    view_name="${view_dir##*/}"
+    cached_zip="${VIEW_CACHE_DIR}/${view_name}.zip"
+    CACHED_VIEWS+=( "${cached_zip}" )
+    cp "${view_dir}/test.outputs/outputs.zip" "${cached_zip}"
     echo "INFO: Baseline coverage cached to '${cached_zip}'."
 done
 
@@ -64,7 +64,7 @@ GENHTML_ARGS=(
     --html-epilog sw/device/coverage/report_epilog.html
 )
 
-ASM_COVERAGE="${BASELINE_CACHE_DIR}/asm_coverage.dat"
+ASM_COVERAGE="${VIEW_CACHE_DIR}/asm_coverage.dat"
 python3 sw/device/coverage/util/gen_asm_coverage.py \
   --coverage="${COVERAGE_DAT}" \
   --output="${ASM_COVERAGE}"
@@ -72,26 +72,26 @@ genhtml "${GENHTML_ARGS[@]}" \
     --output "${COVERAGE_OUTPUT_DIR}/asm_coverage/" \
     "${ASM_COVERAGE}"
 
-COVERAGE_DAT_WITH_ASM="${BASELINE_CACHE_DIR}/coverage_report_asm.dat"
+COVERAGE_DAT_WITH_ASM="${VIEW_CACHE_DIR}/coverage_report_asm.dat"
 python3 sw/device/coverage/util/gen_asm_coverage.py \
   --coverage="${COVERAGE_DAT}" \
   --append \
   --output="${COVERAGE_DAT_WITH_ASM}"
 
-if [[ "${#CACHED_BASELINES[@]}" == "0" ]]; then
+if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
     genhtml "${GENHTML_ARGS[@]}" \
-        --output "${COVERAGE_OUTPUT_DIR}/no_baseline/" \
+        --output "${COVERAGE_OUTPUT_DIR}/no_view/" \
         "${COVERAGE_DAT_WITH_ASM}"
 else
-    for cached_zip in "${CACHED_BASELINES[@]}"; do
-        baseline_name="${cached_zip##*/}"
-        baseline_name="${baseline_name%.zip}"
-        filtered_dat="${BASELINE_CACHE_DIR}/${baseline_name}.dat"
-        output_dir="${COVERAGE_OUTPUT_DIR}/${baseline_name}"
-        echo "Filter with baseline '${baseline_name}'"
+    for cached_zip in "${CACHED_VIEWS[@]}"; do
+        view_name="${cached_zip##*/}"
+        view_name="${view_name%.zip}"
+        filtered_dat="${VIEW_CACHE_DIR}/${view_name}.dat"
+        output_dir="${COVERAGE_OUTPUT_DIR}/${view_name}"
+        echo "Filter with view '${view_name}'"
 
         python3 sw/device/coverage/util/coverage_filter.py \
-          --baseline="${cached_zip}" \
+          --view="${cached_zip}" \
           --coverage="${COVERAGE_DAT_WITH_ASM}" \
           --use_disassembly \
           --output="${filtered_dat}"
@@ -108,14 +108,14 @@ else
     for group_name in "${COVERAGE_VIEW_GROUPS[@]}"; do
         group_expr="${group_name}[@]"
         group=( "${!group_expr##*:}" )
-        group_zip=( "${group[@]/#/${BASELINE_CACHE_DIR}}" )
+        group_zip=( "${group[@]/#/${VIEW_CACHE_DIR}}" )
         group_zip=( "${group_zip[@]/%/.zip}" )
-        filtered_dat="${BASELINE_CACHE_DIR}/${group_name,,}.dat"
+        filtered_dat="${VIEW_CACHE_DIR}/${group_name,,}.dat"
         output_dir="${COVERAGE_OUTPUT_DIR}/${group_name,,}"
-        echo "Filter with baseline group '${group_name,,}'"
+        echo "Filter with view group '${group_name,,}'"
 
         python3 sw/device/coverage/util/coverage_filter.py \
-          --baseline "${group_zip[@]}" \
+          --view "${group_zip[@]}" \
           --coverage="${COVERAGE_DAT_WITH_ASM}" \
           --use_disassembly \
           --output="${filtered_dat}"
@@ -129,10 +129,10 @@ else
           > "${output_dir}/coverage.csv"
     done
 
-    filtered_dat="${BASELINE_CACHE_DIR}/all_baselines.dis.dat"
-    output_dir="${COVERAGE_OUTPUT_DIR}/all_baselines_dis"
+    filtered_dat="${VIEW_CACHE_DIR}/all_views.dat"
+    output_dir="${COVERAGE_OUTPUT_DIR}/all_views"
     python3 sw/device/coverage/util/coverage_filter.py \
-      --baseline "${CACHED_BASELINES[@]}" \
+      --view "${CACHED_VIEWS[@]}" \
       --coverage="${COVERAGE_DAT_WITH_ASM}" \
       --use_disassembly \
       --output="${filtered_dat}"

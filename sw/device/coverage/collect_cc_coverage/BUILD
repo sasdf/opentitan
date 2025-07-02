@@ -33,8 +33,8 @@ rust_binary(
 )
 
 rust_binary(
-    name = "baseline_coverage",
-    srcs = ["baseline_coverage.rs"],
+    name = "generate_coverage_view",
+    srcs = ["generate_coverage_view.rs"],
     deps = [
         ":coverage_lib",
         "@crate_index//:anyhow",

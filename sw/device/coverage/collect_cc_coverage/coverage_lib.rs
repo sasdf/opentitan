@@ -304,7 +304,7 @@ pub fn process_counter<'a>(path: &PathBuf, counter: &ProfileCounter, output: &Pa
     Ok(profile)
 }
 
-pub fn baseline_profraw(profile: &ProfileData, output_path: &PathBuf) -> Result<()> {
+pub fn generate_view_profraw(profile: &ProfileData, output_path: &PathBuf) -> Result<()> {
     let cnts = vec![0x00; profile.cnts_size as usize];
 
     let header = ProfileHeader{
@@ -396,17 +396,17 @@ pub fn llvm_cov_export(format: &str, profdata_file: &PathBuf, objects: &Vec<Stri
     .unwrap();
 }
 
-pub fn baseline_coverage(profile: &ProfileData) -> Result<()> {
+pub fn generate_view(profile: &ProfileData) -> Result<()> {
     let coverage_dir = PathBuf::from(env::var("COVERAGE_DIR").unwrap());
     let output_dir = PathBuf::from(env::var("TEST_UNDECLARED_OUTPUTS_DIR").unwrap());
     let lcov_output_file = output_dir.join("coverage.dat");
     let json_output_file = output_dir.join("coverage.json");
     let profdata_file = output_dir.join("coverage.profdata");
     let profraw_file = coverage_dir.join("coverage.profraw");
-    baseline_profraw(&profile, &profraw_file)?;
+    generate_view_profraw(&profile, &profraw_file)?;
     llvm_profdata_merge(&profraw_file, &profdata_file);
     llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_output_file);
-    append_asm_baseline(&lcov_output_file)?;
+    append_asm_view(&lcov_output_file)?;
     llvm_cov_export("text", &profdata_file, &profile.objects, &json_output_file);
     Ok(())
 }
@@ -463,7 +463,7 @@ pub fn append_asm_coverage(counter: &ProfileCounter, output_path: &PathBuf) -> R
     Ok(())
 }
 
-pub fn append_asm_baseline(output_path: &PathBuf) -> Result<()> {
+pub fn append_asm_view(output_path: &PathBuf) -> Result<()> {
     let mut f = std::fs::OpenOptions::new()
         .append(true)
         .open(output_path)?;

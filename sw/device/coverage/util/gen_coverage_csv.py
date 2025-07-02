@@ -4,7 +4,7 @@ import argparse
 
 from coverage_helper import parse_lcov
 
-path = './bazel-out/_coverage/baseline/all_baselines.dis.dat'
+path = './bazel-out/_coverage/view/all_views.dat'
 
 def main():
   parser = argparse.ArgumentParser(description='List coverage ratio of each file in csv format.')

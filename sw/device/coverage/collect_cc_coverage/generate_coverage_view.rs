@@ -32,7 +32,7 @@ use zerocopy::AsBytes;
 
 use coverage_lib::{
   process_elf,
-  baseline_coverage,
+  generate_view,
   debug_log,
   debug_environ,
 };
@@ -50,9 +50,9 @@ fn main() -> Result<()> {
     match process_elf(&elf) {
         Ok(elf) => {
             debug_log!("Loaded {:?} = {}", elf.file_name, elf.build_id);
-            baseline_coverage(&elf)?;
+            generate_view(&elf)?;
         }
-        Err(err) => eprintln!("Failed to parse {elf:?} for baseline coverage: {err:?}"),
+        Err(err) => eprintln!("Failed to parse {elf:?} for coverage view: {err:?}"),
     };
 
     debug_log!("Success!");

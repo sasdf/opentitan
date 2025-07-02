@@ -19,7 +19,7 @@ from coverage_helper import (
   add_tests,
 )
 
-view_path = './bazel-out/_coverage/baseline/all_baselines.dis.dat'
+view_path = './bazel-out/_coverage/view/all_views.dat'
 lcov_files_path = './bazel-out/_coverage/lcov_files.tmp'
 
 def main():
@@ -37,7 +37,7 @@ def main():
 
   normal = {}
   add_tests(normal, extract_tests('./run_all_coverage.sh'))
-  add_tests(normal, extract_tests('./rom_targets.sh'))
+  add_tests(normal, extract_tests('./targets_rom.sh'))
 
   extended = normal.copy()
   add_tests(extended, extract_tests('./run_min_set_coverage.sh'))

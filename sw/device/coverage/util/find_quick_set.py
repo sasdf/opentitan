@@ -20,7 +20,7 @@ from coverage_helper import (
   collect_test_vectors,
 )
 
-view_path = './bazel-out/_coverage/baseline/all_baselines.dis.dat'
+view_path = './bazel-out/_coverage/view/all_views.dat'
 lcov_files_path = './bazel-out/_coverage/lcov_files.tmp'
 
 def main():

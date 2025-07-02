@@ -90,7 +90,7 @@ def parse_llvm_json(lines):
 
   return result
 
-# Use normal baseline coverage for the following files.
+# Use normal view coverage for the following files.
 # e.g.
 #   macro defined functions can't be detected by disassembly.
 SKIP_DIS = {
@@ -193,9 +193,9 @@ def parse_lcov(lines):
     files[profile.sf] = profile
   return files
 
-def strip_discarded(baseline):
+def strip_discarded(coverage):
   stripped = {}
-  for sf, base in baseline.items():
+  for sf, base in coverage.items():
     # Keep functions that can be hit
     fnda = {n: c for n, c in base.fnda.items() if c > 0}
     fn = {n: l for n, l in base.fn.items() if n in fnda}

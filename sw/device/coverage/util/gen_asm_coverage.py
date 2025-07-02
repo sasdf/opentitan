@@ -23,7 +23,7 @@ from asm_helper import (
 COUNTER_FILE = 'SF:sw/device/coverage/asm_counters.c'
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Filter related coverage based on a baseline.')
+  parser = argparse.ArgumentParser(description='Filter related coverage based on a view.')
   parser.add_argument('--coverage', type=str, help='Path to the coverage file to filter.')
   parser.add_argument('--print_blocks', action='store_true', help='Print basic block debug info.')
   parser.add_argument('--append', action='store_true', help='Append after the input coverage.')

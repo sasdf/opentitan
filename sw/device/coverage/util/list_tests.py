@@ -47,7 +47,7 @@ def main():
   listed = {}
   add_tests(listed, extract_tests('./run_all_coverage.sh'))
   add_tests(listed, extract_tests('./targets_ci.sh'))
-  add_tests(listed, extract_tests('./rom_targets.sh'))
+  add_tests(listed, extract_tests('./targets_rom.sh'))
 
   useful = extract_tests('./targets_useful_extra.sh')
 
@@ -72,7 +72,7 @@ def main():
   test_groups = [eval(name) for name in test_groups_names]
 
   test_groups = [fix_rom_e2e_env(g) for g in test_groups]
-  test_groups = [filter_tests(g, 'baseline_coverage') for g in test_groups]
+  test_groups = [filter_tests(g, 'coverage_view') for g in test_groups]
   test_groups = [filter_tests(g, '/orchestrator/') for g in test_groups]
   test_groups_en = [{k for k, v in g.items() if v} for g in test_groups]
   test_groups = [set(g.keys()) for g in test_groups]

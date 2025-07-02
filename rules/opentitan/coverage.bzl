@@ -39,7 +39,7 @@ echo "To"
 echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.objs.tar"
 """
 
-def _baseline_coverage_test(ctx):
+def _coverage_view_test(ctx):
     # Get the elf to be tested
     elf_label = ctx.attr.elf
     elf = get_one_binary_file(elf_label, field = "elf", providers = [SiliconBinaryInfo])
@@ -68,12 +68,12 @@ def _baseline_coverage_test(ctx):
         runfiles = runfiles,
     )
 
-baseline_coverage_test = rv_rule(
-    implementation = _baseline_coverage_test,
+coverage_view_test = rv_rule(
+    implementation = _coverage_view_test,
     attrs = {
         "elf": attr.label(
             allow_files = True,
-            doc = "ELF file to extract baseline coverage",
+            doc = "ELF file to extract coverage view",
         ),
         "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
         "_lcov_merger": attr.label(
@@ -82,7 +82,7 @@ baseline_coverage_test = rv_rule(
             cfg = "exec",
         ),
         "_collect_cc_coverage": attr.label(
-            default = "//sw/device/coverage/collect_cc_coverage:baseline_coverage",
+            default = "//sw/device/coverage/collect_cc_coverage:generate_coverage_view",
             executable = True,
             cfg = "exec",
         ),

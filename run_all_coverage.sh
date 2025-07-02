@@ -9,7 +9,7 @@ TARGETS=(
 )
 
 source ./targets_ci.sh
-source ./rom_targets.sh
+source ./targets_rom.sh
 source ./targets_skip_in_ci.sh
 source ./targets_useful_extra.sh
 
