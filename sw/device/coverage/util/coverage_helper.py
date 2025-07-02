@@ -3,6 +3,7 @@ import json
 import bisect
 import itertools as it
 import sys
+import zipfile
 import numpy as np
 from collections import namedtuple, defaultdict
 from pathlib import Path
@@ -240,6 +241,10 @@ def and_dict(a, b):
   keys = set(a.keys()) & set(b.keys())
   return {k: a[k] for k in keys}
 
+def add_dict(a, b):
+  keys = set(a.keys()) | set(b.keys())
+  return {k: a.get(k, 0) + b.get(k, 0) for k in keys}
+
 def and_coverage(a, b):
   keys = set(a.keys()) & set(b.keys())
   return {
@@ -270,6 +275,20 @@ def or_coverage(a, b):
     for sf in keys
   }
 
+def add_coverage(a, b):
+  keys = set(a.keys()) | set(b.keys())
+  a = defaultdict(lambda: MISSING, a)
+  b = defaultdict(lambda: MISSING, b)
+  return {
+    sf: FileProfile(
+      sf=sf,
+      fn=or_dict(a[sf].fn, b[sf].fn),
+      fnda=add_dict(a[sf].fnda, b[sf].fnda),
+      da=add_dict(a[sf].da, b[sf].da),
+    )
+    for sf in keys
+  }
+
 def filter_dict(a, b):
   return {k: a.get(k, 0) for k in b.keys()}
 
@@ -288,12 +307,13 @@ def filter_coverage(a, b):
 def generate_lcov(coverage):
   output = []
   for sf, cov in coverage.items():
-    # bazel doesn't collect coverages for generated files.
-    if sf.startswith('SF:bazel-out/'):
+    # skip pre-generated constant headers.
+    if sf.startswith('SF:hw/top_earlgrey/sw/autogen/top_earlgrey.h'):
       continue
 
-    # skip constant headers.
-    if sf.startswith('SF:hw/top_earlgrey/sw/autogen/'):
+    # skip hardware autogen constant headers.
+    # e.g. SF:bazel-out/k8-fastbuild-ST-98e8226209fe/bin/hw/...
+    if re.match(r'^SF:bazel-out/[^/]+/bin/hw/', sf):
       continue
 
     output.append(sf + '\n')
@@ -320,7 +340,7 @@ def generate_lcov(coverage):
   return output
 
 TestLcov = namedtuple('TestLcov', 'name,path,duration,coverage')
-def iter_lcov_files(lcov_files_path):
+def iter_lcov_paths(lcov_files_path):
   with open(lcov_files_path) as files:
     files = sorted(map(Path, files.read().splitlines()))
     files = [p for p in files if p.name == 'coverage.dat']
@@ -332,16 +352,33 @@ def iter_lcov_files(lcov_files_path):
       test_name = f'//{test_dir}:{parts[-1]}'
 
       print(f'Loading [{i+1} / {len(files)}] {test_name}', file=sys.stderr)
-      with open(path) as f:
-        coverage = parse_lcov(f.readlines())
-      coverage = merge_inlined_copies(coverage)
-
       duration = 0
       with open(path.parent / 'test.xml') as f:
         for m in re.findall(r'status="run" duration="(\d+)"', f.read()):
           duration += int(m)
 
-      yield TestLcov(test_name, path, duration, coverage)
+      yield TestLcov(test_name, path, duration, None)
+
+def iter_lcov_files(lcov_files_path):
+  for lcov in iter_lcov_paths(lcov_files_path):
+    with open(lcov.path) as f:
+      coverage = parse_lcov(f.readlines())
+    coverage = merge_inlined_copies(coverage)
+    yield lcov._replace(coverage=coverage)
+
+def iter_raw_lcov_files(lcov_files_path):
+  for lcov in iter_lcov_paths(lcov_files_path):
+    test_zip = lcov.path.parent / 'test.outputs/outputs.zip'
+    if not test_zip.exists(): # e.g. unit tests
+      continue
+    with zipfile.ZipFile(test_zip, 'r') as zip:
+      for name in zip.namelist():
+        if name.endswith('.dat'):
+          with zip.open(name) as f:
+            lines = [l.decode('utf-8') for l in f.readlines()]
+            coverage = parse_lcov(lines)
+            coverage = merge_inlined_copies(coverage)
+            yield lcov._replace(coverage=coverage)
 
 def collect_single_vector(coverage, sf_keys):
   keys, values = [], []

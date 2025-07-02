@@ -94,6 +94,8 @@ fn main() -> Result<()> {
     }
     debug_log!("All elf files are loaded!");
 
+    let output_dir = PathBuf::from(env::var("TEST_UNDECLARED_OUTPUTS_DIR").unwrap());
+
     // Correlate profile data with counters from the device.
     for path in &xprofraw_files {
         debug_log!("Processing {path:?}");
@@ -106,6 +108,8 @@ fn main() -> Result<()> {
         llvm_profdata_merge(&profraw_file, &profdata_file);
         llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_file);
         append_asm_coverage(&counter, &lcov_file).unwrap();
+        let output_lcov_file = output_dir.join(lcov_file.file_name().unwrap());
+        fs::copy(&lcov_file, &output_lcov_file)?;
     }
 
     debug_log!("Success!");

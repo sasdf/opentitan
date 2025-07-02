@@ -52,36 +52,30 @@ echo "Collect overall coverage"
 rm -f "${COVERAGE_DAT}"
 ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
-
-GENHTML_ARGS=(
-    --prefix "${PWD}"
-    --ignore-errors unsupported
-    --ignore-errors inconsistent
-    --ignore-errors category
-    # --ignore-errors corrupt
-    --exclude sw/device/coverage/
-    --ignore-errors unused
-    --html-epilog sw/device/coverage/report_epilog.html
-)
+MERGED_DAT="${VIEW_CACHE_DIR}/merged_coverage.dat"
+python3 sw/device/coverage/util/genfiles_coverage.py \
+  --coverage="${COVERAGE_DAT}" \
+  --lcov_files="${LCOV_FILES}" \
+  --output="${MERGED_DAT}"
 
 ASM_COVERAGE="${VIEW_CACHE_DIR}/asm_coverage.dat"
 python3 sw/device/coverage/util/gen_asm_coverage.py \
-  --coverage="${COVERAGE_DAT}" \
+  --coverage="${MERGED_DAT}" \
   --output="${ASM_COVERAGE}"
-genhtml "${GENHTML_ARGS[@]}" \
-    --output "${COVERAGE_OUTPUT_DIR}/asm_coverage/" \
-    "${ASM_COVERAGE}"
+bash ./run_genhtml.sh \
+    "${ASM_COVERAGE}" \
+    "${COVERAGE_OUTPUT_DIR}/asm_coverage/"
 
 COVERAGE_DAT_WITH_ASM="${VIEW_CACHE_DIR}/coverage_report_asm.dat"
 python3 sw/device/coverage/util/gen_asm_coverage.py \
-  --coverage="${COVERAGE_DAT}" \
+  --coverage="${MERGED_DAT}" \
   --append \
   --output="${COVERAGE_DAT_WITH_ASM}"
 
 if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
-    genhtml "${GENHTML_ARGS[@]}" \
-        --output "${COVERAGE_OUTPUT_DIR}/no_view/" \
-        "${COVERAGE_DAT_WITH_ASM}"
+    bash ./run_genhtml.sh \
+        "${COVERAGE_DAT_WITH_ASM}" \
+        "${COVERAGE_OUTPUT_DIR}/no_view/"
 else
     for cached_zip in "${CACHED_VIEWS[@]}"; do
         view_name="${cached_zip##*/}"
@@ -96,9 +90,9 @@ else
           --use_disassembly \
           --output="${filtered_dat}"
 
-        genhtml "${GENHTML_ARGS[@]}" \
-            --output "${output_dir}" \
-            "${filtered_dat}"
+        bash ./run_genhtml.sh \
+            "${filtered_dat}" \
+            "${output_dir}"
 
         python3 sw/device/coverage/util/gen_coverage_csv.py \
           --path="${filtered_dat}" \
@@ -120,9 +114,9 @@ else
           --use_disassembly \
           --output="${filtered_dat}"
 
-        genhtml "${GENHTML_ARGS[@]}" \
-            --output "${output_dir}" \
-            "${filtered_dat}"
+        bash ./run_genhtml.sh \
+            "${filtered_dat}" \
+            "${output_dir}"
 
         python3 sw/device/coverage/util/gen_coverage_csv.py \
           --path="${filtered_dat}" \
@@ -137,9 +131,9 @@ else
       --use_disassembly \
       --output="${filtered_dat}"
 
-    genhtml "${GENHTML_ARGS[@]}" \
-        --output "${output_dir}" \
-        "${filtered_dat}"
+    bash ./run_genhtml.sh \
+        "${filtered_dat}" \
+        "${output_dir}"
 
     python3 sw/device/coverage/util/gen_coverage_csv.py \
       --path="${filtered_dat}" \

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import re
 
 from coverage_helper import parse_lcov
 
@@ -25,7 +26,13 @@ def main():
     line_miss = len(cov.da) - line_hit if len(cov.da) else 0
     line_rate = (line_hit / len(cov.da)) if len(cov.da) else 1.0
 
-    name = '//' + sf[3:] + '.gcov.html'
+    sf = sf.removeprefix('SF:')
+
+    if sf.startswith('bazel-out'):
+      name = re.sub(r'bazel-out/[^/]*/bin/', '', sf)
+      name = 'generated://' + name + '.gcov.html'
+    else:
+      name = '//' + sf + '.gcov.html'
     print(f'{name},{line_miss},{line_rate*100:.2f},{fn_rate*100:.2f}')
 
 if __name__ == '__main__':
