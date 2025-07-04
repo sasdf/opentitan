@@ -1,0 +1,13 @@
+{
+  "input": {
+    "dmem": {
+      "mode": "0xdeadbeef"  # invalid mode enum
+    }
+  }
+  "output": {
+    "regs": {
+      "STOP_PC": "start_failed"
+      "ERR_BITS": "0x00000008"  # unimp trap
+    }
+  }
+}
