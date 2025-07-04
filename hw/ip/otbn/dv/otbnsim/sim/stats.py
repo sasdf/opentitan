@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-from collections import Counter
+from collections import Counter, defaultdict
+import itertools
 import typing
 from typing import Dict, List, Optional, Tuple
 
@@ -29,6 +30,9 @@ class ExecutionStats:
         # Histogram indexed by the length of the (extended) basic block.
         self.basic_block_histo = Counter()  # type: typing.Counter[int]
         self.ext_basic_block_histo = Counter()  # type: typing.Counter[int]
+
+        # Coverage map indexed by pc.
+        self.coverage = Counter()  # type: typing.Counter[str]
 
         self._current_basic_block_len = 0
         self._current_ext_basic_block_len = 0
@@ -58,6 +62,7 @@ class ExecutionStats:
 
         '''
         pc = state_bc.pc
+        self.coverage[pc] += 1
 
         is_jump = isinstance(insn, JAL) or isinstance(insn, JALR)
         is_branch = isinstance(insn, BEQ) or isinstance(insn, BNE)
@@ -128,31 +133,41 @@ class ExecutionStats:
             self._current_ext_basic_block_len = 0
 
 
-def _dwarf_decode_file_line(dwarf_info: DWARFInfo,
-                            address: int) -> Optional[Tuple[str, int]]:
-    # Go over all the line programs in the DWARF information, looking for
-    # one that describes the given address.
+def _dwarf_iter_file_line(dwarf_info: DWARFInfo, full_path=False):
+    # Go over all the line programs in the DWARF information.
     for CU in dwarf_info.iter_CUs():
         # First, look at line programs to find the file/line for the address
         lineprog = dwarf_info.line_program_for_CU(CU)
-        prevstate = None
         for entry in lineprog.get_entries():
             # We're interested in those entries where a new state is assigned
             if entry.state is None:
                 continue
-            if entry.state.end_sequence:
-                # if the line number sequence ends, clear prevstate.
-                prevstate = None
+            state = entry.state
+
+            if state.end_sequence:
+                yield None
                 continue
-            # Looking for a range of addresses in two consecutive states that
-            # contain the required address.
-            if ((prevstate and
-                 prevstate.address <= address < entry.state.address)):
-                raw_name = lineprog['file_entry'][prevstate.file - 1].name
-                filename = raw_name.decode('utf-8')
-                line = prevstate.line
-                return filename, line
-            prevstate = entry.state
+
+            file_ent = lineprog['file_entry'][state.file - 1]
+            raw_path = file_ent.name
+            dir_index = file_ent.dir_index
+            if full_path and len(lineprog['include_directory']) > 0 and dir_index > 0:
+                dir = lineprog['include_directory'][dir_index - 1]
+                raw_path = dir + b'/' + raw_path
+            path = raw_path.decode('utf-8')
+            yield state.address, path, state.line
+
+
+def _dwarf_decode_file_line(dwarf_info: DWARFInfo,
+                            address: int) -> Optional[Tuple[str, int]]:
+    # Go over all the line programs in the DWARF information, looking for
+    # one that describes the given address.
+    lines = list(_dwarf_iter_file_line(dwarf_info, full_path=False))
+    for before, after in zip(lines, lines[1:]):
+        if before is None or after is None:
+            continue
+        if before[0] <= address < after[0]:
+            return before[1:]
     return None
 
 
@@ -373,3 +388,25 @@ class ExecutionStatAnalyzer:
             out += f"avg: {loop_iterations_avg:.02f}\n"
 
         return out
+
+    def dump_lcov_coverage(self) -> str:
+        if not self._elf_file.has_dwarf_info():
+            return ''
+        dwarf_info = self._elf_file.get_dwarf_info()
+
+        hits_by_path = defaultdict(dict)
+        for line in _dwarf_iter_file_line(dwarf_info, full_path=True):
+            if line is None:
+                continue
+            addr, path, line = line
+            hit = self._stats.coverage.get(addr, 0)
+            hits_by_path[path][line] = hit
+
+        out = []
+        for path, hits in hits_by_path.items():
+            out.append(f'SF:{path}')
+            for line, hit in hits.items():
+                out.append(f'DA:{line},{hit}')
+            out.append('end_of_record')
+
+        return '\n'.join(out) + '\n'
