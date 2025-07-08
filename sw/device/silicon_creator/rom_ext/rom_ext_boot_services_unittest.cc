@@ -253,9 +253,7 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVer) {
 
   EXPECT_CALL(mock_rnd_, Uint32);
 
-  // EXPECT_CALL(mock_hmac_, sha256_init);
-  EXPECT_CALL(mock_hmac_, sha256_configure);
-  EXPECT_CALL(mock_hmac_, sha256_start);
+  EXPECT_CALL(mock_hmac_, sha256_init);
 
   EXPECT_CALL(mock_lifecycle_, DeviceId);
   EXPECT_CALL(mock_otp_, read32);
@@ -266,8 +264,7 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVer) {
   EXPECT_CALL(mock_hmac_, sha256_update);
   EXPECT_CALL(mock_hmac_, sha256_process);
 
-  // EXPECT_CALL(mock_hmac_, sha256_final);
-  EXPECT_CALL(mock_hmac_, sha256_final_truncated);
+  EXPECT_CALL(mock_hmac_, sha256_final);
 
   EXPECT_CALL(mock_owner_verify_, verify).WillOnce(Return(kErrorOk));
 
@@ -279,9 +276,7 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVer) {
 
   EXPECT_CALL(mock_rnd_, Uint32);
 
-  // EXPECT_CALL(mock_hmac_, sha256_init);
-  EXPECT_CALL(mock_hmac_, sha256_configure);
-  EXPECT_CALL(mock_hmac_, sha256_start);
+  EXPECT_CALL(mock_hmac_, sha256_init);
 
   EXPECT_CALL(mock_lifecycle_, DeviceId);
   EXPECT_CALL(mock_otp_, read32);
@@ -292,8 +287,7 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVer) {
   EXPECT_CALL(mock_hmac_, sha256_update);
   EXPECT_CALL(mock_hmac_, sha256_process);
 
-  // EXPECT_CALL(mock_hmac_, sha256_final);
-  EXPECT_CALL(mock_hmac_, sha256_final_truncated);
+  EXPECT_CALL(mock_hmac_, sha256_final);
 
   EXPECT_CALL(mock_owner_verify_, verify).WillOnce(Return(kErrorOk));
 
