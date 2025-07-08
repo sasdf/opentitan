@@ -190,7 +190,7 @@ typedef enum hardened_byte_bool {
  *         at runtime.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t launder32(uint32_t val) {
+inline uint32_t launder32(uint32_t val) {
   // NOTE: This implementation is LLVM-specific, and should be considered to be
   // a no-op in every other compiler. For example, GCC has in the past peered
   // into the insides of assembly blocks.
@@ -262,7 +262,7 @@ static inline uint32_t launder32(uint32_t val) {
  *         runtime.
  */
 OT_WARN_UNUSED_RESULT
-static inline uintptr_t launderw(uintptr_t val) {
+inline uintptr_t launderw(uintptr_t val) {
 #if OT_BUILD_FOR_STATIC_ANALYZER || OT_DISABLE_HARDENING
   return val;
 #endif
@@ -357,7 +357,7 @@ static inline uintptr_t launderw(uintptr_t val) {
  *
  * @param val A value to create a barrier for.
  */
-static inline void barrier32(uint32_t val) { asm volatile("" ::"r"(val)); }
+inline void barrier32(uint32_t val) { asm volatile("" ::"r"(val)); }
 
 /**
  * Creates a reordering barrier for `val`.
@@ -366,7 +366,7 @@ static inline void barrier32(uint32_t val) { asm volatile("" ::"r"(val)); }
  *
  * @param val A value to create a barrier for.
  */
-static inline void barrierw(uintptr_t val) { asm volatile("" ::"r"(val)); }
+inline void barrierw(uintptr_t val) { asm volatile("" ::"r"(val)); }
 
 /**
  * A constant-time, 32-bit boolean value.
@@ -397,7 +397,7 @@ typedef uint32_t ct_bool32_t;
  * @return `a < 0`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_bool32_t ct_sltz32(int32_t a) {
+inline ct_bool32_t ct_sltz32(int32_t a) {
   // Proof. `a` is negative iff its MSB is set;
   // arithmetic-right-shifting by bits(a)-1 smears the sign bit across all
   // of `a`.
@@ -412,7 +412,7 @@ static inline ct_bool32_t ct_sltz32(int32_t a) {
  * @return `a < b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_bool32_t ct_sltu32(uint32_t a, uint32_t b) {
+inline ct_bool32_t ct_sltu32(uint32_t a, uint32_t b) {
   // Proof. See Hacker's Delight page 23.
   return ct_sltz32(OT_SIGNED(((a & ~b) | ((a ^ ~b) & (a - b)))));
 }
@@ -425,7 +425,7 @@ static inline ct_bool32_t ct_sltu32(uint32_t a, uint32_t b) {
  * @return `a == 0`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_bool32_t ct_seqz32(uint32_t a) {
+inline ct_bool32_t ct_seqz32(uint32_t a) {
   // Proof. See Hacker's Delight page 23.
   // HD gives this formula: `a == b := ~(a-b | b-a)`.
   //
@@ -445,7 +445,7 @@ static inline ct_bool32_t ct_seqz32(uint32_t a) {
  * @return `a == b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_bool32_t ct_seq32(uint32_t a, uint32_t b) {
+inline ct_bool32_t ct_seq32(uint32_t a, uint32_t b) {
   // Proof. a ^ b == 0 -> a ^ a ^ b == a ^ 0 -> b == a.
   return ct_seqz32(a ^ b);
 }
@@ -464,7 +464,7 @@ static inline ct_bool32_t ct_seq32(uint32_t a, uint32_t b) {
  * @return `c ? a : b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t ct_cmov32(ct_bool32_t c, uint32_t a, uint32_t b) {
+inline uint32_t ct_cmov32(ct_bool32_t c, uint32_t a, uint32_t b) {
   // Proof. See Hacker's Delight page 46. HD gives this as a branchless swap;
   // branchless select is a special case of that.
 
@@ -490,7 +490,7 @@ typedef uintptr_t ct_boolw_t;
  * @return `a < 0`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_boolw_t ct_sltzw(intptr_t a) {
+inline ct_boolw_t ct_sltzw(intptr_t a) {
   return OT_UNSIGNED(a >> (sizeof(a) * 8 - 1));
 }
 
@@ -502,7 +502,7 @@ static inline ct_boolw_t ct_sltzw(intptr_t a) {
  * @return `a < b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_boolw_t ct_sltuw(uintptr_t a, uintptr_t b) {
+inline ct_boolw_t ct_sltuw(uintptr_t a, uintptr_t b) {
   return ct_sltzw(OT_SIGNED((a & ~b) | ((a ^ ~b) & (a - b))));
 }
 
@@ -514,7 +514,7 @@ static inline ct_boolw_t ct_sltuw(uintptr_t a, uintptr_t b) {
  * @return `a == 0`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_boolw_t ct_seqzw(uintptr_t a) {
+inline ct_boolw_t ct_seqzw(uintptr_t a) {
   return ct_sltzw(OT_SIGNED(~a & (a - 1)));
 }
 
@@ -526,9 +526,7 @@ static inline ct_boolw_t ct_seqzw(uintptr_t a) {
  * @return `a == b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline ct_boolw_t ct_seqw(uintptr_t a, uintptr_t b) {
-  return ct_seqzw(a ^ b);
-}
+inline ct_boolw_t ct_seqw(uintptr_t a, uintptr_t b) { return ct_seqzw(a ^ b); }
 
 /**
  * Performs a constant-time select.
@@ -544,7 +542,7 @@ static inline ct_boolw_t ct_seqw(uintptr_t a, uintptr_t b) {
  * @return `c ? a : b`.
  */
 OT_WARN_UNUSED_RESULT
-static inline uintptr_t ct_cmovw(ct_boolw_t c, uintptr_t a, uintptr_t b) {
+inline uintptr_t ct_cmovw(ct_boolw_t c, uintptr_t a, uintptr_t b) {
   return (launderw(c) & a) | (launderw(~c) & b);
 }
 

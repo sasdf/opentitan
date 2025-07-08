@@ -119,7 +119,7 @@ typedef struct sigverify_spx_root {
  * @return ID of the key.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_spx_key_id_get(const sigverify_spx_key_t *key) {
+inline uint32_t sigverify_spx_key_id_get(const sigverify_spx_key_t *key) {
   return key->data[0];
 }
 

@@ -57,7 +57,7 @@ void hmac_sha256_configure(bool big_endian_digest) {
   hmac_configure(big_endian_digest, /*hmac_mode=*/false);
 }
 
-void hmac_sha256_start(void) {
+inline void hmac_sha256_start(void) {
   uint32_t cmd = bitfield_bit32_write(0, HMAC_CMD_HASH_START_BIT, true);
   abs_mmio_write32(TOP_EARLGREY_HMAC_BASE_ADDR + HMAC_CMD_REG_OFFSET, cmd);
 }
@@ -92,7 +92,7 @@ void hmac_sha256_update_words(const uint32_t *data, size_t len) {
   }
 }
 
-void hmac_sha256_process(void) {
+inline void hmac_sha256_process(void) {
   uint32_t cmd = bitfield_bit32_write(0, HMAC_CMD_HASH_PROCESS_BIT, true);
   abs_mmio_write32(TOP_EARLGREY_HMAC_BASE_ADDR + HMAC_CMD_REG_OFFSET, cmd);
 }

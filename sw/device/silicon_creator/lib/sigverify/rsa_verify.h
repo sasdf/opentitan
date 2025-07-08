@@ -52,7 +52,7 @@ rom_error_t sigverify_rsa_verify(const sigverify_rsa_buffer_t *signature,
  * @return `kErrorOk` if `v` is `kSigverifyRsaSuccess`.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_rsa_success_to_ok(uint32_t v) {
+inline uint32_t sigverify_rsa_success_to_ok(uint32_t v) {
   return (v << 22 ^ v << 19 ^ v << 3) >> 21;
 }
 

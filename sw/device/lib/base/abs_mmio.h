@@ -36,7 +36,7 @@ extern "C" {
  * @return the read value.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint8_t abs_mmio_read8(uint32_t addr) {
+inline uint8_t abs_mmio_read8(uint32_t addr) {
   return *((volatile uint8_t *)addr);
 }
 
@@ -46,7 +46,7 @@ static inline uint8_t abs_mmio_read8(uint32_t addr) {
  * @param addr the address to write to.
  * @param value the value to write.
  */
-static inline void abs_mmio_write8(uint32_t addr, uint8_t value) {
+inline void abs_mmio_write8(uint32_t addr, uint8_t value) {
   *((volatile uint8_t *)addr) = value;
 }
 
@@ -57,7 +57,7 @@ static inline void abs_mmio_write8(uint32_t addr, uint8_t value) {
  * @param addr the address to write to.
  * @param value the value to write.
  */
-static inline void abs_mmio_write8_shadowed(uint32_t addr, uint8_t value) {
+inline void abs_mmio_write8_shadowed(uint32_t addr, uint8_t value) {
   *((volatile uint8_t *)addr) = value;
   *((volatile uint8_t *)addr) = value;
 }
@@ -69,7 +69,7 @@ static inline void abs_mmio_write8_shadowed(uint32_t addr, uint8_t value) {
  * @return the read value.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t abs_mmio_read32(uint32_t addr) {
+inline uint32_t abs_mmio_read32(uint32_t addr) {
   return *((volatile uint32_t *)addr);
 }
 
@@ -79,7 +79,7 @@ static inline uint32_t abs_mmio_read32(uint32_t addr) {
  * @param addr the address to write to.
  * @param value the value to write.
  */
-static inline void abs_mmio_write32(uint32_t addr, uint32_t value) {
+inline void abs_mmio_write32(uint32_t addr, uint32_t value) {
   *((volatile uint32_t *)addr) = value;
 }
 
@@ -90,7 +90,7 @@ static inline void abs_mmio_write32(uint32_t addr, uint32_t value) {
  * @param addr the address to write to.
  * @param value the value to write.
  */
-static inline void abs_mmio_write32_shadowed(uint32_t addr, uint32_t value) {
+inline void abs_mmio_write32_shadowed(uint32_t addr, uint32_t value) {
   *((volatile uint32_t *)addr) = value;
   *((volatile uint32_t *)addr) = value;
 }

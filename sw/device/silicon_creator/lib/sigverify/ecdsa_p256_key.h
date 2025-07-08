@@ -86,7 +86,7 @@ typedef struct ecdsa_p256_signature {
  * @return ID of the key.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_ecdsa_p256_key_id_get(
+inline uint32_t sigverify_ecdsa_p256_key_id_get(
     const ecdsa_p256_public_key_t *pub_key) {
   return pub_key->x[0];
 }

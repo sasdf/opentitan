@@ -90,7 +90,7 @@ rom_error_t sigverify_spx_verify(
  * @return `kErrorOk` if `v` is `kSigverifySpxSuccess`.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_spx_success_to_ok(uint32_t v) {
+inline uint32_t sigverify_spx_success_to_ok(uint32_t v) {
   return (v << 22 ^ v << 8 ^ v << 1) >> 20;
 }
 

@@ -156,7 +156,7 @@ enum {
  * @return A pointer to the retention SRAM.
  */
 OT_WARN_UNUSED_RESULT
-static inline retention_sram_t *retention_sram_get(void) {
+inline retention_sram_t *retention_sram_get(void) {
   return (retention_sram_t *)kRetentionSramBase;
 }
 
