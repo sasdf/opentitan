@@ -73,7 +73,7 @@ rom_error_t sigverify_ecdsa_p256_finish(const ecdsa_p256_signature_t *signature,
  * @return `kErrorOk` if `v` is `kSigverifyEcdsaSuccess`.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_ecdsa_p256_success_to_ok(uint32_t v) {
+inline uint32_t sigverify_ecdsa_p256_success_to_ok(uint32_t v) {
   return (v << 22 ^ v << 19 ^ v << 3) >> 21;
 }
 

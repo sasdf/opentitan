@@ -66,7 +66,7 @@ typedef struct sigverify_rsa_key {
  * @return ID of the key.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t sigverify_rsa_key_id_get(
+inline uint32_t sigverify_rsa_key_id_get(
     const sigverify_rsa_buffer_t *modulus) {
   return modulus->data[0];
 }

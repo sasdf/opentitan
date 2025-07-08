@@ -24,7 +24,7 @@
  *
  * This function may behave as if it is a no-op.
  */
-static inline void wait_for_interrupt(void) {
+inline void wait_for_interrupt(void) {
 #ifdef OT_PLATFORM_RV32
   asm volatile("wfi");
 #endif
@@ -33,7 +33,7 @@ static inline void wait_for_interrupt(void) {
 /**
  * Invalidates the instruction cache.
  */
-static inline void icache_invalidate(void) {
+inline void icache_invalidate(void) {
 #ifdef OT_PLATFORM_RV32
   asm volatile("fence.i");
 #endif

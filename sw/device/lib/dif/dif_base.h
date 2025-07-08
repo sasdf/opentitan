@@ -131,7 +131,7 @@ typedef enum dif_irq_type {
  * @return Bool indicating validity of toggle value.
  */
 OT_WARN_UNUSED_RESULT
-static inline bool dif_is_valid_toggle(dif_toggle_t val) {
+inline bool dif_is_valid_toggle(dif_toggle_t val) {
   switch (val) {
     case kDifToggleEnabled:
       return true;
@@ -149,7 +149,7 @@ static inline bool dif_is_valid_toggle(dif_toggle_t val) {
  * @return Corresponding bool value.
  */
 OT_WARN_UNUSED_RESULT
-static inline bool dif_toggle_to_bool(dif_toggle_t val) {
+inline bool dif_toggle_to_bool(dif_toggle_t val) {
   switch (val) {
     case kDifToggleEnabled:
       return true;
@@ -167,7 +167,7 @@ static inline bool dif_toggle_to_bool(dif_toggle_t val) {
  * @return Corresponding dif_toggle_t value.
  */
 OT_WARN_UNUSED_RESULT
-static inline dif_toggle_t dif_bool_to_toggle(bool val) {
+inline dif_toggle_t dif_bool_to_toggle(bool val) {
   return val ? kDifToggleEnabled : kDifToggleDisabled;
 }
 
@@ -178,7 +178,7 @@ static inline dif_toggle_t dif_bool_to_toggle(bool val) {
  * @return Corresponding dif_toggle_t value.
  */
 OT_WARN_UNUSED_RESULT
-static inline dif_toggle_t dif_multi_bit_bool_to_toggle(multi_bit_bool_t val) {
+inline dif_toggle_t dif_multi_bit_bool_to_toggle(multi_bit_bool_t val) {
   switch (val) {
     case kMultiBitBool4True:
     case kMultiBitBool8True:
@@ -198,7 +198,7 @@ static inline dif_toggle_t dif_multi_bit_bool_to_toggle(multi_bit_bool_t val) {
  * "false".
  */
 OT_WARN_UNUSED_RESULT
-static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool4(dif_toggle_t val) {
+inline multi_bit_bool_t dif_toggle_to_multi_bit_bool4(dif_toggle_t val) {
   if (val == kDifToggleEnabled) {
     return kMultiBitBool4True;
   } else {
@@ -214,7 +214,7 @@ static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool4(dif_toggle_t val) {
  * "false".
  */
 OT_WARN_UNUSED_RESULT
-static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool8(dif_toggle_t val) {
+inline multi_bit_bool_t dif_toggle_to_multi_bit_bool8(dif_toggle_t val) {
   if (val == kDifToggleEnabled) {
     return kMultiBitBool8True;
   } else {
@@ -230,8 +230,7 @@ static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool8(dif_toggle_t val) {
  * "false".
  */
 OT_WARN_UNUSED_RESULT
-static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool12(
-    dif_toggle_t val) {
+inline multi_bit_bool_t dif_toggle_to_multi_bit_bool12(dif_toggle_t val) {
   if (val == kDifToggleEnabled) {
     return kMultiBitBool12True;
   } else {
@@ -247,8 +246,7 @@ static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool12(
  * "false".
  */
 OT_WARN_UNUSED_RESULT
-static inline multi_bit_bool_t dif_toggle_to_multi_bit_bool16(
-    dif_toggle_t val) {
+inline multi_bit_bool_t dif_toggle_to_multi_bit_bool16(dif_toggle_t val) {
   if (val == kDifToggleEnabled) {
     return kMultiBitBool16True;
   } else {

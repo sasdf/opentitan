@@ -75,7 +75,7 @@ typedef struct ibex_timeout {
  * V20191213, pp. 61.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint64_t ibex_mcycle_read(void) {
+inline uint64_t ibex_mcycle_read(void) {
   uint32_t cycle_low = 0;
   uint32_t cycle_high = 0;
   uint32_t cycle_high_2 = 0;
@@ -173,7 +173,7 @@ void ibex_mepc_write(uint32_t mepc);
  * @return The initialized timeout value.
  */
 OT_WARN_UNUSED_RESULT
-static inline ibex_timeout_t ibex_timeout_init(uint32_t timeout_usec) {
+inline ibex_timeout_t ibex_timeout_init(uint32_t timeout_usec) {
   return (ibex_timeout_t){
       .cycles = udiv64_slow(kClockFreqCpuHz * timeout_usec, 1000000, NULL),
       .start = ibex_mcycle_read(),
@@ -187,7 +187,7 @@ static inline ibex_timeout_t ibex_timeout_init(uint32_t timeout_usec) {
  * @return True if the timeout has expired and false otherwise.
  */
 OT_WARN_UNUSED_RESULT
-static inline bool ibex_timeout_check(const ibex_timeout_t *timeout) {
+inline bool ibex_timeout_check(const ibex_timeout_t *timeout) {
   return ibex_mcycle_read() - timeout->start > timeout->cycles;
 }
 
@@ -199,7 +199,7 @@ static inline bool ibex_timeout_check(const ibex_timeout_t *timeout) {
  * @return Time elapsed in microseconds.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint64_t ibex_timeout_elapsed(const ibex_timeout_t *timeout) {
+inline uint64_t ibex_timeout_elapsed(const ibex_timeout_t *timeout) {
   return udiv64_slow((ibex_mcycle_read() - timeout->start) * 1000000,
                      kClockFreqCpuHz, NULL);
 }

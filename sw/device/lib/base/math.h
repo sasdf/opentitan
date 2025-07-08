@@ -57,7 +57,7 @@ uint64_t udiv64_slow(uint64_t a, uint64_t b, uint64_t *rem_out);
  * @return Result, ceil(a / b).
  */
 OT_WARN_UNUSED_RESULT
-static inline size_t ceil_div(size_t a, size_t b) {
+inline size_t ceil_div(size_t a, size_t b) {
   size_t out = a / b;
   if (a % b != 0) {
     out++;

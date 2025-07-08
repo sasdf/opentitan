@@ -54,7 +54,7 @@ extern "C" {
  * boundary.
  */
 OT_WARN_UNUSED_RESULT
-static inline ptrdiff_t misalignment32_of(uintptr_t addr) {
+inline ptrdiff_t misalignment32_of(uintptr_t addr) {
   return addr % alignof(uint32_t);
 }
 
@@ -77,7 +77,7 @@ static inline ptrdiff_t misalignment32_of(uintptr_t addr) {
  * @return the word `ptr` points to.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint32_t read_32(const void *ptr) {
+inline uint32_t read_32(const void *ptr) {
   // Both GCC and Clang optimize the code below into a single word-load on most
   // platforms. It is necessary and sufficient to indicate to the compiler that
   // the pointer points to four bytes of four-byte-aligned memory.
@@ -110,7 +110,7 @@ static inline uint32_t read_32(const void *ptr) {
  * @return the word `ptr` points to.
  */
 OT_WARN_UNUSED_RESULT
-static inline uint64_t read_64(const void *ptr) {
+inline uint64_t read_64(const void *ptr) {
   // Both GCC and Clang optimize the code below into a single word-load on most
   // platforms. It is necessary and sufficient to indicate to the compiler that
   // the pointer points to four bytes of four-byte-aligned memory.
@@ -141,7 +141,7 @@ static inline uint64_t read_64(const void *ptr) {
  * @param value the value to store.
  * @param ptr a word-aligned pointer pointed to at least four bytes of memory.
  */
-static inline void write_32(uint32_t value, void *ptr) {
+inline void write_32(uint32_t value, void *ptr) {
   // Both GCC and Clang optimize the code below into a single word-store on most
   // platforms. See the comment in `read_32()` for more implementation-private
   // information.
@@ -167,7 +167,7 @@ static inline void write_32(uint32_t value, void *ptr) {
  * @param ptr a word-aligned pointer pointed to at least four bytes of memory.
  */
 
-static inline void write_64(uint64_t value, void *ptr) {
+inline void write_64(uint64_t value, void *ptr) {
   // Both GCC and Clang optimize the code below into a single word-store on most
   // platforms. See the comment in `read_64()` for more implementation-private
   // information.
