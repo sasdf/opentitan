@@ -384,16 +384,17 @@ pub fn llvm_cov_export(format: &str, profdata_file: &PathBuf, objects: &Vec<Stri
 
     // Parse the child process's stdout to a string now that it's complete.
     debug_log!("Parsing llvm-cov output");
-    let report_str = std::str::from_utf8(&output.stdout).expect("Failed to parse llvm-cov output");
+    let mut report_str = std::str::from_utf8(&output.stdout)
+        .expect("Failed to parse llvm-cov output")
+        .replace("/proc/self/cwd/", "")
+        .replace(&execroot.display().to_string(), "");
+
+    if (format == "lcov") {
+      report_str = merge_lcov_count_copies(&report_str).unwrap();
+    }
 
     debug_log!("Writing output to {}", output_file.display());
-    fs::write(
-        output_file,
-        report_str
-            .replace("/proc/self/cwd/", "")
-            .replace(&execroot.display().to_string(), ""),
-    )
-    .unwrap();
+    fs::write(output_file, report_str).unwrap();
 }
 
 pub fn generate_view(profile: &ProfileData) -> Result<()> {
@@ -477,4 +478,61 @@ pub fn append_asm_view(output_path: &PathBuf) -> Result<()> {
     writeln!(f, "end_of_record")?;
 
     Ok(())
+}
+
+fn merge_sf_count_copies(contents: &str) -> Result<String> {
+    if !contents.starts_with("SF:") {
+        bail!("Expected contents to start with SF:, got: {}", contents);
+    }
+
+    let mut out = String::new();
+    let mut fnda = HashMap::<String, u64>::new();
+    let mut da = HashMap::<u64, u64>::new();
+
+    for line in contents.lines() {
+        if line.starts_with("FNDA:") {
+            // FNDA:<count>,<name>
+            let line = line.strip_prefix("FNDA:").unwrap();
+            let parts: Vec<&str> = line.split(',').collect();
+            let count = parts[0].parse::<u64>()?;
+            let name = parts[1].to_string();
+            *fnda.entry(name).or_insert(0) += count;
+        } else if line.starts_with("DA:") {
+            // DA:<lineno>,<count>
+            let line = line.strip_prefix("DA:").unwrap();
+            let parts: Vec<&str> = line.split(',').collect();
+            let lineno = parts[0].parse::<u64>()?;
+            let count = parts[1].parse::<u64>()?;
+            *da.entry(lineno).or_insert(0) += count;
+        } else {
+            out.push_str(&format!("{line}\n"));
+        }
+    }
+
+    // Construct merged FNDA/DA entries
+    for (name, count) in fnda {
+        out.push_str(&format!("FNDA:{count},{name}\n"));
+    }
+    for (lineno, count) in da {
+        out.push_str(&format!("DA:{lineno},{count}\n"));
+    }
+
+    Ok(out)
+}
+
+pub fn merge_lcov_count_copies(contents: &str) -> Result<String> {
+    let mut out = String::new();
+
+    // Iterate through each SF by splitting with end_of_record
+    for record in contents.split("\nend_of_record\n") {
+        if record.trim().is_empty() {
+            continue;
+        }
+
+        let record = merge_sf_count_copies(record)?;
+        out.push_str(&record);
+        out.push_str("end_of_record\n");
+    }
+
+    Ok(out)
 }
