@@ -155,9 +155,15 @@ void hmac_hmac_sha256(const void *data, size_t len, hmac_key_t key,
 }
 
 void hmac_sha256_save(hmac_context_t *ctx) {
-
+#ifndef OT_COVERAGE_INSTRUMENTED
+  // Issue the STOP command to halt the operation and compute the intermediate
+  // digest.
+  uint32_t cmd = bitfield_bit32_write(0, HMAC_CMD_HASH_STOP_BIT, true);
+  abs_mmio_write32(TOP_EARLGREY_HMAC_BASE_ADDR + HMAC_CMD_REG_OFFSET, cmd);
+  wait_for_done();
+#else  // OT_COVERAGE_INSTRUMENTED
   /**
-   * Temporary workaround linked to issue #24767
+   * Workaround linked to issue #24767
    *
    * The HMAC HWIP is not told to stop. This will cause the HW to be in an
    * unexpected state, which could be exited by trigerring a simple HASH process
@@ -169,6 +175,7 @@ void hmac_sha256_save(hmac_context_t *ctx) {
    */
   uint32_t start = ibex_mcycle32();
   while(ibex_mcycle32() - start < kHmacTmpDelay);
+#endif
 
   // Read the digest registers. Note that endianness does not matter here,
   // because we will simply restore the registers in the same order as we saved
@@ -185,8 +192,8 @@ void hmac_sha256_save(hmac_context_t *ctx) {
   ctx->msg_len_upper = abs_mmio_read32(TOP_EARLGREY_HMAC_BASE_ADDR +
                                        HMAC_MSG_LENGTH_UPPER_REG_OFFSET);
 
-
-  // Temporary workaround linked to issue #24767
+#ifdef OT_COVERAGE_INSTRUMENTED
+  // Workaround linked to issue #24767
   // Trigger hash_process
   uint32_t cmd_reg = abs_mmio_read32(TOP_EARLGREY_HMAC_BASE_ADDR + HMAC_CMD_REG_OFFSET);
   cmd_reg = bitfield_bit32_write(cmd_reg, HMAC_CMD_HASH_PROCESS_BIT, true);
@@ -194,7 +201,7 @@ void hmac_sha256_save(hmac_context_t *ctx) {
 
   // Wait for HMAC HWIP operation to be completed.
   wait_for_done();
-
+#endif
 
   // Momentarily clear the `sha_en` bit, which clears the digest.
   uint32_t cfg =
