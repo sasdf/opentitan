@@ -47,6 +47,7 @@ cc_library(
         "//sw/device/silicon_creator/lib:boot_data",
         "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:manifest",
+        "//sw/device/silicon_creator/lib:shutdown",
         "//sw/device/silicon_creator/lib/base:chip",
     ],
 )
@@ -403,7 +404,6 @@ cc_library(
         "//sw/device/silicon_creator/lib/base:chip",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/lib/drivers:otp",
-        "//sw/device/silicon_creator/lib/drivers:uart",
     ],
 )
 

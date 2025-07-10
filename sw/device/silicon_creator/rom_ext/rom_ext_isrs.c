@@ -18,7 +18,6 @@ static rom_error_t rom_ext_irq_error(void) {
   uint32_t mepc, mtval;
   CSR_READ(CSR_REG_MEPC, &mepc);
   CSR_READ(CSR_REG_MTVAL, &mtval);
-
   dbg_printf("MCAUSE=%x MEPC=%x MTVAL=%x\r\n", mcause, mepc, mtval);
 
   // Shuffle the mcause bits into the uppermost byte of the word and report
