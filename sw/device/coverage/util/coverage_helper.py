@@ -469,3 +469,27 @@ def extract_tests(path):
       if line.startswith('//'):
         tests[line] = enabled
   return dict(sorted(tests.items()))
+
+def load_view_zip(zip_path, use_disassembly):
+  print(f'Loading {zip_path}', file=sys.stderr)
+  with zipfile.ZipFile(zip_path, 'r') as view_zip:
+    with view_zip.open('coverage.dat', 'r') as f:
+      view = parse_lcov(f.read().decode().splitlines())
+    # Ignore objects that are discarded in the final firmware
+    view = strip_discarded(view)
+
+    if use_disassembly:
+      with view_zip.open('test.dis', 'r') as f:
+        compiled = parse_dis_file(f.read().decode())
+      with view_zip.open('coverage.json', 'r') as f:
+        segments = parse_llvm_json(f.read().decode())
+      compiled = expand_dis_region(compiled, segments)
+
+      # Use normal view coverage for these files.
+      for sf in SKIP_DIS:
+        compiled[sf] = view[sf]
+
+      # Compiled functions lines includes comments,
+      # apply a and filter here to remove them.
+      view = and_coverage(compiled, view)
+  return view

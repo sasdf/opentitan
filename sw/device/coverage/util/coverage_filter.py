@@ -4,17 +4,12 @@ import argparse
 import zipfile
 
 from coverage_helper import (
-  parse_dis_file,
-  expand_dis_region,
+  load_view_zip,
   parse_lcov,
-  strip_discarded,
-  parse_llvm_json,
-  and_coverage,
   or_coverage,
   filter_coverage,
   merge_inlined_copies,
   generate_lcov,
-  SKIP_DIS,
 )
 
 
@@ -28,27 +23,7 @@ def main():
 
   all_views = {}
   for zip_path in args.view:
-    print(f'Loading {zip_path}')
-    with zipfile.ZipFile(zip_path, 'r') as view_zip:
-      with view_zip.open('coverage.dat', 'r') as f:
-        view = parse_lcov(f.read().decode().splitlines())
-      # Ignore objects that are discarded in the final firmware
-      view = strip_discarded(view)
-
-      if args.use_disassembly:
-        with view_zip.open('test.dis', 'r') as f:
-          compiled = parse_dis_file(f.read().decode())
-        with view_zip.open('coverage.json', 'r') as f:
-          segments = parse_llvm_json(f.read().decode())
-        compiled = expand_dis_region(compiled, segments)
-
-        # Use normal view coverage for these files.
-        for sf in SKIP_DIS:
-          compiled[sf] = view[sf]
-
-        # Compiled functions lines includes comments,
-        # apply a and filter here to remove them.
-        view = and_coverage(compiled, view)
+    view = load_view_zip(zip_path, args.use_disassembly)
     all_views = or_coverage(all_views, view)
   view = all_views
 

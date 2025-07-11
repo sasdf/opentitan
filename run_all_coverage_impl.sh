@@ -143,5 +143,8 @@ fi
 echo "Save test target list"
 printf '%s\n' "${TARGETS[@]}" | sort | uniq > "${COVERAGE_OUTPUT_DIR}/test_targets.txt"
 
-echo "Save source diff"
+echo "Save ToE source diff"
 python3 sw/device/coverage/util/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
+
+echo "Save ROM source diff"
+python3 sw/device/coverage/util/show_rom_diff.py > "${COVERAGE_OUTPUT_DIR}/taped_out_rom.diff"
