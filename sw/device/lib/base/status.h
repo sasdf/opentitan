@@ -227,7 +227,7 @@ bool status_extract(status_t s, const char **code, int32_t *arg, char *mod_id);
  * @return True if the status represents Ok.
  */
 OT_WARN_UNUSED_RESULT
-bool status_ok(status_t s);
+OT_ALWAYS_INLINE bool status_ok(status_t s) { return s.value >= 0; }
 
 /**
  * Returns the absl status code in the status.
@@ -236,7 +236,11 @@ bool status_ok(status_t s);
  * @return `absl_status_t` contained within the status_t.
  */
 OT_WARN_UNUSED_RESULT
-absl_status_t status_err(status_t s);
+OT_ALWAYS_INLINE absl_status_t status_err(status_t s) {
+  return s.value < 0 ? (absl_status_t)bitfield_field32_read(
+                           OT_UNSIGNED(s.value), STATUS_FIELD_CODE)
+                     : kOk;
+}
 
 // Create a status with an optional argument.
 // TODO(cfrantz, alphan): Figure out how we want to create statuses in
