@@ -10,7 +10,7 @@ load("//rules:linker.bzl", "ld_library")
 load("//rules:opentitan_test.bzl", "manual_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "fpga_params", "opentitan_binary", "opentitan_test")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
-load("//rules/opentitan:coverage.bzl", "coverage_view_test")
+load("//rules/coverage:view.bzl", "coverage_view_test")
 
 package(default_visibility = ["//visibility:public"])
 

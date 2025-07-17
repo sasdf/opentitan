@@ -6,7 +6,7 @@ load("//rules:const.bzl", "CONST", "hex")
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load("//rules/opentitan:coverage.bzl", "coverage_view_test")
+load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",

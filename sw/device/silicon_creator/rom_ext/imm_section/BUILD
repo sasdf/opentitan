@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@lowrisc_opentitan//rules/opentitan:transform.bzl", "obj_transform")
-load("//rules/opentitan:coverage.bzl", "coverage_view_test")
+load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load("//rules:linker.bzl", "ld_library")
 load(
