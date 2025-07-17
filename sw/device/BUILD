@@ -21,16 +21,12 @@ config_setting(
     values = {"copt": "-DOT_IS_ENGLISH_BREAKFAST_REDUCED_SUPPORT_FOR_INTERNAL_USE_ONLY_"},
 )
 
+# Deprecated: Please use //rules/coverage:enabled instead.
 config_setting(
     name = "measure_coverage_on_target",
     define_values = {
-        "measure_coverage_on_target": "true",
+        "ot_coverage_enabled": "true",
     },
-)
-
-bool_flag(
-    name = "measure_coverage_on_target_flag",
-    build_setting_default = False,
 )
 
 cc_library(

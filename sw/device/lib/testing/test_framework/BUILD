@@ -41,7 +41,7 @@ cc_library(
 alias(
     name = "coverage",
     actual = select({
-        "//sw/device:measure_coverage_on_target": ":coverage_llvm",
+        "//rules/coverage:enabled": ":coverage_llvm",
         "//conditions:default": ":coverage_none",
     }),
     visibility = ["//visibility:private"],

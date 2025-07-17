@@ -43,7 +43,6 @@ opentitan_transition = transition(
     inputs = [
         "//command_line_option:copt",
         "//command_line_option:features",
-        "//sw/device:measure_coverage_on_target_flag",
         "//command_line_option:collect_code_coverage",
     ],
     outputs = [

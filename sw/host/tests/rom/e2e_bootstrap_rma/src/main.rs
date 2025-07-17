@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
     execute_test!(test_no_rma_command, &opts, &transport);
 
     // This testcase failed in coverage build
-    #[cfg(not(feature = "ot_coverage_build"))]
+    #[cfg(not(feature = "ot_coverage_enabled"))]
     {
         execute_test!(test_rma_command, &opts, &transport);
     }

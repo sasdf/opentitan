@@ -10,10 +10,6 @@ package(default_visibility = ["//visibility:public"])
 rust_library(
     name = "transfer_lib",
     srcs = ["transfer_lib.rs"],
-    crate_features = select({
-        "//sw/device:measure_coverage_on_target": ["ot_coverage_build"],
-        "//conditions:default": [],
-    }),
     deps = [
         "//sw/host/opentitanlib",
         "//sw/host/sphincsplus",

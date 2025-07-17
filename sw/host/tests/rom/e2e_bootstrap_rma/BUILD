@@ -11,10 +11,6 @@ rust_binary(
     srcs = [
         "src/main.rs",
     ],
-    crate_features = [] + select({
-        "//sw/device:measure_coverage_on_target": ["ot_coverage_build"],
-        "//conditions:default": [],
-    }),
     deps = [
         "//sw/host/opentitanlib",
         "@crate_index//:anyhow",

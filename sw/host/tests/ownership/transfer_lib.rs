@@ -73,7 +73,7 @@ pub fn ownership_unlock(
     let result = rescue.get_boot_svc()?;
     match result.message {
         Message::OwnershipUnlockResponse(r) => {
-            #[cfg(feature= "ot_coverage_build")]
+            #[cfg(feature= "ot_coverage_enabled")]
             let _ = rescue.enter(transport, EntryMode::Reboot);
             r.status.into()
         },
@@ -138,7 +138,7 @@ pub fn ownership_activate(
     let result = rescue.get_boot_svc()?;
     match &result.message {
         Message::OwnershipActivateResponse(r) => {
-            #[cfg(feature= "ot_coverage_build")]
+            #[cfg(feature= "ot_coverage_enabled")]
             let _ = rescue.enter(transport, EntryMode::Reboot);
             r.status.into()
         },
@@ -271,9 +271,9 @@ impl HybridPair {
 }
 
 pub const OWNER_FLASH_ROM_EXT_START: u16 = 0;
-#[cfg(not(feature = "ot_coverage_build"))]
+#[cfg(not(feature = "ot_coverage_enabled"))]
 pub const OWNER_FLASH_ROM_EXT_SIZE: u16 = 32;
-#[cfg(feature = "ot_coverage_build")]
+#[cfg(feature = "ot_coverage_enabled")]
 pub const OWNER_FLASH_ROM_EXT_SIZE: u16 = 128;
 pub const OWNER_FLASH_FILE_START: u16 = 224;
 pub const OWNER_FLASH_FILE_SIZE: u16 = 32;

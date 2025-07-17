@@ -8,13 +8,6 @@ load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 
 package(default_visibility = ["//visibility:public"])
 
-config_setting(
-    name = "is_coverage_build",
-    values = {
-        "features": "coverage",
-    },
-)
-
 cc_library(
     name = "asm_counters",
     srcs = ["asm_counters.c"],
@@ -87,7 +80,7 @@ cc_library(
 alias(
     name = "uart_runtime",
     actual = select({
-        "//sw/device:measure_coverage_on_target": ":uart_runtime_real",
+        "//rules/coverage:enabled": ":uart_runtime_real",
         "//conditions:default": ":empty_runtime",
     }),
 )
@@ -109,7 +102,7 @@ cc_library(
 alias(
     name = "ottf_runtime",
     actual = select({
-        "//sw/device:measure_coverage_on_target": ":ottf_runtime_real",
+        "//rules/coverage:enabled": ":ottf_runtime_real",
         "//conditions:default": ":empty_runtime",
     }),
 )

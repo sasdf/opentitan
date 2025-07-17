@@ -93,7 +93,7 @@ fn spi_dfu_invalid_commands(params: &RescueParams, transport: &TransportWrapper)
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.set_mode(RescueMode::EraseOwner)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             rescue.reboot()?;
 
@@ -111,7 +111,7 @@ fn spi_dfu_control(params: &RescueParams, transport: &TransportWrapper) -> Resul
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.set_mode(RescueMode::GetOwnerPage1)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             rescue.reboot()?;
 
@@ -133,7 +133,7 @@ fn usb_dfu_in_transaction_cancel(
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.set_mode(RescueMode::DeviceId)?;
         rescue.set_mode(RescueMode::EraseOwner)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             rescue.reboot()?;
 
@@ -155,7 +155,7 @@ fn xmodem_unsupported_rate(params: &RescueParams, transport: &TransportWrapper) 
         expect_err_from_rescue_result(rescue.set_speed(1333333), "error: unsupported baudrate")?;
         expect_err_from_rescue_result(rescue.set_speed(1500000), "error: unsupported baudrate")?;
         expect_err_from_rescue_result(rescue.set_speed(0), "error: unsupported baudrate")?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             rescue.reboot()?;
 
@@ -173,7 +173,7 @@ fn xmodem_crc_error_cancel(params: &RescueParams, transport: &TransportWrapper) 
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_invalid_transaction(RescueMode::RescueB)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -189,7 +189,7 @@ fn xmodem_packet_timeout(params: &RescueParams, transport: &TransportWrapper) ->
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_invalid_transaction(RescueMode::BootLog)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -205,7 +205,7 @@ fn xmodem_packet_bad_len(params: &RescueParams, transport: &TransportWrapper) ->
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_invalid_transaction(RescueMode::EraseOwner)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -221,7 +221,7 @@ fn xmodem_data_timeout(params: &RescueParams, transport: &TransportWrapper) -> R
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_invalid_transaction(RescueMode::DeviceId)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -237,7 +237,7 @@ fn xmodem_crc_timeout(params: &RescueParams, transport: &TransportWrapper) -> Re
         let rescue = params.create(transport)?;
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_invalid_transaction(RescueMode::OwnerBlock)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -253,7 +253,7 @@ fn xmodem_host_data_nak(params: &RescueParams, transport: &TransportWrapper) -> 
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::BootLog)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -269,7 +269,7 @@ fn xmodem_host_data_cancel(params: &RescueParams, transport: &TransportWrapper) 
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::RescueB)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -285,7 +285,7 @@ fn xmodem_host_data_timeout(params: &RescueParams, transport: &TransportWrapper)
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::OwnerBlock)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -301,7 +301,7 @@ fn xmodem_host_start_nak(params: &RescueParams, transport: &TransportWrapper) ->
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::DeviceId)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -317,7 +317,7 @@ fn xmodem_host_start_cancel(params: &RescueParams, transport: &TransportWrapper)
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::Rescue)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(5))?;
@@ -333,7 +333,7 @@ fn xmodem_host_start_timeout(params: &RescueParams, transport: &TransportWrapper
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::EraseOwner)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             let uart = transport.uart("console")?;
             UartConsole::wait_for(&*uart, r"CDI_0:", Duration::from_secs(60))?;
@@ -349,7 +349,7 @@ fn xmodem_host_finish_nak(params: &RescueParams, transport: &TransportWrapper) -
     if params.protocol == RescueProtocol::Xmodem {
         rescue.enter(transport, EntryMode::Reset)?;
         rescue.xmodem_host_ack_err(RescueMode::BootSvcReq)?;
-        #[cfg(feature = "ot_coverage_build")]
+        #[cfg(feature = "ot_coverage_enabled")]
         {
             rescue.reboot()?;
             let uart = transport.uart("console")?;
@@ -377,7 +377,7 @@ fn get_device_id_test(
         )
     })?;
 
-    #[cfg(feature = "ot_coverage_build")]
+    #[cfg(feature = "ot_coverage_enabled")]
     {
         rescue.reboot()?;
 
@@ -417,7 +417,7 @@ fn get_boot_log_test(
         .get_boot_log()
         .context("Failed to get boot log from rescue")?;
 
-    #[cfg(feature = "ot_coverage_build")]
+    #[cfg(feature = "ot_coverage_enabled")]
     {
         rescue.reboot()?;
 
@@ -487,7 +487,7 @@ fn get_owner_page_test(
         .get_raw(RescueMode::GetOwnerPage0)
         .context("Failed to get owner page from rescue")?;
 
-    #[cfg(feature = "ot_coverage_build")]
+    #[cfg(feature = "ot_coverage_enabled")]
     {
         rescue.reboot()?;
 
@@ -779,7 +779,7 @@ fn disability_test(
                 &get_expected_err_msg(CommandTag::BootSvcRsp, params)
             );
 
-            #[cfg(feature = "ot_coverage_build")]
+            #[cfg(feature = "ot_coverage_enabled")]
             {
                 rescue.reboot()?;
                 if let Some(uart) = uart_console {

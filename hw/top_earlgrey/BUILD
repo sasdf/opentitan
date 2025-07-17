@@ -89,7 +89,7 @@ EARLGREY_SLOTS_COVERAGE = {
     "instrumented_rom_slot": "0xe0000",
 }
 EARLGREY_SLOTS = select({
-    "//sw/device:measure_coverage_on_target": EARLGREY_SLOTS_COVERAGE,
+    "//rules/coverage:enabled": EARLGREY_SLOTS_COVERAGE,
     "//conditions:default": EARLGREY_SLOTS_NORMAL,
 })
 

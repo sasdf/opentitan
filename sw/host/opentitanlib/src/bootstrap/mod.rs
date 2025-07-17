@@ -204,7 +204,7 @@ impl<'a> Bootstrap<'a> {
                 rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
-                #[cfg(feature = "ot_coverage_build")]
+                #[cfg(feature = "ot_coverage_enabled")]
                 {
                     log::info!("Receiving report...");
                     let uart = transport.uart("console")?;
