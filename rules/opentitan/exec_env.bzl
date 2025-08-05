@@ -35,7 +35,7 @@ _FIELDS = {
     "rom_scramble_config": ("file.rom_scramble_config", False),
     "openocd": ("attr.openocd", False),
     "openocd_adapter_config": ("attr.openocd_adapter_config", False),
-    "slot_addresses": ("attr.slot_addresses", False),
+    "slot_spec": ("attr.slot_spec", False),
 }
 
 ExecEnvInfo = provider(
@@ -157,8 +157,8 @@ def exec_env_common_attrs(**kwargs):
             allow_files = True,
             doc = "Instrumented ROM image to use in this environment",
         ),
-        "slot_addresses": attr.string_dict(
-            default = kwargs.get("slot_addresses", {}),
+        "slot_spec": attr.string_dict(
+            default = kwargs.get("slot_spec", {}),
             doc = "Firmware slot addresses to use in this environment",
         ),
         "otp": attr.label(
@@ -413,10 +413,10 @@ def common_test_setup(ctx, exec_env, firmware):
         data_files += get_files(jtag_data)
         param["jtag_test_cmd"] = jtag_test_cmd
 
-    # Update actual slot addresses
-    slot_addresses = dict(exec_env.slot_addresses)
-    slot_addresses.update(ctx.attr.slot_addresses)
-    action_param.update(slot_addresses)
-    param.update(slot_addresses)
+    # Update the actual firmware slot spec
+    slot_spec = dict(exec_env.slot_spec)
+    slot_spec.update(ctx.attr.slot_spec)
+    action_param.update(slot_spec)
+    param.update(slot_spec)
 
     return test_harness, data_labels, data_files, param, action_param

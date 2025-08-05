@@ -106,7 +106,7 @@ fpga_cw310(
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
 
     param = {
@@ -173,7 +173,7 @@ sim_qemu(
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
 )
 
 sim_qemu(
@@ -330,7 +330,7 @@ fpga_cw305(
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
 )
 
@@ -364,7 +364,7 @@ fpga_cw340(
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
     },
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
 )
 
@@ -551,7 +551,7 @@ silicon(
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
     },
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = """
         --exec="transport init"
         --exec="bootstrap --clear-uart=true {firmware}"
@@ -593,7 +593,7 @@ silicon(
         "//signing:test_keys": "//sw/device/silicon_creator/rom_ext/sival:rom_ext_dice_x509_fake_slot_a",
         "//conditions:default": "//sw/device/silicon_creator/rom_ext/sival/binaries:rom_ext_dice_x509_prod",
     }),
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = """
         --exec="transport init"
         --exec="bootstrap --clear-uart=true {firmware}"
@@ -619,7 +619,7 @@ sim_verilator(
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
 )
 
@@ -683,7 +683,7 @@ sim_dv(
     otp_mmap = "//hw/ip/otp_ctrl/data:otp_ctrl_mmap.hjson",
     otp_seed = "//hw/ip/otp_ctrl/data:otp_seed",
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
-    slot_addresses = EARLGREY_SLOTS,
+    slot_spec = EARLGREY_SLOTS,
 )
 
 sim_dv(

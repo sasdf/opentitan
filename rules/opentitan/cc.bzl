@@ -272,10 +272,10 @@ def _opentitan_binary(ctx):
         for dep in deps:
             runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
 
-        slot_addresses = dict(exec_env.slot_addresses)
-        slot_addresses.update(ctx.attr.slot_addresses)
+        slot_spec = dict(exec_env.slot_spec)
+        slot_spec.update(ctx.attr.slot_spec)
 
-        linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_addresses.items()]
+        linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
 
         kind = ctx.attr.kind
         provides, signed = _build_binary(ctx, exec_env, name, deps, kind, linkopts = linkopts)
@@ -387,9 +387,9 @@ common_binary_attrs = {
         executable = True,
         cfg = "exec",
     ),
-    "slot_addresses": attr.string_dict(
+    "slot_spec": attr.string_dict(
         default = {},
-        doc = "Firmware slot addresses to use in this environment",
+        doc = "Firmware slot spec to use in this environment",
     ),
     "_util_check_all_zeros": attr.label(
         default = "//util:check_all_zeros.py",
@@ -432,10 +432,10 @@ _testing_bitstream = transition(
 def _opentitan_test(ctx):
     exec_env = ctx.attr.exec_env[ExecEnvInfo]
 
-    slot_addresses = dict(exec_env.slot_addresses)
-    slot_addresses.update(ctx.attr.slot_addresses)
+    slot_spec = dict(exec_env.slot_spec)
+    slot_spec.update(ctx.attr.slot_spec)
 
-    linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_addresses.items()]
+    linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
 
     if ctx.attr.srcs or ctx.attr.deps:
         name = _binary_name(ctx, exec_env)
@@ -561,9 +561,11 @@ def _opentitan_binary_assemble_impl(ctx):
             spec.append("{}@{}".format(binary[exec_env_provider].default.path, offset))
 
         action_param = {}
-        action_param.update(exec_env.slot_addresses)
+        action_param.update(exec_env.slot_spec)
+
         spec = ' '.join(spec)
         for _ in range(10):
+          # Recursive evaluation of the assemble spec
           spec = spec.format(**action_param)
         spec = spec.split(' ')
 
