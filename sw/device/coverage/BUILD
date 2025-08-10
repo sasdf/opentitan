@@ -55,12 +55,20 @@ cc_library(
 )
 
 cc_library(
-    name = "empty_runtime",
+    name = "empty_runtime_real",
     srcs = ["empty_runtime.c"],
     deps = [
         "//sw/device/lib/base:macros",
     ],
     features = ["-coverage"],
+)
+
+alias(
+    name = "empty_runtime",
+    actual = select({
+        "//rules/coverage:enabled": ":empty_runtime_real",
+        "//conditions:default": "//sw/device:nothing",
+    }),
 )
 
 cc_library(
@@ -94,7 +102,7 @@ alias(
     actual = select({
         "//rules/coverage:instrumented": ":uart_runtime_real",
         "//rules/coverage:enabled": ":uart_runtime_skip",
-        "//conditions:default": ":empty_runtime",
+        "//conditions:default": "//sw/device:nothing",
     }),
 )
 
@@ -127,7 +135,7 @@ alias(
     actual = select({
         "//rules/coverage:instrumented": ":ottf_runtime_real",
         "//rules/coverage:enabled": ":ottf_runtime_skip",
-        "//conditions:default": ":empty_runtime",
+        "//conditions:default": "//sw/device:nothing",
     }),
 )
 
