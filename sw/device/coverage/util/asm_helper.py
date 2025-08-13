@@ -16,36 +16,26 @@ ASM_FILES = [
   "sw/device/silicon_creator/lib/flash_exc_handler.S",
 ]
 
-ASM_COUNTER_SIZE = 96
-g_available_counters = set(range(ASM_COUNTER_SIZE))
-
-class InstType(enum.Enum):
-  DISABLED = enum.auto()
-  REGISTER_BITS = enum.auto()
-  PRF_CNTS = enum.auto()
-
-PRAGMA_REGEX = r"(// PRAGMA_COVERAGE:.+\n?)"
-PRAGMA_REG_START = "// PRAGMA_COVERAGE: start autogen with register bits"
-PRAGMA_REG_STOP = "// PRAGMA_COVERAGE: stop autogen with register bits"
-PRAGMA_PRF_START = "// PRAGMA_COVERAGE: start autogen with prf counters"
-PRAGMA_PRF_STOP = "// PRAGMA_COVERAGE: stop autogen with prf counters"
+PRAGMA_REGEX = r"(// *PRAGMA_COVERAGE:.+\n?)"
+PRAGMA_SECTION_REGEX = r"// *PRAGMA_COVERAGE: *section\((.+?)\)\n?"
+PRAGMA_AUTOGEN_START = "// PRAGMA_COVERAGE: start autogen"
+PRAGMA_AUTOGEN_STOP = "// PRAGMA_COVERAGE: stop autogen"
 PRAGMA_SKIP_START = "// PRAGMA_COVERAGE: start block skip"
 PRAGMA_SKIP_STOP = "// PRAGMA_COVERAGE: stop block skip"
 
 ALL_PRAGMA = {
-  PRAGMA_REG_START,
-  PRAGMA_REG_STOP,
-  PRAGMA_PRF_START,
-  PRAGMA_PRF_STOP,
+  PRAGMA_AUTOGEN_START,
+  PRAGMA_AUTOGEN_STOP,
   PRAGMA_SKIP_START,
   PRAGMA_SKIP_STOP,
 }
 
 FUNCTYPE_REGEX = r"\.type +(\w+), *@function"
+SIZE_REGEX = r"\.size +(\w+), *\. *- *(\w+)"
 SECTION_REGEX = r"\.section +[\w\.]+(,.*)?"
-COUNTER_REGEX = r"COVERAGE_ASM_(AUTOGEN|MANUAL)_MARK_(REG|PRF)\((\w+),\s*(\d+)\)"
+COUNTER_REGEX = r"COVERAGE_ASM_(AUTOGEN|MANUAL)_MARK\((\w+),\s*(\d+)\)"
 
-Line = namedtuple("Line", ["text", "line_type", "continuation", "args"])
+Line = namedtuple("Line", ["text", "lineno", "line_type", "continuation", "args"])
 
 class LineType(enum.Enum):
   COMMENT = enum.auto()
@@ -55,6 +45,7 @@ class LineType(enum.Enum):
   COUNTER = enum.auto()
   PRAGMA = enum.auto()
   FUNCTYPE = enum.auto()
+  SIZE = enum.auto()
   OTHER = enum.auto()
 
 COLOR_RED = "\033[31m"
@@ -74,23 +65,22 @@ LINE_COLORS = {
   LineType.TRAP: COLOR_RED,
   LineType.COUNTER: COLOR_GREEN,
   LineType.PRAGMA: COLOR_MAGENTA,
-  LineType.FUNCTYPE: COLOR_MAGENTA,
+  LineType.FUNCTYPE: COLOR_BLUE,
+  LineType.SIZE: COLOR_BLUE,
   LineType.OTHER: COLOR_RESET,
 }
 
 COMMENT_TYPES = {
   LineType.COMMENT,
   LineType.FUNCTYPE,
+  LineType.SIZE,
   LineType.PRAGMA
 }
 
 def parse_counter_mark(line):
   m = re.search(COUNTER_REGEX, line.strip())
-  manual, inst_type, reg, off = m.groups()
-  if inst_type == 'REG':
-    return int(off) + (32 if reg == 's11' else 0)
-  else:
-    return int(off)
+  manual, reg, off = m.groups()
+  return int(off)
 
 Block = namedtuple("Block", ["lines", "counter", "up", "down"])
 
@@ -101,7 +91,7 @@ def segment_basic_blocks(lines):
   inside_skip_block = False
   inside_code_section = False
   continuation_line_type = None
-  for line in lines:
+  for lineno, line in enumerate(lines):
     if line.strip().startswith('/*'):
       inside_comment_block = True
     elif '*/' not in line:
@@ -125,6 +115,8 @@ def segment_basic_blocks(lines):
 
     if continuation_line_type is not None:
       line_type = continuation_line_type
+    elif re.fullmatch(PRAGMA_SECTION_REGEX, line.strip()):
+      line_type = LineType.PRAGMA
     elif re.search(PRAGMA_REGEX, line.strip()):
       assert line.strip() in ALL_PRAGMA, f'Unknown coverage pragma: {line.strip()}'
       line_type = LineType.PRAGMA
@@ -139,6 +131,8 @@ def segment_basic_blocks(lines):
     elif line.strip().startswith('#'):
       line_type = LineType.COMMENT
     elif ':' in line:
+      assert line.strip().endswith(':'), "Got extra contents after label"
+      args = line.strip().removesuffix(':')
       line_type = LineType.LABEL
     elif line.strip().startswith('LABEL_FOR_TEST'):
       # Treat LABEL_FOR_TEST as a comment. These are special markers for
@@ -164,6 +158,10 @@ def segment_basic_blocks(lines):
     elif (m := re.match(FUNCTYPE_REGEX, line.strip())):
       line_type = LineType.FUNCTYPE
       args = m.group(1).strip()
+    elif (m := re.match(SIZE_REGEX, line.strip())):
+      assert m.group(1) == m.group(2), f"Got different label for size statement {m.groups()}"
+      line_type = LineType.SIZE
+      args = m.group(1).strip()
     elif line.strip().startswith('.'):
       line_type = LineType.COMMENT
     else:
@@ -179,11 +177,12 @@ def segment_basic_blocks(lines):
     # create new basic block for new label / pragma
     if line_type == LineType.LABEL:
       blocks.append(Block(lines=[], counter=None, up=False, down=True))
-    if line_type == LineType.PRAGMA:
+    if line_type in {LineType.PRAGMA, LineType.SIZE}:
       blocks.append(Block(lines=[], counter=None, up=True, down=True))
 
     blocks[-1].lines.append(Line(
       text=line,
+      lineno=lineno,
       line_type=line_type,
       continuation=is_continuation,
       args=args,
@@ -193,7 +192,7 @@ def segment_basic_blocks(lines):
     if line_type in {LineType.BRANCH, LineType.TRAP}:
       blocks[-1] = blocks[-1]._replace(down=False)
       blocks.append(Block(lines=[], counter=None, up=False, down=True))
-    if line_type == LineType.PRAGMA:
+    if line_type in {LineType.PRAGMA, LineType.SIZE}:
       blocks.append(Block(lines=[], counter=None, up=True, down=True))
 
   # merge trap chain
@@ -221,42 +220,36 @@ def remove_autogen(lines):
   return [l for l in lines if not is_autogen(l)]
 
 
-def get_next_counter(inst_type):
-  assert g_available_counters, "Coverage counter exhausted"
-  if inst_type == InstType.REGISTER_BITS:
-    counter = min(g_available_counters)
-    assert counter < 64, "Coverage counter exhausted"
-  else:
-    counter = max(g_available_counters)
-  g_available_counters.remove(counter)
-  return counter
+def get_max_counter(blocks):
+  counters = []
+  for block in blocks:
+    for line in block.lines:
+      if line.line_type == LineType.COUNTER:
+        counters.append(line.args)
+  return max(counters, default=-1)
 
 def instrument_blocks(blocks):
+  counter = get_max_counter(blocks) + 1
+
   start_line = 1
   instrumented = []
-  mode = InstType.DISABLED
+  autogen_enabled = False
   for block in blocks:
     block = copy.deepcopy(block)
 
     # handle pragma
     if block.lines[0].line_type == LineType.PRAGMA:
       pragma = block.lines[0].text.strip()
-      if pragma == PRAGMA_REG_START:
-        mode = InstType.REGISTER_BITS
-      elif pragma == PRAGMA_PRF_START:
-        mode = InstType.PRF_CNTS
-      elif pragma == PRAGMA_REG_STOP:
-        assert mode == InstType.REGISTER_BITS, mode
-        mode = InstType.DISABLED
-      elif pragma == PRAGMA_PRF_STOP:
-        assert mode == InstType.PRF_CNTS, mode
-        mode = InstType.DISABLED
+      if pragma == PRAGMA_AUTOGEN_START:
+        autogen_enabled = True
+      elif pragma == PRAGMA_AUTOGEN_STOP:
+        autogen_enabled = False
       instrumented.append(block)
       start_line += len(block.lines)
       continue
 
     # skip the block if auto instrumentation is not enabled.
-    if mode == InstType.DISABLED:
+    if not autogen_enabled:
       instrumented.append(block)
       start_line += len(block.lines)
       continue
@@ -281,18 +274,18 @@ def instrument_blocks(blocks):
       insert_idx += 1
 
     # insert instrumentation
-    counter = get_next_counter(mode)
     block = block._replace(counter=counter)
-    kind = 'REG' if mode == InstType.REGISTER_BITS else 'PRF'
     block.lines.insert(insert_idx, Line(
-      f"  COVERAGE_ASM_AUTOGEN_MARK_{kind}(t6, {counter})",
-      LineType.COUNTER,
-      False,
-      counter,
+      text=f"  COVERAGE_ASM_AUTOGEN_MARK(t6, {counter})",
+      lineno=None,
+      line_type=LineType.COUNTER,
+      continuation=False,
+      args=counter,
     ))
 
     instrumented.append(block)
     start_line += len(block.lines)
+    counter += 1
   return instrumented
 
 def propagate_counters(blocks):
@@ -311,19 +304,6 @@ def propagate_counters(blocks):
     last_counter = blocks[i].counter if blocks[i].up else None
 
   return blocks
-
-def reserve_manual_counters(path):
-  with open(path, "r") as f:
-    lines = f.read()
-
-  for c in re.finditer(COUNTER_REGEX, lines):
-    if c.group(1) != 'MANUAL':
-      continue
-
-    counter = parse_counter_mark(c.group(0))
-    assert counter in g_available_counters, f"Counter reused in file {path}: {c.group(0)}"
-    g_available_counters.remove(counter)
-
 
 def autogen_counters(path):
   with open(path, "r") as f:

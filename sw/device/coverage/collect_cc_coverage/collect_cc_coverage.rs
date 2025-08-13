@@ -41,7 +41,6 @@ use coverage_lib::{
   llvm_profdata_merge,
   get_runfiles_dir,
   debug_environ,
-  append_asm_coverage,
 };
 
 fn main() -> Result<()> {
@@ -107,7 +106,6 @@ fn main() -> Result<()> {
         let lcov_file = path.with_extension("dat");
         llvm_profdata_merge(&profraw_file, &profdata_file);
         llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_file);
-        append_asm_coverage(&counter, &lcov_file).unwrap();
         let output_lcov_file = output_dir.join(lcov_file.file_name().unwrap());
         fs::copy(&lcov_file, &output_lcov_file)?;
     }

@@ -8,6 +8,8 @@
 #include "flash_ctrl_regs.h"
 #include "rstmgr_regs.h"
 
+// PRAGMA_COVERAGE: section(__llvm_prf_cnts_head)
+
   // Place this code into the .crt section to be able to call it early in
   // the boot process before ePMP is reconfigured.
   //
@@ -25,7 +27,7 @@
   .global _asm_exception_handler
   .type _asm_exception_handler, @function
 _asm_exception_handler:
-  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 1)
+  COVERAGE_ASM_MANUAL_MARK(t6, 0)
   COVERAGE_ASM_REPORT()
 
 .L_exception_loop:

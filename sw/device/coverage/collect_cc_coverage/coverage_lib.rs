@@ -42,9 +42,6 @@ pub const PRF_VERSION: u64 = 8;
 pub const PRF_DATA_ENTRY_SIZE: u64 = 40;
 pub const VARIANT_MASK_BYTE_COVERAGE: u64 = (0x1 << 60);
 
-pub const ASM_COUNTER_FILE: &str = "SF:sw/device/coverage/asm_counters.c";
-pub const ASM_COUNTER_SIZE: usize = 96;
-
 
 #[macro_export]
 macro_rules! debug_log {
@@ -420,10 +417,11 @@ pub fn generate_view(profile: &ProfileData) -> Result<()> {
     let json_output_file = output_dir.join("coverage.json");
     let profdata_file = output_dir.join("coverage.profdata");
     let profraw_file = coverage_dir.join("coverage.profraw");
+    let bazel_output_file = coverage_dir.join("coverage.dat");
     generate_view_profraw(&profile, &profraw_file)?;
     llvm_profdata_merge(&profraw_file, &profdata_file);
     llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_output_file);
-    append_asm_view(&lcov_output_file)?;
+    llvm_cov_export("lcov", &profdata_file, &profile.objects, &bazel_output_file);
     llvm_cov_export("text", &profdata_file, &profile.objects, &json_output_file);
     Ok(())
 }
@@ -451,49 +449,6 @@ pub fn load_object_list(path: &PathBuf) -> Result<Vec<String>> {
     }
 
     return Ok(results);
-}
-
-pub fn append_asm_coverage(counter: &ProfileCounter, output_path: &PathBuf) -> Result<()> {
-    if counter.cnts.len() < ASM_COUNTER_SIZE {
-        bail!("Manual coverage counter is too short.");
-    }
-
-    let (cnts, _) = counter.cnts.split_at(ASM_COUNTER_SIZE);
-
-    let mut f = std::fs::OpenOptions::new()
-        .append(true)
-        .open(output_path)?;
-
-    writeln!(f, "{ASM_COUNTER_FILE}")?;
-
-    for (i, byte) in cnts.iter().enumerate() {
-        let count = match byte {
-            0xff => 0, // Not executed
-            0x00 => 1, // Executed
-            _ => bail!("Invalid asm coverage counter value: {byte}"),
-        };
-        writeln!(f, "DA:{},{}", i + 1, count)?;
-    }
-
-    writeln!(f, "end_of_record")?;
-
-    Ok(())
-}
-
-pub fn append_asm_view(output_path: &PathBuf) -> Result<()> {
-    let mut f = std::fs::OpenOptions::new()
-        .append(true)
-        .open(output_path)?;
-
-    writeln!(f, "{ASM_COUNTER_FILE}")?;
-
-    for i in 0..ASM_COUNTER_SIZE {
-        writeln!(f, "DA:{},{}", i + 1, 1)?;
-    }
-
-    writeln!(f, "end_of_record")?;
-
-    Ok(())
 }
 
 fn merge_sf_count_copies(contents: &str) -> Result<String> {
@@ -526,10 +481,14 @@ fn merge_sf_count_copies(contents: &str) -> Result<String> {
     }
 
     // Construct merged FNDA/DA entries
-    for (name, count) in fnda {
+    let mut sorted_fnda: Vec<_> = fnda.into_iter().collect();
+    sorted_fnda.sort_by(|a, b| a.0.cmp(&b.0));
+    for (name, count) in sorted_fnda {
         out.push_str(&format!("FNDA:{count},{name}\n"));
     }
-    for (lineno, count) in da {
+    let mut sorted_da: Vec<_> = da.into_iter().collect();
+    sorted_da.sort_by(|a, b| a.0.cmp(&b.0));
+    for (lineno, count) in sorted_da {
         out.push_str(&format!("DA:{lineno},{count}\n"));
     }
 

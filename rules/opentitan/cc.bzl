@@ -17,8 +17,18 @@ load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
 load("//rules/opentitan:util.bzl", "assemble_for_test")
 
-def _create_cc_instrumented_files_info(ctx, metadata_files):
-    # Simplified version of the same function in cc_helper.bzl
+def create_cc_instrumented_files_info(ctx, metadata_files):
+    """Creates an InstrumentedFilesInfo provider to be added to the target.
+
+    This is a simplified version of the same function in `cc_helper.bzl`.
+
+    Args:
+      ctx: The rule context.
+      metadata_files: A list of metadata files to be added to the provider.
+
+    Returns:
+      An InstrumentedFilesInfo provider.
+    """
     cc_config = ctx.fragments.cpp
     info = coverage_common.instrumented_files_info(
         ctx = ctx,
@@ -314,7 +324,7 @@ def _opentitan_binary(ctx):
 
     providers.append(DefaultInfo(files = depset(default_info), runfiles = runfiles))
     providers.append(OutputGroupInfo(**groups))
-    providers.append(_create_cc_instrumented_files_info(
+    providers.append(create_cc_instrumented_files_info(
         ctx = ctx,
         metadata_files = [],
     ))

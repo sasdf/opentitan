@@ -73,9 +73,6 @@ def main():
 
   files = [e.removeprefix('SF:') for e in view.keys()]
 
-  if 'sw/device/coverage/asm_counters.c' in files:
-    files.remove('sw/device/coverage/asm_counters.c')
-
   diff = subprocess.run([
     'git', 'diff', base_commit, '--', *files
   ], stdout=subprocess.PIPE).stdout.decode()

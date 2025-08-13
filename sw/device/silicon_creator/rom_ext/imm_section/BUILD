@@ -4,6 +4,7 @@
 
 load("@lowrisc_opentitan//rules/opentitan:transform.bzl", "obj_transform")
 load("//rules/coverage:view.bzl", "coverage_view_test")
+load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load("//rules:linker.bzl", "ld_library")
 load(
@@ -25,15 +26,25 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+asm_library_with_coverage(
+    name = "imm_section_start",
+    srcs = ["imm_section_start.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        "//sw/device/coverage:runtime_api_asm",
+        "//sw/device/lib/base:hardened",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+    ],
+    alwayslink = True,
+)
+
 cc_library(
     name = "main_lib",
-    srcs = [
-        "imm_section.c",
-        "imm_section_start.S",
-    ],
+    srcs = ["imm_section.c"],
     hdrs = ["imm_section.h"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
+        ":imm_section_start",
         ":imm_section_epmp",
         ":imm_section_version_def",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",

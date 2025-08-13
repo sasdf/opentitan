@@ -7,6 +7,8 @@
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
 
+// PRAGMA_COVERAGE: section(__llvm_prf_cnts)
+
 /**
  * Helper macro to move v into the correct position to set the pmp{N*4+i}cfg
  * field in the pmpcfg{N} register.
@@ -31,7 +33,7 @@
 
 // -----------------------------------------------------------------------------
 
-  // PRAGMA_COVERAGE: start autogen with register bits
+  // PRAGMA_COVERAGE: start autogen
 
   /**
    * The "ax" flag below is necessary to ensure that this section
@@ -59,7 +61,7 @@ rom_epmp_init:
   // Setup PMP address registers.
 
   // ROM TEXT
-  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 17)
+  COVERAGE_ASM_AUTOGEN_MARK(t6, 0)
   la   t0, _epmp_text_tor_lo
   csrw pmpaddr0, t0
   la   t0, _epmp_text_tor_hi

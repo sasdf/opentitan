@@ -30,11 +30,9 @@
 #define COVERAGE_ASM_REPORT() \
   call coverage_report; \
 
-#define COVERAGE_ASM_MANUAL_MARK_PRF(kTemp, kIndex) \
-  lui kTemp, %hi(_prf_cnts_asm+kIndex); \
-  sb zero, %lo(_prf_cnts_asm+kIndex)(kTemp) \
-
-#define COVERAGE_ASM_MANUAL_MARK_REG COVERAGE_ASM_MANUAL_MARK_PRF
+#define COVERAGE_ASM_AUTOGEN_MARK(kTemp, kIndex) \
+  lui kTemp, %hi(.L__asm_profc + kIndex); \
+  sb zero, %lo(.L__asm_profc + kIndex)(kTemp) \
 
 #else // OT_COVERAGE_INSTRUMENTED
 
@@ -43,14 +41,10 @@
 #define COVERAGE_ASM_BACKUP_COUNTERS(...)
 #define COVERAGE_ASM_RESTORE_COUNTERS(...)
 #define COVERAGE_ASM_REPORT(...)
-#define COVERAGE_ASM_MANUAL_MARK_PRF(...)
-#define COVERAGE_ASM_MANUAL_MARK_REG(...)
+#define COVERAGE_ASM_AUTOGEN_MARK(...)
 
 #endif // OT_COVERAGE_INSTRUMENTED
 
-
-#define COVERAGE_ASM_AUTOGEN_MARK_REG COVERAGE_ASM_MANUAL_MARK_REG
-#define COVERAGE_ASM_AUTOGEN_MARK_PRF COVERAGE_ASM_MANUAL_MARK_PRF
-
+#define COVERAGE_ASM_MANUAL_MARK COVERAGE_ASM_AUTOGEN_MARK
 
 #endif  // OPENTITAN_SW_DEVICE_COVERAGE_RUNTIME_ASM_H_

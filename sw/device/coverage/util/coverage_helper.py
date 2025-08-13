@@ -43,6 +43,7 @@ def parse_llvm_json(lines):
   function_by_sf = defaultdict(list)
   for info in cov['data'][0]['functions']:
     sf = 'SF:' + info['filenames'][0]
+
     regions = [Region(*r) for r in info['regions']]
     # Ensure the first region is the main function body.
     assert regions[0].Kind == 0, regions[0]
@@ -97,7 +98,6 @@ def parse_llvm_json(lines):
 #   macro defined functions can't be detected by disassembly.
 SKIP_DIS = {
   'SF:sw/device/silicon_creator/lib/manifest.h',
-  'SF:sw/device/coverage/asm_counters.c',
 }
 
 def expand_dis_region(dis, segments):

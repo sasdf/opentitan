@@ -6,6 +6,8 @@
 #include "sw/device/coverage/runtime_asm.h"
 #include "sw/device/lib/base/hardened_asm.h"
 
+// PRAGMA_COVERAGE: section(__llvm_prf_cnts)
+
   /**
    * NOTE: The "ax" flag below is necessary to ensure that this section
    * is allocated executable space in ROM by the linker.
@@ -42,7 +44,7 @@ _imm_section_start_boot:
   // NOTE: Coverage transport isn't re-initialized to reuse ROM's settings.
   COVERAGE_ASM_INIT()
 
-  // PRAGMA_COVERAGE: start autogen with register bits
+  // PRAGMA_COVERAGE: start autogen
 
   /**
    * Disable Interrupts.
@@ -52,7 +54,7 @@ _imm_section_start_boot:
    */
 
   // Clear `MIE` field of `mstatus` (disable interrupts globally).
-  COVERAGE_ASM_AUTOGEN_MARK_REG(t6, 45)
+  COVERAGE_ASM_AUTOGEN_MARK(t6, 0)
   csrci mstatus, 0x8
 
   /**

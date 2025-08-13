@@ -29,16 +29,10 @@ BAZEL_ARGS=(
 )
 
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
-COVERAGE_DAT_WITH_ASM="bazel-out/_coverage/_coverage_report_asm.dat"
 
 rm -f "${COVERAGE_DAT}"
 
 ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
-
-python3 sw/device/coverage/util/gen_asm_coverage.py \
-  --coverage="${COVERAGE_DAT}" \
-  --append \
-  --output="${COVERAGE_DAT_WITH_ASM}"
 
 GENHTML_ARGS=(
     --prefix "${PWD}"
@@ -48,7 +42,7 @@ GENHTML_ARGS=(
     # --ignore-errors corrupt
     --html-epilog sw/device/coverage/report_epilog.html
     --output "${COVERAGE_OUTPUT_DIR}"
-    "${COVERAGE_DAT_WITH_ASM}"
+    "${COVERAGE_DAT}"
 )
 
 genhtml "${GENHTML_ARGS[@]}"

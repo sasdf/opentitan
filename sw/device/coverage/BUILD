@@ -9,12 +9,6 @@ load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "asm_counters",
-    srcs = ["asm_counters.c"],
-    alwayslink = True,
-)
-
-cc_library(
     name = "asm_runtime",
     srcs = ["asm_runtime.c"],
     deps = [
@@ -38,7 +32,6 @@ cc_library(
     name = "runtime_api",
     hdrs = ["runtime.h"],
     deps = [
-        ":asm_counters",
         ":empty_runtime",
         "//sw/device/lib/base:macros",
     ],
@@ -48,7 +41,6 @@ cc_library(
     name = "runtime_api_asm",
     hdrs = ["runtime_asm.h"],
     deps = [
-        ":asm_counters",
         ":asm_runtime",
         ":runtime_api",
     ],

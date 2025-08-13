@@ -7,6 +7,8 @@
 #include "sw/device/lib/base/hardened_asm.h"
 #include "otp_ctrl_regs.h"
 
+// PRAGMA_COVERAGE: section(__llvm_prf_cnts)
+
 /**
  * ROM_EXT Interrupt Vector
  */
@@ -92,7 +94,7 @@ _rom_ext_start_boot:
   // It's no-op when coverage mode is not enabled.
   COVERAGE_ASM_INIT()
   COVERAGE_ASM_TRANSPORT_INIT()
-  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 66)
+  COVERAGE_ASM_MANUAL_MARK(t6, 0)
 
   /**
    * Call the .rom_ext_immutable first if it's not called by ROM.
@@ -107,7 +109,7 @@ _rom_ext_start_boot:
   // Re-initialize after returning from immutable section.
   COVERAGE_ASM_INIT()
   COVERAGE_ASM_TRANSPORT_INIT()
-  COVERAGE_ASM_MANUAL_MARK_PRF(t6, 67)
+  COVERAGE_ASM_MANUAL_MARK(t6, 1)
 
   /**
    * Continue booting the mutable rom_ext.

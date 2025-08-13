@@ -6,8 +6,6 @@ from collections import namedtuple
 
 from asm_helper import (
   ASM_FILES,
-  g_available_counters,
-  reserve_manual_counters,
   autogen_counters,
   remove_autogen,
   LINE_COLORS,
@@ -36,9 +34,6 @@ if __name__ == '__main__':
           f.write(lines)
     exit(0)
 
-  for path in args.files:
-    reserve_manual_counters(path)
-
   all_blocks = []
   for path in args.files:
     all_blocks.append(autogen_counters(path))
@@ -66,7 +61,3 @@ if __name__ == '__main__':
         f.write(lines)
     else:
       print(f'Skip saving {path}')
-
-  print('=' * 80)
-  print(f'Remaining {len(g_available_counters)} counters')
-  print(g_available_counters)

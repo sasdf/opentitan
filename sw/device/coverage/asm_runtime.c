@@ -4,29 +4,15 @@
 
 #ifdef OT_COVERAGE_INSTRUMENTED
 
-OT_SECTION("__llvm_prf_cnts_asm")
-uint8_t _prf_cnts_asm[96] = {
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-};
+extern uint8_t __llvm_prf_cnts_start[];
+extern uint8_t __llvm_prf_cnts_end[];
 
 OT_NO_COVERAGE
 uint32_t coverage_backup_asm_counters(uint32_t offset) {
+  int32_t remaining = (int32_t)(__llvm_prf_cnts_end - __llvm_prf_cnts_start);
   uint32_t packed_byte = 0;
-  for (uint8_t k = 0; k < 32; ++k) {
-    uint32_t bit = _prf_cnts_asm[offset + k] == 0 ? 1 : 0;
+  for (uint8_t k = 0; k < 32 && remaining > 0; ++k, remaining--) {
+    uint32_t bit = __llvm_prf_cnts_start[offset + k] == 0 ? 1 : 0;
     packed_byte |= (bit << k);
   }
   return packed_byte;
@@ -34,14 +20,15 @@ uint32_t coverage_backup_asm_counters(uint32_t offset) {
 
 OT_NO_COVERAGE
 void coverage_restore_asm_counters(uint32_t a, uint32_t b) {
-  for (int i=0; i<32; i++) {
+  int32_t remaining = (int32_t)(__llvm_prf_cnts_end - __llvm_prf_cnts_start);
+  for (int i=0; i<32 && remaining > 0; i++, remaining--) {
     if ((a >> i) & 1) {
-      _prf_cnts_asm[i] = 0;
+      __llvm_prf_cnts_start[i] = 0;
     }
   }
-  for (int i=0; i<32; i++) {
+  for (int i=0; i<32 && remaining > 0; i++, remaining--) {
     if ((b >> i) & 1) {
-      _prf_cnts_asm[i+32] = 0;
+      __llvm_prf_cnts_start[i+32] = 0;
     }
   }
 }

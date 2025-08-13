@@ -38,7 +38,6 @@ for view_dat in $view_files; do
     echo "INFO: Baseline coverage cached to '${cached_zip}'."
 done
 
-
 if [[ "${#TARGETS[@]}" == "0" ]]; then
     for test_group_name in "${TEST_GROUPS[@]}"; do
         test_group_expr="${test_group_name}[@]"
@@ -64,23 +63,9 @@ python3 sw/device/coverage/util/genfiles_coverage.py \
   --lcov_files="${LCOV_FILES}" \
   --output="${MERGED_DAT}"
 
-ASM_COVERAGE="${VIEW_CACHE_DIR}/asm_coverage.dat"
-python3 sw/device/coverage/util/gen_asm_coverage.py \
-  --coverage="${MERGED_DAT}" \
-  --output="${ASM_COVERAGE}"
-bash ./run_genhtml.sh \
-    "${ASM_COVERAGE}" \
-    "${COVERAGE_OUTPUT_DIR}/asm_coverage/"
-
-COVERAGE_DAT_WITH_ASM="${VIEW_CACHE_DIR}/coverage_report_asm.dat"
-python3 sw/device/coverage/util/gen_asm_coverage.py \
-  --coverage="${MERGED_DAT}" \
-  --append \
-  --output="${COVERAGE_DAT_WITH_ASM}"
-
 if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
-        "${COVERAGE_DAT_WITH_ASM}" \
+        "${MERGED_DAT}" \
         "${COVERAGE_OUTPUT_DIR}/no_view/"
 else
     for cached_zip in "${CACHED_VIEWS[@]}"; do
@@ -92,7 +77,7 @@ else
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --view="${cached_zip}" \
-          --coverage="${COVERAGE_DAT_WITH_ASM}" \
+          --coverage="${MERGED_DAT}" \
           --use_disassembly \
           --output="${filtered_dat}"
 
@@ -116,7 +101,7 @@ else
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --view "${group_zip[@]}" \
-          --coverage="${COVERAGE_DAT_WITH_ASM}" \
+          --coverage="${MERGED_DAT}" \
           --use_disassembly \
           --output="${filtered_dat}"
 
@@ -133,7 +118,7 @@ else
     output_dir="${COVERAGE_OUTPUT_DIR}/all_views"
     python3 sw/device/coverage/util/coverage_filter.py \
       --view "${CACHED_VIEWS[@]}" \
-      --coverage="${COVERAGE_DAT_WITH_ASM}" \
+      --coverage="${MERGED_DAT}" \
       --use_disassembly \
       --output="${filtered_dat}"
 
