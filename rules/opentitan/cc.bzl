@@ -15,7 +15,7 @@ load("@lowrisc_opentitan//rules/opentitan:util.bzl", "get_fallback", "get_overri
 load("@lowrisc_opentitan//rules:rv.bzl", "rv_rule")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
-load("//rules/opentitan:util.bzl", "assemble_for_test")
+load("//rules/opentitan:util.bzl", "assemble_for_test", "recursive_format")
 
 def create_cc_instrumented_files_info(ctx, metadata_files):
     """Creates an InstrumentedFilesInfo provider to be added to the target.
@@ -187,7 +187,7 @@ def _binary_name(ctx, exec_env):
         exec_env = exec_env.exec_env,
     )
 
-def _build_binary(ctx, exec_env, name, deps, kind, linkopts):
+def _build_binary(ctx, exec_env, name, deps, kind):
     """Build a binary, sign and perform output file transformations.
 
     This function is the core of the `opentitan_binary` and `opentitan_test`
@@ -203,6 +203,12 @@ def _build_binary(ctx, exec_env, name, deps, kind, linkopts):
       (dict, dict): A dict of output artifacts and a dict of signing artifacts.
     """
     linker_script = get_fallback(ctx, "attr.linker_script", exec_env)
+
+    slot_spec = dict(exec_env.slot_spec)
+    slot_spec.update(ctx.attr.slot_spec)
+
+    linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
+
     elf, mapfile, objects = ot_binary(
         ctx,
         name = name,
@@ -282,13 +288,8 @@ def _opentitan_binary(ctx):
         for dep in deps:
             runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
 
-        slot_spec = dict(exec_env.slot_spec)
-        slot_spec.update(ctx.attr.slot_spec)
-
-        linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
-
         kind = ctx.attr.kind
-        provides, signed = _build_binary(ctx, exec_env, name, deps, kind, linkopts)
+        provides, signed = _build_binary(ctx, exec_env, name, deps, kind)
         providers.append(exec_env.provider(kind = kind, **provides))
         default_info.append(provides["default"])
         default_info.append(provides["elf"])
@@ -442,16 +443,11 @@ _testing_bitstream = transition(
 def _opentitan_test(ctx):
     exec_env = ctx.attr.exec_env[ExecEnvInfo]
 
-    slot_spec = dict(exec_env.slot_spec)
-    slot_spec.update(ctx.attr.slot_spec)
-
-    linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
-
     if ctx.attr.srcs or ctx.attr.deps:
         name = _binary_name(ctx, exec_env)
         deps = ctx.attr.deps + exec_env.libs
         kind = ctx.attr.kind
-        provides, signed = _build_binary(ctx, exec_env, name, deps, kind, linkopts)
+        provides, signed = _build_binary(ctx, exec_env, name, deps, kind)
         p = exec_env.provider(**provides)
     else:
         p = None
@@ -574,9 +570,7 @@ def _opentitan_binary_assemble_impl(ctx):
         action_param.update(exec_env.slot_spec)
 
         spec = " ".join(spec)
-        for _ in range(10):
-            # Recursive evaluation of the assemble spec
-            spec = spec.format(**action_param)
+        spec = recursive_format(spec, action_param)
         spec = spec.split(" ")
 
         # Generate the multislot bin.

@@ -12,6 +12,7 @@ load(
     "@lowrisc_opentitan//rules/opentitan:util.bzl",
     "assemble_for_test",
     "get_fallback",
+    "recursive_format",
 )
 load(
     "//rules/opentitan:exec_env.bzl",
@@ -133,10 +134,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         assemble = param.get("assemble")
         if "instrumented_rom" in action_param and "instrumented_rom" not in assemble:
           assemble += " {instrumented_rom}@{instrumented_rom_slot}"
-
-        for _ in range(10):
-            # Recursive evaluation of the assemble spec
-            assemble = assemble.format(**action_param)
+        assemble = recursive_format(assemble, action_param)
         assemble = ctx.expand_location(assemble, data_labels)
         image = assemble_for_test(
             ctx,
