@@ -82,8 +82,8 @@ rom_error_t sigverify_with_bad_signature_test(void) {
   uint32_t recovered_r[kEcdsaP256SignatureComponentWords];
   ecdsa_p256_public_key_t kCorruptedKey = kEcdsaKey;
   kCorruptedKey.x[0]++;
-  CHECK(otbn_boot_sigverify(&kCorruptedKey, &kEcdsaSignature, &digest, recovered_r) ==
-       kErrorSigverifyBadEcdsaSignature);
+  CHECK(otbn_boot_sigverify(&kCorruptedKey, &kEcdsaSignature, &digest,
+                            recovered_r) == kErrorSigverifyBadEcdsaSignature);
   return kErrorOk;
 }
 

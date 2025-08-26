@@ -935,9 +935,9 @@ static rom_error_t spx_verify_enabled_bad_config_test(void) {
   enable_spx_verify();
 
   uint32_t flash_exec = 0;
-  rom_error_t error = sigverify_spx_verify(
-      NULL, &kPubKey, /*config=*/0, kLcStateProd, NULL, 0, NULL, 0, NULL, 0,
-      NULL, &flash_exec);
+  rom_error_t error =
+      sigverify_spx_verify(NULL, &kPubKey, /*config=*/0, kLcStateProd, NULL, 0,
+                           NULL, 0, NULL, 0, NULL, &flash_exec);
 
   if (error != kErrorSigverifyBadSpxConfig) {
     LOG_ERROR("error must be 0x%08x, not 0x%08x", kErrorSigverifyBadSpxConfig,
