@@ -170,6 +170,14 @@ SRAM_EXEC_TESTCASES = [
             changes_otp = True,
             exit_success = test["exit_success"],
             rom_ext = test["rom_ext"],
+            test_cmd = """
+                --exec="transport init"
+                --exec="fpga clear-bitstream"
+                --exec="fpga load-bitstream {bitstream}"
+                --exec="bootstrap --clear-uart=true {firmware}"
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                no-op
+            """,
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
         deps = [

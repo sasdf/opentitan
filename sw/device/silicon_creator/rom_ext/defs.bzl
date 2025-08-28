@@ -87,14 +87,12 @@ TEST_OWNER_CONFIGS = {
     "owner_sram_exec_enabled": {
         "owner_defines": [
             "TEST_OWNER_SRAM_EXEC_MODE=kOwnerSramExecModeEnabled",
-            "TEST_OWNER_FORCE_UPDATE=1",
         ],
         "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
     },
     "owner_sram_exec_disabled": {
         "owner_defines": [
             "TEST_OWNER_SRAM_EXEC_MODE=kOwnerSramExecModeDisabled",
-            "TEST_OWNER_FORCE_UPDATE=1",
         ],
         "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
     },
