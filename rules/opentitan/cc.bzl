@@ -6,7 +6,6 @@ load(
     "@lowrisc_opentitan//rules/opentitan:transform.bzl",
     "convert_to_vmem",
     "obj_disassemble",
-    "obj_tarball",
     "obj_transform",
 )
 load("@lowrisc_opentitan//rules:signing.bzl", "sign_binary")
@@ -69,7 +68,7 @@ def ot_binary(ctx, **kwargs):
         linker_script: Linker script for this binary.
         linkopts: Extra linker options for this binary.
     Returns:
-      (elf_file, map_file, objects) File objects.
+      (elf_file, map_file) File objects.
     """
     cc_toolchain = find_cc_toolchain(ctx)
     features = cc_common.configure_features(
@@ -139,13 +138,7 @@ def ot_binary(ctx, **kwargs):
         additional_outputs = [mapfile],
     )
 
-    objects = []
-    for linking_ctx in linking_contexts:
-        for inp in linking_ctx.linker_inputs.to_list():
-            for lib in inp.libraries:
-                objects.extend(lib.objects)
-
-    return lout.executable, mapfile, objects
+    return lout.executable, mapfile
 
 def _as_group_info(name, items):
     """Prepare a dict of files for OutputGroupInfo.
@@ -209,7 +202,7 @@ def _build_binary(ctx, exec_env, name, deps, kind):
 
     linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
 
-    elf, mapfile, objects = ot_binary(
+    elf, mapfile = ot_binary(
         ctx,
         name = name,
         deps = deps,
@@ -253,12 +246,6 @@ def _build_binary(ctx, exec_env, name, deps, kind):
         src = elf,
     )
 
-    tarball = obj_tarball(
-        ctx,
-        name = name,
-        srcs = objects,
-    )
-
     provides = exec_env.transform(
         ctx,
         exec_env,
@@ -269,7 +256,6 @@ def _build_binary(ctx, exec_env, name, deps, kind):
         disassembly = disassembly,
         mapfile = mapfile,
     )
-    provides["objects"] = tarball
     return provides, signed
 
 def _opentitan_binary(ctx):
@@ -297,7 +283,6 @@ def _opentitan_binary(ctx):
         runfiles = runfiles.merge(ctx.runfiles(files = [
             provides["elf"],
             provides["disassembly"],
-            provides["objects"],
         ]))
 
         # FIXME(cfrantz): logs are a special case and get added into

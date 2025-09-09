@@ -26,7 +26,7 @@ ld_library(
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
         "//sw/device:info_sections",
-        "//sw/device/coverage:llvm_prf_cnts",
+        "//sw/device/coverage:coverage_sections",
         "//sw/device/silicon_creator/lib/base:static_critical_sections",
     ],
 )

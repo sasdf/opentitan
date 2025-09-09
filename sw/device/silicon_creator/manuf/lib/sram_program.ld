@@ -124,7 +124,7 @@ SECTIONS {
 
   } > ram_main : sram_segment
 
+  INCLUDE sw/device/coverage/bss.ld
+
   INCLUDE sw/device/info_sections.ld
 }
-
-INCLUDE sw/device/coverage/llvm_prf_cnts.ld

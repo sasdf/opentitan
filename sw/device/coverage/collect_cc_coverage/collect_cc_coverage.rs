@@ -97,7 +97,7 @@ fn main() -> Result<()> {
         let profdata_file = path.with_extension("xprofdata");
         let lcov_file = path.with_extension("dat");
         llvm_profdata_merge(&profraw_file, &profdata_file);
-        llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_file);
+        llvm_cov_export("lcov", &profdata_file, &profile.elf, &lcov_file);
         let output_lcov_file = output_dir.join(lcov_file.file_name().unwrap());
         fs::copy(&lcov_file, &output_lcov_file)?;
     }

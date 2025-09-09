@@ -15,7 +15,6 @@ rust_library(
         "@crate_index//:hex",
         "@crate_index//:object",
         "@crate_index//:rand",
-        "@crate_index//:tar",
         "@crate_index//:zerocopy",
     ],
 )

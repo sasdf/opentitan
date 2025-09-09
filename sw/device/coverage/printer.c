@@ -32,7 +32,7 @@ extern char _build_id_end[];
  * for more information.
  */
 
-OT_SET_BSS_SECTION("__llvm_prf_noinit", int __llvm_profile_runtime;
+OT_SET_BSS_SECTION("__ot_coverage_bss", int __llvm_profile_runtime;
                    static uint32_t coverage_status;
                    static uint32_t coverage_crc; static char send_buf[0x100];);
 

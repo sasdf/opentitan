@@ -228,7 +228,7 @@ SECTIONS {
     _bss_end = .;
   } > ram_main
 
+  INCLUDE sw/device/coverage/bss.ld
+
   INCLUDE sw/device/info_sections.ld
 }
-
-INCLUDE sw/device/coverage/llvm_prf_cnts.ld

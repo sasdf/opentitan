@@ -30,14 +30,6 @@ echo "Linking"
 echo "  $dis"
 echo "To"
 echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.dis"
-
-tar="$(realpath "{tar_file}")"
-ln -s "$tar" "${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.objs.tar"
-ls -lah "$tar"
-echo "Linking"
-echo "  $tar"
-echo "To"
-echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.objs.tar"
 """
 
 def _coverage_view_test(ctx):
@@ -45,7 +37,6 @@ def _coverage_view_test(ctx):
     elf_label = ctx.attr.elf
     elf = get_one_binary_file(elf_label, field = "elf", providers = [SiliconBinaryInfo])
     dis = get_one_binary_file(elf_label, field = "disassembly", providers = [SiliconBinaryInfo])
-    tar = get_one_binary_file(elf_label, field = "objects", providers = [SiliconBinaryInfo])
 
     # Nop test
     script = ctx.actions.declare_file(ctx.attr.name + ".bash")
@@ -54,13 +45,12 @@ def _coverage_view_test(ctx):
         _TEST_SCRIPT.format(
             elf_file = elf.short_path,
             dis_file = dis.short_path,
-            tar_file = tar.short_path,
         ),
         is_executable = True,
     )
 
     # Propagate all runfiles from elf attr
-    runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis, tar])
+    runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis])
     runfiles = runfiles.merge(ctx.attr.elf[DefaultInfo].default_runfiles)
 
     # FIXME: workaround due to missing tools_path in rules_cc toolchain.

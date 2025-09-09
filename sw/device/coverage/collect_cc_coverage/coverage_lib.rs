@@ -32,7 +32,6 @@ use std::process;
 use zerocopy::AsBytes;
 
 use std::fs::File;
-use tar::Archive;
 
 pub const BUILD_ID_SIZE: usize = 20;
 pub const PRF_MAGIC: u64 = 0xff6c70726f665281;
@@ -128,7 +127,6 @@ pub struct ProfileCounter {
 pub struct ProfileData {
     pub build_id: String,
     pub elf: PathBuf,
-    pub objects: Vec<String>,
     pub file_name: String,
     pub header: ProfileHeader,
     pub cnts_size: u64,
@@ -167,7 +165,6 @@ pub fn process_elf(path: &PathBuf) -> Result<ProfileData> {
     Ok(ProfileData {
         build_id: build_id,
         elf: path.clone(),
-        objects: load_object_list(&path.with_extension("objs.tar"))?,
         file_name,
         header: ProfileHeader {
             Magic: PRF_MAGIC,
@@ -382,7 +379,7 @@ pub fn llvm_profdata_merge(profraw_file: &PathBuf, profdata_file: &PathBuf) {
 pub fn llvm_cov_export(
     format: &str,
     profdata_file: &PathBuf,
-    objects: &Vec<String>,
+    elf: &PathBuf,
     output_file: &PathBuf,
 ) {
     let execroot = PathBuf::from(env::var("ROOT").unwrap());
@@ -390,7 +387,7 @@ pub fn llvm_cov_export(
 
     // "${LLVM_COV}" export -instr-profile "${profdata_file" -format=lcov \
     //     -ignore-filename-regex='^/tmp/.+' \
-    //     ${objects} | sed 's#/proc/self/cwd/##' > "${output_file}"
+    //     ${elf} | sed 's#/proc/self/cwd/##' > "${output_file}"
     let mut llvm_cov_cmd = process::Command::new(llvm_cov);
     llvm_cov_cmd
         .arg("export")
@@ -400,7 +397,7 @@ pub fn llvm_cov_export(
         .arg("-ignore-filename-regex='.*external/.+'")
         .arg("-ignore-filename-regex='/tmp/.+'")
         .arg(format!("-path-equivalence=.,'{}'", execroot.display()))
-        .args(objects)
+        .arg(elf)
         .stdout(process::Stdio::piped());
 
     debug_log!("Spawning {:#?}", llvm_cov_cmd);
@@ -435,39 +432,10 @@ pub fn generate_view(profile: &ProfileData) -> Result<()> {
     let bazel_output_file = coverage_dir.join("coverage.dat");
     generate_view_profraw(&profile, &profraw_file)?;
     llvm_profdata_merge(&profraw_file, &profdata_file);
-    llvm_cov_export("lcov", &profdata_file, &profile.objects, &lcov_output_file);
-    llvm_cov_export("lcov", &profdata_file, &profile.objects, &bazel_output_file);
-    llvm_cov_export("text", &profdata_file, &profile.objects, &json_output_file);
+    llvm_cov_export("lcov", &profdata_file, &profile.elf, &lcov_output_file);
+    llvm_cov_export("lcov", &profdata_file, &profile.elf, &bazel_output_file);
+    llvm_cov_export("text", &profdata_file, &profile.elf, &json_output_file);
     Ok(())
-}
-
-pub fn load_object_list(path: &PathBuf) -> Result<Vec<String>> {
-    let tmp_dir = PathBuf::from(env::var("TEST_TMPDIR").unwrap());
-
-    // create a random temp dir under `tmp_dir`
-    let tmp_dir = tmp_dir.join(format!("objs-{}", rand::random::<u64>()));
-    fs::create_dir_all(&tmp_dir).context("failed to create temporary directory")?;
-
-    debug_log!(
-        "Extracting archive {} to {}",
-        path.display(),
-        tmp_dir.display()
-    );
-
-    let mut ar = Archive::new(File::open(path)?);
-
-    // unpack to $i.o for each i, e in enumerate(ar.entries)
-    let mut results: Vec<String> = Vec::new();
-    for (i, entry) in ar.entries()?.enumerate() {
-        let mut entry = entry?;
-        let path = tmp_dir.join(format!("{}.o", i));
-        let path = path.to_str().unwrap().to_owned();
-        entry.unpack(&path)?;
-        results.push("-object".to_string());
-        results.push(path);
-    }
-
-    return Ok(results);
 }
 
 fn merge_sf_count_copies(contents: &str) -> Result<String> {

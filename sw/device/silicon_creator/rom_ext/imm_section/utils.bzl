@@ -70,8 +70,7 @@ def _choose_one_build(src):
     # exec env.
     bin = get_one_binary_file(src, field = "binary", providers = [SiliconBinaryInfo])
     elf = get_one_binary_file(src, field = "elf", providers = [SiliconBinaryInfo])
-    objects = get_one_binary_file(src, field = "objects", providers = [SiliconBinaryInfo])
-    return bin, [elf, objects]
+    return bin, [elf]
 
 def _create_imm_section_targets_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)

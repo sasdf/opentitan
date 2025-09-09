@@ -156,6 +156,8 @@ SECTIONS {
     _bss_end = .;
   } > ram_main
 
+  INCLUDE sw/device/coverage/bss.ld
+
   INCLUDE sw/device/info_sections.ld
 
   /**
@@ -173,5 +175,3 @@ SECTIONS {
       "Error: immutable section version string should be exactly 32 bytes");
   } > rom_ext_flash
 }
-
-INCLUDE sw/device/coverage/llvm_prf_cnts.ld

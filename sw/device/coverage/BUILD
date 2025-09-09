@@ -132,9 +132,10 @@ alias(
 )
 
 ld_library(
-    name = "llvm_prf_cnts",
+    name = "coverage_sections",
     includes = [
-        "llvm_prf_cnts.ld",
+        "bss.ld",
+        "info.ld",
         "rodata.ld",
     ],
 )

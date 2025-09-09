@@ -241,6 +241,8 @@ SECTIONS {
     *(.freertos.heap)
   } > ram_main :freertos_segment
 
+  INCLUDE sw/device/coverage/bss.ld
+
   /**
    * Non-volatile scratch and counter areas for tests.
    *
@@ -317,5 +319,3 @@ SECTIONS {
 
   INCLUDE sw/device/info_sections.ld
 }
-
-INCLUDE sw/device/coverage/llvm_prf_cnts.ld
