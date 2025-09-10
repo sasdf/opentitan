@@ -362,6 +362,7 @@ def iter_lcov_paths(lcov_files_path):
 
 def _process_lcov_contents(lcov):
   coverage = parse_lcov(lcov.coverage.decode().splitlines())
+  coverage = normalize_genfiles(coverage)
   coverage = merge_inlined_copies(coverage)
   return lcov._replace(coverage=coverage)
 
@@ -409,6 +410,7 @@ def collect_test_vectors(view_path, lcov_files_path):
   print(f'Loading {view_path}', file=sys.stderr)
   with open(view_path) as f:
     view = parse_lcov(f.readlines())
+    view = normalize_genfiles(view)
     view = merge_inlined_copies(view)
 
   sf_keys = sorted(view.keys())
@@ -482,6 +484,7 @@ def load_view_zip(zip_path, use_disassembly):
       view = parse_lcov(f.read().decode().splitlines())
     # Ignore objects that are discarded in the final firmware
     view = strip_discarded(view)
+    view = normalize_genfiles(view)
 
     if use_disassembly:
       with view_zip.open('test.dis', 'r') as f:
@@ -489,6 +492,7 @@ def load_view_zip(zip_path, use_disassembly):
       with view_zip.open('coverage.json', 'r') as f:
         segments = parse_llvm_json(f.read().decode())
       compiled = expand_dis_region(compiled, segments)
+      compiled = normalize_genfiles(compiled)
 
       # Use normal view coverage for these files.
       for sf in SKIP_DIS:
@@ -498,3 +502,21 @@ def load_view_zip(zip_path, use_disassembly):
       # apply a and filter here to remove them.
       view = and_coverage(compiled, view)
   return view
+
+def normalize_genfiles(coverage):
+  coverage = defaultdict(lambda: MISSING, coverage)
+  for sf, a in list(coverage.items()):
+    if sf.startswith('SF:bazel-out/k8-fastbuild-'):
+      # From SF:bazel-out/k8-fastbuild-ST-1f195ba657d8/bin/sw/...
+      # To SF:bazel-out/k8-fastbuild/bin/sw/...
+      normalized = re.sub(r'^(.*?/k8-fastbuild)-[^/]+(/.*)$', r'\1\2', sf)
+
+      del coverage[sf]
+      b = coverage[normalized]
+      coverage[normalized] = FileProfile(
+        sf=normalized,
+        fn=or_dict(a.fn, b.fn),
+        fnda=add_dict(a.fnda, b.fnda),
+        da=add_dict(a.da, b.da),
+      )
+  return coverage

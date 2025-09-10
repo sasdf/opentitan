@@ -57,15 +57,9 @@ echo "Collect overall coverage"
 rm -f "${COVERAGE_DAT}"
 ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
-MERGED_DAT="${VIEW_CACHE_DIR}/merged_coverage.dat"
-python3 sw/device/coverage/util/genfiles_coverage.py \
-  --coverage="${COVERAGE_DAT}" \
-  --lcov_files="${LCOV_FILES}" \
-  --output="${MERGED_DAT}"
-
 if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
-        "${MERGED_DAT}" \
+        "${COVERAGE_DAT}" \
         "${COVERAGE_OUTPUT_DIR}/no_view/"
 else
     for cached_zip in "${CACHED_VIEWS[@]}"; do
@@ -77,7 +71,7 @@ else
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --view="${cached_zip}" \
-          --coverage="${MERGED_DAT}" \
+          --coverage="${COVERAGE_DAT}" \
           --use_disassembly \
           --output="${filtered_dat}"
 
@@ -101,7 +95,7 @@ else
 
         python3 sw/device/coverage/util/coverage_filter.py \
           --view "${group_zip[@]}" \
-          --coverage="${MERGED_DAT}" \
+          --coverage="${COVERAGE_DAT}" \
           --use_disassembly \
           --output="${filtered_dat}"
 
@@ -118,7 +112,7 @@ else
     output_dir="${COVERAGE_OUTPUT_DIR}/all_views"
     python3 sw/device/coverage/util/coverage_filter.py \
       --view "${CACHED_VIEWS[@]}" \
-      --coverage="${MERGED_DAT}" \
+      --coverage="${COVERAGE_DAT}" \
       --use_disassembly \
       --output="${filtered_dat}"
 

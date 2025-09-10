@@ -3,7 +3,7 @@
 import argparse
 import re
 
-from coverage_helper import parse_lcov
+from coverage_helper import parse_lcov, normalize_genfiles
 
 path = './bazel-out/_coverage/view/all_views.dat'
 
@@ -20,6 +20,7 @@ def main():
 
   with open(args.path) as f:
     coverage = parse_lcov(f.read().splitlines())
+    coverage = normalize_genfiles(coverage)
 
   for sf, cov in sorted(coverage.items()):
     if any(sf.startswith('SF:' + e) for e in IGNORE):
