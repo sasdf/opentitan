@@ -10,7 +10,6 @@ from coverage_helper import (
   filter_coverage,
   merge_inlined_copies,
   generate_lcov,
-  normalize_genfiles,
 )
 
 
@@ -25,14 +24,12 @@ def main():
   all_views = {}
   for zip_path in args.view:
     view = load_view_zip(zip_path, args.use_disassembly)
-    view = normalize_genfiles(view)
     all_views = or_coverage(all_views, view)
   view = all_views
 
   # Read the coverage file to filter
   with open(args.coverage, 'r') as f:
     coverage = parse_lcov(f.readlines())
-    coverage = normalize_genfiles(coverage)
   original_coverage = coverage
 
   # Filter the coverage
