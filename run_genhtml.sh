@@ -6,11 +6,11 @@ GENHTML_ARGS=(
     --ignore-errors inconsistent
     --ignore-errors category
     # --ignore-errors corrupt
-    --exclude sw/device/coverage/
+    --exclude sw/device/lib/coverage/
     --exclude sw/otbn/crypto/run_p256.s
     --exclude sw/otbn/crypto/tests/
     --ignore-errors unused
-    --html-epilog sw/device/coverage/report_epilog.html
+    --html-epilog util/coverage_new/report_epilog.html
 )
 
 # function to run genhtml

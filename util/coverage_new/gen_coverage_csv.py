@@ -8,7 +8,7 @@ from coverage_helper import parse_lcov, normalize_genfiles
 path = './bazel-out/_coverage/view/all_views.dat'
 
 IGNORE = [
-  "sw/device/coverage/",
+  "sw/device/lib/coverage/",
   "sw/otbn/crypto/run_p256.s",
   "sw/otbn/crypto/tests/",
 ]

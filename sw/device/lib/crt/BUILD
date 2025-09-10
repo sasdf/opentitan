@@ -12,6 +12,6 @@ asm_library_with_coverage(
     srcs = ["crt.S"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
-        "//sw/device/coverage:runtime_api_asm",
+        "//sw/device/lib/coverage:api_asm",
     ],
 )

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
-#include "sw/device/coverage/runtime_asm.h"
+#include "sw/device/lib/coverage/api_asm.h"
 #include "sw/device/lib/base/hardened_asm.h"
 
 // PRAGMA_COVERAGE: section(__llvm_prf_cnts)

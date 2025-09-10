@@ -14,7 +14,7 @@
  * what these functions
  */
 
-#include "sw/device/coverage/runtime_asm.h"
+#include "sw/device/lib/coverage/api_asm.h"
 
 // PRAGMA_COVERAGE: section(__llvm_prf_cnts_head)
 

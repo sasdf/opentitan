@@ -157,7 +157,7 @@ SECTIONS {
 
   } > ottf_flash
 
-  INCLUDE sw/device/coverage/rodata.ld
+  INCLUDE sw/device/lib/coverage/rodata.ld
 
   /**
    * Standard mutable data section, at the bottom of RAM. This will be
@@ -241,7 +241,7 @@ SECTIONS {
     *(.freertos.heap)
   } > ram_main :freertos_segment
 
-  INCLUDE sw/device/coverage/bss.ld
+  INCLUDE sw/device/lib/coverage/bss.ld
 
   /**
    * Non-volatile scratch and counter areas for tests.

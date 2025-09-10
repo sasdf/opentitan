@@ -30,7 +30,7 @@ cc_library(
     hdrs = ["coverage.h"],
     features = ["-coverage"],
     deps = [
-        "//sw/device/coverage:printer",
+        "//sw/device/lib/coverage:printer",
         "//sw/device/lib/base:crc32",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/runtime:log",
@@ -85,7 +85,7 @@ ld_library(
     includes = ["ottf_common.ld"],
     deps = [
         "//sw/device:info_sections",
-        "//sw/device/coverage:coverage_sections",
+        "//sw/device/lib/coverage:coverage_sections",
         "//sw/device/silicon_creator/lib/base:static_critical_sections",
     ],
 )
@@ -222,7 +222,7 @@ cc_library(
         ":ottf_isrs",
         ":test_framework_manifest_def",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:ottf_runtime",
+        "//sw/device/lib/coverage:ottf_runtime",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/crt",
@@ -285,8 +285,8 @@ cc_library(
         ":ottf_start",
         ":ottf_test_config",
         ":status",
-        "//sw/device/coverage:ottf_runtime",
-        "//sw/device/coverage:runtime_api",
+        "//sw/device/lib/coverage:ottf_runtime",
+        "//sw/device/lib/coverage:api",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:mmio",
@@ -361,7 +361,7 @@ dual_cc_library(
             "//sw/device/lib/runtime:irq",
             "//sw/device/lib/testing:spi_device_testutils",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-            "//sw/device/coverage:ottf_runtime",
+            "//sw/device/lib/coverage:ottf_runtime",
         ],
         shared = [
             ":ottf_test_config",

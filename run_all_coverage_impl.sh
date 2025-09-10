@@ -69,7 +69,7 @@ else
         output_dir="${COVERAGE_OUTPUT_DIR}/${view_name}"
         echo "Filter with view '${view_name}'"
 
-        python3 sw/device/coverage/util/coverage_filter.py \
+        python3 util/coverage_new/coverage_filter.py \
           --view="${cached_zip}" \
           --coverage="${COVERAGE_DAT}" \
           --use_disassembly \
@@ -79,7 +79,7 @@ else
             "${filtered_dat}" \
             "${output_dir}"
 
-        python3 sw/device/coverage/util/gen_coverage_csv.py \
+        python3 util/coverage_new/gen_coverage_csv.py \
           --path="${filtered_dat}" \
           > "${output_dir}/coverage.csv"
     done
@@ -93,7 +93,7 @@ else
         output_dir="${COVERAGE_OUTPUT_DIR}/${group_name,,}"
         echo "Filter with view group '${group_name,,}'"
 
-        python3 sw/device/coverage/util/coverage_filter.py \
+        python3 util/coverage_new/coverage_filter.py \
           --view "${group_zip[@]}" \
           --coverage="${COVERAGE_DAT}" \
           --use_disassembly \
@@ -103,14 +103,14 @@ else
             "${filtered_dat}" \
             "${output_dir}"
 
-        python3 sw/device/coverage/util/gen_coverage_csv.py \
+        python3 util/coverage_new/gen_coverage_csv.py \
           --path="${filtered_dat}" \
           > "${output_dir}/coverage.csv"
     done
 
     filtered_dat="${VIEW_CACHE_DIR}/all_views.dat"
     output_dir="${COVERAGE_OUTPUT_DIR}/all_views"
-    python3 sw/device/coverage/util/coverage_filter.py \
+    python3 util/coverage_new/coverage_filter.py \
       --view "${CACHED_VIEWS[@]}" \
       --coverage="${COVERAGE_DAT}" \
       --use_disassembly \
@@ -120,7 +120,7 @@ else
         "${filtered_dat}" \
         "${output_dir}"
 
-    python3 sw/device/coverage/util/gen_coverage_csv.py \
+    python3 util/coverage_new/gen_coverage_csv.py \
       --path="${filtered_dat}" \
       > "${output_dir}/coverage.csv"
 fi
@@ -129,7 +129,7 @@ echo "Save test target list"
 printf '%s\n' "${TARGETS[@]}" | sort | uniq > "${COVERAGE_OUTPUT_DIR}/test_targets.txt"
 
 echo "Save ToE source diff"
-python3 sw/device/coverage/util/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
+python3 util/coverage_new/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
 
 echo "Save ROM source diff"
-python3 sw/device/coverage/util/show_rom_diff.py > "${COVERAGE_OUTPUT_DIR}/taped_out_rom.diff"
+python3 util/coverage_new/show_rom_diff.py > "${COVERAGE_OUTPUT_DIR}/taped_out_rom.diff"

@@ -74,7 +74,7 @@ ld_library(
     includes = ["rom_common.ld"],
     deps = [
         "//sw/device:info_sections",
-        "//sw/device/coverage:coverage_sections",
+        "//sw/device/lib/coverage:coverage_sections",
     ],
 )
 
@@ -85,7 +85,7 @@ ld_library(
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
         #"//sw/device:info_sections",
-        #"//sw/device/coverage:coverage_sections",
+        #"//sw/device/lib/coverage:coverage_sections",
     ],
 )
 
@@ -96,7 +96,7 @@ ld_library(
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
         #"//sw/device:info_sections",
-        #"//sw/device/coverage:coverage_sections",
+        #"//sw/device/lib/coverage:coverage_sections",
     ],
 )
 
@@ -110,7 +110,7 @@ asm_library_with_coverage(
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:runtime_api_asm",
+        "//sw/device/lib/coverage:api_asm",
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:macros",
     ],
@@ -152,9 +152,9 @@ asm_library_with_coverage(
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:runtime_api",
-        "//sw/device/coverage:runtime_api_asm",
-        "//sw/device/coverage:uart_runtime",
+        "//sw/device/lib/coverage:api",
+        "//sw/device/lib/coverage:api_asm",
+        "//sw/device/lib/coverage:uart_runtime",
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:multibits",
         "//sw/device/silicon_creator/lib/base:chip",
@@ -197,7 +197,7 @@ cc_library(
         ":sigverify_keys_spx",
         ":sigverify_otp_keys",
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
-        "//sw/device/coverage:runtime_api",
+        "//sw/device/lib/coverage:api",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
@@ -328,7 +328,7 @@ asm_library_with_coverage(
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:runtime_api_asm",
+        "//sw/device/lib/coverage:api_asm",
         "//sw/device/silicon_creator/lib:epmp_state",
     ],
 )
@@ -341,7 +341,7 @@ cc_library(
     deps = [
         ":rom_epmp_init",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/coverage:runtime_api_asm",
+        "//sw/device/lib/coverage:api_asm",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:memory",

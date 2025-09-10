@@ -74,7 +74,7 @@ SECTIONS {
     __rodata_end = .;
   } > ram_main : sram_segment
 
-  INCLUDE sw/device/coverage/rodata.ld
+  INCLUDE sw/device/lib/coverage/rodata.ld
 
   .data : ALIGN(4) {
     /* This will get loaded into `gp`, and the linker will use that register for
@@ -124,7 +124,7 @@ SECTIONS {
 
   } > ram_main : sram_segment
 
-  INCLUDE sw/device/coverage/bss.ld
+  INCLUDE sw/device/lib/coverage/bss.ld
 
   INCLUDE sw/device/info_sections.ld
 }

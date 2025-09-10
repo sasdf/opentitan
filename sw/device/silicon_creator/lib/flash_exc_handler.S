@@ -12,7 +12,7 @@
  * name of the general interrupt handler for the respective target.
  */
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
-#include "sw/device/coverage/runtime_asm.h"
+#include "sw/device/lib/coverage/api_asm.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/hardened_asm.h"
 #include "flash_ctrl_regs.h"

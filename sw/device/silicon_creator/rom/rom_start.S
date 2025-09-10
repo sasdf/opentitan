@@ -5,7 +5,7 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
 #include "sw/device/lib/base/hardened_asm.h"
 #include "sw/device/lib/base/multibits_asm.h"
-#include "sw/device/coverage/runtime_asm.h"
+#include "sw/device/lib/coverage/api_asm.h"
 #include "sw/device/silicon_creator/lib/base/chip.h"
 #include "sw/device/silicon_creator/lib/stack_utilization_asm.h"
 #include "aon_timer_regs.h"

@@ -78,7 +78,7 @@ coverage_view_test = rv_rule(
             cfg = "exec",
         ),
         "_collect_cc_coverage": attr.label(
-            default = "//sw/device/coverage/collect_cc_coverage:generate_coverage_view",
+            default = "//util/coverage_new/collect_cc_coverage:generate_coverage_view",
             executable = True,
             cfg = "exec",
         ),

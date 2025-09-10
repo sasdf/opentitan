@@ -922,7 +922,7 @@ PROVISIONING_TESTS=(
 )
 
 UNSUPPORTED_TESTS=(
-# //sw/device/coverage/collect_cc_coverage:collect_cc_coverage_test
+# //util/coverage_new/collect_cc_coverage:collect_cc_coverage_test
 # //sw/device/lib/base:global_mock_unittest
 # //sw/device/tests/closed_source:example_test_fpga_cw310_rom_with_fake_keys
 # //sw/device/tests/closed_source:example_test_fpga_cw310_test_rom

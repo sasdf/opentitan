@@ -29,8 +29,8 @@ cc_library(
 )
 
 cc_library(
-    name = "runtime_api",
-    hdrs = ["runtime.h"],
+    name = "api",
+    hdrs = ["api.h"],
     deps = [
         ":empty_runtime",
         "//sw/device/lib/base:macros",
@@ -38,11 +38,11 @@ cc_library(
 )
 
 cc_library(
-    name = "runtime_api_asm",
-    hdrs = ["runtime_asm.h"],
+    name = "api_asm",
+    hdrs = ["api_asm.h"],
     deps = [
+        ":api",
         ":asm_runtime",
-        ":runtime_api",
     ],
 )
 

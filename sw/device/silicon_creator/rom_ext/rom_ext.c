@@ -4,7 +4,7 @@
 
 #include "sw/device/silicon_creator/rom_ext/rom_ext.h"
 
-#include "sw/device/coverage/runtime.h"
+#include "sw/device/lib/coverage/api.h"
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"

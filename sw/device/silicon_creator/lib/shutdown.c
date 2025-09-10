@@ -6,7 +6,7 @@
 
 #include <assert.h>
 
-#include "sw/device/coverage/runtime.h"
+#include "sw/device/lib/coverage/api.h"
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"

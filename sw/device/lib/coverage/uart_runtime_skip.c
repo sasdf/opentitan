@@ -10,7 +10,7 @@ void coverage_transport_init(void) {
   pinmux_init_uart0_tx();
   uart_init(kUartNCOValue);
 
-  // python3 sw/device/coverage/util/uart_hex.py 'COV_SKIP:UART\r\n'
+  // python3 util/uart_hex.py 'COV_SKIP:UART\r\n'
   uart_write_imm(0x50494b535f564f43);
   uart_write_imm(0x000a0d545241553a);
   while (!uart_tx_idle())
@@ -20,7 +20,7 @@ void coverage_transport_init(void) {
 void coverage_init(void) {}
 
 void coverage_report(void) {
-  // python3 sw/device/coverage/util/uart_hex.py '== COVERAGE PROFILE SKIP
+  // python3 util/uart_hex.py '== COVERAGE PROFILE SKIP
   // ==\r\n'
   uart_write_imm(0x5245564f43203d3d);
   uart_write_imm(0x464f525020454741);

@@ -11,7 +11,7 @@ ld_library(
     name = "info_sections",
     includes = ["info_sections.ld"],
     deps = [
-        "//sw/device/coverage:coverage_sections",
+        "//sw/device/lib/coverage:coverage_sections",
     ],
 )
 

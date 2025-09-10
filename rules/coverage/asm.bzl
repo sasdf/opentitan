@@ -12,7 +12,7 @@ def _asm_source_with_coverage(ctx):
     through the original source files.
 
     The assembly sources need to be pre-instrumented, either manually or using
-    the `sw/device/coverage/util/instrument_asm.py` tool.
+    the `util/coverage_new/instrument_asm.py` tool.
     """
     inputs = ctx.files.srcs
 
@@ -58,7 +58,7 @@ asm_source_with_coverage = rule(
         ),
         "_asm_prf_data_tool": attr.label(
             doc = "Tool to add asm profiling and mapping data.",
-            default = "//sw/device/coverage/util:add_asm_prf_data",
+            default = "//util/coverage_new:add_asm_prf_data",
             executable = True,
             cfg = "exec",
         ),

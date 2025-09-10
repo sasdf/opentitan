@@ -105,7 +105,7 @@ SECTIONS {
     *(.rodata.*)
   } > owner_flash
 
-  INCLUDE sw/device/coverage/rodata.ld
+  INCLUDE sw/device/lib/coverage/rodata.ld
 
   /**
    * Critical static data that is accessible by both the ROM and the ROM
@@ -175,7 +175,7 @@ SECTIONS {
     _bss_end = .;
   } > ram_main
 
-  INCLUDE sw/device/coverage/bss.ld
+  INCLUDE sw/device/lib/coverage/bss.ld
 
   INCLUDE sw/device/info_sections.ld
 }

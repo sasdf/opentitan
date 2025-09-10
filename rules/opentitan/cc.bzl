@@ -524,7 +524,7 @@ opentitan_test = rv_rule(
             cfg = "exec",
         ),
         "_collect_cc_coverage": attr.label(
-            default = "//sw/device/coverage/collect_cc_coverage",
+            default = "//util/coverage_new/collect_cc_coverage",
             executable = True,
             cfg = "exec",
         ),
