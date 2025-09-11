@@ -18,11 +18,6 @@
 //! - `COVERAGE_DIR`: The directory where coverage artifacts are stored.
 //! - `TEST_UNDECLARED_OUTPUTS_DIR`: The directory where extra coverage report is stored.
 //!
-//! The following environment variables may also be set to explicitly specify
-//! tool paths, otherwise the tools should be included in runfiles.
-//! - `LLVM_PROFDATA`: Path to the llvm-profdata tool.
-//! - `LLVM_COV`: Path to the llvm-cov tool.
-//!
 //! The script looks in $COVERAGE_DIR for the OpenTitan compressed counters
 //! (`.xprofraw`) and uses lcov to get the coverage data. The coverage data
 //! is placed in $COVERAGE_DIR with `.dat` extension.

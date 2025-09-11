@@ -10,11 +10,6 @@
 //! - `VERBOSE_COVERAGE`: Print debug info from the coverage scripts
 //! - `COVERAGE_DIR`: The directory where coverage artifacts are stored.
 //! - `TEST_UNDECLARED_OUTPUTS_DIR`: The directory where extra coverage report is stored.
-//!
-//! The following environment variables may also be set to explicitly specify
-//! tool paths, otherwise the tools should be included in runfiles.
-//! - `LLVM_PROFDATA`: Path to the llvm-profdata tool.
-//! - `LLVM_COV`: Path to the llvm-cov tool.
 
 use anyhow::Result;
 use std::env;

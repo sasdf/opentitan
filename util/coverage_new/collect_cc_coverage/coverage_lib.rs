@@ -8,11 +8,6 @@
 //! - `ROOT`: Location from where the code coverage collection was invoked.
 //! - `RUNFILES_DIR`: Location of the test's runfiles.
 //! - `VERBOSE_COVERAGE`: Print debug info from the coverage scripts
-//!
-//! The following environment variables may also be set to explicitly specify
-//! tool paths, otherwise the tools should be included in runfiles.
-//! - `LLVM_PROFDATA`: Path to the llvm-profdata tool.
-//! - `LLVM_COV`: Path to the llvm-cov tool.
 
 use anyhow::{bail, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -378,15 +373,7 @@ impl ProfileRegistry {
     }
 }
 
-fn find_tool(env_name: &str, file_name: &str) -> Result<PathBuf> {
-    let path = &env::var(env_name).unwrap();
-    debug_log!("{env_name}: {path}");
-    if !path.is_empty() {
-        return Ok(PathBuf::from(path));
-    }
-
-    // FIXME: workaround due to missing tools_path in rules_cc toolchain.
-    // See also https://github.com/bazelbuild/rules_cc/issues/351
+fn find_tool(file_name: &str) -> Result<PathBuf> {
     let path = get_runfiles_dir()
         .join("+lowrisc_rv32imcb_toolchain+lowrisc_rv32imcb_toolchain/bin")
         .join(file_name);
@@ -407,7 +394,7 @@ fn find_tool(env_name: &str, file_name: &str) -> Result<PathBuf> {
 ///     "${profraw_file}" \
 ///     --output "${profdata_file}"
 pub fn llvm_profdata_merge(profraw_file: &PathBuf, profdata_file: &PathBuf) {
-    let llvm_profdata = find_tool("LLVM_PROFDATA", "llvm-profdata").unwrap();
+    let llvm_profdata = find_tool("llvm-profdata").unwrap();
 
     // "${LLVM_PROFDATA}" merge -output "${profdata_file}" "${profraw_file}"
     let mut llvm_profdata_cmd = process::Command::new(llvm_profdata);
@@ -447,7 +434,7 @@ pub fn llvm_cov_export(
     output_file: &PathBuf,
 ) {
     let execroot = path_from_env("ROOT");
-    let llvm_cov = find_tool("LLVM_COV", "llvm-cov").unwrap();
+    let llvm_cov = find_tool("llvm-cov").unwrap();
 
     let mut llvm_cov_cmd = process::Command::new(llvm_cov);
     llvm_cov_cmd

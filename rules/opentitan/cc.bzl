@@ -298,8 +298,6 @@ def _opentitan_binary(ctx):
         groups.update(_as_group_info(exec_env.exec_env, signed))
         groups.update(_as_group_info(exec_env.exec_env, provides))
 
-    # FIXME: workaround due to missing tools_path in rules_cc toolchain.
-    # See also https://github.com/bazelbuild/rules_cc/issues/351
     cc_toolchain = find_cc_toolchain(ctx)
     runfiles = runfiles.merge(ctx.runfiles(files = cc_toolchain.all_files.to_list()))
 

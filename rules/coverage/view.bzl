@@ -53,8 +53,6 @@ def _coverage_view_test(ctx):
     runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis])
     runfiles = runfiles.merge(ctx.attr.elf[DefaultInfo].default_runfiles)
 
-    # FIXME: workaround due to missing tools_path in rules_cc toolchain.
-    # See also https://github.com/bazelbuild/rules_cc/issues/351
     cc_toolchain = find_cc_toolchain(ctx)
     toolchain_runfiles = ctx.runfiles(files = cc_toolchain.all_files.to_list())
     runfiles = runfiles.merge(toolchain_runfiles)
