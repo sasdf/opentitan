@@ -9,26 +9,6 @@ load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "asm_runtime",
-    srcs = ["asm_runtime.c"],
-    deps = [
-        "//sw/device/lib/base:macros",
-    ],
-)
-
-cc_library(
-    name = "printer",
-    srcs = ["printer.c"],
-    hdrs = ["printer.h"],
-    features = ["-coverage"],
-    deps = [
-        "//sw/device/lib/base:crc32",
-        "//sw/device/lib/base:macros",
-    ],
-    alwayslink = True,  # replacing weak symbol
-)
-
-cc_library(
     name = "api",
     hdrs = ["api.h"],
     deps = [
@@ -44,6 +24,32 @@ cc_library(
         ":api",
         ":asm_runtime",
     ],
+)
+
+cc_library(
+    name = "asm_runtime_real",
+    srcs = ["asm_runtime.c"],
+    features = ["-coverage"],
+)
+
+alias(
+    name = "asm_runtime",
+    actual = select({
+        "//rules/coverage:instrumented": ":asm_runtime_real",
+        "//conditions:default": "//sw/device:nothing",
+    }),
+)
+
+cc_library(
+    name = "printer",
+    srcs = ["printer.c"],
+    hdrs = ["printer.h"],
+    features = ["-coverage"],
+    deps = [
+        "//sw/device/lib/base:crc32",
+        "//sw/device/lib/base:macros",
+    ],
+    alwayslink = True,  # replacing weak symbol
 )
 
 cc_library(

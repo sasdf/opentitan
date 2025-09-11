@@ -1,13 +1,8 @@
 #include <stdint.h>
 
-#include "sw/device/lib/base/macros.h"
-
-#ifdef OT_COVERAGE_INSTRUMENTED
-
 extern uint8_t __llvm_prf_cnts_start[];
 extern uint8_t __llvm_prf_cnts_end[];
 
-OT_NO_COVERAGE
 uint32_t coverage_backup_asm_counters(uint32_t offset) {
   int32_t remaining = (int32_t)(__llvm_prf_cnts_end - __llvm_prf_cnts_start);
   uint32_t packed_byte = 0;
@@ -18,7 +13,6 @@ uint32_t coverage_backup_asm_counters(uint32_t offset) {
   return packed_byte;
 }
 
-OT_NO_COVERAGE
 void coverage_restore_asm_counters(uint32_t a, uint32_t b) {
   int32_t remaining = (int32_t)(__llvm_prf_cnts_end - __llvm_prf_cnts_start);
   for (int i = 0; i < 32 && remaining > 0; i++, remaining--) {
@@ -32,5 +26,3 @@ void coverage_restore_asm_counters(uint32_t a, uint32_t b) {
     }
   }
 }
-
-#endif
