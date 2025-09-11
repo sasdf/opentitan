@@ -157,6 +157,50 @@ pub struct ProfileRegistry {
     map: HashMap<String, ProfileData>,
 }
 
+fn decompress_counters<T: Read>(f: &mut T) -> Result<Vec<u8>> {
+    let mut cnts: Vec<u8> = Vec::new();
+
+    let mut byte = [0u8; 1];
+    while f.read_exact(&mut byte).is_ok() {
+        if byte[0] == 0 || byte[0] == 0xff {
+            let tag = byte[0];
+            // Compressed padding.
+            f.read_exact(&mut byte)?; // Read the padding marker/size.
+
+            // Determine the padding length.
+            let pad = match byte[0] {
+                0xFE => {
+                    let mut pad = [0u8; 2];
+                    f.read_exact(&mut pad)?;
+                    u16::from_le_bytes(pad) as usize
+                }
+                0xFF => {
+                    let mut pad = [0u8; 4];
+                    f.read_exact(&mut pad[..3])?;
+                    u32::from_le_bytes(pad) as usize
+                }
+                // Any other value is the padding length itself.
+                _ => byte[0] as usize,
+            };
+            let new_size = cnts.len() + pad;
+            // Prevent excessive counter than what can be held on OpenTitan.
+            if new_size > 1024 * 1024 {
+                bail!("Decompressed counter is too large");
+            }
+            cnts.resize(new_size, tag);
+        } else {
+            // Packed data byte.
+            for k in 0..8 {
+                let bit = (byte[0] >> k) & 1;
+                // If bit is 0, original value is 0xff. Otherwise 0x00.
+                cnts.push(if bit == 0 { 0xff } else { 0x00 });
+            }
+        }
+    }
+
+    Ok(cnts)
+}
+
 impl ProfileCounter {
     /// Loads `ProfileCounter` from a compressed counter file.
     pub fn load(path: &PathBuf) -> Result<ProfileCounter> {
@@ -173,49 +217,9 @@ impl ProfileCounter {
         f.read_exact(&mut build_id)?;
 
         // Decompressed cnts
-        let mut cnts: Vec<u8> = Vec::new();
-
-        let mut byte = [0u8; 1];
-        while f.read_exact(&mut byte).is_ok() {
-            if byte[0] == 0 || byte[0] == 0xff {
-                let tag = byte[0];
-                // Compressed padding.
-                f.read_exact(&mut byte)?; // Read the padding marker/size.
-
-                // Determine the padding length.
-                let pad = match byte[0] {
-                    0xFE => {
-                        let mut pad = [0u8; 2];
-                        f.read_exact(&mut pad)?;
-                        u16::from_le_bytes(pad) as usize
-                    }
-                    0xFF => {
-                        let mut pad = [0u8; 4];
-                        f.read_exact(&mut pad[..3])?;
-                        u32::from_le_bytes(pad) as usize
-                    }
-                    // Any other value is the padding length itself.
-                    _ => byte[0] as usize,
-                };
-                let new_size = cnts.len() + pad;
-                // Prevent excessive counter than what can be held on OpenTitan.
-                if new_size > 1024 * 1024 {
-                    bail!("Decompressed counter is too large");
-                }
-                cnts.resize(new_size, tag);
-            } else {
-                // Packed data byte.
-                for k in 0..8 {
-                    let bit = (byte[0] >> k) & 1;
-                    // If bit is 0, original value is 0xff. Otherwise 0x00.
-                    cnts.push(if bit == 0 { 0xff } else { 0x00 });
-                }
-            }
-        }
-
         Ok(ProfileCounter {
             build_id: hex::encode(build_id),
-            cnts: cnts.to_vec(),
+            cnts: decompress_counters(&mut f)?,
         })
     }
 }

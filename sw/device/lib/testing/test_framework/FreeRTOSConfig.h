@@ -29,7 +29,7 @@
 #ifndef OT_COVERAGE_INSTRUMENTED
 #define configTOTAL_HEAP_SIZE ((size_t)0x8000u)
 #else  // OT_COVERAGE_INSTRUMENTED
-#define configTOTAL_HEAP_SIZE ((size_t)0x100u)
+#define configTOTAL_HEAP_SIZE ((size_t)0x1000u)
 #endif
 #define configUSE_MALLOC_FAILED_HOOK 1
 

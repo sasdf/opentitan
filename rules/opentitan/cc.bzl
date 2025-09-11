@@ -93,7 +93,6 @@ def ot_binary(ctx, **kwargs):
     # those out and passed them as private headers instead
     hdrs = [s for s in all_srcs if s.extension == "h"]
     srcs = [s for s in all_srcs if s.extension != "h"]
-
     cctx, cout = cc_common.compile(
         name = name,
         actions = ctx.actions,
@@ -263,12 +262,8 @@ def _opentitan_binary(ctx):
     default_info = []
     groups = {}
     runfiles = ctx.runfiles()
-    seen = {}
     for exec_env_target in ctx.attr.exec_env:
         exec_env = exec_env_target[ExecEnvInfo]
-        if exec_env in seen:
-            continue
-        seen[exec_env] = None
         name = _binary_name(ctx, exec_env)
         deps = ctx.attr.deps + exec_env.libs
         for dep in deps:

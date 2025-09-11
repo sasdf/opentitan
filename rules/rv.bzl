@@ -68,7 +68,15 @@ def rv_rule(**kwargs):
     if "extra_bazel_features" not in attrs:
         attrs["extra_bazel_features"] = attr.string_list(default = [])
     if "collect_code_coverage" not in attrs:
-        attrs["collect_code_coverage"] = attr.int(default = -1)
+        attrs["collect_code_coverage"] = attr.int(
+            default = -1,
+            doc = """Whether to collect coverage for this target.
+
+            When set to -1 (the default), the decision is inherited from the global setting.
+            When set to 0, coverage collection is always disabled for this target.
+            When set to 1, coverage collection is always enabled for this target.
+            """,
+        )
     attrs["_allowlist_function_transition"] = attr.label(
         default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
     )
