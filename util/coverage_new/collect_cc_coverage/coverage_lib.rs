@@ -1,44 +1,45 @@
-//! This script collects code coverage data for OpenTitan FPGA profiles.
+// Copyright lowRISC contributors (OpenTitan project).
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+//! This module provides utilities to handle coverage profiles for OpenTitan.
 //!
-//! By taking advantage of Bazel C++ code coverage collection, this script is
-//! able to be executed by the existing coverage collection mechanics.
-//!
-//! Bazel uses the lcov tool for gathering coverage data. There is also
-//! an experimental support for clang llvm coverage, which uses the .profraw
-//! data files to compute the coverage report.
-//!
-//! This script assumes the following environment variables are set:
-//! - `COVERAGE_DIR``: Directory containing metadata files needed for coverage collection (e.g. gcda files, profraw).
-//! - `COVERAGE_OUTPUT_FILE`: The coverage action output path.
+//! This module assumes the following environment variables are set:
 //! - `ROOT`: Location from where the code coverage collection was invoked.
 //! - `RUNFILES_DIR`: Location of the test's runfiles.
 //! - `VERBOSE_COVERAGE`: Print debug info from the coverage scripts
 //!
-//! The script looks in $COVERAGE_DIR for the Rust metadata coverage files
-//! (profraw) and uses lcov to get the coverage data. The coverage data
-//! is placed in $COVERAGE_DIR as a `coverage.dat` file.
+//! The following environment variables may also be set to explicitly specify
+//! tool paths, otherwise the tools should be included in runfiles.
+//! - `LLVM_PROFDATA`: Path to the llvm-profdata tool.
+//! - `LLVM_COV`: Path to the llvm-cov tool.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
-use object::{Object, ObjectSection, ObjectSymbol};
+use object::{Object, ObjectSection};
 use std::collections::HashMap;
 use std::env;
-use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Seek, Write};
-use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use zerocopy::AsBytes;
 
-use std::fs::File;
-
+/// Size of SHA-1 build id.
 pub const BUILD_ID_SIZE: usize = 20;
-pub const PRF_MAGIC: u64 = 0xff6c70726f665281;
-pub const OTC_MAGIC: u64 = 0x7265766f43544f81; // File magic: \x81OTCover
+/// LLVM's INSTR_PROF_RAW_MAGIC_32.
+/// https://github.com/llvm/llvm-project/blob/llvmorg-16.0.2/compiler-rt/include/profile/InstrProfData.inc#L635-L647
+pub const PRF_MAGIC: u64 = 0xff6c70726f665281; // File magic: \x81Rforpl\xff
+/// OpenTitan specific compressed counter format.
+pub const OTC_MAGIC: u64 = 0xff65766f43544f81; // File magic: \x81OTCove\xff
+/// LLVM's INSTR_PROF_RAW_VERSION.
+/// https://github.com/llvm/llvm-project/blob/llvmorg-16.0.2/compiler-rt/include/profile/InstrProfData.inc#L649-L651
 pub const PRF_VERSION: u64 = 8;
+/// LLVM's VARIANT_MASK_BYTE_COVERAGE.
+/// https://github.com/llvm/llvm-project/blob/llvmorg-16.0.2/compiler-rt/include/profile/InstrProfData.inc#L673
+pub const VARIANT_MASK_BYTE_COVERAGE: u64 = 0x1 << 60;
+/// Size of each entry in __llvm_prf_data section.
 pub const PRF_DATA_ENTRY_SIZE: u64 = 40;
-pub const VARIANT_MASK_BYTE_COVERAGE: u64 = (0x1 << 60);
 
 #[macro_export]
 macro_rules! debug_log {
@@ -49,9 +50,34 @@ macro_rules! debug_log {
     };
 }
 
+/// Prints out environment variables to stderr if `VERBOSE_COVERAGE` is set.
+///
+/// This function is primarily used for debugging purposes, providing visibility
+/// into the environment variables to debug bazel integration.
+pub fn debug_environ() {
+    debug_log!("Environment variables::");
+    for (key, value) in env::vars() {
+        debug_log!("{}={}", key, value);
+    }
+}
+
+/// Retrieves a `PathBuf` from an environment variable, panicking if it's empty.
+pub fn path_from_env(name: &str) -> PathBuf{
+    let path = PathBuf::from(env::var(name).unwrap());
+    if path.as_os_str().is_empty() {
+        panic!("Environment variable `{name}` cannot be empty.");
+    }
+    path
+}
+
+/// Retrieves the runfiles directory, resolving it to an absolute path.
+///
+/// This function determines the absolute path to the runfiles directory.
+/// It uses the `ROOT` and `RUNFILES_DIR` environment variables. If `RUNFILES_DIR`
+/// is not absolute, it's resolved relative to `ROOT`.
 pub fn get_runfiles_dir() -> PathBuf {
-    let execroot = PathBuf::from(env::var("ROOT").unwrap());
-    let mut runfiles_dir = PathBuf::from(env::var("RUNFILES_DIR").unwrap());
+    let execroot = path_from_env("ROOT");
+    let mut runfiles_dir = path_from_env("RUNFILES_DIR");
 
     if !runfiles_dir.is_absolute() {
         runfiles_dir = execroot.join(runfiles_dir);
@@ -63,36 +89,18 @@ pub fn get_runfiles_dir() -> PathBuf {
     return runfiles_dir;
 }
 
-pub fn debug_environ() {
-    debug_log!("Environment variables::");
-    for (key, value) in env::vars() {
-        debug_log!("{}={}", key, value);
-    }
-}
-
+/// Searches a directory and its subdirectories for files with a specific extension.
+///
+/// This function recursively traverses the given directory `dir` and all its
+/// subdirectories. It collects and returns a vector of `PathBuf` for all
+/// files whose extension matches the provided `extension` string.
 pub fn search_by_extension(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
-    fs::read_dir(dir)
-        .unwrap()
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            if let Some(ext) = path.extension() {
-                if ext == extension {
-                    return Some(path);
-                }
-            }
-            None
-        })
-        .collect()
-}
-
-pub fn recursive_search_by_extension(dir: &PathBuf, extension: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                paths.extend(recursive_search_by_extension(&path, extension));
+                paths.extend(search_by_extension(&path, extension));
             } else if let Some(ext) = path.extension() {
                 if ext == extension {
                     paths.push(path);
@@ -103,27 +111,33 @@ pub fn recursive_search_by_extension(dir: &PathBuf, extension: &str) -> Vec<Path
     paths
 }
 
+/// LLVM profraw file header.
+///
+/// This represents the INSTR_PROF_RAW_HEADER structure defined in:
+/// http://github.com/llvm/llvm-project/blob/llvmorg-16.0.2/compiler-rt/include/profile/InstrProfData.inc#L128-L141
 #[derive(AsBytes, Debug, Default)]
 #[repr(C)]
 pub struct ProfileHeader {
-    pub Magic: u64,
-    pub Version: u64,
-    pub BinaryIdsSize: u64,
-    pub NumData: u64,
-    pub PaddingBytesBeforeCounters: u64,
-    pub NumCounters: u64,
-    pub PaddingBytesAfterCounters: u64,
-    pub NamesSize: u64,
-    pub CountersDelta: u64,
-    pub NamesDelta: u64,
-    pub ValueKindLast: u64,
+    pub magic: u64,
+    pub version: u64,
+    pub binary_ids_size: u64,
+    pub num_data: u64,
+    pub padding_bytes_before_counters: u64,
+    pub num_counters: u64,
+    pub padding_bytes_after_counters: u64,
+    pub names_size: u64,
+    pub counters_delta: u64,
+    pub names_delta: u64,
+    pub value_kind_last: u64,
 }
 
+/// Represents collected profile counter data from a device.
 pub struct ProfileCounter {
     pub build_id: String,
     pub cnts: Vec<u8>,
 }
 
+/// Represents coverage metadata from elf files.
 pub struct ProfileData {
     pub build_id: String,
     pub elf: PathBuf,
@@ -134,204 +148,233 @@ pub struct ProfileData {
     pub names: Vec<u8>,
 }
 
-pub fn process_elf(path: &PathBuf) -> Result<ProfileData> {
-    let elf = fs::read(path).context("failed to read ELF")?;
-    let elf = object::File::parse(&*elf).context("failed to parse ELF")?;
-    let file_name = path.file_name().context("Missing filename")?;
-    let file_name = file_name.to_str().context("Missing filename")?.to_string();
-
-    let prf_cnts = elf
-        .section_by_name("__llvm_prf_cnts")
-        .context("__llvm_prf_cnts not found")?;
-    let prf_data = elf
-        .section_by_name("__llvm_prf_data")
-        .context("__llvm_prf_data not found")?;
-    let prf_names = elf
-        .section_by_name("__llvm_prf_names")
-        .context("__llvm_prf_names not found")?;
-    let build_id = elf
-        .section_by_name(".note.gnu.build-id")
-        .context(".note.gnu.build-id not found")?;
-
-    let build_id = build_id.data()?;
-    let build_id = &build_id[build_id.len() - BUILD_ID_SIZE..];
-    let build_id = hex::encode(build_id);
-    debug_log!("Got build_id = {build_id:?}");
-
-    if prf_data.size() % PRF_DATA_ENTRY_SIZE != 0 {
-        bail!("Invalid __llvm_prf_data section size");
-    }
-
-    Ok(ProfileData {
-        build_id: build_id,
-        elf: path.clone(),
-        file_name,
-        header: ProfileHeader {
-            Magic: PRF_MAGIC,
-            Version: 0, // The field will be set later.
-            BinaryIdsSize: 0,
-            NumData: prf_data.size() / PRF_DATA_ENTRY_SIZE,
-            PaddingBytesBeforeCounters: 0,
-            NumCounters: 0, // The field will be set later.
-            PaddingBytesAfterCounters: 0,
-            NamesSize: prf_names.size(),
-            CountersDelta: prf_cnts.address().wrapping_sub(prf_data.address()) as u32 as u64,
-            NamesDelta: prf_names.address() as u32 as u64,
-            ValueKindLast: 1,
-        },
-        cnts_size: prf_cnts.size(),
-        data: prf_data.data()?.to_vec(),
-        names: prf_names.data()?.to_vec(),
-    })
+/// Registry for `ProfileData` instances, indexed by build ID.
+///
+/// This struct manages a collection of `ProfileData` objects, providing a
+/// convenient way to look up coverage metadata by the unique build ID of the
+/// ELF file they originate from.
+pub struct ProfileRegistry {
+    map: HashMap<String, ProfileData>,
 }
 
-pub fn decompress(path: &PathBuf) -> Result<ProfileCounter> {
-    let mut f = std::fs::File::open(path)?;
+impl ProfileCounter {
+    /// Loads `ProfileCounter` from a compressed counter file.
+    pub fn load(path: &PathBuf) -> Result<ProfileCounter> {
+        let mut f = std::fs::File::open(path)?;
 
-    // Check header
-    let magic_bytes = f.read_u64::<LittleEndian>()?;
-    if magic_bytes != OTC_MAGIC {
-        bail!("Unknown profraw file magic bytes.");
-    }
+        // Check header
+        let magic_bytes = f.read_u64::<LittleEndian>()?;
+        if magic_bytes != OTC_MAGIC {
+            bail!("Unknown profraw file magic bytes.");
+        }
 
-    // Read build id
-    let mut build_id = [0u8; BUILD_ID_SIZE];
-    f.read_exact(&mut build_id)?;
+        // Read build id
+        let mut build_id = [0u8; BUILD_ID_SIZE];
+        f.read_exact(&mut build_id)?;
 
-    // Decompressed cnts
-    let mut cnts: Vec<u8> = Vec::new();
+        // Decompressed cnts
+        let mut cnts: Vec<u8> = Vec::new();
 
-    let mut byte = [0u8; 1];
-    while f.read_exact(&mut byte).is_ok() {
-        if byte[0] == 0 || byte[0] == 0xff {
-            let tag = byte[0];
-            // Compressed padding.
-            f.read_exact(&mut byte)?; // Read the padding marker/size.
+        let mut byte = [0u8; 1];
+        while f.read_exact(&mut byte).is_ok() {
+            if byte[0] == 0 || byte[0] == 0xff {
+                let tag = byte[0];
+                // Compressed padding.
+                f.read_exact(&mut byte)?; // Read the padding marker/size.
 
-            // Determine the padding length.
-            let pad = match byte[0] {
-                0xFE => {
-                    let mut pad = [0u8; 2];
-                    f.read_exact(&mut pad)?;
-                    u16::from_le_bytes(pad) as usize
+                // Determine the padding length.
+                let pad = match byte[0] {
+                    0xFE => {
+                        let mut pad = [0u8; 2];
+                        f.read_exact(&mut pad)?;
+                        u16::from_le_bytes(pad) as usize
+                    }
+                    0xFF => {
+                        let mut pad = [0u8; 4];
+                        f.read_exact(&mut pad[..3])?;
+                        u32::from_le_bytes(pad) as usize
+                    }
+                    // Any other value is the padding length itself.
+                    _ => byte[0] as usize,
+                };
+                let new_size = cnts.len() + pad;
+                // Prevent excessive counter than what can be held on OpenTitan.
+                if new_size > 1024 * 1024 {
+                    bail!("Decompressed counter is too large");
                 }
-                0xFF => {
-                    let mut pad = [0u8; 4];
-                    f.read_exact(&mut pad[..3])?;
-                    u32::from_le_bytes(pad) as usize
+                cnts.resize(new_size, tag);
+            } else {
+                // Packed data byte.
+                for k in 0..8 {
+                    let bit = (byte[0] >> k) & 1;
+                    // If bit is 0, original value is 0xff. Otherwise 0x00.
+                    cnts.push(if bit == 0 { 0xff } else { 0x00 });
                 }
-                // Any other value is the padding length itself.
-                _ => byte[0] as usize,
-            };
-            let new_size = cnts.len() + pad;
-            // Prevent excessive counter than what can be held on OpenTitan.
-            if new_size > 1024 * 1024 {
-                bail!("Decompressed counter is too large");
-            }
-            cnts.resize(new_size, tag);
-        } else {
-            // Packed data byte.
-            for k in 0..8 {
-                let bit = (byte[0] >> k) & 1;
-                // If bit is 0, original value is 0xff. Otherwise 0x00.
-                cnts.push(if bit == 0 { 0xff } else { 0x00 });
             }
         }
-    }
 
-    Ok(ProfileCounter {
-        build_id: hex::encode(build_id),
-        cnts: cnts.to_vec(),
-    })
+        Ok(ProfileCounter {
+            build_id: hex::encode(build_id),
+            cnts: cnts.to_vec(),
+        })
+    }
 }
 
-pub fn process_counter<'a>(
-    path: &PathBuf,
-    counter: &ProfileCounter,
-    output: &PathBuf,
-    profile_map: &'a HashMap<String, ProfileData>,
-) -> Result<&'a ProfileData> {
-    let ProfileCounter { build_id, cnts } = counter;
+impl ProfileData {
+    /// Creates a `ProfileData` instance by extracting coverage metadata from an ELF file.
+    pub fn from_elf(path: &PathBuf) -> Result<ProfileData> {
+        let elf = fs::read(path).context("failed to read ELF")?;
+        let elf = object::File::parse(&*elf).context("failed to parse ELF")?;
+        let file_name = path.file_name().context("Missing filename")?;
+        let file_name = file_name.to_str().context("Missing filename")?.to_string();
 
-    // Counters only, try to correlate with elf data.
-    let profile = match profile_map.get(build_id) {
-        Some(profile) => profile,
-        None => {
-            eprintln!("ERROR: Missing profile with build-id {build_id:?}.");
-            eprintln!("Loaded elf profiles:");
-            for (bid, profile) in profile_map {
-                eprintln!("  {bid} : {:?}", profile.elf);
-            }
-            bail!("Missing profile with build-id {build_id:?}.");
+        let prf_cnts = elf
+            .section_by_name("__llvm_prf_cnts")
+            .context("__llvm_prf_cnts not found")?;
+        let prf_data = elf
+            .section_by_name("__llvm_prf_data")
+            .context("__llvm_prf_data not found")?;
+        let prf_names = elf
+            .section_by_name("__llvm_prf_names")
+            .context("__llvm_prf_names not found")?;
+        let build_id = elf
+            .section_by_name(".note.gnu.build-id")
+            .context(".note.gnu.build-id not found")?;
+
+        let build_id = build_id.data()?;
+        let build_id = &build_id[build_id.len() - BUILD_ID_SIZE..];
+        let build_id = hex::encode(build_id);
+        debug_log!("Got build_id = {build_id:?}");
+
+        if prf_data.size() % PRF_DATA_ENTRY_SIZE != 0 {
+            bail!("Invalid __llvm_prf_data section size");
         }
-    };
-    eprintln!("Profile:");
-    eprintln!("  Profraw:  {:?}", path);
-    eprintln!("  BuildID:  {}", build_id);
-    eprintln!("  Firmware: {:?}", profile.file_name);
-    debug_log!("{:?}", profile.elf);
 
-    if profile.cnts_size != cnts.len() as u64 {
-        bail!("cnts size mismatched");
+        Ok(ProfileData {
+            build_id: build_id,
+            elf: path.clone(),
+            file_name,
+            header: ProfileHeader {
+                magic: PRF_MAGIC,
+                version: PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE,
+                binary_ids_size: 0,
+                num_data: prf_data.size() / PRF_DATA_ENTRY_SIZE,
+                padding_bytes_before_counters: 0,
+                num_counters: 0, // The field will be set later.
+                padding_bytes_after_counters: 0,
+                names_size: prf_names.size(),
+                counters_delta: prf_cnts.address().wrapping_sub(prf_data.address()) as u32 as u64,
+                names_delta: prf_names.address() as u32 as u64,
+                value_kind_last: 1,
+            },
+            cnts_size: prf_cnts.size(),
+            data: prf_data.data()?.to_vec(),
+            names: prf_names.data()?.to_vec(),
+        })
     }
 
-    let header = ProfileHeader {
-        Version: PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE,
-        NumCounters: cnts.len() as u64,
-        ..profile.header
-    };
-    debug_log!("{:#?}", header);
-    assert_eq!(
-        profile.data.len() as u64,
-        header.NumData * PRF_DATA_ENTRY_SIZE
-    );
-    assert_eq!(profile.names.len() as u64, header.NamesSize);
+    /// Generates a `profraw` file from `ProfileData` and a `ProfileCounter`.
+    ///
+    /// This function takes a `ProfileData` instance (which contains coverage
+    /// metadata from an ELF) and a `ProfileCounter` instance (which contains
+    /// the actual counter values from a runtime profile). It combines them to
+    /// produce a `profraw` file in the format expected by LLVM's `llvm-profdata`
+    /// tool.
+    pub fn generate_profraw(
+        &self,
+        counter: &ProfileCounter,
+        output: &PathBuf,
+    ) -> Result<()> {
+        let ProfileCounter { cnts, .. } = counter;
 
-    let mut f = std::fs::File::create(output)?;
-    f.write_all(header.as_bytes())?;
-    f.write_all(&profile.data)?;
-    f.write_all(&cnts)?;
-    f.write_all(&profile.names)?;
+        if self.cnts_size != cnts.len() as u64 {
+            bail!("cnts size mismatched");
+        }
 
-    let size = f.seek(std::io::SeekFrom::Current(0))?;
-    if size % 8 != 0 {
-        let buf = [0; 8];
-        let pad: usize = (8 - (size % 8)) as usize;
-        f.write_all(&buf[..pad])?;
+        let header = ProfileHeader {
+            num_counters: cnts.len() as u64,
+            ..self.header
+        };
+        debug_log!("{:#?}", header);
+        assert_eq!(
+            self.data.len() as u64,
+            header.num_data * PRF_DATA_ENTRY_SIZE
+        );
+        assert_eq!(self.names.len() as u64, header.names_size);
+
+        let mut f = std::fs::File::create(output)?;
+        f.write_all(header.as_bytes())?;
+        f.write_all(&self.data)?;
+        f.write_all(&cnts)?;
+        f.write_all(&self.names)?;
+
+        let size = f.seek(std::io::SeekFrom::Current(0))?;
+        if size % 8 != 0 {
+            let buf = [0; 8];
+            let pad: usize = (8 - (size % 8)) as usize;
+            f.write_all(&buf[..pad])?;
+        }
+
+        Ok(())
     }
 
-    Ok(profile)
+    /// Generates a `profraw` file with all counters covered.
+    ///
+    /// This function creates a synthetic `profraw` file based on the
+    /// `ProfileData`, considering all counters as covered.
+    pub fn generate_view_profraw(&self, output_path: &PathBuf) -> Result<()> {
+        let cnts = vec![0x00; self.cnts_size as usize];
+        let counter = ProfileCounter { build_id: self.build_id.clone(), cnts };
+        self.generate_profraw(&counter, output_path)
+    }
 }
 
-pub fn generate_view_profraw(profile: &ProfileData, output_path: &PathBuf) -> Result<()> {
-    let cnts = vec![0x00; profile.cnts_size as usize];
+impl ProfileRegistry {
+    /// Loads all available `ProfileData` from ELF files found in the runfiles directory
+    /// and indexes them by their build ID.
+    pub fn load() -> Result<ProfileRegistry> {
+        let runfiles_dir = get_runfiles_dir();
+        debug_log!("runfiles_dir: {:?}", runfiles_dir);
 
-    let header = ProfileHeader {
-        Version: PRF_VERSION | VARIANT_MASK_BYTE_COVERAGE,
-        NumCounters: cnts.len() as u64,
-        ..profile.header
-    };
-    debug_log!("{:#?}", header);
-    assert_eq!(
-        profile.data.len() as u64,
-        header.NumData * PRF_DATA_ENTRY_SIZE
-    );
-    assert_eq!(profile.names.len() as u64, header.NamesSize);
+        // Collect all elf files in the runfiles.
+        let elf_files: Vec<PathBuf> = search_by_extension(&runfiles_dir, "elf");
 
-    let mut f = std::fs::File::create(output_path)?;
-    f.write_all(header.as_bytes())?;
-    f.write_all(&profile.data)?;
-    f.write_all(&cnts)?;
-    f.write_all(&profile.names)?;
+        debug_log!("elf_files: {:?}", elf_files);
 
-    let size = f.seek(std::io::SeekFrom::Current(0))?;
-    if size % 8 != 0 {
-        let buf = [0; 8];
-        let pad: usize = (8 - (size % 8)) as usize;
-        f.write_all(&buf[..pad])?;
+        // Index elf profile data with build id.
+        let mut profile_map = HashMap::new();
+        for path in &elf_files {
+            match ProfileData::from_elf(path) {
+                Ok(profile) => {
+                    debug_log!("Loaded {:?} = {}", profile.file_name, profile.build_id);
+                    profile_map.insert(profile.build_id.clone(), profile);
+                }
+                Err(err) => eprintln!("Skip {path:?}: {err:?}"),
+            }
+        }
+        debug_log!("All elf files are loaded!");
+
+        Ok(ProfileRegistry{
+            map: profile_map,
+        })
     }
 
-    Ok(())
+    /// Returns the `ProfileData` for the given build ID.
+    pub fn get(&self, build_id: &str) -> Result<&ProfileData> {
+        // Counters only, try to correlate with elf data.
+        let profile = match self.map.get(build_id) {
+            Some(profile) => profile,
+            None => {
+                eprintln!("ERROR: Missing profile with build-id {build_id:?}.");
+                eprintln!("Loaded elf profiles:");
+                for (bid, profile) in &self.map {
+                    eprintln!("  {bid} : {:?}", profile.elf);
+                }
+                bail!("Missing profile with build-id {build_id:?}.");
+            }
+        };
+        Ok(profile)
+    }
 }
 
 fn find_tool(env_name: &str, file_name: &str) -> Result<PathBuf> {
@@ -354,6 +397,14 @@ fn find_tool(env_name: &str, file_name: &str) -> Result<PathBuf> {
     bail!("ERROR: missing {file_name} tool.");
 }
 
+/// Executes the llvm-profdata tool to merge multiple profraw files into a single profdata file.
+///
+/// This function constructs and executes an `llvm-profdata merge` command.
+///
+/// $ llvm-profdata merge \
+///     --sparse \
+///     "${profraw_file}" \
+///     --output "${profdata_file}"
 pub fn llvm_profdata_merge(profraw_file: &PathBuf, profdata_file: &PathBuf) {
     let llvm_profdata = find_tool("LLVM_PROFDATA", "llvm-profdata").unwrap();
 
@@ -376,18 +427,27 @@ pub fn llvm_profdata_merge(profraw_file: &PathBuf, profdata_file: &PathBuf) {
     }
 }
 
+/// Executes the llvm-cov tool to export coverage data in a specified format.
+///
+/// This function constructs and executes an `llvm-cov export` command.
+///
+/// $ llvm-cov export \
+///     -format="${format}" \
+///     -instr-profile "${profdata_file}" \
+///     -ignore-filename-regex='.*external/.+' \
+///     -ignore-filename-regex='^/tmp/.+' \
+///     -path-equivalence=.,"${ROOT}" \
+///     "${elf}" \
+///   | sed 's#/proc/self/cwd/##' > "${output_file}"
 pub fn llvm_cov_export(
     format: &str,
     profdata_file: &PathBuf,
     elf: &PathBuf,
     output_file: &PathBuf,
 ) {
-    let execroot = PathBuf::from(env::var("ROOT").unwrap());
+    let execroot = path_from_env("ROOT");
     let llvm_cov = find_tool("LLVM_COV", "llvm-cov").unwrap();
 
-    // "${LLVM_COV}" export -instr-profile "${profdata_file" -format=lcov \
-    //     -ignore-filename-regex='^/tmp/.+' \
-    //     ${elf} | sed 's#/proc/self/cwd/##' > "${output_file}"
     let mut llvm_cov_cmd = process::Command::new(llvm_cov);
     llvm_cov_cmd
         .arg("export")
@@ -414,7 +474,7 @@ pub fn llvm_cov_export(
         .replace("/proc/self/cwd/", "")
         .replace(&execroot.display().to_string(), "");
 
-    if (format == "lcov") {
+    if format == "lcov" {
         report_str = merge_lcov_count_copies(&report_str).unwrap();
     }
 
@@ -422,22 +482,12 @@ pub fn llvm_cov_export(
     fs::write(output_file, report_str).unwrap();
 }
 
-pub fn generate_view(profile: &ProfileData) -> Result<()> {
-    let coverage_dir = PathBuf::from(env::var("COVERAGE_DIR").unwrap());
-    let output_dir = PathBuf::from(env::var("TEST_UNDECLARED_OUTPUTS_DIR").unwrap());
-    let lcov_output_file = output_dir.join("coverage.dat");
-    let json_output_file = output_dir.join("coverage.json");
-    let profdata_file = output_dir.join("coverage.profdata");
-    let profraw_file = coverage_dir.join("coverage.profraw");
-    let bazel_output_file = coverage_dir.join("coverage.dat");
-    generate_view_profraw(&profile, &profraw_file)?;
-    llvm_profdata_merge(&profraw_file, &profdata_file);
-    llvm_cov_export("lcov", &profdata_file, &profile.elf, &lcov_output_file);
-    llvm_cov_export("lcov", &profdata_file, &profile.elf, &bazel_output_file);
-    llvm_cov_export("text", &profdata_file, &profile.elf, &json_output_file);
-    Ok(())
-}
-
+/// Merges function and line coverage counts for duplicate entries within a single source file.
+///
+/// This helper function is used by `merge_lcov_count_copies` to process
+/// an individual source file block (`SF:`) from an LCOV report. It aggregates
+/// `FNDA:` (function data) and `DA:` (line data) entries, summing up counts
+/// for any duplicates.
 fn merge_sf_count_copies(contents: &str) -> Result<String> {
     if !contents.starts_with("SF:") {
         bail!("Expected contents to start with SF:, got: {}", contents);
@@ -482,7 +532,16 @@ fn merge_sf_count_copies(contents: &str) -> Result<String> {
     Ok(out)
 }
 
-pub fn merge_lcov_count_copies(contents: &str) -> Result<String> {
+
+/// Merges function and line coverage counts for each source file within an LCOV report.
+///
+/// LCOV reports can sometimes contain multiple FNDA entries for the same function in the same
+/// source file, and bazel's lcov_merger cannot handle them properly.
+///
+/// This function processes an entire LCOV report, identifies each `SF:` blocks, and merges all
+/// duplicated `FNDA:` (function data) and `DA:` (line data) counts into a single consolidated
+/// entry for each source file path.
+fn merge_lcov_count_copies(contents: &str) -> Result<String> {
     let mut out = String::new();
 
     // Iterate through each SF by splitting with end_of_record
