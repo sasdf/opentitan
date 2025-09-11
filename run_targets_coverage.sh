@@ -17,8 +17,6 @@ shift
 BAZEL_ARGS=(
     --test_output=streamed
     # --test_timeout=600
-    --copt=-Wno-error
-    --copt=-Wno-enum-constexpr-conversion
     # --cache_test_results=no
     --config=ot_coverage
     --local_test_jobs=1

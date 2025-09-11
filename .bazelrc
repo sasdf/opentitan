@@ -42,7 +42,6 @@ build:asan-libfuzzer --@rules_fuzzing//fuzzing:cc_engine_sanitizer=asan
 build:ot_coverage --repo_env='CC=clang'
 build:ot_coverage --repo_env='BAZEL_USE_LLVM_NATIVE_COVERAGE=1'
 build:ot_coverage --java_runtime_version='remotejdk_11'
-build:ot_coverage --copt='-Wno-error'
 
 # Set coverage mode indicators
 build:ot_coverage --define='ot_coverage_enabled=true'
