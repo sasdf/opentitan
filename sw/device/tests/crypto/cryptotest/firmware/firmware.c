@@ -66,6 +66,8 @@ status_t process_cmd(ujson_t *uj) {
       case kCryptotestCommandSphincsPlus:
         RESP_ERR(uj, handle_sphincsplus(uj));
         break;
+      case kCryptotestCommandQuit:
+        return OK_STATUS(0);
       default:
         LOG_ERROR("Unrecognized command: %d", cmd);
         RESP_ERR(uj, INVALID_ARGUMENT());
