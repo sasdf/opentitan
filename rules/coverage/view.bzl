@@ -11,7 +11,6 @@ load(
     "SiliconBinaryInfo",
     "get_one_binary_file",
 )
-load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 
 _TEST_SCRIPT = """\
 env
@@ -53,9 +52,11 @@ def _coverage_view_test(ctx):
     runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis])
     runfiles = runfiles.merge(ctx.attr.elf[DefaultInfo].default_runfiles)
 
-    cc_toolchain = find_cc_toolchain(ctx)
-    toolchain_runfiles = ctx.runfiles(files = cc_toolchain.all_files.to_list())
-    runfiles = runfiles.merge(toolchain_runfiles)
+    if ctx.var.get("ot_coverage_enabled", "false") == "true":
+        coverage_runfiles = ctx.attr._collect_cc_coverage[DefaultInfo].default_runfiles
+    else:
+        coverage_runfiles = ctx.runfiles()
+    runfiles = runfiles.merge(coverage_runfiles)
 
     return DefaultInfo(
         executable = script,
@@ -69,7 +70,6 @@ coverage_view_test = rv_rule(
             allow_files = True,
             doc = "ELF file to extract coverage view",
         ),
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
         "_lcov_merger": attr.label(
             default = configuration_field(fragment = "coverage", name = "output_generator"),
             executable = True,
@@ -82,6 +82,5 @@ coverage_view_test = rv_rule(
         ),
     },
     fragments = ["cpp"],
-    toolchains = ["@rules_cc//cc:toolchain_type"],
     test = True,
 )

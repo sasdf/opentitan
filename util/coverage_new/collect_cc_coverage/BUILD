@@ -9,6 +9,9 @@ package(default_visibility = ["//visibility:public"])
 rust_library(
     name = "coverage_lib",
     srcs = ["coverage_lib.rs"],
+    data = [
+        "//toolchain:opentitan_toolchain",
+    ],
     deps = [
         "@crate_index//:anyhow",
         "@crate_index//:byteorder",

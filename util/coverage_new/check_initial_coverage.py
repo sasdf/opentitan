@@ -13,3 +13,7 @@ data = data.rstrip(b'\xa5')
 
 # Asserts the section are all 0xff (uncovered).
 assert data.strip(b'\xff') == b'', data
+
+# Bazel's action requires an output.
+with open(sys.argv[2], 'w') as f:
+    f.write('ok')

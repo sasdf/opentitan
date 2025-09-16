@@ -211,6 +211,7 @@ def _build_binary(ctx, exec_env, name, deps, kind):
     binary = obj_transform(
         ctx,
         name = name,
+        strip_llvm_prf_cnts = True,
         suffix = "bin",
         format = "binary",
         src = elf,
@@ -275,10 +276,6 @@ def _opentitan_binary(ctx):
         default_info.append(provides["default"])
         default_info.append(provides["elf"])
         default_info.append(provides["disassembly"])
-        runfiles = runfiles.merge(ctx.runfiles(files = [
-            provides["elf"],
-            provides["disassembly"],
-        ]))
 
         # FIXME(cfrantz): logs are a special case and get added into
         # the DefaultInfo provider.
@@ -297,9 +294,6 @@ def _opentitan_binary(ctx):
 
         groups.update(_as_group_info(exec_env.exec_env, signed))
         groups.update(_as_group_info(exec_env.exec_env, provides))
-
-    cc_toolchain = find_cc_toolchain(ctx)
-    runfiles = runfiles.merge(ctx.runfiles(files = cc_toolchain.all_files.to_list()))
 
     providers.append(DefaultInfo(files = depset(default_info), runfiles = runfiles))
     providers.append(OutputGroupInfo(**groups))
@@ -438,12 +432,14 @@ def _opentitan_test(ctx):
     else:
         harness_runfiles = ctx.runfiles()
 
-    cc_toolchain = find_cc_toolchain(ctx)
-    runfiles.extend(cc_toolchain.all_files.to_list())
+    if ctx.var.get("ot_coverage_enabled", "false") == "true":
+        coverage_runfiles = ctx.attr._collect_cc_coverage[DefaultInfo].default_runfiles
+    else:
+        coverage_runfiles = ctx.runfiles()
 
     return DefaultInfo(
         executable = executable,
-        runfiles = ctx.runfiles(files = runfiles).merge_all([harness_runfiles]),
+        runfiles = ctx.runfiles(files = runfiles).merge_all([harness_runfiles, coverage_runfiles]),
     )
 
 opentitan_test = rv_rule(
