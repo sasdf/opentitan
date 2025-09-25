@@ -271,10 +271,12 @@ impl HybridPair {
 }
 
 pub const OWNER_FLASH_ROM_EXT_START: u16 = 0;
+
 #[cfg(not(feature = "ot_coverage_enabled"))]
 pub const OWNER_FLASH_ROM_EXT_SIZE: u16 = 32;
 #[cfg(feature = "ot_coverage_enabled")]
-pub const OWNER_FLASH_ROM_EXT_SIZE: u16 = 128;
+pub const OWNER_FLASH_ROM_EXT_SIZE: u16 = 64;
+
 pub const OWNER_FLASH_FILE_START: u16 = 224;
 pub const OWNER_FLASH_FILE_SIZE: u16 = 32;
 pub const OWNER_FLASH_OWNER_START: u16 = OWNER_FLASH_ROM_EXT_START + OWNER_FLASH_ROM_EXT_SIZE;

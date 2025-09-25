@@ -13,9 +13,9 @@ EARLGREY_SLOTS_NORMAL = {
 EARLGREY_SLOTS_COVERAGE = {
     "rom_ext_slot_a": "0x0",
     "rom_ext_slot_b": "0x80000",
-    "owner_slot_a": "0x40000",
-    "owner_slot_b": "0xc0000",
-    "rom_ext_size": "0x40000",
+    "owner_slot_a": "0x20000",
+    "owner_slot_b": "0xa0000",
+    "rom_ext_size": "0x20000",
     "instrumented_rom_slot": "0xe0000",
 }
 

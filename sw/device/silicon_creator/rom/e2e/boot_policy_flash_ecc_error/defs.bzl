@@ -70,9 +70,9 @@ BOOT_POLICY_FLASH_ECC_ERROR_TESTS = [
         "name": "a_corrupt_b_valid_{}",
         "a": ":flash_ecc_self_corruption_slot_a_{}",
         "b": ":uncorrupted_test_slot_b",
-        # The regex allows either 8, 9, c in the address, which accomodates the test program
+        # The regex allows either 8, 9, a in the address, which accomodates the test program
         # being linked as either a ROM_EXT or application.
-        "exit_success": "Booted slot=0x200[89c]0000; Cause={}",
+        "exit_success": "Booted slot=0x200[89a]0000; Cause={}",
         # When running under the ROM_EXT, we want to try SlotA first and make sure that
         # we handle the corrupted flash properly.
         "primary": "SlotA",
@@ -83,7 +83,7 @@ BOOT_POLICY_FLASH_ECC_ERROR_TESTS = [
         "b": ":flash_ecc_self_corruption_slot_b_{}",
         # The regex allows either 0, 1, 4 in the address, which accomodates the test program
         # being linked as either a ROM_EXT or application.
-        "exit_success": "Booted slot=0x200[014]0000; Cause={}",
+        "exit_success": "Booted slot=0x200[012]0000; Cause={}",
         # When running under the ROM_EXT, we want to try SlotB first and make sure that
         # we handle the corrupted flash properly.
         "primary": "SlotB",
