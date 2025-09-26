@@ -16,7 +16,8 @@ EARLGREY_SLOTS_COVERAGE = {
     "owner_slot_a": "0x20000",
     "owner_slot_b": "0xa0000",
     "rom_ext_size": "0x20000",
-    "instrumented_rom_slot": "0xe0000",
+    "instrumented_rom_slot": "0xf0000",
+    "instrumented_rom_size": "0x10000",
 }
 
 EARLGREY_SLOTS = select({

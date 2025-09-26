@@ -14,10 +14,11 @@
 
 INCLUDE hw/top_earlgrey/sw/autogen/top_earlgrey_memory.ld
 
-_rom_boot_address = ORIGIN(eflash) + LENGTH(eflash) - 0x20000;
+_rom_end_address = ORIGIN(eflash) + LENGTH(eflash);
+_rom_boot_address = _rom_end_address - _instrumented_rom_size;
 
-_rom_digest_size = 32;
-_chip_info_start = ORIGIN(eflash) + LENGTH(eflash) - _rom_digest_size - _chip_info_size;
+_chip_info_end = _rom_end_address;
+_chip_info_start = _chip_info_end - _chip_info_size;
 
 REGION_ALIAS("rom_region", eflash);
 
