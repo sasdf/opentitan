@@ -131,6 +131,7 @@ UNIT_TESTS=(
 //sw/device/lib/ujson/rust:roundtrip_test
 //sw/device/silicon_creator/manuf/base:perso_tlv_data_unittest
 //sw/device/silicon_creator/lib/ownership:ownership_unittest
+//sw/device/lib/base:random_order_unittest
 
 # CE: variable-sized object may not be initialized
 # //sw/device/lib/crypto/impl:keyblob_unittest
@@ -867,6 +868,8 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_flash_transaction_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_out_chunk_too_big_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_rescue_error_handling_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_watchdog_disabled_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_watchdog_enabled_test_fpga_hyper310_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_device_id_request_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_noupdate_with_bad_owner_block_test_fpga_hyper310_rom_ext
@@ -940,6 +943,7 @@ UNSUPPORTED_TESTS=(
 # //third_party/coremark/top_earlgrey:coremark_test_sim_dv
 # //third_party/coremark/top_earlgrey:coremark_test_sim_qemu_rom_with_fake_keys
 # //third_party/coremark/top_earlgrey:coremark_test_sim_verilator
+# //third_party/coremark/top_earlgrey:coremark_test_sim_qemu_sival_rom_ext
 # //sw/device/silicon_creator/rom_ext/sival/binaries:sival_signature_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_signature_test
 )

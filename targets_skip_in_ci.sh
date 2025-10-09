@@ -86,6 +86,8 @@ EX_CW340_TEST_ROM_TESTS=(
 //sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw340_test_rom
 //sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw340_test_rom
 
+//sw/device/tests:crt_test_fpga_cw340_test_rom
+
 # //sw/device/silicon_creator/lib/sigverify/sigverify_tests:sigverify_cryptotest_fpga_cw340_test_rom
 # //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_test_rom
 )
@@ -431,6 +433,8 @@ EX_CW310_SIVAL_TESTS=(
 //sw/device/tests/autogen:plic_all_irqs_test_20_fpga_cw310_sival
 //sw/device/tests:keymgr_sideload_otbn_simple_test_fpga_cw310_sival
 
+//sw/device/tests:keymgr_derive_sealing_test_fpga_cw310_sival_rom_ext
+
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival
 # //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_sival
 
@@ -688,7 +692,8 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_flash_transaction_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_out_chunk_too_big_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_rescue_error_handling_test_fpga_cw340_rom_ext
-
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_watchdog_disabled_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_watchdog_enabled_test_fpga_cw340_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/ownership:invalid_device_id_request_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_noupdate_with_bad_owner_block_test_fpga_cw340_rom_ext
