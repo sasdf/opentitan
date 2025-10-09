@@ -35,7 +35,6 @@ asm_library_with_coverage(
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/coverage:api_asm",
     ],
-    alwayslink = True,
 )
 
 cc_library(
