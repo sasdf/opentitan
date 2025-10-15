@@ -24,10 +24,7 @@ pub struct UartConsole {
     pub deadline: Option<Instant>,
     pub exit_success: Option<Regex>,
     pub exit_failure: Option<Regex>,
-    pub timestamp: bool,
     pub buffer: String,
-    pub newline: bool,
-    pub carriage_return: bool,
     pub break_en: bool,
     pub coverage_plugin: CoveragePlugin,
     pub logging_plugin: LoggingPlugin,
@@ -321,8 +318,6 @@ impl UartConsole {
         T: ConsoleDevice + ?Sized,
     {
         let mut console = UartConsole {
-            timestamp: true,
-            newline: true,
             timeout: Some(timeout),
             exit_success: Some(Regex::new(rx)?),
             ..Default::default()
@@ -353,8 +348,6 @@ impl UartConsole {
         T: ConsoleDevice + ?Sized,
     {
         let mut console = UartConsole {
-            timestamp: true,
-            newline: true,
             timeout: Some(timeout),
             coverage_plugin: CoveragePlugin::default().set_stop_after_report(),
             ..Default::default()
