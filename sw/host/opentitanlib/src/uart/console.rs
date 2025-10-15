@@ -9,11 +9,12 @@ use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::os::fd::{AsFd, AsRawFd};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use crate::io::console::{ConsoleDevice, ConsoleError};
 use crate::uart::console_plugin::ConsolePlugin;
 use crate::uart::coverage_plugin::CoveragePlugin;
+use crate::uart::logging_plugin::LoggingPlugin;
 use crate::util::file;
 
 #[derive(Default)]
@@ -29,6 +30,7 @@ pub struct UartConsole {
     pub carriage_return: bool,
     pub break_en: bool,
     pub coverage_plugin: CoveragePlugin,
+    pub logging_plugin: LoggingPlugin,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,6 +193,9 @@ impl UartConsole {
         if let Some(status) = self.coverage_plugin.get_exit_status() {
             return Some(status);
         }
+        if let Some(status) = self.logging_plugin.get_exit_status() {
+            return Some(status);
+        }
 
         self.process_exit_regex()
     }
@@ -200,7 +205,7 @@ impl UartConsole {
         &mut self,
         device: &T,
         timeout: Duration,
-        stdout: &mut Option<&mut dyn Write>,
+        _stdout: &mut Option<&mut dyn Write>,
     ) -> Result<bool>
     where
         T: ConsoleDevice + ?Sized,
@@ -214,37 +219,12 @@ impl UartConsole {
         // Process the received bytes through plugin chain.
         let buf = buf[..len].to_vec();
         let buf = self.coverage_plugin.process_bytes(buf)?;
+        let buf = self.logging_plugin.process_bytes(buf)?;
         let len = buf.len();
         if len == 0 {
             return Ok(true);
         }
 
-        if self.buffer_mode == BufferMode::Normal {
-            for i in 0..len {
-                if self.timestamp && self.newline {
-                    let t = humantime::format_rfc3339_millis(SystemTime::now());
-                    stdout.as_mut().map_or(Ok(()), |out| {
-                        out.write_fmt(format_args!("[{}  console]", t))
-                    })?;
-                    self.newline = false;
-                }
-                self.newline = buf[i] == b'\n';
-                stdout.as_mut().map_or(Ok(()), |out| {
-                    out.write_all(if self.newline && !self.carriage_return {
-                        b"\r\n"
-                    } else {
-                        &buf[i..i + 1]
-                    })
-                })?;
-                self.carriage_return = buf[i] == b'\r';
-            }
-            stdout.as_mut().map_or(Ok(()), |out| out.flush())?;
-
-            // If we're logging, save it to the logfile.
-            self.logfile
-                .as_mut()
-                .map_or(Ok(()), |f| f.write_all(&buf[..len]))?;
-        }
         self.append_buffer(&buf[..len]);
         Ok(true)
     }
