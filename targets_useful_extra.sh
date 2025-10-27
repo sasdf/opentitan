@@ -8,4 +8,5 @@ USEFUL_EXTRA_TESTS=(
 //sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_spx_test_key_0_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_dev_key_0_dev_key_0_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw340_instrumented_rom
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext
 )

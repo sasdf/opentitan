@@ -727,7 +727,7 @@ EX_CW340_FAKE_KEYS_TESTS=(
 //sw/device/tests:flash_ctrl_test_fpga_cw340_rom_with_fake_keys
 )
 
-EX_CW340_SIVAL_ROM_EXT=(
+EX_CW340_SIVAL_ROM_EXT_TESTS=(
 //sw/device/tests:example_mem_ujcmd_test_fpga_cw340_sival_rom_ext
 //sw/device/tests:sleep_pin_mio_dio_val_test_fpga_cw340_sival_rom_ext
 //sw/device/tests:spi_device_ottf_console_test_fpga_cw340_sival_rom_ext
@@ -1282,6 +1282,19 @@ EX_INS_ROM_TESTS=(
 # //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_test_unlocked0_enabled_zero_fpga_cw340_instrumented_rom
 )
 
+EX_CW340_A2_ROM_EXT_TESTS=(
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_a_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_b_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_a_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_b_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_b_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_cw340_A2_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_cw340_A2_rom_ext
+)
+
 EX_UNSUPPORTED_TESTS=(
 )
 
@@ -1304,6 +1317,7 @@ EX_TEST_GROUPS=(
     "EX_IMM_TESTS"
     "EX_CW340_ROM_EXT_TESTS"
     "EX_CW340_FAKE_KEYS_TESTS"
-    "EX_CW340_SIVAL_ROM_EXT"
+    "EX_CW340_SIVAL_ROM_EXT_TESTS"
+    "EX_CW340_A2_ROM_EXT_TESTS"
     "EX_INS_ROM_TESTS"
 )
