@@ -477,6 +477,13 @@ fpga_cw340(
 )
 
 fpga_cw340(
+    name = "fpga_cw340_A2_rom_ext",
+    testonly = True,
+    base = ":fpga_cw340_rom_ext",
+    rom = "//sw/device/silicon_creator/rom/binaries:earlgrey_A2_rom",
+)
+
+fpga_cw340(
     name = "fpga_cw340_instrumented_rom",
     testonly = True,
     base = ":fpga_cw340_rom_with_fake_keys",
