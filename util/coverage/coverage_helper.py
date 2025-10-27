@@ -1,6 +1,7 @@
 import re
 import json
 import bisect
+import copy
 import itertools as it
 import sys
 import zipfile
@@ -237,6 +238,13 @@ def merge_inlined_copies(coverage):
 
     coverage[sf] = cov._replace(fnda=fnda, fn=fn)
   return coverage
+
+def fix_fnda_by_da(coverage):
+  cov = copy.deepcopy(coverage)
+  for name, line in cov.fn.items():
+    if not cov.fnda.get(name, 0) and cov.da.get(line, 0):
+      cov.fnda[name] = cov.da.get(line, 0)
+  return cov
 
 def and_dict(a, b):
   keys = set(a.keys()) & set(b.keys())

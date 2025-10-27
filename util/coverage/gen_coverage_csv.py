@@ -3,7 +3,7 @@
 import argparse
 import re
 
-from coverage_helper import parse_lcov
+from coverage_helper import parse_lcov, fix_fnda_by_da
 
 path = './bazel-out/_coverage/view/all_views.dat'
 
@@ -24,6 +24,8 @@ def main():
   for sf, cov in sorted(coverage.items()):
     if any(sf.startswith('SF:' + e) for e in IGNORE):
       continue
+
+    cov = fix_fnda_by_da(cov)
 
     fn_hit = sum(1 for count in cov.fnda.values() if count > 0)
     fn_rate = (fn_hit / len(cov.fnda)) if len(cov.fnda) else 1.0
