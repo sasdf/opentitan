@@ -201,13 +201,23 @@ def _build_binary(ctx, exec_env, name, deps, kind):
 
     linkopts = ["-Wl,--defsym=_{}={}".format(key, value) for key, value in slot_spec.items()]
 
-    elf, mapfile = ot_binary(
-        ctx,
-        name = name,
-        deps = deps,
-        linker_script = linker_script,
-        linkopts = linkopts,
-    )
+    if getattr(ctx.files, "prebuilt_elf", None):
+        mapfile, found = None, None
+        for elf in ctx.files.prebuilt_elf:
+            if elf.basename == name + ".elf":
+                found = True
+                break
+        if not found:
+            fail("No {}.elf in prebuilt_elf list".format(name))
+    else:
+        elf, mapfile = ot_binary(
+            ctx,
+            name = name,
+            deps = deps,
+            linker_script = linker_script,
+            linkopts = linkopts,
+        )
+
     binary = obj_transform(
         ctx,
         name = name,
@@ -388,6 +398,9 @@ opentitan_binary = rv_rule(
         "exec_env": attr.label_list(
             providers = [ExecEnvInfo],
             doc = "List of execution environments for this target.",
+        ),
+        "prebuilt_elf": attr.label_list(
+            allow_files = True,
         ),
         "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
     }.items()),
