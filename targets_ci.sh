@@ -981,9 +981,6 @@ OTBN_TESTS=(
 //sw/otbn/crypto/tests:p256_testcase_p256_keygen_valid
 //sw/otbn/crypto/tests:p256_isoncurve_proj_test
 //sw/otbn/crypto/tests:p256_scalar_reblind_test
-//sw/otbn/crypto/tests:p384_internal_mult_test
-//sw/otbn/crypto/tests:p384_isoncurve_proj_test
-//sw/otbn/crypto/tests:p384_masked_scalar_reblind_test
 
 # Passed, but unused.
 # //sw/otbn/crypto/tests:div_consttime
@@ -1027,6 +1024,9 @@ OTBN_TESTS=(
 # //sw/otbn/crypto/tests:p384_proj_add_test
 # //sw/otbn/crypto/tests:p384_scalar_mult_consttime
 # //sw/otbn/crypto/tests:p384_scalar_mult_test
+# //sw/otbn/crypto/tests:p384_internal_mult_test
+# //sw/otbn/crypto/tests:p384_isoncurve_proj_test
+# //sw/otbn/crypto/tests:p384_masked_scalar_reblind_test
 # //sw/otbn/crypto/tests:primality_negative_test
 # //sw/otbn/crypto/tests:primality_test
 # //sw/otbn/crypto/tests:primality_test_witness_negative_test
