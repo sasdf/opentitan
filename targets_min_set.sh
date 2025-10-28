@@ -17,6 +17,10 @@ CW310_SIVAL_TESTS=(
   '//sw/device/silicon_creator/lib:otbn_boot_services_functest_fpga_cw310_sival'
 )
 
+CW340_A2_ROM_EXT_TESTS=(
+  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext'
+)
+
 CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
   '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_b_fpga_cw340_instrumented_rom'
@@ -39,16 +43,18 @@ CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw340_instrumented_rom'
 )
 
+CW340_ROM_EXT_TESTS=(
+  '//sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_in_transaction_cancel_fpga_cw340_rom_ext'
+)
+
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_empty_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_enter_rescue_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aab_test_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_ecdsa_public_key_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_ecdsa_signature_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_entry_point_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_manifest_version_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_entry_point_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_extension_spx_signature_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:flash_exc_handler_disabled_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_disabled_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_enabled_test_fpga_hyper310_rom_ext'
@@ -87,12 +93,13 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_dfu_requests_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_flash_transaction_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_rescue_boot_svc_req_disability_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_in_transaction_cancel_fpga_cw340_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_rescue_error_handling_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_restricted_commands_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_unauthorized_fpga_hyper310_rom_ext'
 )
 
 OTBN_TESTS=(
@@ -107,12 +114,14 @@ OTBN_TESTS=(
   '//sw/otbn/crypto/tests:p256_ecdh_shared_key_test'
   '//sw/otbn/crypto/tests:p256_ecdsa_sign_test'
   '//sw/otbn/crypto/tests:p256_ecdsa_verify_test'
+  '//sw/otbn/crypto/tests:p256_isoncurve_proj_test'
   '//sw/otbn/crypto/tests:p256_isoncurve_test'
   '//sw/otbn/crypto/tests:p256_key_from_seed_test'
   '//sw/otbn/crypto/tests:p256_mul_modp_test'
   '//sw/otbn/crypto/tests:p256_proj_add_test'
   '//sw/otbn/crypto/tests:p256_proj_double_test'
   '//sw/otbn/crypto/tests:p256_scalar_mult_test'
+  '//sw/otbn/crypto/tests:p256_scalar_reblind_test'
   '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_not_on_curve'
   '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_x_too_large'
   '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_y_too_large'
@@ -163,7 +172,9 @@ TEST_GROUPS=(
   'CW310_ROM_EXT_TESTS'
   'CW310_SIVAL_ROM_EXT_TESTS'
   'CW310_SIVAL_TESTS'
+  'CW340_A2_ROM_EXT_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
+  'CW340_ROM_EXT_TESTS'
   'HYPER310_ROM_EXT_TESTS'
   'OTBN_TESTS'
   'PROVISIONING_TESTS'
