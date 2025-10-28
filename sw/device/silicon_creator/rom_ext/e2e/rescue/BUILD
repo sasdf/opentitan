@@ -768,6 +768,7 @@ opentitan_test(
             --exec="rescue get-device-id --reboot=false"
             # Try the `REBO` mode and make sure we reboot without crash.
             --exec="console --non-interactive --send='REBO\r' --exit-success='Finished' --exit-failure='BFV:.*\r\n'"
+            --exec="fpga clear-bitstream"
             no-op
         """,
     ),
