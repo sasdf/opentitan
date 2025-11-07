@@ -123,7 +123,7 @@ sh_test(
         env = {
             "PYTHON": "$(PYTHON3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
-            "FPGA": "{}".format(fpga),
+            "FPGA": "cw340",
         },
         tags = [
             "changes_otp",

@@ -196,7 +196,7 @@ opentitan_binary(
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
-            bitstream = ":bitstream_sigverify_spx_{}_{}".format(
+            otp = ":otp_img_sigverify_spx_{}_{}".format(
                 lc_state,
                 t["name"],
             ),
@@ -243,7 +243,7 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
-        bitstream = ":bitstream_sigverify_spx_prod_enabled_true",
+        otp = ":otp_img_sigverify_spx_prod_enabled_true",
     ),
     spx_key = {
         "//sw/device/silicon_creator/rom/keys/fake/spx:prod_key_1_spx_key": "prod_key_1",
