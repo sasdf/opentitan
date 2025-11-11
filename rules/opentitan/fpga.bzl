@@ -12,6 +12,7 @@ load(
     "@lowrisc_opentitan//rules/opentitan:util.bzl",
     "assemble_for_test",
     "get_fallback",
+    "recursive_format",
 )
 load(
     "//rules/opentitan:exec_env.bzl",
@@ -42,8 +43,15 @@ function cleanup {{
 trap cleanup EXIT
 
 TEST_CMD=({test_cmd})
-echo Invoking test: {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
-RUST_BACKTRACE=1 {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+if command -v qq >/dev/null 2>&1; then
+  echo Invoking test: qq {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+  echo
+  echo Wait until the FPGA becomes available...
+  RUST_BACKTRACE=1 qq {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+else
+  echo Invoking test: {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+  RUST_BACKTRACE=1 {test_harness} {args} "$@" "${{TEST_CMD[@]}}"
+fi
 """
 
 def _transform(ctx, exec_env, name, elf, binary, signed_bin, disassembly, mapfile):
@@ -123,23 +131,59 @@ def _test_dispatch(ctx, exec_env, firmware):
     # assemble the image.  Replace the firmware param with the newly assembled
     # image.
     if "assemble" in param:
-        assemble = param["assemble"].format(**action_param)
+        assemble = param.get("assemble")
+        if "instrumented_rom" in action_param and "instrumented_rom" not in assemble:
+            assemble += " {instrumented_rom}@{instrumented_rom_slot}"
+        assemble = recursive_format(assemble, action_param)
         assemble = ctx.expand_location(assemble, data_labels)
         image = assemble_for_test(
             ctx,
             name = ctx.attr.name,
-            spec = assemble.split(" "),
+            spec = assemble.strip().split(" "),
             data_files = data_files,
             opentitantool = exec_env._opentitantool,
         )
         param["firmware"] = image.short_path
         action_param["firmware"] = image.path
         data_files.append(image)
+    elif "instrumented_rom" in action_param:
+        fail("Got instrumented rom without assemble spec")
 
     # FIXME: maybe splice a bitstream here
 
     # Perform all relevant substitutions on the test_cmd.
     test_cmd = get_fallback(ctx, "attr.test_cmd", exec_env)
+
+    if "instrumented_rom" in action_param:
+        assemble = "{instrumented_rom}@{instrumented_rom_slot}"
+        for _ in range(10):
+            # Recursive evaluation of the assemble spec
+            assemble = assemble.format(**action_param)
+        assemble = ctx.expand_location(assemble, data_labels)
+        image = assemble_for_test(
+            ctx,
+            name = ctx.attr.name + "_ins_rom",
+            spec = assemble.strip().split(" "),
+            data_files = data_files,
+            opentitantool = exec_env._opentitantool,
+        )
+        param["ins_rom_image"] = image.short_path
+        action_param["ins_rom_image"] = image.path
+        data_files.append(image)
+
+        test_cmd_list = test_cmd.split("\n")
+
+        def find_bitstream_idx():
+            for i, e in list(enumerate(test_cmd_list)):
+                if "load-bitstream" in e:
+                    return i
+            return -1
+
+        idx = find_bitstream_idx()
+        if idx != -1:
+            test_cmd_list.insert(idx + 1, '--exec="bootstrap --clear-uart=true {ins_rom_image}"')
+            test_cmd = "\n".join(test_cmd_list)
+
     test_cmd = test_cmd.format(**param)
     test_cmd = ctx.expand_location(test_cmd, data_labels)
 

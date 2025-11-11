@@ -13,6 +13,7 @@
 #include "otp_ctrl_regs.h"
 #include "sensor_ctrl_regs.h"
 #include "sram_ctrl_regs.h"
+#include "flash_ctrl_regs.h"
 
 /**
  * Test ROM interrupt vectors.
@@ -86,7 +87,82 @@ _test_rom_interrupt_vector:
   .balign 4
   .global _reset_start
   .type _reset_start, @function
+
 _reset_start:
+#ifdef OT_COVERAGE_ENABLED
+  // Remove address space protections by configuring entry 15 as
+  // read-write-execute for the entire address space and then clearing
+  // all other entries.
+  // NOTE: This should happen before attemting to access any address outside
+  // the initial ePMP RX region at reset, e.g. `kDeviceType` which is in
+  // .rodata.
+  li   t0, (0x9f << 24) // Locked NAPOT read-write-execute.
+  csrw pmpcfg3, t0
+  li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
+  csrw pmpaddr15, t0
+
+  // Configure `pmpcfg0` in test ROM to enable instrumented ROM execution.
+  // Without this configuration, the instrumented ROM can not be executed due to
+  // ePMP reconfiguration in `rom_epmp_init`.
+  li   t0, (0x8f << 8) // Locked TOR read-write-execute.
+  csrw pmpcfg0, t0
+  li   t0, 0
+  csrw pmpaddr0, t0
+  li   t0, 0x10000000 // TOR encoded region convering entire eFlash address space.
+  csrw pmpaddr1, t0
+
+  csrw pmpcfg1, zero
+  csrw pmpcfg2, zero
+
+
+  // Reset instrumented ROM region config
+  li    t1, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
+
+  // t0 = (((_instrumented_rom_size / 2048) << 9) | (_instrumented_rom_slot / 2048))
+  la    t0, _instrumented_rom_size
+  srli  t0, t0, 11 // Divide by 2048 (2^11)
+  slli  t0, t0, 9  // Shift to bit 9 for size field
+
+  la    t3, _instrumented_rom_slot
+  srli  t3, t3, 11 // Divide by 2048 (2^11)
+  or    t0, t0, t3
+  sw    t0, FLASH_CTRL_MP_REGION_7_REG_OFFSET(t1)
+
+  li t0, 0x9996666
+  sw    t0, FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET(t1)
+
+
+  // Check if instrumented ROM is presented
+  la a0, (_instrumented_rom_slot + 0x20000000)
+  lw t0, 0x180(a0)
+
+  // Continue if it's not 'IROM'
+  li t1, 0x4d4f5249
+  bne t0, t1, continue_test_rom
+
+  // Set up the stack.
+  la sp, _stack_end
+
+  // Initialize main memory (main SRAM).
+  li    t1, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
+  li    t0, (1 << SRAM_CTRL_CTRL_INIT_BIT)
+  sw    t0, SRAM_CTRL_CTRL_REG_OFFSET(t1)
+
+  // Set exception/interrupt handlers.
+  //
+  // Note: the increment just sets the low bits to 0b01 which is the vectored
+  // mode setting.
+  addi  t0, a0, 1
+  csrw mtvec, t0
+
+  // Jump to instrumented ROM
+  li   a3, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
+  li   t1, 0xa26a38f7
+  sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
+  jalr ra, 0x80(a0)
+
+continue_test_rom:
+#endif
 
   // Set up the global pointer. This requires that we disable linker relaxations
   // (or it will be relaxed to `mv gp, gp`).

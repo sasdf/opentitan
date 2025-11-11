@@ -1,0 +1,86 @@
+CW310_SIVAL_ROM_EXT_TESTS=(
+  '//sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw310_sival_rom_ext'
+  '//sw/device/silicon_creator/lib/sigverify:ecdsa_p256_verify_functest_fpga_cw310_sival_rom_ext'
+  '//sw/device/silicon_creator/lib/sigverify:spx_verify_functest_fpga_cw310_sival_rom_ext'
+  '//sw/device/tests:chip_power_sleep_load_test_fpga_cw310_sival_rom_ext'
+  '//sw/device/tests:crt_test_fpga_cw310_sival_rom_ext'
+)
+
+CW310_SIVAL_TESTS=(
+  '//sw/device/silicon_creator/lib:otbn_boot_services_functest_fpga_cw310_sival'
+)
+
+CW340_INSTRUMENTED_ROM_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:a_corrupt_b_valid_manifest_security_version_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_flash_ecc_error:flash_exc_handler_disabled_test_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_b_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_meas_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_with_fault_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_ecdsa_test_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_fake_spx_dev_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_fake_spx_dev_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_fake_spx_test_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_fake_ecdsa_dev_key_0_fake_spx_dev_key_0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw340_instrumented_rom'
+  '//sw/device/silicon_creator/rom/e2e:rom_ext_upgrade_fpga_cw340_instrumented_rom'
+  '//sw/device/tests:sleep_pwm_pulses_test_fpga_cw340_instrumented_rom'
+)
+
+OTBN_TESTS=(
+  '//sw/otbn/crypto/tests:boot_testcase_boot_key_endorse_valid'
+  '//sw/otbn/crypto/tests:boot_testcase_boot_key_save_valid'
+  '//sw/otbn/crypto/tests:boot_testcase_boot_keygen_valid'
+  '//sw/otbn/crypto/tests:boot_testcase_boot_mode_invalid'
+  '//sw/otbn/crypto/tests:boot_testcase_boot_sigverify_valid'
+  '//sw/otbn/crypto/tests:p256_arithmetic_to_boolean_mod_test'
+  '//sw/otbn/crypto/tests:p256_arithmetic_to_boolean_test'
+  '//sw/otbn/crypto/tests:p256_base_mult_test'
+  '//sw/otbn/crypto/tests:p256_ecdh_shared_key_test'
+  '//sw/otbn/crypto/tests:p256_ecdsa_sign_test'
+  '//sw/otbn/crypto/tests:p256_ecdsa_verify_test'
+  '//sw/otbn/crypto/tests:p256_isoncurve_test'
+  '//sw/otbn/crypto/tests:p256_key_from_seed_test'
+  '//sw/otbn/crypto/tests:p256_mul_modp_test'
+  '//sw/otbn/crypto/tests:p256_proj_add_test'
+  '//sw/otbn/crypto/tests:p256_scalar_mult_test'
+  '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_not_on_curve'
+  '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_x_too_large'
+  '//sw/otbn/crypto/tests:p256_testcase_p256_check_public_key_y_too_large'
+  '//sw/otbn/crypto/tests:p256_testcase_p256_keygen_valid'
+)
+
+UNIT_TESTS=(
+  '//sw/device/lib/base:memory_unittest'
+  '//sw/device/silicon_creator/lib/drivers:alert_unittest'
+  '//sw/device/silicon_creator/lib/drivers:ast_unittest'
+  '//sw/device/silicon_creator/lib/drivers:flash_ctrl_unittest'
+  '//sw/device/silicon_creator/lib/drivers:keymgr_unittest'
+  '//sw/device/silicon_creator/lib/drivers:lifecycle_unittest'
+  '//sw/device/silicon_creator/lib/drivers:otbn_unittest'
+  '//sw/device/silicon_creator/lib/drivers:rnd_unittest'
+  '//sw/device/silicon_creator/lib/drivers:spi_device_unittest'
+  '//sw/device/silicon_creator/lib/drivers:watchdog_unittest'
+  '//sw/device/silicon_creator/lib:boot_data_unittest'
+  '//sw/device/silicon_creator/lib:epmp_unittest'
+  '//sw/device/silicon_creator/lib:manifest_unittest'
+  '//sw/device/silicon_creator/lib:shutdown_unittest'
+  '//sw/device/silicon_creator/rom:boot_policy_unittest'
+  '//sw/device/silicon_creator/rom:bootstrap_unittest'
+)
+
+
+TEST_GROUPS=(
+  'EXTRA_TESTS'
+  'CW310_SIVAL_ROM_EXT_TESTS'
+  'CW310_SIVAL_TESTS'
+  'CW340_INSTRUMENTED_ROM_TESTS'
+  'OTBN_TESTS'
+  'UNIT_TESTS'
+)

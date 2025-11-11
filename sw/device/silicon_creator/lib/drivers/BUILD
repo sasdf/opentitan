@@ -191,6 +191,7 @@ dual_cc_library(
     ),
     deps = dual_inputs(
         device = [
+            ":ibex",
             "//hw/ip/hmac/data:hmac_c_regs",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         ],
@@ -655,6 +656,7 @@ dual_cc_library(
         device = [
             "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+            "//sw/device/lib/coverage:api",
         ],
         host = [
             "//sw/device/lib/base:global_mock",

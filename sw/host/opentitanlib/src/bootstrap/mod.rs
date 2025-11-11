@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::rc::Rc;
+use std::time::Duration;
+
 use anyhow::Result;
 use clap::{Args, ValueEnum};
 use humantime::parse_duration;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
-use std::time::Duration;
 use thiserror::Error;
 
 use crate::app::{NoProgressBar, TransportWrapper};
@@ -16,6 +17,7 @@ use crate::io::gpio::GpioPin;
 use crate::io::spi::SpiParams;
 use crate::io::uart::UartParams;
 use crate::transport::{Capability, ProgressIndicator};
+use crate::uart::console::UartConsole;
 
 mod eeprom;
 mod legacy;
@@ -199,10 +201,17 @@ impl<'a> Bootstrap<'a> {
                 // control when the newly flashed image gets to boot the first time.
                 rom_boot_strapping.remove()?;
             } else {
-                log::info!("Releasing bootstrap pins, resetting device...");
+                log::info!("Releasing bootstrap pins");
                 rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
+                #[cfg(feature = "ot_coverage_enabled")]
+                {
+                    log::info!("Receiving report...");
+                    let uart = transport.uart("console")?;
+                    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+                }
+                log::info!("Resetting device...");
                 transport.reset_target(self.reset_delay, false)?;
             }
         }

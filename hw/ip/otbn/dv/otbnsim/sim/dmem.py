@@ -52,7 +52,7 @@ class Dmem:
         # if the word has invalid integrity bits and we'll get an error if we
         # try to read it. Otherwise, we store the integer value.
         num_words = dmem_size // 4
-        self.data = [None] * num_words  # type: List[Optional[int]]
+        self.data: List[Optional[int]] = [None] * num_words
 
         # Because it's an actual memory, stores to DMEM take two cycles in the
         # RTL. We wouldn't need to model this except that a DMEM invalidation
@@ -63,11 +63,11 @@ class Dmem:
         # this cycle. However, the first commit() will then move it to the
         # self.pending list. Entries here will only make it to self.data on the
         # next commit().
-        self.trace = []  # type: List[TraceDmemStore]
-        self.pending = {}  # type: Dict[int, int]
+        self.trace: List[TraceDmemStore] = []
+        self.pending: Dict[int, int] = {}
 
-    def _load_5byte_le_words(self, data: bytes) -> None:
-        '''Replace the start of memory with data
+    def _load_5byte_le_words(self, data: bytes, word_offset: int) -> None:
+        '''Replace the memory start at word_offset with data
 
         The bytes loaded should represent each 32-bit word with 5 bytes,
         consisting of a validity byte (0 or 1) followed by 4 bytes for the word
@@ -97,10 +97,10 @@ class Dmem:
                 raise ValueError('The validity byte for 32-bit word {} '
                                  'in the input data is {}, not 0 or 1.'
                                  .format(idx32, vld))
-            self.data[idx32] = u32 if vld else None
+            self.data[idx32 + word_offset] = u32 if vld else None
 
-    def _load_4byte_le_words(self, data: bytes) -> None:
-        '''Replace the start of memory with data
+    def _load_4byte_le_words(self, data: bytes, word_offset: int) -> None:
+        '''Replace the memory start at word_offset with data
 
         The bytes loaded should represent each 32-bit word with 4 bytes in
         little-endian format.
@@ -116,19 +116,19 @@ class Dmem:
             data = data + b'0' * (32 - (len(data) % 32))
 
         for idx32, u32 in enumerate(struct.iter_unpack('<I', data)):
-            self.data[idx32] = u32[0]
+            self.data[idx32 + word_offset] = u32[0]
 
-    def load_le_words(self, data: bytes, has_validity: bool) -> None:
-        '''Replace the start of memory with data
+    def load_le_words(self, data: bytes, has_validity: bool, word_offset: int) -> None:
+        '''Replace the memory start at word_offset with data
 
         Uses the 5-byte format if has_validity is true and the 4-byte format
         otherwise.
 
         '''
         if has_validity:
-            self._load_5byte_le_words(data)
+            self._load_5byte_le_words(data, word_offset)
         else:
-            self._load_4byte_le_words(data)
+            self._load_4byte_le_words(data, word_offset)
 
     def dump_le_words(self) -> bytes:
         '''Return the contents of memory as bytes.

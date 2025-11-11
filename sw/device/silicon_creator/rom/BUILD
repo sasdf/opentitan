@@ -10,6 +10,8 @@ load("//rules:linker.bzl", "ld_library")
 load("//rules:opentitan_test.bzl", "manual_test")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "fpga_params", "opentitan_binary", "opentitan_test")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
+load("//rules/coverage:view.bzl", "coverage_view_test")
+load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -62,37 +64,63 @@ cc_test(
 )
 
 ld_library(
+    name = "ld_common",
+    includes = ["rom_common.ld"],
+    deps = [
+        "//sw/device:info_sections",
+        "//sw/device/lib/coverage:coverage_sections",
+    ],
+)
+
+ld_library(
     name = "linker_script",
     script = "rom.ld",
     deps = [
+        ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
-        "//sw/device:info_sections",
+    ],
+)
+
+ld_library(
+    name = "ld_instrumented_rom",
+    script = "instrumented_rom.ld",
+    deps = [
+        ":ld_common",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
+    ],
+)
+
+asm_library_with_coverage(
+    name = "rom_isrs_S",
+    srcs = ["rom_isrs.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:hardened",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/coverage:api_asm",
     ],
 )
 
 cc_library(
     name = "rom_isrs",
-    srcs = [
-        "rom_isrs.S",
-        "rom_isrs.c",
-    ],
+    srcs = ["rom_isrs.c"],
     hdrs = ["rom_isrs.h"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
-        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        ":rom_isrs_S",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/silicon_creator/lib:error",
     ],
 )
 
-cc_library(
+asm_library_with_coverage(
     name = "mask_rom_lib",
     srcs = ["rom_start.S"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
-        ":linker_script",
         ":rom_common",
         ":rom_epmp",
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
@@ -113,6 +141,9 @@ cc_library(
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:multibits",
+        "//sw/device/lib/coverage:api",
+        "//sw/device/lib/coverage:api_asm",
+        "//sw/device/lib/coverage:uart_runtime",
         "//sw/device/silicon_creator/lib/base:chip",
     ],
     alwayslink = True,
@@ -139,6 +170,7 @@ cc_library(
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:stdasm",
+        "//sw/device/lib/coverage:api",
         "//sw/device/lib/crt",
         "//sw/device/lib/runtime:hart",
         "//sw/device/silicon_creator/lib:boot_log",
@@ -190,6 +222,7 @@ cc_library(
 
 opentitan_binary(
     name = "mask_rom",
+    collect_code_coverage = 0,
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
@@ -200,12 +233,47 @@ opentitan_binary(
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
+        ":linker_script",
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
         # by tests such as `rom_epmp_test`.
         ":rom_isrs",
     ],
+)
+
+cc_library(
+    name = "instrumented_header",
+    srcs = ["instrumented_header.c"],
+    deps = [
+        "//sw/device/lib/base:macros",
+    ],
+    alwayslink = True,
+)
+
+opentitan_binary(
+    name = "instrumented_mask_rom",
+    exec_env = [
+        "//hw/top_earlgrey:fpga_cw310",
+        "//hw/top_earlgrey:fpga_cw340",
+        "//hw/top_earlgrey:silicon_creator",
+    ],
+    linker_script = ":ld_instrumented_rom",
+    manifest = "//hw/top_earlgrey:none_manifest",
+    deps = [
+        ":instrumented_header",
+        ":ld_instrumented_rom",
+        ":mask_rom_lib",
+        # We depend on rom_isrs here rather than in mask_rom_lib so that the
+        # `rom_exception_handler` symbol remains unresolved and can be supplied
+        # by tests such as `rom_epmp_test`.
+        ":rom_isrs",
+    ],
+)
+
+coverage_view_test(
+    name = "instrumented_mask_rom_coverage_view",
+    elf = "instrumented_mask_rom",
 )
 
 # Create the legacy ROM target names so that existing splicing rules can find
@@ -232,15 +300,25 @@ legacy_rom_targets(
     ]
 ]
 
+asm_library_with_coverage(
+    name = "rom_epmp_init",
+    srcs = ["rom_epmp_init.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/coverage:api_asm",
+        "//sw/device/silicon_creator/lib:epmp_state",
+    ],
+)
+
+
 cc_library(
     name = "rom_epmp",
-    srcs = [
-        "rom_epmp.c",
-        "rom_epmp_init.S",
-    ],
+    srcs = ["rom_epmp.c"],
     hdrs = ["rom_epmp.h"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
+        ":rom_epmp_init",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
@@ -557,7 +635,7 @@ opentitan_test(
             --exec="console --non-interactive --exit-success='PASS.*\r\n' --exit-failure='{exit_failure}'"
 
             --exec="no-op --info '### Measuring stack utilization for bootstrap slot B'"
-            --exec="bootstrap --mirror=false --clear-uart=true --leave-in-bootstrap {good_b}@0x80000"
+            --exec="bootstrap --mirror=false --clear-uart=true --leave-in-bootstrap {good_b}@{rom_ext_slot_b}"
             --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
 
             --exec="gpio remove ROM_BOOTSTRAP"

@@ -57,6 +57,10 @@
  * End DV Sections
  */
 
+/* Coverage Runtime Sections. */
+INCLUDE sw/device/lib/coverage/info.ld
+
+
 /* ELF-internal Sections. */
 .symtab 0x0 : { *(.symtab) }
 .strtab 0x0 : { *(.strtab) }

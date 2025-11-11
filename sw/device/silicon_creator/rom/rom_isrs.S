@@ -5,7 +5,10 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/hardened_asm.h"
+#include "sw/device/lib/coverage/api_asm.h"
 #include "flash_ctrl_regs.h"
+
+// PRAGMA_COVERAGE: section(__llvm_prf_cnts)
 
 .equ LOAD_ACCESS_FAULT, 5
 
@@ -33,6 +36,8 @@ rom_exception_handler:
   // Save `sp` into `mscratch` and use the 128 bytes reserved at the top of
   // RAM as the exception frame.
   csrw mscratch, sp
+
+  COVERAGE_ASM_MANUAL_MARK(sp,0)
 
   // Before saving the stack frame, check if handling of flash exceptions is
   // enabled.  Determine this with just the stack pointer so that if not enabled,
@@ -78,23 +83,29 @@ rom_exception_handler:
   sw   x30,  30 * OT_WORD_SIZE(sp)
   sw   x31,  31 * OT_WORD_SIZE(sp)
 
+  // PRAGMA_COVERAGE: autogen start
+
   // Get the mcause, mask the reason and check that it is LoadAccessFault.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,1)
   csrr a1, mcause
   andi a1, a1, 31
   li   a2, LOAD_ACCESS_FAULT
   bne  a1, a2, .L_not_a_flash_error
 
   // Check if there is a flash error.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,2)
   li   a3, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
   lw   a1, FLASH_CTRL_FAULT_STATUS_REG_OFFSET(a3)
   andi a1, a1, PHY_ERRORS
   beqz a1, .L_not_a_flash_error
 
   // Clear the flash error.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,3)
   sw   x0, FLASH_CTRL_FAULT_STATUS_REG_OFFSET(a3)
   // Hardening: check that the error is cleared.
   lw   a1, FLASH_CTRL_FAULT_STATUS_REG_OFFSET(a3)
   beqz a1, .L_flash_fault_handled
+  COVERAGE_ASM_AUTOGEN_MARK(t6,4)
   j    .L_not_a_flash_error
   unimp
   unimp
@@ -124,6 +135,7 @@ rom_exception_handler:
   // Where rd' and rs1' are (register_num - 8, ie: rd' of 0 means reg x8).
   //
 
+  COVERAGE_ASM_AUTOGEN_MARK(t6,5)
   csrr a0, mepc
   lh   a2, 0(a0)
   addi a0, a0, OT_HALF_WORD_SIZE
@@ -133,10 +145,12 @@ rom_exception_handler:
   bne  a3, a1, .L_compressed_trap_instr
   // Check if its an uncompressed load instruction by checking that the next
   // five bits are zero.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,6)
   srli a3, a2, 2
   andi a3, a3, 0x1f
   bnez a3, .L_not_a_flash_error
   // Get the register number into a3 by masking off the rd field.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,7)
   srli a3, a2, 7
   andi a3, a3, 0x1f
   // We already added one half word, so for a 32-bit instruction, add another.
@@ -145,8 +159,10 @@ rom_exception_handler:
 
 .L_compressed_trap_instr:
   // Check if its a compressed load instruction.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,8)
   bnez a3, .L_not_a_flash_error
   // Get the register number into a3 by masking off the rd' field and adding 8.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,9)
   srli a3, a2, 2
   andi a3, a3, 7
   addi a3, a3, 8
@@ -154,6 +170,7 @@ rom_exception_handler:
 .L_hardened_mepc_check:
   // Hardening: double-check that the retval calculation is 4 bytes or fewer
   // from the original value of MEPC.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,10)
   addi a1, a1, 1
   csrr a2, mepc
   sub  a2, a0, a2
@@ -163,9 +180,11 @@ rom_exception_handler:
   // that register.
   // RISCV register x0, aka zero.  This register is always const 0, so there
   // is nothing to do.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,11)
   beqz a3, .L_flash_fault_done
 
   // All other registers load the value 0xFFFFFFFF as the faulting value.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,12)
   li   a2, -1
   slli a3, a3, 2
   add  a3, a3, sp
@@ -174,6 +193,7 @@ rom_exception_handler:
 .L_flash_fault_done:
   // Exception handler exit and return to C:
   // Load the correct MEPC for the next instruction in the current task.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,13)
   csrw mepc, a0
 
   // Restore all registers from the stack and restore SP to its former value.
@@ -212,6 +232,7 @@ rom_exception_handler:
   mret
 
 .L_no_flash_exceptions:
+  COVERAGE_ASM_MANUAL_MARK(sp,14)
   csrr sp, mscratch
 .L_not_a_flash_error:
   // Since we aren't dealing with a flash error, we'll jump to the normal
@@ -222,6 +243,7 @@ rom_exception_handler:
   // Note: we _also_ do not restore SP - we'll restart the stack at
   // `ram_end - 128`.  This allows us to report exceptions after jumping
   // to the next stage if the next stage has trashed its SP register.
+  COVERAGE_ASM_AUTOGEN_MARK(t6,15)
   j rom_interrupt_handler
 
   // Normally, we'd put an `unimp` sled here, however, we know by inspecting

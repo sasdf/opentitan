@@ -1,0 +1,147 @@
+diff --git a/platforms/riscv32/features/BUILD.bazel b/platforms/riscv32/features/BUILD.bazel
+index 63e62b9..8691ef8 100644
+--- a/platforms/riscv32/features/BUILD.bazel
++++ b/platforms/riscv32/features/BUILD.bazel
+@@ -136,6 +136,40 @@ feature(
+     ],
+ )
+ 
++feature(
++    name = "coverage",
++    enabled = False,
++    flag_sets = [
++        flag_set(
++            actions = C_ALL_COMPILE_ACTIONS + CPP_ALL_COMPILE_ACTIONS,
++            flag_groups = [
++                flag_group(
++                    flags = [
++                        "-mllvm", "-disable-vp",
++                        "-mllvm", "--enable-single-byte-coverage",
++                        "-fprofile-instr-generate",
++                        "-fcoverage-mapping",
++                        "-DOT_COVERAGE_INSTRUMENTED=1",
++                    ],
++                ),
++            ],
++        ),
++        flag_set(
++            actions = LD_ALL_ACTIONS,
++            flag_groups = [
++                flag_group(
++                    flags = [
++                        "-fprofile-instr-generate",
++                        "-fcoverage-mapping",
++                        "-Wl,--defsym=_ot_coverage_instrumented=1",
++                        "-Wl,--build-id=sha1",
++                    ],
++                ),
++            ],
++        ),
++    ],
++)
++
+ feature(
+     name = "guards",
+     enabled = False,
+@@ -199,6 +231,7 @@ feature_set(
+         ":fastbuild",
+         ":opt",
+         ":minsize",
++        ":coverage",
+         ":sys_spec",
+         ":rv32_bitmanip",
+     ],
+diff --git a/toolchains/lowrisc_rv32imcb/BUILD.bazel b/toolchains/lowrisc_rv32imcb/BUILD.bazel
+index f05762e..d375356 100644
+--- a/toolchains/lowrisc_rv32imcb/BUILD.bazel
++++ b/toolchains/lowrisc_rv32imcb/BUILD.bazel
+@@ -45,5 +45,7 @@ filegroup(
+         "objcopy": "wrappers/objcopy",
+         "objdump": "wrappers/objdump",
+         "strip": "wrappers/strip",
++        "llvm-profdata": "wrappers/llvm-profdata",
++        "llvm-cov": "wrappers/llvm-cov",
+     },
+ ) for device in DEVICES]
+diff --git a/toolchains/lowrisc_rv32imcb/wrappers/driver.sh b/toolchains/lowrisc_rv32imcb/wrappers/driver.sh
+index 32e6513..67239b3 100755
+--- a/toolchains/lowrisc_rv32imcb/wrappers/driver.sh
++++ b/toolchains/lowrisc_rv32imcb/wrappers/driver.sh
+@@ -10,7 +10,11 @@ PREFIX="riscv32-unknown-elf"
+ ARGS=()
+ POSTARGS=()
+ 
+-exec "external/${TOOLCHAIN}/bin/${PREFIX}-${PROG}" \
++if ! [[ "${PROG}" =~ ^llvm- ]]; then
++    PROG="${PREFIX}-${PROG}"
++fi
++
++exec "external/${TOOLCHAIN}/bin/${PROG}" \
+     "${ARGS[@]}" \
+     "$@"\
+     "${POSTARGS[@]}"
+diff --git a/toolchains/lowrisc_rv32imcb/wrappers/llvm-cov b/toolchains/lowrisc_rv32imcb/wrappers/llvm-cov
+new file mode 100755
+index 0000000..67239b3
+--- /dev/null
++++ b/toolchains/lowrisc_rv32imcb/wrappers/llvm-cov
+@@ -0,0 +1,20 @@
++#!/bin/bash --norc
++# Copyright lowRISC contributors.
++# Licensed under the Apache License, Version 2.0, see LICENSE for details.
++# SPDX-License-Identifier: Apache-2.0
++
++PROG=${0##*/}
++TOOLCHAIN="lowrisc_rv32imcb_files"
++PREFIX="riscv32-unknown-elf"
++
++ARGS=()
++POSTARGS=()
++
++if ! [[ "${PROG}" =~ ^llvm- ]]; then
++    PROG="${PREFIX}-${PROG}"
++fi
++
++exec "external/${TOOLCHAIN}/bin/${PROG}" \
++    "${ARGS[@]}" \
++    "$@"\
++    "${POSTARGS[@]}"
+diff --git a/toolchains/lowrisc_rv32imcb/wrappers/llvm-profdata b/toolchains/lowrisc_rv32imcb/wrappers/llvm-profdata
+new file mode 100755
+index 0000000..67239b3
+--- /dev/null
++++ b/toolchains/lowrisc_rv32imcb/wrappers/llvm-profdata
+@@ -0,0 +1,20 @@
++#!/bin/bash --norc
++# Copyright lowRISC contributors.
++# Licensed under the Apache License, Version 2.0, see LICENSE for details.
++# SPDX-License-Identifier: Apache-2.0
++
++PROG=${0##*/}
++TOOLCHAIN="lowrisc_rv32imcb_files"
++PREFIX="riscv32-unknown-elf"
++
++ARGS=()
++POSTARGS=()
++
++if ! [[ "${PROG}" =~ ^llvm- ]]; then
++    PROG="${PREFIX}-${PROG}"
++fi
++
++exec "external/${TOOLCHAIN}/bin/${PROG}" \
++    "${ARGS[@]}" \
++    "$@"\
++    "${POSTARGS[@]}"
+diff --git a/toolchains/lowrisc_rv32imcb/wrappers/BUILD b/toolchains/lowrisc_rv32imcb/wrappers/BUILD
+index 7121e88..1603e79 100644
+--- a/toolchains/lowrisc_rv32imcb/wrappers/BUILD
++++ b/toolchains/lowrisc_rv32imcb/wrappers/BUILD
+@@ -11,6 +11,8 @@ filegroup(
+         "gcc",
+         "gcov",
+         "ld",
++        "llvm-cov",
++        "llvm-profdata",
+         "nm",
+         "objcopy",
+         "objdump",

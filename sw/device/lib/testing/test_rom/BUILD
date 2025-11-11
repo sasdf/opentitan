@@ -27,6 +27,7 @@ ld_library(
 
 opentitan_binary(
     name = "test_rom",
+    collect_code_coverage = 0,
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw305",
@@ -186,6 +187,7 @@ cc_library(
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:mmio",
+        "//sw/device/lib/coverage:ottf_runtime",
         "//sw/device/lib/crt",
         "//sw/device/lib/dif:clkmgr",
         "//sw/device/lib/dif:flash_ctrl",

@@ -1,0 +1,26 @@
+# Copyright lowRISC contributors (OpenTitan project).
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+
+EARLGREY_SLOTS_NORMAL = {
+    "rom_ext_slot_a": "0x0",
+    "rom_ext_slot_b": "0x80000",
+    "owner_slot_a": "0x10000",
+    "owner_slot_b": "0x90000",
+    "rom_ext_size": "0x10000",
+}
+
+EARLGREY_SLOTS_COVERAGE = {
+    "rom_ext_slot_a": "0x0",
+    "rom_ext_slot_b": "0x80000",
+    "owner_slot_a": "0x10000",
+    "owner_slot_b": "0x90000",
+    "rom_ext_size": "0x10000",
+    "instrumented_rom_slot": "0xf0000",
+    "instrumented_rom_size": "0x10000",
+}
+
+EARLGREY_SLOTS = select({
+    "@lowrisc_opentitan//rules/coverage:enabled": EARLGREY_SLOTS_COVERAGE,
+    "//conditions:default": EARLGREY_SLOTS_NORMAL,
+})

@@ -62,7 +62,10 @@ configure_make(
         "--disable-vsllink",
         "--enable-remote-bitbang",
     ],
-    copts = ["-Wno-error=unused-variable"],
+    copts = [
+        "-Wno-error",
+        "-Wno-error=unused-variable",
+    ],
     env = {"CCACHE": "none"},
     lib_source = "@openocd//:all_srcs",
     out_binaries = ["openocd"],

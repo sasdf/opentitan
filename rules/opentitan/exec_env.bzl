@@ -18,6 +18,7 @@ _FIELDS = {
     "spx_key": ("attr.spx_key", False),
     "manifest": ("file.manifest", False),
     "rom": ("attr.rom", False),
+    "instrumented_rom": ("attr.instrumented_rom", False),
     "rom_mmi": ("file.rom_mmi", False),
     "rom_ext": ("attr.rom_ext", False),
     "otp": ("file.otp", False),
@@ -35,6 +36,7 @@ _FIELDS = {
     "rom_scramble_config": ("file.rom_scramble_config", False),
     "openocd": ("attr.openocd", False),
     "openocd_adapter_config": ("attr.openocd_adapter_config", False),
+    "slot_spec": ("attr.slot_spec", False),
 }
 
 ExecEnvInfo = provider(
@@ -156,6 +158,15 @@ def exec_env_common_attrs(**kwargs):
             default = kwargs.get("rom_ext"),
             allow_files = True,
             doc = "ROM_EXT image to use in this environment",
+        ),
+        "instrumented_rom": attr.label(
+            default = kwargs.get("instrumented_rom"),
+            allow_files = True,
+            doc = "Instrumented ROM image to use in this environment",
+        ),
+        "slot_spec": attr.string_dict(
+            default = kwargs.get("slot_spec", {}),
+            doc = "Firmware slot addresses to use in this environment",
         ),
         "otp": attr.label(
             default = kwargs.get("otp"),
@@ -314,13 +325,27 @@ def update_file_attr(name, attr, provider, data_files, param, action_param = Non
             fail("attr must be a single item")
     if type(attr) == "File":
         _update(name, attr, data_files, param, action_param)
-    elif provider and provider in attr:
+        return
+
+    if DefaultInfo in attr:
+        data_files.extend(attr[DefaultInfo].default_runfiles.files.to_list() or [])
+
+    if provider and provider in attr:
         update_file_provider(name, attr[provider], data_files, param, action_param, default)
     elif DefaultInfo in attr:
-        file = attr[DefaultInfo].files.to_list()
-        if len(file) > 1:
-            fail("Expected to find exactly one file in", attr, ", but got", file)
-        _update(name, file[0], data_files, param, action_param)
+        # Filter out disassembly files.
+        file_list = attr[DefaultInfo].files.to_list()
+        file = None
+        num_files = 0
+        for f in file_list:
+            if f.extension == "dis":
+                continue
+            else:
+                file = f
+                num_files += 1
+        if num_files > 1:
+            fail("Expected to find exactly one file in", attr, ", but got", num_files)
+        _update(name, file, data_files, param, action_param)
     else:
         fail("No file providers in", attr)
 
@@ -369,6 +394,10 @@ def common_test_setup(ctx, exec_env, firmware):
     rom_ext = get_fallback(ctx, "attr.rom_ext", exec_env)
     update_file_attr("rom_ext", rom_ext, exec_env.provider, data_files, param, action_param)
 
+    instrumented_rom = get_fallback(ctx, "attr.instrumented_rom", exec_env)
+    update_file_attr("instrumented_rom", instrumented_rom, exec_env.provider, data_files, param, action_param)
+
+
     # Add the binaries built by the test or added to the test.
     update_file_provider("firmware", firmware, data_files, param, action_param)
     for attr, name in ctx.attr.binaries.items():
@@ -391,5 +420,11 @@ def common_test_setup(ctx, exec_env, firmware):
         data_labels += jtag_data
         data_files += get_files(jtag_data)
         param["jtag_test_cmd"] = jtag_test_cmd
+
+    # Update the actual firmware slot spec
+    slot_spec = dict(exec_env.slot_spec)
+    slot_spec.update(ctx.attr.slot_spec)
+    action_param.update(slot_spec)
+    param.update(slot_spec)
 
     return test_harness, data_labels, data_files, param, action_param

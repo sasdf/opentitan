@@ -232,6 +232,7 @@ manifest(d = {
     opentitan_binary(
         name = "rom_ext_{}_slot_{}".format(variation_name, slot),
         testonly = True,
+        collect_code_coverage = 0,
         # TODO(#22780): Integrate real keys for A1 flows.
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:prod_key_0_ecdsa_p256": "prod_key_0"},
         exec_env = [
@@ -262,6 +263,7 @@ manifest(d = {
 opentitan_binary(
     name = "rom_ext_owner_update_newversion",
     testonly = True,
+    collect_code_coverage = 0,
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:prod_key_0_ecdsa_p256": "prod_key_0"},
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
@@ -286,6 +288,7 @@ manifest(d = {
 opentitan_binary(
     name = "rom_ext_dice_x509_slot_a_bad_address_translation",
     testonly = True,
+    collect_code_coverage = 0,
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",

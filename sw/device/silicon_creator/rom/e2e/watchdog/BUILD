@@ -96,6 +96,7 @@ WATCHDOG_TEST_CASES = {
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310",
             "//hw/top_earlgrey:sim_verilator",
+            "//hw/top_earlgrey:fpga_cw340_instrumented_rom",
         ],
         local_defines = [
             "EXPECT_WATCHDOG_{}".format(watchdog_config.upper()),
