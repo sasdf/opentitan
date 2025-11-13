@@ -1,6 +1,9 @@
+import io
+import os
 import re
 import json
 import bisect
+import gzip
 import copy
 import itertools as it
 import sys
@@ -474,26 +477,144 @@ def extract_tests(path):
         tests[line] = enabled
   return dict(sorted(tests.items()))
 
+def load_view_impl(dirfile, mode, use_disassembly):
+  with dirfile.open('coverage.dat', mode) as f:
+    view = parse_lcov(f.read().decode().splitlines())
+  # Ignore objects that are discarded in the final firmware
+  view = strip_discarded(view)
+
+  if use_disassembly:
+    with dirfile.open('test.dis', mode) as f:
+      compiled = parse_dis_file(f.read().decode())
+    with dirfile.open('coverage.json', mode) as f:
+      segments = parse_llvm_json(f.read().decode())
+    compiled = expand_dis_region(compiled, segments)
+
+    # Use normal view coverage for these files.
+    for sf in SKIP_DIS:
+      compiled[sf] = view[sf]
+
+    for sf in view.keys():
+      if sf.lower().endswith('.s'):
+        compiled[sf] = view[sf]
+
+    # Compiled functions lines includes comments,
+    # apply a and filter here to remove them.
+    view = and_coverage(compiled, view)
+  return view
+
 def load_view_zip(zip_path, use_disassembly):
   print(f'Loading {zip_path}', file=sys.stderr)
   with zipfile.ZipFile(zip_path, 'r') as view_zip:
-    with view_zip.open('coverage.dat', 'r') as f:
-      view = parse_lcov(f.read().decode().splitlines())
-    # Ignore objects that are discarded in the final firmware
-    view = strip_discarded(view)
+    return load_view_impl(view_zip, 'r', use_disassembly)
 
-    if use_disassembly:
-      with view_zip.open('test.dis', 'r') as f:
-        compiled = parse_dis_file(f.read().decode())
-      with view_zip.open('coverage.json', 'r') as f:
-        segments = parse_llvm_json(f.read().decode())
-      compiled = expand_dis_region(compiled, segments)
+def load_view_dir(outputs_path, use_disassembly):
+  old_cwd = os.getcwd()
+  try:
+    os.chdir(outputs_path)
+    return load_view_impl(io, 'rb', use_disassembly)
+  finally:
+    os.chdir(old_cwd)
 
-      # Use normal view coverage for these files.
-      for sf in SKIP_DIS:
-        compiled[sf] = view[sf]
+def load_view(outputs_path, use_disassembly):
+  test_zip = Path(outputs_path) / 'outputs.zip'
+  if test_zip.exists():
+    return load_view_zip(test_zip, use_disassembly)
+  else:
+    return load_view_dir(outputs_path, use_disassembly)
 
-      # Compiled functions lines includes comments,
-      # apply a and filter here to remove them.
-      view = and_coverage(compiled, view)
-  return view
+def simplify_path(path):
+  path = re.sub(r'^bazel-out/k8[^/]*/bin/', 'gen:', path)
+  return path
+
+class CoverageCollection:
+  """Builder for the coverage collection json (gzipped).
+
+  Format:
+    {
+      "tests": [ list of test label ],
+      "coverage": {
+        "source file path": {
+          "l": [ // lines
+            {
+              "c": "line content",
+              "s": bool, // whether the line is skipped.
+              "t": [ idx of the hit tests  ]
+            },
+            ...
+          ],
+          "f": { // functions
+            "funcname": bool, // whether the line is hit.
+            ...
+          }
+        },
+        ...
+      }
+    }
+  """
+  def __init__(self):
+    self.tests = []
+    self.coverage = {}
+    self.loaded_sources = {}
+
+  def add_test(self, test_label, test_lcov):
+    test_idx = len(self.tests)
+    self.tests.append(test_label)
+    for sf_key, file_profile in test_lcov.items():
+      sf_path = sf_key.removeprefix('SF:')
+      path = simplify_path(sf_path)
+
+      # Read the source file content if not already loaded
+      if sf_path not in self.loaded_sources:
+        with open(sf_path, 'r') as f:
+          self.loaded_sources[sf_path] = f.read()
+
+      # Consistency check for transitions
+      if path in self.loaded_sources:
+        assert self.loaded_sources[path] == self.loaded_sources[sf_path], \
+          f"Inconsistent sources between {path} and {sf_path}"
+      else:
+        self.loaded_sources[path] = self.loaded_sources[sf_path]
+
+      if path not in self.coverage:
+        # Initialize line data for the source file
+        contents = self.loaded_sources[path].splitlines()
+        self.coverage[path] = {
+          "l": [{"c": line, "s": True, "t": []} for line in contents],
+          "f": {},
+        }
+
+      lines = self.coverage[path]["l"]
+
+      # Update line coverage data
+      for lineno, count in file_profile.da.items():
+        # Adjust line number to 0-based index for list
+        assert lineno > 0, lineno
+        lineno -= 1
+
+        # Ensure the line exists in our structure.
+        assert lineno < len(lines), \
+            f"Line {lineno} in {sf_path} is out of bounds (file has {len(lines)} lines)."
+
+        lines[lineno]['s'] = False
+        # Only add test index if the line was actually hit (count > 0).
+        if count > 0:
+          if test_idx not in lines[lineno]['t']:
+            lines[lineno]['t'].append(test_idx)
+
+      # Update function coverage data
+      funcs = self.coverage[path]["f"]
+      for func_name, lineno in file_profile.fn.items():
+        # Adjust function line number to 0-based index for consistency
+        assert lineno > 0, lineno
+        lineno -= 1
+
+        if func_name not in funcs:
+          funcs[func_name] = False
+
+        if file_profile.fnda.get(func_name, 0) > 0 or file_profile.da.get(lineno, 0) > 0:
+          funcs[func_name] = True
+
+  def save(self, output_path):
+    with gzip.open(output_path, 'wt') as f:
+      json.dump({ "tests": self.tests, "coverage": self.coverage }, f)

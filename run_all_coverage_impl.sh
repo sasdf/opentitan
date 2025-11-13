@@ -2,6 +2,9 @@ COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
 VIEW_CACHE_DIR="bazel-out/_coverage/view/"
 
+VIEWER_DIR="${COVERAGE_OUTPUT_DIR}/viewer"
+mkdir -p "${VIEWER_DIR}"
+
 rm -f "${COVERAGE_DAT}"
 
 if ! declare -p COVERAGE_VIEWS &>/dev/null; then
@@ -17,6 +20,10 @@ if [[ "${#COVERAGE_VIEWS[@]}" == "0" ]]; then
 fi
 
 ./bazelisk.sh coverage "${COVERAGE_VIEWS[@]}" "${BAZEL_ARGS[@]}" "$@"
+
+python3 ./util/coverage/collect_view_json.py \
+    --output="${VIEWER_DIR}/view.json.gz"
+
 CACHED_VIEWS=()
 
 rm -rf "${VIEW_CACHE_DIR}"
@@ -56,6 +63,11 @@ fi
 echo "Collect overall coverage"
 rm -f "${COVERAGE_DAT}"
 ./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
+
+python3 ./util/coverage/collect_coverage_json.py \
+    --output="${VIEWER_DIR}/coverage.json.gz"
+
+cp ./util/coverage/viewer.html "${VIEWER_DIR}"
 
 if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
