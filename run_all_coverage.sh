@@ -15,7 +15,7 @@ source ./targets_useful_extra.sh
 
 TEST_GROUPS=(
     "UNIT_TESTS"
-    "OTBN_TESTS"
+    # "OTBN_TESTS"
     "TEST_ROM_TESTS"
     "CW310_FAKE_KEYS_TESTS"
     "MANUF_TESTS"

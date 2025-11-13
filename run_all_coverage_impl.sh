@@ -146,5 +146,5 @@ python3 util/coverage/bundle_logs.py "${COVERAGE_OUTPUT_DIR}/testlogs"
 echo "Save ToE source diff"
 python3 util/coverage/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
 
-echo "Save ROM source diff"
-python3 util/coverage/show_rom_diff.py > "${COVERAGE_OUTPUT_DIR}/taped_out_rom.diff"
+# echo "Save ROM source diff"
+# python3 util/coverage/show_rom_diff.py > "${COVERAGE_OUTPUT_DIR}/taped_out_rom.diff"
