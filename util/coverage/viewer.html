@@ -387,6 +387,11 @@
   </div>
 
   <script>
+    var bundledData = new Map();
+    // -- Bundled data --
+  </script>
+
+  <script>
     // --- Global State Variables ---
     let coverageData; // Main coverage data from coverage.json.gz
     let viewData;     // Coverage data for views from view.json.gz
@@ -438,11 +443,19 @@
      * @returns {Promise<object>} The parsed JSON data.
      */
     async function loadGzippedJson(gz_path) {
-      const response = await fetch(gz_path);
-      if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status} for ${gz_path}`);
+      let stream = null;
+      if (bundledData.has(gz_path)) {
+          const array = Uint8Array.fromBase64(bundledData.get(gz_path));
+          const blob = new Blob([array]);
+          stream = blob.stream();
+      } else {
+          const response = await fetch(gz_path);
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status} for ${gz_path}`);
+          }
+          stream = response.body;
       }
-      const decompressedStream = response.body.pipeThrough(new DecompressionStream('gzip'));
+      const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
       const decompressedResponse = new Response(decompressedStream);
       return await decompressedResponse.json();
     }
@@ -486,7 +499,7 @@
 
       } catch (error) {
         console.error('Failed to load coverage data:', error);
-        dom.sourceCodeElement.textContent = `Error loading coverage data: ${error.message}. Please ensure 'coverage.json.gz' and 'coverage_view.json.gz' are available.`;
+        dom.sourceCodeElement.textContent = `Error loading coverage data: ${error.message}. Please ensure 'coverage.json.gz' and 'view.json.gz' are available.`;
       }
     }
 

@@ -67,7 +67,11 @@ rm -f "${COVERAGE_DAT}"
 python3 ./util/coverage/collect_coverage_json.py \
     --output="${VIEWER_DIR}/coverage.json.gz"
 
-cp ./util/coverage/viewer.html "${VIEWER_DIR}/index.html"
+python3 ./util/coverage/viewer_bundler.py \
+    --viewer_html=./util/coverage/viewer.html \
+    --coverage_json="${VIEWER_DIR}/coverage.json.gz" \
+    --view_json="${VIEWER_DIR}/view.json.gz" \
+    --output_html="${VIEWER_DIR}/index.html"
 
 if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
