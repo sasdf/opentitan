@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Coverage Viewer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/prism.min.js" integrity="sha512-HiD3V4nv8fcjtouznjT9TqDNDm1EXngV331YGbfVGeKUoH+OLkRTCMzA34ecjlgSQZpdHZupdSrqHY+Hz3l6uQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism-dark.min.css" integrity="sha512-Njdz7T/p6Ud1FiTMqH87bzDxaZBsVNebOWmacBjMdgWyeIhUSFU4V52oGwo3sT+ud+lyIE98sS291/zxBfozKw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
     /* Base Layout */
     body {
@@ -15,6 +18,18 @@
       overflow: hidden;
       background-color: #1e1e1e; /* Dark background */
       color: #cccccc; /* Light text */
+    }
+
+    /* Scrollbar Styles for Dark Mode */
+    ::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 0;
+      height: 0;
+    }
+
+    /* Selection Styles for Dark Mode */
+    ::selection {
+      background-color: #4a4a4a; /* Darker grey for selection background */
     }
 
     /* Sidebar Styles */
@@ -69,7 +84,7 @@
       padding: 8px 30px 8px 8px; /* Room for reset button */
       box-sizing: border-box;
       border: 1px solid #444; /* Darker border */
-      border-radius: 4px;
+      border-radius: 100px;
       width: 100%;
       -webkit-appearance: none; /* Remove default dropdown arrow */
       -moz-appearance: none;
@@ -79,7 +94,7 @@
     }
     #reset-test-filter {
       position: absolute;
-      right: 5px;
+      right: 12px;
       top: 50%;
       width: 1.5em;
       height: 1.5em;
@@ -103,7 +118,8 @@
       font-family: monospace;
       max-height: 150px;
       overflow-y: auto;
-      padding: 5px;
+      margin-top: 10px;
+      margin-left: 10px;
     }
     #view-test-checkboxes label {
       display: inline-block;
@@ -118,6 +134,55 @@
     #view-test-checkboxes input[type="checkbox"] {
         accent-color: #4CAF50; /* Green accent for checkboxes */
     }
+
+    /* Syntax Highlight Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #555;
+      -webkit-transition: .4s;
+      transition: .4s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:focus + .slider {
+      box-shadow: 0 0 1px #4CAF50;
+    }
+    input:checked + .slider:before {
+      -webkit-transform: translateX(14px);
+      -ms-transform: translateX(14px);
+      transform: translateX(14px);
+    }
+    /* END Syntax Highlight Switch */
 
     /* File List Table */
     #file-list-container {
@@ -195,6 +260,7 @@
     /* Main Content Area */
     #content {
       flex-grow: 1;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
@@ -208,22 +274,59 @@
       color: #cccccc;
     }
     #current-file-name {
-      font-weight: bold;
       font-family: monospace;
     }
+    #highlight-toggle-container { /* Style for the moved switch */
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #highlight-toggle-container label { /* Style for the moved switch */
+      font-family: monospace;
+      font-size: 0.8em;
+    }
     #source-code-container {
+      position: relative;
       flex-grow: 1;
-      overflow: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
       background-color: #1e1e1e; /* Dark code background */
       padding: 10px;
+      box-sizing: border-box;
       color: #aaaaaa;
     }
-    pre {
+    #source-code-container pre {
       margin: 0;
+      width: 100%;
+      overflow: auto;
+      display: inline-block;
     }
-    code {
-      display: block;
+    #source-code-container code {
+      font-family: monospace;
+      line-height: 1.35;
+      font-size: 1em;
+      text-shadow: none;
+      display: inline-block;
+      min-width: 100%;
       white-space: pre;
+      color: #bbb;
+    }
+    #source-content-pre {
+      position: absolute;
+      width: calc(100% - 110px) !important;
+      top: 10px;
+      left: 100px;
+    }
+    #source-content-pre.no-highlight * {
+        color: inherit !important;
+        background: inherit !important;
+        text-shadow: none !important;
+    }
+    #source-content-pre * {
+      background: transparent;
+    }
+    #source-content-pre *::selection {
+      background-color: inherit;
     }
 
     /* Code Line Styling */
@@ -284,10 +387,10 @@
       background-color: #538633; /* Darker green for hit lines */
     }
     .not-hit {
-      background-color: #382020; /* Darker red for not hit lines */
+      background-color: #402020; /* Darker red for not hit lines */
     }
     .not-hit.highlighted {
-      background-color: #584020; /* Darker red for not hit lines */
+      background-color: #604020; /* Darker red for not hit lines */
     }
     .not-hit:hover {
       background-color: #663333; /* Darker red for not hit lines */
@@ -336,7 +439,7 @@
   <div id="sidebar">
     <div id="filter-and-search">
       <div id="view-test-filter-controls">
-        <label>Filter by View Tests:</label>
+        <label>Coverage View:</label>
         <div id="view-test-checkboxes">
           <!-- View test checkboxes are dynamically populated by JavaScript -->
         </div>
@@ -352,6 +455,8 @@
         <input type="text" id="search-input" placeholder="Search files...">
       </div>
     </div>
+
+
     <div id="file-list-container">
       <table id="file-list">
         <thead>
@@ -371,9 +476,19 @@
   <div id="content">
     <div id="source-header">
       <span id="current-file-name"></span>
+      <div id="highlight-toggle-container">
+          <label for="syntax-highlight-toggle">&lt;/&gt;</label>
+          <label class="switch">
+              <input type="checkbox" id="syntax-highlight-toggle" checked>
+              <span class="slider"></span>
+          </label>
+      </div>
     </div>
     <div id="source-code-container">
       <pre><code id="source-code">
+        <!-- Source code is loaded here by JavaScript -->
+      </code></pre>
+      <pre id="source-content-pre"><code id="source-content">
         <!-- Source code is loaded here by JavaScript -->
       </code></pre>
     </div>
@@ -402,6 +517,7 @@
     let hidePanelTimeout = null;  // Timer for hiding the test info panel
     let allFilePathsMetadata = []; // Stores path for all files from coverageData
     let displayedFilePathsMetadata = []; // Stores metadata for files currently displayed in the list (after search/filters)
+    let syntaxHighlightEnabled = true; // New state for syntax highlighting
 
     // Reverse lookup maps: test name <-> index
     const testNameToIndex = {};
@@ -416,6 +532,8 @@
       currentFileNameSpan: document.getElementById('current-file-name'),
       sourceCodeContainer: document.getElementById('source-code-container'),
       sourceCodeElement: document.getElementById('source-code'),
+      sourceContentPre: document.getElementById('source-content-pre'),
+      sourceContentElement: document.getElementById('source-content'),
       testInfoPanel: document.getElementById('test-info-panel'),
       testListPopup: document.getElementById('test-list-popup'),
       filterByTestSelect: document.getElementById('filter-by-test'),
@@ -423,6 +541,7 @@
       viewTestCheckboxesDiv: document.getElementById('view-test-checkboxes'),
       sidebar: document.getElementById('sidebar'),
       sidebarSplitter: document.getElementById('sidebar-splitter'),
+      syntaxHighlightToggle: document.getElementById('syntax-highlight-toggle'),
     };
 
     // --- Sorting State ---
@@ -485,7 +604,7 @@
         populateTestFilterDropdown();
         populateViewTestCheckboxes();
 
-        // Process URL hash to restore state (file, line, filters, sort)
+        // Process URL hash to restore state (file, line, filters, sort, highlight)
         processUrlHash(false);
 
         // After processing hash, apply filters and load initial file if necessary
@@ -496,6 +615,12 @@
         } else if (!currentFilePath && displayedFilePathsMetadata.length === 0) {
           displayNoFilesMessage();
         }
+
+        // Highlight the active file in the list *after* the file list has been rendered.
+        if (currentFilePath) {
+            updateActiveFileInList(currentFilePath);
+        }
+
 
       } catch (error) {
         console.error('Failed to load coverage data:', error);
@@ -618,6 +743,25 @@
 
         dom.fileListBody.appendChild(tr);
       });
+      // After rendering, update the active file visually
+      if (currentFilePath) {
+          updateActiveFileInList(currentFilePath);
+      }
+    }
+
+    /**
+     * Updates the visual 'active' state for a file in the file list.
+     * @param {string} filePath - The path of the file to mark as active.
+     */
+    function updateActiveFileInList(filePath) {
+        Array.from(dom.fileListBody.children).forEach(tr => {
+            if (tr.dataset.filePath === filePath) {
+                tr.classList.add('active');
+                tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Scroll to make active file visible
+            } else {
+                tr.classList.remove('active');
+            }
+        });
     }
 
     /**
@@ -626,6 +770,7 @@
     function displayNoFilesMessage() {
         dom.currentFileNameSpan.textContent = 'No files match criteria.';
         dom.sourceCodeElement.innerHTML = '';
+        dom.sourceContentElement.innerHTML = '';
         currentFilePath = null;
         currentLineNumber = null;
     }
@@ -683,6 +828,7 @@
         currentLineNumber = null;
         dom.currentFileNameSpan.textContent = 'No file selected or file not found.';
         dom.sourceCodeElement.innerHTML = '';
+        dom.sourceContentElement.innerHTML = '';
         updateUrlHash(pushState);
         return;
       }
@@ -695,16 +841,11 @@
       const viewFileProfile = viewData.coverage[filePath];
       dom.currentFileNameSpan.textContent = filePath;
       const newSourceCodeElement = document.createElement('code');
+      const newSourceContentElement = document.createElement('code');
+      newSourceContentElement.classList.add('language-clike');
 
       // Update active file highlight in the file list
-      Array.from(dom.fileListBody.children).forEach(tr => {
-        if (tr.dataset.filePath === filePath) {
-          tr.classList.add('active');
-          tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Scroll to make active file visible
-        } else {
-          tr.classList.remove('active');
-        }
-      });
+      updateActiveFileInList(filePath);
 
       // Prepare indices for faster filtering
       const filteredViewTestIndices = filteredViewTests
@@ -759,10 +900,7 @@
         });
         lineDiv.appendChild(lineNumberSpan);
 
-        const lineContentSpan = document.createElement('span');
-        lineContentSpan.classList.add('line-content');
-        lineContentSpan.textContent = lineData.c; // Display the actual source code content
-        lineDiv.appendChild(lineContentSpan);
+        newSourceContentElement.textContent += lineData.c + '\n';
 
         // Apply CSS classes for visual indication of coverage status
         if (skippedByViewFilter) {
@@ -777,9 +915,16 @@
         newSourceCodeElement.appendChild(lineDiv);
       });
 
+      // Only highlight if syntaxHighlightEnabled is true
+      if (syntaxHighlightEnabled) {
+          Prism.highlightElement(newSourceContentElement);
+      }
+
       // Replace the old source code element with the new one
       dom.sourceCodeElement.replaceWith(newSourceCodeElement);
       dom.sourceCodeElement = newSourceCodeElement; // Update the DOM reference
+      dom.sourceContentElement.replaceWith(newSourceContentElement);
+      dom.sourceContentElement = newSourceContentElement; // Update the DOM reference
 
       // Scroll to the specific line if currentLineNumber is set
       if (currentLineNumber !== null) {
@@ -988,6 +1133,15 @@
     }
 
     /**
+     * Handles changes to the syntax highlight toggle.
+     * Updates `syntaxHighlightEnabled` and reloads the current source file.
+     */
+    function handleSyntaxHighlightToggle() {
+        syntaxHighlightEnabled = dom.syntaxHighlightToggle.checked;
+        updateStateAndReload(true);
+    }
+
+    /**
      * Re-evaluates the current file display, filters, and loads/reloads the source code.
      * @param {boolean} pushState - Whether to push a new state to browser history.
      */
@@ -1041,6 +1195,10 @@
           params.set('sort_key', currentSortKey);
           params.set('sort_order', currentSortOrder);
       }
+      // Add syntax highlight state if it's disabled (default is enabled)
+      if (!syntaxHighlightEnabled) {
+          params.set('highlight', 'off');
+      }
 
       const newHash = params.toString();
       const newUrl = newHash ? `#${newHash}` : window.location.pathname; // If no params, remove hash
@@ -1070,6 +1228,7 @@
       const searchFromHash = params.get('search');
       const sortKeyFromHash = params.get('sort_key');
       const sortOrderFromHash = params.get('sort_order');
+      const highlightFromHash = params.get('highlight'); // New: Syntax highlight state
 
       let stateChanged = false; // Flag to indicate if any part of the state has changed from current UI
 
@@ -1156,6 +1315,14 @@
         stateChanged = true;
       }
 
+      // --- Process Syntax Highlight State ---
+      const newSyntaxHighlightEnabled = highlightFromHash !== 'off'; // 'off' means disabled, anything else means enabled/default
+      if (syntaxHighlightEnabled !== newSyntaxHighlightEnabled) {
+          syntaxHighlightEnabled = newSyntaxHighlightEnabled;
+          dom.syntaxHighlightToggle.checked = newSyntaxHighlightEnabled;
+          stateChanged = true;
+      }
+
       // If any state changed (or if it's initial load), re-apply filters and update UI
       if (stateChanged) {
         applyFileAndSortFilters();
@@ -1207,6 +1374,8 @@
     dom.filterByTestSelect.addEventListener('change', handleTestFilterChange);
     dom.resetTestFilterButton.addEventListener('click', handleResetTestFilter);
     dom.searchInput.addEventListener('input', () => updateStateAndReload(true));
+    dom.syntaxHighlightToggle.addEventListener('change', handleSyntaxHighlightToggle);
+
 
     // --- Sidebar Resize Logic ---
     let isResizing = false;
