@@ -5,6 +5,7 @@
 load("//rules:autogen.bzl", "autogen_stamp_include")
 load("//rules:stamp.bzl", "stamp_flag")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_PLATFORM")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -27,4 +28,18 @@ stamp_flag(name = "stamp_flag")
 # file should be included in srcs instead of deps.
 autogen_stamp_include(
     name = "autogen_stamp_include",
+)
+
+string_flag(
+    name = "fpga",
+    build_setting_default = "hyper340",
+    values = [
+        "",
+        "hyper340",
+    ],
+)
+
+config_setting(
+    name = "use_cw340",
+    flag_values = {":fpga": "hyper340"},
 )

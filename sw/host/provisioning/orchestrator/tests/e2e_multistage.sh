@@ -22,6 +22,7 @@ ORCHESTRATOR_PATH=$TEST_TMPDIR/orchestrator.zip
 # at the test's runfiles. However, if RUNFILES_DIR is set, orchestrator.zip will
 # inherit its value instead of setting it to the proper directory. This breaks
 # runfile resolution, so we unset this variable here.
+RUNFILES_DIR_BAK="$RUNFILES_DIR"
 unset RUNFILES_DIR
 
 # Run tool in CP-only mode first. The path to the --sku-config parameter is
@@ -30,7 +31,7 @@ $PYTHON ${ORCHESTRATOR_PATH} \
   --sku-config=sw/host/provisioning/orchestrator/configs/skus/emulation.hjson \
   --test-unlock-token="0x11111111_11111111_11111111_11111111" \
   --test-exit-token="0x22222222_22222222_22222222_22222222" \
-  --fpga=hyper310 \
+  --fpga=${FPGA} \
   --non-interactive \
   --cp-only \
   --db-path=$TEST_TMPDIR/registry.sqlite
@@ -42,7 +43,16 @@ $PYTHON ${ORCHESTRATOR_PATH} \
   --sku-config=sw/host/provisioning/orchestrator/configs/skus/emulation.hjson \
   --test-unlock-token="0x11111111_11111111_11111111_11111111" \
   --test-exit-token="0x22222222_22222222_22222222_22222222" \
-  --fpga=hyper310 \
+  --fpga=${FPGA} \
   --fpga-dont-clear-bitstream \
   --non-interactive \
   --db-path=$TEST_TMPDIR/registry.sqlite
+
+# Post-process the coverage profile if under coverage mode
+if [[ "$COVERAGE" == "1" ]]; then
+  export RUNFILES_DIR="$RUNFILES_DIR_BAK"
+  export COLLECT_CC_COVERAGE="$PWD/$COLLECT_CC_COVERAGE"
+  cd "$ROOT"
+
+  "$COLLECT_CC_COVERAGE"
+fi

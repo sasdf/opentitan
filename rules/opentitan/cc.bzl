@@ -530,6 +530,7 @@ opentitan_test = rv_rule(
             executable = True,
             cfg = "exec",
         ),
+        "_fpga": attr.label(default = "//rules:fpga"),
     }.items()),
     fragments = ["cpp"],
     toolchains = ["@rules_cc//cc:toolchain_type"],

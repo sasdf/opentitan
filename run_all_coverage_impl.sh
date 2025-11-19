@@ -1,8 +1,20 @@
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
 VIEW_CACHE_DIR="bazel-out/_coverage/view/"
-
 VIEWER_DIR="${COVERAGE_OUTPUT_DIR}/viewer"
+
+# FPGA checks
+if lsusb | grep ':c310' > /dev/null; then
+  BAZEL_ARGS+=(
+    --//rules:fpga=""
+  )
+fi
+
+if ! lsusb | grep ':c340' > /dev/null; then
+  echo "ERROR: No CW340 board is connected"
+  exit 1
+fi
+
 mkdir -p "${VIEWER_DIR}"
 
 rm -f "${COVERAGE_DAT}"

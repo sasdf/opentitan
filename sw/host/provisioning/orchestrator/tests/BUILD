@@ -16,6 +16,11 @@ load("@ot_python_deps//:requirements.bzl", "requirement")
 
 package(default_visibility = ["//visibility:public"])
 
+CW340_OVERRIDE = select({
+    "//rules:use_cw340": {"FPGA": "cw340"},
+    "//conditions:default": {},
+})
+
 py_test(
     name = "db_test",
     srcs = ["db_test.py"],
@@ -75,13 +80,16 @@ sh_test(
     srcs = ["e2e_option_flags.sh"],
     data = [
         ":orchestrator_hyper310_zip",
+        "//util/coverage/collect_cc_coverage",
         "@//sw/host/provisioning/orchestrator/configs/skus:emulation.hjson",
         "@python3",
     ],
     env = {
         "PYTHON": "$(location @python3//:python3)",
         "PACKAGE": "npcr12",
-    },
+        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+        "FPGA": "hyper310",
+    } | CW340_OVERRIDE,
     tags = [
         "changes_otp",
         "exclusive",
@@ -95,11 +103,14 @@ sh_test(
     srcs = ["e2e_multistage.sh"],
     data = [
         ":orchestrator_hyper310_zip",
+        "//util/coverage/collect_cc_coverage",
         "@python3",
     ],
     env = {
         "PYTHON": "$(location @python3//:python3)",
-    },
+        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+        "FPGA": "hyper310",
+    } | CW340_OVERRIDE,
     tags = [
         "changes_otp",
         "exclusive",
@@ -114,13 +125,16 @@ sh_test(
     srcs = ["e2e_ate_individ.sh"],
     data = [
         ":orchestrator_hyper310_zip",
+        "//util/coverage/collect_cc_coverage",
         "@//sw/host/provisioning/orchestrator/configs/skus:emulation.hjson",
         "@python3",
     ],
     env = {
         "PYTHON": "$(location @python3//:python3)",
         "PACKAGE": "npcr12",
-    },
+        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+        "FPGA": "hyper310",
+    } | CW340_OVERRIDE,
     tags = [
         "changes_otp",
         "exclusive",
@@ -147,7 +161,7 @@ sh_test(
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
             "FPGA": "{}".format(fpga),
-        },
+        } | CW340_OVERRIDE,
         tags = [
             "changes_otp",
             "exclusive",

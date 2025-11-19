@@ -9,7 +9,7 @@ load("//rules:const.bzl", "KEY_AUTHENTICITY")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "bitstream",
+    name = "_hyper310_bitstream",
     testonly = True,
     srcs = select({
         "//hw/bitstream:bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -20,8 +20,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "bitstream",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:bitstream",
+        "//conditions:default": ":_hyper310_bitstream",
+    }),
+)
+
 filegroup(
-    name = "mmi",
+    name = "_hyper310_mmi",
     testonly = True,
     srcs = select({
         "//hw/bitstream:bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -30,6 +38,14 @@ filegroup(
         "//conditions:default": ["@bitstreams//:chip_earlgrey_cw310_hyperdebug_mmi"],
     }),
     tags = ["manual"],
+)
+
+alias(
+    name = "mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:mmi",
+        "//conditions:default": ":_hyper310_mmi",
+    }),
 )
 
 # Build the Test ROM and splice it into the bitstream.

@@ -84,7 +84,7 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
-        bitstream = ":bitstream_default_otp",
+        otp = ":otp_img_default",
         tags = maybe_skip_in_ci(CONST.LCV.RMA),
     ),
     deps = [

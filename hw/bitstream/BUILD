@@ -58,7 +58,7 @@ config_setting(
 )
 
 filegroup(
-    name = "bitstream",
+    name = "_cw310_bitstream",
     testonly = True,
     srcs = select({
         "bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -69,8 +69,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "bitstream",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:bitstream",
+        "//conditions:default": ":_cw310_bitstream",
+    }),
+)
+
 filegroup(
-    name = "cw310_mmi",
+    name = "_cw310_mmi",
     testonly = True,
     srcs = select({
         "bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -79,6 +87,14 @@ filegroup(
         "//conditions:default": ["@bitstreams//:chip_earlgrey_cw310_mmi"],
     }),
     tags = ["manual"],
+)
+
+alias(
+    name = "cw310_mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:mmi",
+        "//conditions:default": ":_cw310_mmi",
+    }),
 )
 
 # Build the Test ROM and splice it into the bitstream.

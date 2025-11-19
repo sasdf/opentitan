@@ -181,11 +181,11 @@ opentitan_binary(
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
-            bitstream = ":bitstream_sigverify_spx_{}_{}".format(
+            exit_success = t["exit_success"][lc_state],
+            otp = ":otp_img_sigverify_spx_{}_{}".format(
                 lc_state,
                 t["name"],
             ),
-            exit_success = t["exit_success"][lc_state],
             tags = maybe_skip_in_ci(lc_state_val),
         ),
         spx_key = spx_key_for_lc_state(
