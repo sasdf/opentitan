@@ -35,12 +35,14 @@ cc_library(
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:macros",
     ],
+    alwayslink = True,
 )
 
 cc_library(
     name = "instrumented_rom_loader_disabled",
     srcs = ["instrumented_rom_loader_disabled.S"],
     target_compatible_with = [OPENTITAN_CPU],
+    alwayslink = True,
 )
 
 opentitan_binary(
