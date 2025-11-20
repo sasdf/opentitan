@@ -25,6 +25,43 @@ ld_library(
     ],
 )
 
+cc_library(
+    name = "instrumented_rom_loader_enabled",
+    srcs = ["instrumented_rom_loader_enabled.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+    deps = [
+        "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
+        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:macros",
+    ],
+)
+
+cc_library(
+    name = "instrumented_rom_loader_disabled",
+    srcs = ["instrumented_rom_loader_disabled.S"],
+    target_compatible_with = [OPENTITAN_CPU],
+)
+
+opentitan_binary(
+    name = "instrumented_rom_loader",
+    collect_code_coverage = 0,
+    exec_env = [
+        "//hw/top_earlgrey:fpga_cw310",
+        "//hw/top_earlgrey:fpga_cw305",
+        "//hw/top_earlgrey:fpga_cw340",
+        "//hw/top_earlgrey:sim_dv_base",
+        "//hw/top_earlgrey:sim_qemu_base",
+        "//hw/top_earlgrey:sim_verilator_base",
+    ],
+    kind = "rom",
+    linker_script = ":linker_script",
+    deps = [
+        ":instrumented_rom_loader_enabled",
+        ":test_rom_lib",
+    ],
+)
+
 opentitan_binary(
     name = "test_rom",
     collect_code_coverage = 0,
@@ -39,6 +76,7 @@ opentitan_binary(
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
+        ":instrumented_rom_loader_disabled",
         ":test_rom_lib",
     ],
 )

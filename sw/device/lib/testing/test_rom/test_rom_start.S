@@ -89,64 +89,6 @@ _test_rom_interrupt_vector:
   .type _reset_start, @function
 
 _reset_start:
-#ifdef OT_COVERAGE_ENABLED
-  // Remove address space protections by configuring entry 15 as
-  // read-write-execute for the entire address space and then clearing
-  // all other entries.
-  // NOTE: This should happen before attemting to access any address outside
-  // the initial ePMP RX region at reset, e.g. `kDeviceType` which is in
-  // .rodata.
-  li   t0, (0x9f << 24) // Locked NAPOT read-write-execute.
-  csrw pmpcfg3, t0
-  li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
-  csrw pmpaddr15, t0
-
-  // Configure `pmpcfg0` in test ROM to enable instrumented ROM execution.
-  // Without this configuration, the instrumented ROM can not be executed due to
-  // ePMP reconfiguration in `rom_epmp_init`.
-  li   t0, (0x8f << 8) // Locked TOR read-write-execute.
-  csrw pmpcfg0, t0
-  li   t0, 0
-  csrw pmpaddr0, t0
-  li   t0, 0x10000000 // TOR encoded region convering entire eFlash address space.
-  csrw pmpaddr1, t0
-
-  csrw pmpcfg1, zero
-  csrw pmpcfg2, zero
-
-  // Check if instrumented ROM is presented
-  la a0, (_instrumented_rom_slot + 0x20000000)
-  lw t0, 0x80(a0)
-
-  // Continue if it's 0 or -1
-  li t1, 0x1
-  add t0, t0, t1
-  bleu t0, t1, continue_test_rom
-
-  // Set up the stack.
-  la sp, _stack_end
-
-  // Initialize main memory (main SRAM).
-  li    t1, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
-  li    t0, (1 << SRAM_CTRL_CTRL_INIT_BIT)
-  sw    t0, SRAM_CTRL_CTRL_REG_OFFSET(t1)
-
-  // Set exception/interrupt handlers.
-  //
-  // Note: the increment just sets the low bits to 0b01 which is the vectored
-  // mode setting.
-  addi  t0, a0, 1
-  csrw mtvec, t0
-
-  // Jump to instrumented ROM
-  li   a3, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
-  li   t1, 0xa26a38f7
-  sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
-  jalr ra, 0x80(a0)
-
-continue_test_rom:
-#endif
-
   // Set up the global pointer. This requires that we disable linker relaxations
   // (or it will be relaxed to `mv gp, gp`).
   .option push
@@ -205,6 +147,8 @@ continue_test_rom:
   .global _start
   .type _start, @function
 _start:
+  call _try_instrumented_rom
+
 #if !OT_IS_ENGLISH_BREAKFAST
   // Check if AST initialization should be skipped.
   li   a0, (TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR + \
