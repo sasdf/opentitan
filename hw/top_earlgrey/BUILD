@@ -483,14 +483,7 @@ fpga_cw340(
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
     },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    rom = "//sw/device/lib/testing/test_rom:instrumented_rom_loader",
 )
 
 # FPGA configuration used to emulate silicon targets. This rule can be used by
@@ -525,14 +518,7 @@ fpga_cw340(
         "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
     },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    rom = "//sw/device/lib/testing/test_rom:instrumented_rom_loader",
 )
 
 # FPGA configuration used to emulate silicon targets containing a `rom_ext`

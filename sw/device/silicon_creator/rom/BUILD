@@ -79,24 +79,20 @@ ld_library(
 )
 
 ld_library(
-    name = "ld_rom",
+    name = "linker_script",
     script = "rom.ld",
     deps = [
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
-        #"//sw/device:info_sections",
-        #"//sw/device/lib/coverage:coverage_sections",
     ],
 )
 
 ld_library(
-    name = "ld_instrumented_rom",
+    name = "linker_script_instrumented",
     script = "instrumented_rom.ld",
     deps = [
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
-        #"//sw/device:info_sections",
-        #"//sw/device/lib/coverage:coverage_sections",
     ],
 )
 
@@ -130,7 +126,7 @@ cc_library(
 )
 
 asm_library_with_coverage(
-    name = "common_mask_rom_lib",
+    name = "mask_rom_lib",
     srcs = ["rom_start.S"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
@@ -158,26 +154,6 @@ asm_library_with_coverage(
         "//sw/device/lib/coverage:api_asm",
         "//sw/device/lib/coverage:uart_runtime",
         "//sw/device/silicon_creator/lib/base:chip",
-    ],
-    alwayslink = True,
-)
-
-cc_library(
-    name = "mask_rom_lib",
-    target_compatible_with = [OPENTITAN_CPU],
-    deps = [
-        ":common_mask_rom_lib",
-        ":ld_rom",
-    ],
-    alwayslink = True,
-)
-
-cc_library(
-    name = "instrumented_rom_lib",
-    target_compatible_with = [OPENTITAN_CPU],
-    deps = [
-        ":common_mask_rom_lib",
-        ":ld_instrumented_rom",
     ],
     alwayslink = True,
 )
@@ -265,14 +241,24 @@ opentitan_binary(
         "//hw/top_earlgrey:silicon_creator",
     ],
     kind = "rom",
-    linker_script = ":ld_rom",
+    linker_script = ":linker_script",
     deps = [
+        ":linker_script",
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
         # by tests such as `rom_epmp_test`.
         ":rom_isrs",
     ],
+)
+
+cc_library(
+    name = "instrumented_header",
+    srcs = ["instrumented_header.c"],
+    deps = [
+        "//sw/device/lib/base:macros",
+    ],
+    alwayslink = True,
 )
 
 opentitan_binary(
@@ -282,10 +268,12 @@ opentitan_binary(
         "//hw/top_earlgrey:fpga_cw340",
         "//hw/top_earlgrey:silicon_creator",
     ],
-    linker_script = ":ld_instrumented_rom",
+    linker_script = ":linker_script_instrumented",
     manifest = "//hw/top_earlgrey:none_manifest",
     deps = [
-        ":instrumented_rom_lib",
+        ":instrumented_header",
+        ":linker_script_instrumented",
+        ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
         # by tests such as `rom_epmp_test`.
@@ -344,7 +332,6 @@ cc_library(
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:memory",
-        "//sw/device/lib/coverage:api_asm",
         "//sw/device/silicon_creator/lib:epmp_state",
         "//sw/device/silicon_creator/lib/drivers:lifecycle",
     ],
@@ -366,7 +353,7 @@ opentitan_test(
         "//hw/top_earlgrey:sim_verilator": None,
     },
     kind = "rom",
-    linker_script = ":ld_rom",
+    linker_script = ":linker_script",
     linkopts = [
         "-Wl,--defsym=rom_test=1",
     ],
