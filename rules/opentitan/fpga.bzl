@@ -181,6 +181,8 @@ def _get_test_commands(ctx, param, exec_env):
         test_setup_cmd.append('--exec="fpga clear-bitstream"')
     if "bitstream" in param:
         test_setup_cmd.append('--exec="fpga load-bitstream {bitstream}"')
+    if "instrumented_rom" in param:
+        test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {instrumented_rom}"')
     if _get_bool(param, "testopt_bootstrap") and "firmware" in param:
         test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {firmware}"')
     test_setup_cmd = "\n".join(test_setup_cmd)
@@ -224,8 +226,6 @@ def _test_dispatch(ctx, exec_env, firmware):
     # image.
     if "assemble" in param:
         assemble = param.get("assemble")
-        if "instrumented_rom" in action_param and "instrumented_rom" not in assemble:
-            assemble += " {instrumented_rom}@{instrumented_rom_slot}"
         assemble = recursive_format(assemble, action_param)
         assemble = ctx.expand_location(assemble, data_labels)
         image = assemble_for_test(
@@ -238,42 +238,8 @@ def _test_dispatch(ctx, exec_env, firmware):
         param["firmware"] = image.short_path
         action_param["firmware"] = image.path
         data_files.append(image)
-    elif "instrumented_rom" in action_param:
-        fail("Got instrumented rom without assemble spec")
 
     # FIXME: maybe splice a bitstream here
-
-    """
-    if "instrumented_rom" in action_param:
-        assemble = "{instrumented_rom}@{instrumented_rom_slot}"
-        for _ in range(10):
-            # Recursive evaluation of the assemble spec
-            assemble = assemble.format(**action_param)
-        assemble = ctx.expand_location(assemble, data_labels)
-        image = assemble_for_test(
-            ctx,
-            name = ctx.attr.name + "_ins_rom",
-            spec = assemble.strip().split(" "),
-            data_files = data_files,
-            opentitantool = exec_env._opentitantool,
-        )
-        param["ins_rom_image"] = image.short_path
-        action_param["ins_rom_image"] = image.path
-        data_files.append(image)
-
-        test_cmd_list = test_cmd.split("\n")
-
-        def find_bitstream_idx():
-            for i, e in list(enumerate(test_cmd_list)):
-                if "load-bitstream" in e:
-                    return i
-            return -1
-
-        idx = find_bitstream_idx()
-        if idx != -1:
-            test_cmd_list.insert(idx + 1, '--exec="bootstrap --clear-uart=true {ins_rom_image}"')
-            test_cmd = "\n".join(test_cmd_list)
-    """
 
     # Get the pre-test_cmd args.
     args = get_fallback(ctx, "attr.args", exec_env)

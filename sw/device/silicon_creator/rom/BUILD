@@ -15,6 +15,7 @@ load(
     "opentitan_manual_test",
     "opentitan_test",
 )
+load("//rules/opentitan:cc.bzl", "opentitan_binary_assemble")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
@@ -278,6 +279,16 @@ opentitan_binary(
         # `rom_exception_handler` symbol remains unresolved and can be supplied
         # by tests such as `rom_epmp_test`.
         ":rom_isrs",
+    ],
+)
+
+opentitan_binary_assemble(
+    name = "instrumented_rom_image",
+    bins = {
+        ":instrumented_mask_rom": "{instrumented_rom_slot}",
+    },
+    exec_env = [
+        "//hw/top_earlgrey:fpga_cw340",
     ],
 )
 

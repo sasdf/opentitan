@@ -454,14 +454,8 @@ fpga_cw340(
     testonly = True,
     base = ":fpga_cw340_rom_with_fake_keys",
     exec_env = "fpga_cw340_instrumented_rom",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
+    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_rom_image",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
-    param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
     rom = "//sw/device/lib/testing/test_rom:instrumented_rom_loader",
 )
 
@@ -490,13 +484,7 @@ fpga_cw340(
     testonly = True,
     base = ":fpga_cw340_sival",
     exec_env = "fpga_cw340_instrumented_rom_prod",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
-    param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
+    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_rom_image",
     rom = "//sw/device/lib/testing/test_rom:instrumented_rom_loader",
 )
 
