@@ -191,6 +191,12 @@ def _get_test_commands(ctx, param, exec_env):
     test_cleanup_cmd = []
     if _get_bool(param, "testopt_clear_after_test"):
         test_cleanup_cmd.append('--exec="fpga clear-bitstream"')
+    elif "instrumented_rom" in param:
+        # Cleanup instrumented ROM magic bytes.
+        test_cleanup_cmd.extend([
+            '--exec="transport init"',
+            '--exec="fpga clear-instrumented-rom --clear-uart=true --slot={instrumented_rom_slot}"',
+        ])
 
     test_cleanup_cmd = "\n".join(test_cleanup_cmd)
 
