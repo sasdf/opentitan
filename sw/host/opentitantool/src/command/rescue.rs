@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use clap::{Args, Subcommand};
 use serde_annotate::Annotate;
 use std::any::Any;
@@ -16,7 +16,6 @@ use opentitanlib::chip::helper::{OwnershipActivateParams, OwnershipUnlockParams}
 use opentitanlib::image::image::Image;
 use opentitanlib::image::manifest::ManifestKind;
 use opentitanlib::ownership::{OwnerBlock, TlvHeader};
-use opentitanlib::rescue::xmodem::XmodemError;
 use opentitanlib::rescue::{EntryMode, RescueMode, RescueParams};
 use opentitanlib::util::file::FromReader;
 use opentitanlib::util::parse_int::ParseInt;
