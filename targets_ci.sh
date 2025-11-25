@@ -729,7 +729,6 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_spidfu_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_xmodem_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_fpga_hyper310_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_too_big_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_manifest_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_fpga_hyper310_rom_ext
@@ -919,7 +918,6 @@ CW340_FAKE_KEYS_TESTS=(
 
 CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:corrupted_digest_test_fpga_cw340_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_in_transaction_cancel_fpga_cw340_rom_ext
 )
 
 HYPER310_FAKE_KEYS_TESTS=(

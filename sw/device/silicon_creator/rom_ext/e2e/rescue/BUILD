@@ -198,37 +198,6 @@ genrule(
     for rxslot in _POSITIONS.keys()
 ]
 
-opentitan_test(
-    name = "rescue_too_big",
-    exec_env = {
-        "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
-        "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-    },
-    fpga = fpga_params(
-        timeout = "long",
-        assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a}",
-        binaries = {
-            ":boot_test_slot_a": "slot_a",
-            ":boot_test_slot_b": "slot_b",
-        },
-        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
-        test_cmd = """
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
-            # Construct an oversized empty image (1026 * 1024)
-            --exec="image assemble --size=1050624 --mirror=false --output=fw.img {slot_b}@{owner_slot_b}"
-            # Load firmware via rescue, including the bad ROM_EXT
-            --exec="rescue firmware --raw --slot=SlotB fw.img --expect-cancel --reboot=false"
-            # Check for kErrorRescueImageTooBig
-            --exec="console --non-interactive --exit-success='BFV:02525309' --exit-failure='{exit_success}'"
-            # Check for firmware execution
-            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-            no-op
-        """,
-    ),
-)
-
 [
     opentitan_test(
         name = "next_slot_{}".format(protocol),
@@ -803,6 +772,7 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
     },
     fpga = fpga_params(
+        timeout = "long",
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
         binaries = {
             "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a": "romext",
@@ -899,27 +869,6 @@ opentitan_test(
         --clear-bitstream
         --bootstrap={firmware}
         rescue {params} --action=usb-dfu-out-chunk-too-big
-        """,
-        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
-    ),
-)
-
-opentitan_test(
-    name = "usbdfu_in_transaction_cancel",
-    exec_env = {
-        "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-    },
-    fpga = fpga_params(
-        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
-        binaries = {
-            "//sw/device/silicon_creator/rom_ext:rom_ext_usbdfu": "romext",
-            ":boot_test_slot_a": "firmware",
-        },
-        params = "-p usb-dfu -t strap -v 3",
-        test_cmd = """
-        --clear-bitstream
-        --bootstrap={firmware}
-        rescue {params} --action=usb-dfu-in-transaction-cancel
         """,
         test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
     ),

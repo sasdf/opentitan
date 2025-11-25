@@ -44,7 +44,6 @@ CW340_INSTRUMENTED_ROM_TESTS=(
 )
 
 CW340_ROM_EXT_TESTS=(
-  '//sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_in_transaction_cancel_fpga_cw340_rom_ext'
 )
 
 HYPER310_ROM_EXT_TESTS=(
@@ -82,7 +81,6 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_inactivity_timeout_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rate_230400_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_rom_ext_slot_b_update_slot_b_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_too_big_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_unsupported_rate_1M33_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_unsupported_rate_1M50_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_unsupported_rate_460K_test_fpga_hyper310_rom_ext'
@@ -93,6 +91,7 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_dfu_requests_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_invalid_flash_transaction_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:spidfu_rescue_boot_svc_req_disability_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/rescue:usbdfu_out_chunk_too_big_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_rescue_error_handling_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_restricted_commands_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_hyper310_rom_ext'

@@ -49,12 +49,6 @@ pub struct Firmware {
     reset_target: EntryMode,
     #[arg(value_name = "FILE")]
     filename: PathBuf,
-    #[arg(
-        long,
-        default_value_t = false,
-        help = "Testonly. Expect the operation to be cancelled by device."
-    )]
-    expect_cancel: bool,
 }
 
 impl CommandDispatch for Firmware {
@@ -91,22 +85,7 @@ impl CommandDispatch for Firmware {
         if let Some(rate) = self.rate {
             prev_baudrate = rescue.set_speed(rate)?;
         }
-        match rescue.update_firmware(self.slot, payload) {
-            Ok(_) => {
-                if self.expect_cancel {
-                    bail!("Expects cancel during firmware rescue, but got OK.");
-                }
-            }
-            Err(e) => {
-                if self.expect_cancel
-                    && Some(&XmodemError::Cancelled) == e.downcast_ref::<XmodemError>()
-                {
-                    log::info!("Operation cancelled by device as expected");
-                } else {
-                    return Err(e);
-                }
-            }
-        };
+        rescue.update_firmware(self.slot, payload)?;
         if self.rate.is_some() {
             rescue.set_speed(prev_baudrate)?;
         }

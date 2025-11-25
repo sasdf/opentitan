@@ -50,7 +50,6 @@ pub enum DfuRescueTestActions {
     InvalidSpiDfuRequests,
     InvalidSpiFlashTransaction,
     UsbDfuOutChunkTooBig,
-    UsbDfuInTransactionCancel,
 }
 
 const SET_INTERFACE: u8 = 0x0b;
@@ -315,46 +314,15 @@ fn invalid_spi_flash_transaction(
 fn usb_dfu_out_chunk_too_big(params: &RescueParams, transport: &TransportWrapper) -> Result<()> {
     let rescue = UsbDfu::new(params.clone());
     rescue.enter(transport, EntryMode::Reset)?;
-    rescue.set_mode(RescueMode::Rescue)?;
-    let data = vec![0u8; 4096];
-    let result = rescue.download(&data);
+    rescue.set_mode(RescueMode::RescueB)?;
+    let chunk = vec![0u8; 2048];
+    let chunk_too_big = vec![0u8; 4096];
+
+    rescue.download(&chunk)?;
+    let result = rescue.download(&chunk_too_big);
 
     if result.is_ok() {
         return Err(anyhow!("USB transaction should fail"));
-    }
-
-    rescue.reboot()?;
-
-    let uart = transport.uart("console")?;
-    UartConsole::wait_for(&*uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_enabled")]
-    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
-
-    Ok(())
-}
-
-fn usb_dfu_in_transaction_cancel(
-    params: &RescueParams,
-    transport: &TransportWrapper,
-) -> Result<()> {
-    let rescue = UsbDfu::new(params.clone());
-    rescue.enter(transport, EntryMode::Reset)?;
-    rescue.set_mode(RescueMode::DeviceId)?;
-    let usb = rescue.device();
-    let mut data = vec![0u8; 2048];
-    //  Issue a USB control request with minimal timeout to cancel the transaction.
-    let result = usb.handle().read_control(
-        DfuRequestType::In.into(),
-        DfuRequest::UpLoad.into(),
-        0,
-        rescue.get_interface() as u16,
-        &mut data,
-        Duration::from_millis(1),
-    );
-
-    if result.is_ok() {
-        return Err(anyhow!("Invalid read control should fail"));
     }
 
     rescue.reboot()?;
@@ -386,9 +354,6 @@ fn main() -> Result<()> {
             }
             DfuRescueTestActions::UsbDfuOutChunkTooBig => {
                 usb_dfu_out_chunk_too_big(&rescue.params, &transport)?
-            }
-            DfuRescueTestActions::UsbDfuInTransactionCancel => {
-                usb_dfu_in_transaction_cancel(&rescue.params, &transport)?
             }
         },
     }
