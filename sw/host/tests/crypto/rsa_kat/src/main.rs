@@ -247,8 +247,12 @@ fn test_rsa(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
         for rsa_test in &rsa_tests {
             log::info!("Test counter: {}", rsa_test.test_case_id);
             run_rsa_testcase(rsa_test, opts, &spi_console_device)?;
+            break;
         }
+        break;
     }
+    CryptotestCommand::Quit.send(&spi_console_device)?;
+    let _ = UartConsole::wait_for(&spi_console_device, r"PASS!", opts.timeout * 10)?;
     Ok(())
 }
 

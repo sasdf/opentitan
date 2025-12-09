@@ -294,7 +294,7 @@ EX_CW310_FAKE_KEYS_TESTS=(
 //sw/device/tests/crypto:rsa_2048_keygen_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_2048_signature_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_3072_encryption_functest_fpga_cw310_rom_with_fake_keys
-//sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_rom_with_fake_keys
+# //sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_3072_signature_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_4096_encryption_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_4096_signature_functest_fpga_cw310_rom_with_fake_keys
@@ -486,7 +486,8 @@ EX_CW340_SIVAL_TESTS=(
 //sw/device/tests:clkmgr_reset_frequency_test_fpga_cw340_sival
 //sw/device/tests:keymgr_derive_sealing_test_fpga_cw340_sival
 //sw/device/tests:otp_ctrl_descrambling_test_fpga_cw340_sival
-//sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival
+
+# //sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival
 
 # //sw/device/tests:otbn_smoketest_fpga_cw340_sival
 

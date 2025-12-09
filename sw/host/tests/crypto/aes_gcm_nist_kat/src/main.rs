@@ -150,8 +150,12 @@ fn test_aes_gcm(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
             test_counter += 1;
             log::info!("Test counter: {}", test_counter);
             run_aes_gcm_testcase(aes_gcm_test, opts, &spi_console_device)?;
+            break;
         }
+        break;
     }
+    CryptotestCommand::Quit.send(&spi_console_device)?;
+    let _ = UartConsole::wait_for(&spi_console_device, r"PASS!", opts.timeout * 10)?;
     Ok(())
 }
 

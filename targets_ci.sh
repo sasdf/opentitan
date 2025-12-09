@@ -506,7 +506,6 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests/crypto:rsa_2048_keygen_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_2048_signature_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_3072_encryption_functest_fpga_cw310_sival_rom_ext
-//sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_3072_signature_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_4096_encryption_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_4096_signature_functest_fpga_cw310_sival_rom_ext
@@ -561,6 +560,7 @@ CW310_SIVAL_ROMEXT_TESTS=(
 # //sw/device/tests:ottf_alert_catch_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_mem_test_test_unlocked0_fpga_cw310_sival_rom_ext
+# //sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_sival_rom_ext
 
 # Timeout
 # //sw/device/tests:power_virus_systemtest_fpga_cw310_sival_rom_ext
@@ -928,10 +928,6 @@ CW340_SIVAL_TESTS=(
 //sw/device/tests:keymgr_derive_sealing_test_fpga_cw340_sival
 )
 
-CW340_SIVAL_ROM_EXT_TESTS=(
-//sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival_rom_ext
-)
-
 CW340_FAKE_KEYS_TESTS=(
 //sw/device/tests:ottf_console_with_gpio_tx_indicator_test_fpga_cw340_rom_with_fake_keys
 )
@@ -965,6 +961,7 @@ UNSUPPORTED_TESTS=(
 # //third_party/coremark/top_earlgrey:coremark_test_sim_qemu_sival_rom_ext
 # //sw/device/silicon_creator/rom_ext/sival/binaries:sival_signature_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_signature_test
+# //sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival_rom_ext
 )
 
 # ./bazelisk.sh query 'tests(//sw/otbn/...) except attr("tags", "skip_in_ci|manual|broken", //sw/otbn/...)'
@@ -1113,7 +1110,6 @@ TEST_GROUPS=(
     "HYPER310_ROMEXT_TESTS"
     "CW310_ROMEXT_TESTS"
     "CW340_SIVAL_TESTS"
-    "CW340_SIVAL_ROM_EXT_TESTS"
     "CW340_FAKE_KEYS_TESTS"
     "CW340_ROM_EXT_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"

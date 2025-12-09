@@ -6,10 +6,11 @@ CW310_ROM_EXT_TESTS=(
 
 CW310_SIVAL_ROM_EXT_TESTS=(
   '//sw/device/lib/crypto/drivers:entropy_test_fpga_cw310_sival_rom_ext'
+  '//sw/device/lib/crypto/impl:status_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/silicon_creator/lib/ownership:owner_verify_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:crt_test_fpga_cw310_sival_rom_ext'
+  '//sw/device/tests:pwrmgr_usbdev_smoketest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:spi_host_irq_test_fpga_cw310_sival_rom_ext'
-  '//sw/device/lib/crypto/impl:status_functest_fpga_cw310_sival_rom_ext'
 )
 
 CW310_SIVAL_TESTS=(
@@ -27,9 +28,6 @@ CW340_INSTRUMENTED_ROM_TESTS=(
   '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_spx_dev_key_0_fpga_cw340_instrumented_rom'
 )
 
-CW340_ROM_EXT_TESTS=(
-)
-
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext'
@@ -38,6 +36,7 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aab_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_entry_point_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_extension_spx_signature_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_manifest_version_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:flash_exc_handler_disabled_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_disabled_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/handoff:sram_exec_enabled_test_fpga_hyper310_rom_ext'
@@ -79,12 +78,10 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_rescue_error_handling_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:xmodem_restricted_commands_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/secver:secver_write_test_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_unauthorized_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_hyper310_rom_ext'
-  '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_enabled_test_fpga_hyper310_rom_ext'
 )
 
 PROVISIONING_TESTS=(
@@ -132,7 +129,6 @@ TEST_GROUPS=(
   'CW310_SIVAL_ROM_EXT_TESTS'
   'CW310_SIVAL_TESTS'
   'CW340_INSTRUMENTED_ROM_TESTS'
-  'CW340_ROM_EXT_TESTS'
   'HYPER310_ROM_EXT_TESTS'
   'PROVISIONING_TESTS'
   'UNIT_TESTS'
