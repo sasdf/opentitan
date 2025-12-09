@@ -173,7 +173,7 @@ INS_ROM_TESTS=(
 //sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_disabled_test_fpga_cw340_instrumented_rom
 //sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom
-
+//sw/device/silicon_creator/rom/e2e:rom_e2e_chip_info_fpga_cw340_instrumented_rom
 
 # Partially passed
 //sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom

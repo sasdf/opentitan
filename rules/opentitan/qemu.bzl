@@ -32,6 +32,7 @@ def qemu_params(
         rom_ext = None,
         otp = None,
         bitstream = None,
+        needs_jtag = False,
         test_cmd = "",
         data = [],
         defines = [],
@@ -39,6 +40,7 @@ def qemu_params(
         globals = {},
         traces = [],
         qemu_args = [],
+        bootstrap = False,
         **kwargs):
     extra_params = {
         "icount": str(icount),
@@ -48,6 +50,8 @@ def qemu_params(
         "globals": json.encode(globals),
         # The same goes for this array of strings:
         "traces": json.encode(traces),
+        # And these Booleans:
+        "bootstrap": json.encode(bootstrap),
     }
 
     return struct(
@@ -60,10 +64,13 @@ def qemu_params(
         rom_ext = rom_ext,
         otp = otp,
         bitstream = bitstream,
-        test_cmd = test_cmd,
+        test_cmd = ("""
+            {jtag_test_cmd}
+        """ if needs_jtag else "") + test_cmd,
         data = data,
         param = kwargs | extra_params,
         defines = defines,
+        needs_jtag = needs_jtag,
     )
 
 def gen_cfg(ctx, **kwargs):
@@ -335,8 +342,7 @@ def _test_dispatch(ctx, exec_env, firmware):
     test_harness, data_labels, data_files, param, action_param = common_test_setup(ctx, exec_env, firmware)
 
     # If the test requested an assembled image, then use opentitantool to
-    # assemble the image.  Replace the firmware param with the newly assembled
-    # image.
+    # assemble the image.
     if "assemble" in param:
         assemble = param.get("assemble")
         assemble = recursive_format(assemble, action_param)
@@ -348,11 +354,16 @@ def _test_dispatch(ctx, exec_env, firmware):
             data_files = data_files,
             opentitantool = exec_env._opentitantool,
         )
+        data_files.append(image)
+    elif firmware:
+        image = firmware.signed_bin or firmware.default
+    else:
+        image = None
+
+    # Replace the firmware param with the newly assembled image.
+    if image:
         param["firmware"] = image.short_path
         action_param["firmware"] = image.path
-        data_files.append(image)
-    else:
-        image = firmware.signed_bin or firmware.default
 
     data_files += [exec_env.qemu]
 
@@ -387,32 +398,42 @@ def _test_dispatch(ctx, exec_env, firmware):
     data_files += [otp_image]
     qemu_args += ["-drive", "if=pflash,file=otp_img.raw,format=raw"]
     test_script_fmt |= {
-        "mutable_otp": "otp_img.raw",
         "otp": otp_image.short_path,
     }
 
-    # Generate the flash backend image for QEMU emulation
-    # TODO: when bootstrapping is available, this should always create a blank
-    # flash image and bootstrap the data. Ideally, relevant info pages would
-    # be spliced in at this step, but that is not yet supported by either
-    # flashgen or by Bazel.
-    flash_image = gen_flash(
-        ctx,
-        flashgen = exec_env.flashgen,
-        firmware_bin = image,
-        # TODO: no support for convenience debug symbols from ELFs for now
-        firmware_elf = None,
-        # Do not sanity check ELFs, because we do not expect the binary to
-        # match the ELF because of the added manifest extensions (e.g. SPX
-        # signatures) present in the signed binary.
-        check_elfs = False,
-    )
-    data_files += [flash_image]
-    qemu_args += ["-drive", "if=mtd,id=eflash,bus=2,file=flash_img.bin,format=raw"]
-    test_script_fmt |= {
-        "flash": flash_image.short_path,
-        "mutable_flash": "flash_img.bin",
-    }
+    # If real bootstrapping is requested then prepare the correct command, otherwise we need
+    # to prepare a QEMU drive containing flash contents.
+    # Ideally, relevant info pages would be spliced in at this step, but that is
+    # not yet supported by either flashgen or by Bazel.
+    if param["bootstrap"] and json.decode(param["bootstrap"]):
+        if ctx.attr.test_harness:
+            fail("cannot specify both `bootstrap = True` and a test harness (harnesses bootstrap manually)")
+        test_script_fmt |= {"flash": ""}
+        bootstrap_cmd = "bootstrap --clear-uart=true {firmware}".format(**param)
+        param["bootstrap_cmd"] = '--exec="{}"'.format(bootstrap_cmd)
+    else:
+        # Generate the flash backend image for QEMU emulation
+        flash_image = gen_flash(
+            ctx,
+            flashgen = exec_env.flashgen,
+            firmware_bin = image,
+            # TODO: no support for convenience debug symbols from ELFs for now
+            firmware_elf = None,
+            # Do not sanity check ELFs, because we do not expect the binary to
+            # match the ELF because of the added manifest extensions (e.g. SPX
+            # signatures) present in the signed binary.
+            check_elfs = False,
+        )
+        data_files += [flash_image]
+        qemu_args += ["-drive", "if=mtd,id=eflash,bus=2,file=flash_img.bin,format=raw"]
+        test_script_fmt |= {
+            "flash": flash_image.short_path,
+        }
+        param["bootstrap_cmd"] = '--exec="no-op" # SKIPPING BOOTSTRAP'
+
+    # Attach SPI flash to SPI Host 0/SPI Device bus. Chosen model is W25Q256 (32MiB)
+    qemu_args += ["-global", "ot-earlgrey-board.spiflash0=w25q256"]
+    qemu_args += ["-drive", "if=mtd,file=spiflash0.bin,format=raw,bus=0"]
 
     # Get the pre-test_cmd args.
     args = get_fallback(ctx, "attr.args", exec_env)
@@ -423,9 +444,15 @@ def _test_dispatch(ctx, exec_env, firmware):
     qemu_args += ["-chardev", "pty,id=monitor,path=qemu-monitor"]
     qemu_args += ["-mon", "chardev=monitor,mode=control"]
 
-    # Create a chardev for the console UART:
-    qemu_args += ["-chardev", "pty,id=console"]
-    qemu_args += ["-serial", "chardev:console"]
+    # Create chardevs for each UART:
+    qemu_args += ["-chardev", "pty,id=uart0"]
+    qemu_args += ["-chardev", "pty,id=uart1"]
+    qemu_args += ["-chardev", "pty,id=uart2"]
+    qemu_args += ["-chardev", "pty,id=uart3"]
+    qemu_args += ["-serial", "chardev:uart0"]
+    qemu_args += ["-serial", "chardev:uart1"]
+    qemu_args += ["-serial", "chardev:uart2"]
+    qemu_args += ["-serial", "chardev:uart3"]
 
     # Create a chardev for the log device:
     qemu_args += ["-chardev", "pty,id=log"]
@@ -433,6 +460,25 @@ def _test_dispatch(ctx, exec_env, firmware):
 
     # Create a chardev for the SPI device:
     qemu_args += ["-chardev", "pty,id=spidev"]
+
+    # Create a chardev and proxy device for each I2C bus:
+    qemu_args += ["-chardev", "pty,id=i2c0"]
+    qemu_args += ["-chardev", "pty,id=i2c1"]
+    qemu_args += ["-chardev", "pty,id=i2c2"]
+    qemu_args += ["-device", "ot-i2c_host_proxy,bus=ot-i2c0,chardev=i2c0"]
+    qemu_args += ["-device", "ot-i2c_host_proxy,bus=ot-i2c1,chardev=i2c1"]
+    qemu_args += ["-device", "ot-i2c_host_proxy,bus=ot-i2c2,chardev=i2c2"]
+
+    # Create a chardev for the GPIO:
+    qemu_args += ["-chardev", "pty,id=gpio"]
+    qemu_args += ["-global", "ot-gpio-eg.chardev=gpio"]
+
+    # Create a chardev for the USBDEV control:
+    qemu_args += ["-chardev", "pty,id=usbdev-cmd"]
+    qemu_args += ["-chardev", "pty,id=usbdev-host"]
+
+    # Create a chardev for the RV_DM JTAG TAP:
+    qemu_args += ["-chardev", "socket,id=taprbb,path=qemu-jtag.sock,server=on,wait=off"]
 
     # Scale the Ibex clock by an `icount` factor.
     qemu_args += ["-icount", "shift={}".format(param["icount"])]
@@ -475,6 +521,11 @@ def _test_dispatch(ctx, exec_env, firmware):
     # in the oversampled `VAL` register.
     qemu_args += ["-global", "ot-uart.oversample-break=true"]
     qemu_args += ["-global", "ot-uart.toggle-break=true"]
+
+    # QEMU will by default interpret quit commands over JTAG to the TAP Ctrls
+    # as signals to exit VM execution. We want to be able to disconnect from
+    # JTAG without stopping execution completely for tests.
+    qemu_args += ["-global", "tap-ctrl-rbb.quit=false"]
 
     # Add parameter-specified globals.
     if param["globals"]:

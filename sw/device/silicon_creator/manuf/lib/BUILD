@@ -112,6 +112,7 @@ cc_library(
         "//sw/device/lib/crypto/include:datatypes",
         "//sw/device/lib/dif:otp_ctrl",
         "//sw/device/lib/testing:otp_ctrl_testutils",
+        "//sw/device/silicon_creator/lib/drivers:hmac",
     ],
 )
 
@@ -228,6 +229,7 @@ opentitan_test(
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:status",
+        "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/dif:otp_ctrl",
         "//sw/device/lib/dif:rstmgr",

@@ -114,31 +114,6 @@ static status_t otbn_assert_idle(void) {
   return OTCRYPTO_ASYNC_INCOMPLETE;
 }
 
-/**
- * Helper function for writing to OTBN's DMEM or IMEM.
- *
- * @param dest_addr Destination address.
- * @param src Source buffer.
- * @param num_words Number of words to copy.
- */
-static void otbn_write(uint32_t dest_addr, const uint32_t *src,
-                       size_t num_words) {
-  // TODO: replace 0 with a random index like the silicon_creator driver
-  // (requires an interface to Ibex's RND valid bit and data register).
-  size_t i = ((uint64_t)0 * (uint64_t)num_words) >> 32;
-  enum { kStep = 1 };
-  size_t iter_cnt = 0;
-  for (; launder32(iter_cnt) < num_words; ++iter_cnt) {
-    abs_mmio_write32(dest_addr + i * sizeof(uint32_t), src[i]);
-    i += kStep;
-    if (launder32(i) >= num_words) {
-      i -= num_words;
-    }
-    HARDENED_CHECK_LT(i, num_words);
-  }
-  HARDENED_CHECK_EQ(iter_cnt, num_words);
-}
-
 status_t otbn_dmem_write(size_t num_words, const uint32_t *src,
                          otbn_addr_t dest) {
   HARDENED_TRY(check_offset_len(dest, num_words, kOtbnDMemSizeBytes));
@@ -155,9 +130,8 @@ status_t otbn_dmem_write(size_t num_words, const uint32_t *src,
   random_order_init(&order, num_words);
 
   size_t count = 0;
-  size_t expected_count = random_order_len(&order);
 
-  for (; launderw(count) < expected_count; count = launderw(count) + 1) {
+  for (; launderw(count) < num_words; count = launderw(count) + 1) {
     // The value obtained from `advance()` is laundered, to prevent
     // implementation details from leaking across procedures.
     size_t idx = launderw(random_order_advance(&order));
@@ -183,7 +157,7 @@ status_t otbn_dmem_write(size_t num_words, const uint32_t *src,
     crc32_add(&ctx, crc_data, sizeof(crc_data));
   }
   RANDOM_ORDER_HARDENED_CHECK_DONE(order);
-  HARDENED_CHECK_EQ(count, expected_count);
+  HARDENED_CHECK_EQ(count, num_words);
 
   // Get the computed (expected) checksum, fetch the checksum from the OTBN
   // LOAD_CHECKSUM register, and compare both registers.

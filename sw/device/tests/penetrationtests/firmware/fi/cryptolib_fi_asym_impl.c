@@ -118,8 +118,7 @@ status_t cryptolib_fi_rsa_enc_impl(cryptolib_fi_asym_rsa_enc_in_t uj_input,
         .key_length = public_key_bytes,
         .key = public_key_data,
     };
-    TRY(otcrypto_rsa_public_key_construct(rsa_size, modulus, uj_input.e,
-                                          &public_key));
+    TRY(otcrypto_rsa_public_key_construct(rsa_size, modulus, &public_key));
 
     // Create input message.
     uint8_t msg_buf[num_words];
@@ -196,8 +195,8 @@ status_t cryptolib_fi_rsa_enc_impl(cryptolib_fi_asym_rsa_enc_in_t uj_input,
     if (uj_input.trigger & kPentestTrigger1) {
       pentest_set_trigger_high();
     }
-    TRY(otcrypto_rsa_private_key_from_exponents(
-        rsa_size, modulus, uj_input.e, d_share0, d_share1, &private_key));
+    TRY(otcrypto_rsa_private_key_from_exponents(rsa_size, modulus, d_share0,
+                                                d_share1, &private_key));
     if (uj_input.trigger & kPentestTrigger1) {
       pentest_set_trigger_low();
     }
@@ -357,8 +356,8 @@ status_t cryptolib_fi_rsa_sign_impl(
   if (uj_input.trigger & kPentestTrigger1) {
     pentest_set_trigger_high();
   }
-  TRY(otcrypto_rsa_private_key_from_exponents(
-      rsa_size, modulus, uj_input.e, d_share0, d_share1, &private_key));
+  TRY(otcrypto_rsa_private_key_from_exponents(rsa_size, modulus, d_share0,
+                                              d_share1, &private_key));
   if (uj_input.trigger & kPentestTrigger1) {
     pentest_set_trigger_low();
   }
@@ -509,8 +508,7 @@ status_t cryptolib_fi_rsa_verify_impl(
   if (uj_input.trigger & kPentestTrigger1) {
     pentest_set_trigger_high();
   }
-  TRY(otcrypto_rsa_public_key_construct(rsa_size, modulus, uj_input.e,
-                                        &public_key));
+  TRY(otcrypto_rsa_public_key_construct(rsa_size, modulus, &public_key));
   // Trigger window.
   if (uj_input.trigger & kPentestTrigger1) {
     pentest_set_trigger_low();
@@ -671,7 +669,7 @@ status_t cryptolib_fi_p256_sign_impl(
   p256_masked_scalar_t private_key_masked;
   otcrypto_blinded_key_t private_key = {
       .config = kP256PrivateKeyConfig,
-      .keyblob_length = sizeof(private_key_masked),
+      .keyblob_length = kP256MaskedScalarTotalShareBytes,
       .keyblob = (uint32_t *)&private_key_masked,
   };
   memset(private_key_masked.share0, 0, kP256MaskedScalarShareBytes);
@@ -897,7 +895,7 @@ status_t cryptolib_fi_p384_sign_impl(
   p384_masked_scalar_t private_key_masked;
   otcrypto_blinded_key_t private_key = {
       .config = kP384PrivateKeyConfig,
-      .keyblob_length = sizeof(private_key_masked),
+      .keyblob_length = kP384MaskedScalarTotalShareBytes,
       .keyblob = (uint32_t *)&private_key_masked,
   };
   memset(private_key_masked.share0, 0, kP384MaskedScalarShareBytes);

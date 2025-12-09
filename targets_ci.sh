@@ -2,7 +2,6 @@
 TEST_ROM_TESTS=(
 //sw/device/lib/testing/test_rom:test_rom_test_fpga_cw310_test_rom
 //sw/device/tests:otp_ctrl_descrambling_test_fpga_cw310_test_rom
-//sw/device/tests/crypto:rsa_3072_verify_functest_wycheproof_fpga_cw310_test_rom
 
 # Report regex
 # //sw/device/tests:status_report_test_fpga_cw310_test_rom
@@ -330,6 +329,8 @@ CRYPTO_TESTS=(
 //sw/device/tests/crypto/cryptotest:shake128_kat_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto/cryptotest:shake256_kat_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw310_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw310_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw310_sival_rom_ext
 )
 
 CW310_SIVAL_ROMEXT_TESTS=(
@@ -507,7 +508,6 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests/crypto:rsa_3072_encryption_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_3072_signature_functest_fpga_cw310_sival_rom_ext
-//sw/device/tests/crypto:rsa_3072_verify_functest_hardcoded_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_4096_encryption_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:rsa_4096_signature_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:sha256_functest_fpga_cw310_sival_rom_ext
@@ -556,6 +556,7 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests:crt_test_fpga_cw310_sival_rom_ext
 //sw/device/lib/crypto/drivers:rv_core_ibex_test_fpga_cw310_sival_rom_ext
 //sw/device/tests:keymgr_sideload_otbn_simple_test_fpga_cw310_sival_rom_ext
+//sw/device/lib/crypto/impl:status_functest_fpga_cw310_sival_rom_ext
 
 # //sw/device/tests:ottf_alert_catch_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
@@ -629,6 +630,7 @@ CW310_SIVAL_TESTS=(
 //sw/device/tests:rv_dm_lc_disabled_tl_prod_fpga_cw310_sival
 //sw/device/tests:rv_dm_lc_disabled_tl_rma_fpga_cw310_sival
 //sw/device/tests:rv_dm_lc_disabled_tl_test_unlocked1_fpga_cw310_sival
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw310_sival
 
 # OpenOCD: runnable but empty coverage
 # //sw/device/tests:rv_dm_lc_disabled_jtag_dev_fpga_cw310_sival
@@ -693,6 +695,19 @@ IMM_TESTS=(
 # //sw/device/silicon_creator/rom_ext/imm_section/e2e/exec_env:env_independent_dice_x509_slot_virtual_test
 )
 
+CW340_A2_ROM_EXT_TESTS=(
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_a_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_b_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_a_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_b_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_b_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_cw340_A2_rom_ext
+# //sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_cw340_A2_rom_ext
+)
+
 HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext
@@ -701,7 +716,6 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aba_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_abb_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_primary_test_fpga_hyper310_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_wakeup_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/handoff:fault_hardware_interrupt_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/handoff:fault_illegal_instruction_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/handoff:fault_load_access_fpga_hyper310_rom_ext
@@ -716,7 +730,6 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_owner_block_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:bad_unlock_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:flash_error_test_fpga_hyper310_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/ownership:fpga_owner_upgrade_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:good_appkey_constraint_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:locked_update_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_badlock_test_fpga_hyper310_rom_ext
@@ -875,6 +888,9 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:transfer_bl0_slot_b_test_fpga_hyper310_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/handoff:rom_ext_device_status_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_disabled_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_enabled_test_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:install_owner_upgrade_test_fpga_hyper310_rom_ext
 
 # FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
@@ -910,6 +926,10 @@ CW340_SIVAL_TESTS=(
 //sw/device/tests:kmac_entropy_test_fpga_cw340_sival
 //sw/device/tests:otbn_mem_scramble_test_fpga_cw340_sival
 //sw/device/tests:keymgr_derive_sealing_test_fpga_cw340_sival
+)
+
+CW340_SIVAL_ROM_EXT_TESTS=(
+//sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival_rom_ext
 )
 
 CW340_FAKE_KEYS_TESTS=(
@@ -980,7 +1000,37 @@ OTBN_TESTS=(
 //sw/otbn/crypto/tests:p256_isoncurve_proj_test
 //sw/otbn/crypto/tests:p256_scalar_reblind_test
 
-# Passed, but unused.
+# Unused.
+# //sw/otbn/crypto/tests/generated:mul_test0
+# //sw/otbn/crypto/tests/generated:mul_test1
+# //sw/otbn/crypto/tests/generated:mul_test2
+# //sw/otbn/crypto/tests/generated:mul_test3
+# //sw/otbn/crypto/tests/generated:mul_test4
+# //sw/otbn/crypto/tests/generated:mul_test5
+# //sw/otbn/crypto/tests/generated:mul_test6
+# //sw/otbn/crypto/tests/generated:mul_test7
+# //sw/otbn/crypto/tests/generated:mul_test8
+# //sw/otbn/crypto/tests/generated:mul_test9
+# //sw/otbn/crypto/tests/generated:sha3_test0
+# //sw/otbn/crypto/tests/generated:sha3_test1
+# //sw/otbn/crypto/tests/generated:sha3_test2
+# //sw/otbn/crypto/tests/generated:sha3_test3
+# //sw/otbn/crypto/tests/generated:sha3_test4
+# //sw/otbn/crypto/tests/generated:sha3_test5
+# //sw/otbn/crypto/tests/generated:sha3_test6
+# //sw/otbn/crypto/tests/generated:sha3_test7
+# //sw/otbn/crypto/tests/generated:sha3_test8
+# //sw/otbn/crypto/tests/generated:sha3_test9
+# //sw/otbn/crypto/tests/generated:shake_test0
+# //sw/otbn/crypto/tests/generated:shake_test1
+# //sw/otbn/crypto/tests/generated:shake_test2
+# //sw/otbn/crypto/tests/generated:shake_test3
+# //sw/otbn/crypto/tests/generated:shake_test4
+# //sw/otbn/crypto/tests/generated:shake_test5
+# //sw/otbn/crypto/tests/generated:shake_test6
+# //sw/otbn/crypto/tests/generated:shake_test7
+# //sw/otbn/crypto/tests/generated:shake_test8
+# //sw/otbn/crypto/tests/generated:shake_test9
 # //sw/otbn/crypto/tests:div_consttime
 # //sw/otbn/crypto/tests:div_large_test
 # //sw/otbn/crypto/tests:div_medium_test
@@ -997,11 +1047,7 @@ OTBN_TESTS=(
 # //sw/otbn/crypto/tests:gcd_small_test
 # //sw/otbn/crypto/tests:lcm_consttime
 # //sw/otbn/crypto/tests:lcm_test
-# //sw/otbn/crypto/tests:miller_rabin_consttime_1024
-# //sw/otbn/crypto/tests:miller_rabin_consttime_1536
-# //sw/otbn/crypto/tests:miller_rabin_consttime_2048
 # //sw/otbn/crypto/tests:modinv_f4_consttime_test
-# //sw/otbn/crypto/tests:modinv_f4_test
 # //sw/otbn/crypto/tests:mul_consttime
 # //sw/otbn/crypto/tests:mul_test
 # //sw/otbn/crypto/tests:p384_arithmetic_to_boolean_mod_test
@@ -1013,25 +1059,20 @@ OTBN_TESTS=(
 # //sw/otbn/crypto/tests:p384_ecdh_shared_key_test
 # //sw/otbn/crypto/tests:p384_ecdsa_sign_test
 # //sw/otbn/crypto/tests:p384_ecdsa_verify_test
+# //sw/otbn/crypto/tests:p384_internal_mult_test
+# //sw/otbn/crypto/tests:p384_isoncurve_proj_test
 # //sw/otbn/crypto/tests:p384_isoncurve_test
 # //sw/otbn/crypto/tests:p384_keygen_from_seed_test
 # //sw/otbn/crypto/tests:p384_keygen_test
+# //sw/otbn/crypto/tests:p384_masked_scalar_reblind_test
 # //sw/otbn/crypto/tests:p384_mulmod448x128_test
 # //sw/otbn/crypto/tests:p384_mulmod_n_consttime
 # //sw/otbn/crypto/tests:p384_mulmod_p_consttime
 # //sw/otbn/crypto/tests:p384_proj_add_test
 # //sw/otbn/crypto/tests:p384_scalar_mult_consttime
 # //sw/otbn/crypto/tests:p384_scalar_mult_test
-# //sw/otbn/crypto/tests:p384_internal_mult_test
-# //sw/otbn/crypto/tests:p384_isoncurve_proj_test
-# //sw/otbn/crypto/tests:p384_masked_scalar_reblind_test
-# //sw/otbn/crypto/tests:primality_negative_test
-# //sw/otbn/crypto/tests:primality_test
-# //sw/otbn/crypto/tests:primality_test_witness_negative_test
-# //sw/otbn/crypto/tests:primality_test_witness_test
 # //sw/otbn/crypto/tests:proj_add_p384_consttime
 # //sw/otbn/crypto/tests:relprime_f4_consttime_test
-# //sw/otbn/crypto/tests:relprime_f4_test
 # //sw/otbn/crypto/tests:rsa_1024_dec_test
 # //sw/otbn/crypto/tests:rsa_1024_enc_test
 # //sw/otbn/crypto/tests:rsa_2048_dec_test
@@ -1039,35 +1080,24 @@ OTBN_TESTS=(
 # //sw/otbn/crypto/tests:rsa_3072_dec_test
 # //sw/otbn/crypto/tests:rsa_3072_enc_test
 # //sw/otbn/crypto/tests:rsa_4096_enc_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkp_good_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkp_not_prime_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkp_not_relprime_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkq_good_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkq_not_prime_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkq_not_relprime_test
-# //sw/otbn/crypto/tests:rsa_keygen_checkq_too_close_test
-# //sw/otbn/crypto/tests:rsa_verify_3072_consts_test
-# //sw/otbn/crypto/tests:rsa_verify_3072_test
-# //sw/otbn/crypto/tests:rsa_verify_exp3_test
-# //sw/otbn/crypto/tests:rsa_verify_test
+# //sw/otbn/crypto/tests:rsa_512_dec_test
+# //sw/otbn/crypto/tests:rsa_distance_negative_test
+# //sw/otbn/crypto/tests:rsa_miller_rabin_negative_test
+# //sw/otbn/crypto/tests:rsa_miller_rabin_test
+# //sw/otbn/crypto/tests:rsa_modinv_f4_test
+# //sw/otbn/crypto/tests:rsa_primality_negative_test
+# //sw/otbn/crypto/tests:rsa_primality_test
+# //sw/otbn/crypto/tests:rsa_relprime_f4_negative_test
+# //sw/otbn/crypto/tests:rsa_relprime_f4_test
 # //sw/otbn/crypto/tests:sha256_consttime
 # //sw/otbn/crypto/tests:sha256_test
 # //sw/otbn/crypto/tests:sha384_test
+# //sw/otbn/crypto/tests:sha3_shake_test
 # //sw/otbn/crypto/tests:sha512_compact_test
 # //sw/otbn/crypto/tests:sha512_test
 # //sw/otbn/crypto/tests:x25519_consttime
 # //sw/otbn/crypto/tests:x25519_test1
 # //sw/otbn/crypto/tests:x25519_test2
-# //sw/otbn/crypto/tests/generated:mul_test0
-# //sw/otbn/crypto/tests/generated:mul_test1
-# //sw/otbn/crypto/tests/generated:mul_test2
-# //sw/otbn/crypto/tests/generated:mul_test3
-# //sw/otbn/crypto/tests/generated:mul_test4
-# //sw/otbn/crypto/tests/generated:mul_test5
-# //sw/otbn/crypto/tests/generated:mul_test6
-# //sw/otbn/crypto/tests/generated:mul_test7
-# //sw/otbn/crypto/tests/generated:mul_test8
-# //sw/otbn/crypto/tests/generated:mul_test9
 )
 
 TEST_GROUPS=(
@@ -1083,6 +1113,7 @@ TEST_GROUPS=(
     "HYPER310_ROMEXT_TESTS"
     "CW310_ROMEXT_TESTS"
     "CW340_SIVAL_TESTS"
+    "CW340_SIVAL_ROM_EXT_TESTS"
     "CW340_FAKE_KEYS_TESTS"
     "CW340_ROM_EXT_TESTS"
     "HYPER310_FAKE_KEYS_TESTS"

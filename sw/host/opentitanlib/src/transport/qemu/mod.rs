@@ -2,32 +2,48 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod gpio;
+pub mod i2c;
 pub mod monitor;
 pub mod reset;
 pub mod spi;
 pub mod uart;
+pub mod usbdev;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, bail};
 
 use crate::backend::qemu::QemuOpts;
+use crate::debug::openocd::OpenOcdJtagChain;
 use crate::io::gpio::{GpioError, GpioPin};
+use crate::io::jtag::{JtagChain, JtagParams};
 use crate::io::uart::Uart;
+use crate::transport::Bus;
 use crate::transport::Target;
 use crate::transport::common::uart::SerialPortUart;
+use crate::transport::qemu::gpio::{QemuGpio, QemuGpioPin};
+use crate::transport::qemu::i2c::QemuI2c;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
 use crate::transport::qemu::reset::QemuReset;
 use crate::transport::qemu::spi::QemuSpi;
 use crate::transport::qemu::uart::QemuUart;
+use crate::transport::qemu::usbdev::QemuVbusSense;
 use crate::transport::{
     Capabilities, Capability, Transport, TransportError, TransportInterfaceType,
 };
 
 /// ID of the fake pin we use to model resets.
 const QEMU_RESET_PIN_IDX: u8 = u8::MAX;
+/* Until we have a more complete model of the pinmux, we need to model this
+ * MIO directly. */
+const QEMU_VBUS_SENSE_PIN_IDX: u8 = u8::MAX - 1;
 
 /// Baudrate for QEMU's consoles. These are PTYs so it currently doesn't matter,
 /// but we must use a non-zero value because the pacing calculations divide by
@@ -43,13 +59,25 @@ pub struct Qemu {
     reset: Rc<dyn GpioPin>,
 
     /// Console UART.
-    console: Option<Rc<dyn Uart>>,
+    uarts: HashMap<String, Rc<dyn Uart>>,
 
     /// SPI device.
     spi: Option<Rc<dyn Target>>,
 
+    /// I2C devices.
+    i2cs: HashMap<String, Rc<dyn Bus>>,
+
+    /// GPIO pins (not including reset pin).
+    gpio: Option<Rc<RefCell<QemuGpio>>>,
+
+    /// VBUS sense pin (actually goes via the `usbdev-cmd` chardev).
+    vbus_sense: Option<Rc<dyn GpioPin>>,
+
     /// QEMU log modelled as a UART.
     log: Option<Rc<dyn Uart>>,
+
+    /// Debug module JTAG.
+    jtag_sock: Option<PathBuf>,
 }
 
 impl Qemu {
@@ -58,8 +86,11 @@ impl Qemu {
     /// The transport will configure capabilities that it can find from the running QEMU instance.
     /// It looks for the following chardevs which should be connected to QEMU devices:
     ///
-    /// * `console` (pty) - connect to UART using `-serial chardev:console`.
+    /// * `uart{n}` (pty) - connect to UARTs in order using `-serial chardev:uart{n}`.
     /// * `log`     (pty) - connect to QEMU's log using `-global ot-ibex_wrapper.logdev=log`.
+    /// * `spidev`  (pty) - automatically connected to QEMU spi device.
+    /// * `i2c{n}`  (pty) - connect to I2C bus using `-device ot-i2c_host_proxy,bus=ot-i2c{n},chardev=i2c{n}`.
+    /// * `gpio`    (pty) - connect to GPIO block using `global ot-gpio-{eg,dj}.chardev=gpio`
     ///
     /// You can create a chardev with `-chardev <kind>,id=<id>` and connect it
     /// to a device using one of the flags in the list above. The kind must
@@ -78,18 +109,45 @@ impl Qemu {
                 .find_map(|c| (c.id == id).then_some(&c.kind))
         }
 
-        // Console UART:
-        let console = match find_chardev(&chardevs, "console") {
+        // UARTs:
+        let mut uarts = HashMap::new();
+        for chardev in &chardevs {
+            let Some(id) = chardev.id.strip_prefix("uart") else {
+                continue;
+            };
+
+            let ChardevKind::Pty { ref path } = chardev.kind else {
+                continue;
+            };
+
+            let serial_port = SerialPortUart::open_pseudo(path.to_str().unwrap(), CONSOLE_BAUDRATE)
+                .context("failed to open QEMU console PTY")?;
+            let uart: Rc<dyn Uart> =
+                Rc::new(QemuUart::new(Rc::clone(&monitor), &chardev.id, serial_port));
+
+            uarts.insert(id.to_string(), uart);
+        }
+        if uarts.is_empty() {
+            log::info!(
+                "could not find pty chardevs with ids starting with `uart`, UART support disabled"
+            );
+        }
+
+        // USBDEV control:
+        let vbus_sense = match find_chardev(&chardevs, "usbdev-cmd") {
             Some(ChardevKind::Pty { path }) => {
-                let serial_port =
-                    SerialPortUart::open_pseudo(path.to_str().unwrap(), CONSOLE_BAUDRATE)
-                        .context("failed to open QEMU console PTY")?;
-                let uart: Rc<dyn Uart> =
-                    Rc::new(QemuUart::new(Rc::clone(&monitor), "console", serial_port));
-                Some(uart)
+                let tty = serialport::new(
+                    path.to_str().context("TTY path not UTF8")?,
+                    CONSOLE_BAUDRATE,
+                )
+                .open_native()
+                .context("failed to open QEMU usbdev-cmd PTY")?;
+
+                let vbus_sense: Rc<dyn GpioPin> = Rc::new(QemuVbusSense::new(tty));
+                Some(vbus_sense)
             }
             _ => {
-                log::info!("could not find pty chardev with id=console, skipping UART");
+                log::info!("could not find pty chardev with id=usbdev, skipping USBDEV");
                 None
             }
         };
@@ -104,7 +162,7 @@ impl Qemu {
                 Some(log)
             }
             _ => {
-                log::info!("could not find pty chardev with id=log, skipping QEMU log");
+                log::info!("could not find pty chardev with id=log, QEMU log unavailable");
                 None
             }
         };
@@ -117,7 +175,51 @@ impl Qemu {
                 Some(spi)
             }
             _ => {
-                log::info!("could not find pty chardev with id=spidev, skipping SPI");
+                log::info!("could not find pty chardev with id=spidev, SPI support disabled");
+                None
+            }
+        };
+
+        // Try connecting to each of the I2C buses.
+        let mut i2cs = HashMap::new();
+        for chardev in &chardevs {
+            let Some(id) = chardev.id.strip_prefix("i2c") else {
+                continue;
+            };
+
+            let ChardevKind::Pty { ref path } = chardev.kind else {
+                continue;
+            };
+
+            let i2c = QemuI2c::new(path).context("failed to connect to QEMU I2C PTY")?;
+            let i2c: Rc<dyn Bus> = Rc::new(i2c);
+
+            i2cs.insert(id.to_string(), i2c);
+        }
+        if i2cs.is_empty() {
+            log::info!(
+                "could not find pty chardevs with ids starting with `i2c`, I2C support disabled"
+            );
+        }
+
+        // If there's a chardev called `gpio`, configure it as a PTY and use as the GPIO pins.
+        let gpio = match find_chardev(&chardevs, "gpio") {
+            Some(ChardevKind::Pty { path }) => {
+                let gpio = QemuGpio::new(path).context("failed to connect to QEMU GPIO PTY")?;
+                let gpio = Rc::new(RefCell::new(gpio));
+                Some(gpio)
+            }
+            _ => {
+                log::info!("could not find pty chardev with id=gpio, GPIO support disabled");
+                None
+            }
+        };
+
+        // Debug module JTAG tap:
+        let jtag_sock = match find_chardev(&chardevs, "taprbb") {
+            Some(ChardevKind::Socket { path }) => Some(path.clone()),
+            _ => {
+                log::info!("could not find socket chardev with id=taprbb, skipping JTAG");
                 None
             }
         };
@@ -126,12 +228,20 @@ impl Qemu {
         let reset = QemuReset::new(Rc::clone(&monitor));
         let reset = Rc::new(reset);
 
+        // QEMU polls once per second to see if PTYs have been connected to. We must wait that
+        // full second to be sure that QEMU is watching all of them.
+        thread::sleep(Duration::from_secs(1));
+
         Ok(Qemu {
             monitor,
             reset,
-            console,
+            uarts,
+            vbus_sense,
             log,
             spi,
+            i2cs,
+            gpio,
+            jtag_sock,
         })
     }
 }
@@ -143,7 +253,7 @@ impl Transport for Qemu {
         // GPIO pin in `.gpio_pin` will cause an error if GPIO isn't connected.
         let mut cap = Capability::GPIO;
 
-        if self.console.is_some() || self.log.is_some() {
+        if !self.uarts.is_empty() || self.log.is_some() {
             cap |= Capability::UART;
         }
 
@@ -151,19 +261,35 @@ impl Transport for Qemu {
             cap |= Capability::SPI;
         }
 
+        if !self.i2cs.is_empty() {
+            cap |= Capability::I2C;
+        }
+
         Ok(Capabilities::new(cap))
     }
 
     fn uart(&self, instance: &str) -> anyhow::Result<Rc<dyn Uart>> {
-        match instance {
-            "0" => Ok(Rc::clone(
-                self.console.as_ref().context("uart 0 not connected")?,
-            )),
-            "LOG" => Ok(Rc::clone(
+        if instance == "LOG" {
+            return Ok(Rc::clone(
                 self.log.as_ref().context("QEMU log not connected")?,
-            )),
-            _ => Err(TransportError::InvalidInstance(
+            ));
+        }
+
+        match self.uarts.get(instance) {
+            Some(uart) => Ok(Rc::clone(uart)),
+            None => Err(TransportError::InvalidInstance(
                 TransportInterfaceType::Uart,
+                instance.to_string(),
+            )
+            .into()),
+        }
+    }
+
+    fn i2c(&self, instance: &str) -> anyhow::Result<Rc<dyn Bus>> {
+        match self.i2cs.get(instance) {
+            Some(i2c) => Ok(Rc::clone(i2c)),
+            None => Err(TransportError::InvalidInstance(
+                TransportInterfaceType::I2c,
                 instance.to_string(),
             )
             .into()),
@@ -174,9 +300,21 @@ impl Transport for Qemu {
         let pin = u8::from_str(instance).with_context(|| format!("can't convert {instance:?}"))?;
 
         if pin < 32 {
-            bail!("GPIO interface not currently supported");
+            let Some(ref gpio) = self.gpio else {
+                bail!("GPIO interface not connected");
+            };
+
+            let mut gpio = gpio.borrow_mut();
+            let gpio = gpio
+                .pins
+                .entry(pin)
+                .or_insert_with(|| QemuGpioPin::new(Rc::clone(self.gpio.as_ref().unwrap()), pin));
+
+            Ok(Rc::clone(gpio))
         } else if pin == QEMU_RESET_PIN_IDX {
             Ok(Rc::clone(&self.reset))
+        } else if pin == QEMU_VBUS_SENSE_PIN_IDX && self.vbus_sense.is_some() {
+            Ok(Rc::clone(self.vbus_sense.as_ref().unwrap()))
         } else {
             Err(GpioError::InvalidPinNumber(pin).into())
         }
@@ -184,5 +322,17 @@ impl Transport for Qemu {
 
     fn spi(&self, _instance: &str) -> anyhow::Result<Rc<dyn Target>> {
         Ok(Rc::clone(self.spi.as_ref().unwrap()))
+    }
+
+    fn jtag(&self, opts: &JtagParams) -> anyhow::Result<Box<dyn JtagChain>> {
+        let jtag = OpenOcdJtagChain::new(
+            &format!(
+                "adapter driver remote_bitbang; remote_bitbang port 0; remote_bitbang host {sock}",
+                sock = self.jtag_sock.as_ref().unwrap().display(),
+            ),
+            opts,
+        )?;
+
+        Ok(Box::new(jtag))
     }
 }

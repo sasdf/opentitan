@@ -20,4 +20,3 @@ _rom_boot_address = ORIGIN(rom);
 REGION_ALIAS("rom_region", rom);
 
 INCLUDE sw/device/silicon_creator/rom/rom_common.ld
-

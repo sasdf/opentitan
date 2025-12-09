@@ -216,7 +216,7 @@ SECTIONS {
    * This is the last thing in rom.
    */
   .chip_info _chip_info_start : ALIGN(4) {
-    KEEP(*(.chip_info))
+    KEEP(*(.build_info))
   } > rom_region
 
   INCLUDE sw/device/info_sections.ld

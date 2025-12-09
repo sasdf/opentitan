@@ -9,6 +9,7 @@ CW310_SIVAL_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/lib/ownership:owner_verify_functest_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:crt_test_fpga_cw310_sival_rom_ext'
   '//sw/device/tests:spi_host_irq_test_fpga_cw310_sival_rom_ext'
+  '//sw/device/lib/crypto/impl:status_functest_fpga_cw310_sival_rom_ext'
 )
 
 CW310_SIVAL_TESTS=(
@@ -83,6 +84,7 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_unauthorized_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_hyper310_rom_ext'
+  '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_enabled_test_fpga_hyper310_rom_ext'
 )
 
 PROVISIONING_TESTS=(

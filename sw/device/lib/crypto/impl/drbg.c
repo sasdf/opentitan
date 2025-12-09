@@ -6,6 +6,7 @@
 
 #include "sw/device/lib/base/hardened_memory.h"
 #include "sw/device/lib/base/math.h"
+#include "sw/device/lib/base/memory.h"
 #include "sw/device/lib/crypto/drivers/entropy.h"
 #include "sw/device/lib/crypto/impl/status.h"
 #include "sw/device/lib/crypto/include/datatypes.h"
@@ -35,8 +36,22 @@ static status_t seed_material_construct(
   seed_material->len = nwords;
 
   // Copy seed data.
-  // TODO(#17711) Change to `hardened_memcpy`.
-  memcpy(seed_material->data, value.data, value.len);
+  if (misalignment32_of((uintptr_t)&value.data) == 0 &&
+      value.len % sizeof(uint32_t)) {
+    // The data buffer is word-aligned and the data length is a multiple of the
+    // word size. We can use the SCA hardened memcpy.
+    HARDENED_TRY(hardened_memcpy(
+        seed_material->data, (const uint32_t *)value.data, seed_material->len));
+  } else {
+    // The data buffer is not word-aligned. We need to use randomized_bytecopy
+    // that also implements randomization to reduce SCA leakage.
+    HARDENED_TRY(
+        randomized_bytecopy(seed_material->data, value.data, value.len));
+    // Check whether a FI tampered copying the bytes.
+    HARDENED_CHECK_EQ(
+        consttime_memeq_byte(value.data, seed_material->data, value.len),
+        kHardenedBoolTrue);
+  }
 
   // Set any unset bytes to zero.
   size_t unset_bytes = nwords * sizeof(uint32_t) - value.len;
@@ -66,17 +81,18 @@ static otcrypto_status_t seed_material_xor(
     return OTCRYPTO_OK;
   }
 
-  // Copy into a word-aligned buffer. Using a word-wise XOR is slightly safer
-  // from a side channel perspective than byte-wise.
+  // Copy into a word-aligned buffer. This allows us to use a XOR that is more
+  // resilient against SCA leakage.
   size_t nwords = ceil_div(value.len, sizeof(uint32_t));
   uint32_t value_words[nwords];
   value_words[nwords - 1] = 0;
-  memcpy(value_words, value.data, value.len);
+  HARDENED_TRY(randomized_bytecopy(value_words, value.data, value.len));
+  // Check whether a FI tampered copying the bytes.
+  HARDENED_CHECK_EQ(consttime_memeq_byte(value.data, value_words, value.len),
+                    kHardenedBoolTrue);
 
   // XOR with seed value.
-  for (size_t i = 0; i < nwords; i++) {
-    seed_material->data[i] ^= value_words[i];
-  }
+  HARDENED_TRY(hardened_xor_in_place(seed_material->data, value_words, nwords));
 
   return OTCRYPTO_OK;
 }

@@ -4,6 +4,7 @@
 
 #include "sw/device/lib/crypto/impl/ecc/p384.h"
 
+#include "sw/device/lib/base/crc32.h"
 #include "sw/device/lib/base/hardened.h"
 #include "sw/device/lib/base/hardened_memory.h"
 #include "sw/device/lib/crypto/drivers/otbn.h"
@@ -91,21 +92,22 @@ enum {
   /*
    * The expected instruction counts for constant time functions.
    */
-  kModeKeygenInsCnt = 1899010,
-  kModeKeygenSideloadInsCnt = 1898904,
-  kModeEcdhInsCnt = 1910613,
-  kModeEcdhSideloadInsCnt = 1910762,
-  kModeEcdsaSignInsCnt = 1546539,
-  kModeEcdsaSignSideloadInsCnt = 1546688,
+  kModeKeygenInsCnt = 1935430,
+  kModeKeygenSideloadInsCnt = 1935323,
+  kModeEcdhInsCnt = 1947029,
+  kModeEcdhSideloadInsCnt = 1947177,
+  kModeEcdsaSignInsCnt = 1574769,
+  kModeEcdsaSignSideloadInsCnt = 1574917,
 };
 
-static status_t p384_masked_scalar_write(const p384_masked_scalar_t *src,
+static status_t p384_masked_scalar_write(p384_masked_scalar_t *src,
                                          const otbn_addr_t share0_addr,
                                          const otbn_addr_t share1_addr) {
   HARDENED_TRY(
       otbn_dmem_write(kP384MaskedScalarShareWords, src->share0, share0_addr));
   HARDENED_TRY(
       otbn_dmem_write(kP384MaskedScalarShareWords, src->share1, share1_addr));
+  HARDENED_CHECK_EQ(p384_masked_scalar_checksum_check(src), kHardenedBoolTrue);
 
   // Write trailing 0s so that OTBN's 384-bit read of the second share does not
   // cause an error.
@@ -115,6 +117,26 @@ static status_t p384_masked_scalar_write(const p384_masked_scalar_t *src,
                              share1_addr + kP384MaskedScalarShareBytes));
 
   return OTCRYPTO_OK;
+}
+
+uint32_t p384_masked_scalar_checksum(const p384_masked_scalar_t *scalar) {
+  uint32_t ctx;
+  crc32_init(&ctx);
+  // Compute the checksum only over a single share to avoid side-channel
+  // leakage. From a FI perspective only covering one key share is fine as
+  // (a) manipulating the second share with FI has only limited use to an
+  // adversary and (b) when manipulating the entire pointer to the key structure
+  // the checksum check fails.
+  crc32_add(&ctx, (unsigned char *)scalar->share0, kP384CoordBytes);
+  return crc32_finish(&ctx);
+}
+
+hardened_bool_t p384_masked_scalar_checksum_check(
+    const p384_masked_scalar_t *scalar) {
+  if (scalar->checksum == launder32(p384_masked_scalar_checksum(scalar))) {
+    return kHardenedBoolTrue;
+  }
+  return kHardenedBoolFalse;
 }
 
 /**
@@ -160,6 +182,26 @@ static status_t set_message_digest(const uint32_t digest[kP384ScalarWords],
   return p384_scalar_write(digest_little_endian, dst);
 }
 
+uint32_t p384_ecdh_shared_key_checksum(const p384_ecdh_shared_key_t *key) {
+  uint32_t ctx;
+  crc32_init(&ctx);
+  // Compute the checksum only over a single share to avoid side-channel
+  // leakage. From a FI perspective only covering one key share is fine as
+  // (a) manipulating the second share with FI has only limited use to an
+  // adversary and (b) when manipulating the entire pointer to the key structure
+  // the checksum check fails.
+  crc32_add(&ctx, (unsigned char *)key->share0, kP384CoordBytes);
+  return crc32_finish(&ctx);
+}
+
+hardened_bool_t p384_ecdh_shared_key_checksum_check(
+    const p384_ecdh_shared_key_t *key) {
+  if (key->checksum == launder32(p384_ecdh_shared_key_checksum(key))) {
+    return kHardenedBoolTrue;
+  }
+  return kHardenedBoolFalse;
+}
+
 status_t p384_keygen_start(void) {
   // Load the ECDH/P-384 app. Fails if OTBN is non-idle.
   HARDENED_TRY(otbn_load_app(kOtbnAppP384));
@@ -176,12 +218,14 @@ status_t p384_keygen_finalize(p384_masked_scalar_t *private_key,
                               p384_point_t *public_key) {
   // Spin here waiting for OTBN to complete.
   HARDENED_TRY_WIPE_DMEM(otbn_busy_wait_for_done());
+  HARDENED_CHECK_EQ(otbn_instruction_count_get(), kModeKeygenInsCnt);
 
   // Read the masked private key from OTBN dmem.
   HARDENED_TRY_WIPE_DMEM(otbn_dmem_read(kP384MaskedScalarShareWords, kOtbnVarD0,
                                         private_key->share0));
   HARDENED_TRY_WIPE_DMEM(otbn_dmem_read(kP384MaskedScalarShareWords, kOtbnVarD1,
                                         private_key->share1));
+  private_key->checksum = p384_masked_scalar_checksum(private_key);
 
   // Read the public key from OTBN dmem.
   HARDENED_TRY_WIPE_DMEM(
@@ -210,6 +254,7 @@ status_t p384_sideload_keygen_start(void) {
 status_t p384_sideload_keygen_finalize(p384_point_t *public_key) {
   // Spin here waiting for OTBN to complete.
   HARDENED_TRY_WIPE_DMEM(otbn_busy_wait_for_done());
+  HARDENED_CHECK_EQ(otbn_instruction_count_get(), kModeKeygenSideloadInsCnt);
 
   // Read the public key from OTBN dmem.
   HARDENED_TRY_WIPE_DMEM(
@@ -224,7 +269,7 @@ status_t p384_sideload_keygen_finalize(p384_point_t *public_key) {
 }
 
 status_t p384_ecdsa_sign_start(const uint32_t digest[kP384ScalarWords],
-                               const p384_masked_scalar_t *private_key) {
+                               p384_masked_scalar_t *private_key) {
   // Load the ECDSA/P-384 app. Fails if OTBN is non-idle.
   HARDENED_TRY(otbn_load_app(kOtbnAppP384));
 
@@ -259,8 +304,15 @@ status_t p384_ecdsa_sideload_sign_start(
 }
 
 status_t p384_ecdsa_sign_finalize(p384_ecdsa_signature_t *result) {
+  uint32_t ins_cnt;
   // Spin here waiting for OTBN to complete.
   HARDENED_TRY_WIPE_DMEM(otbn_busy_wait_for_done());
+  ins_cnt = otbn_instruction_count_get();
+  if (launder32(ins_cnt) == kModeEcdsaSignSideloadInsCnt) {
+    HARDENED_CHECK_EQ(ins_cnt, kModeEcdsaSignSideloadInsCnt);
+  } else {
+    HARDENED_CHECK_EQ(ins_cnt, kModeEcdsaSignInsCnt);
+  }
 
   // Read signature R out of OTBN dmem.
   HARDENED_TRY_WIPE_DMEM(
@@ -329,7 +381,7 @@ status_t p384_ecdsa_verify_finalize(const p384_ecdsa_signature_t *signature,
   return OTCRYPTO_OK;
 }
 
-status_t p384_ecdh_start(const p384_masked_scalar_t *private_key,
+status_t p384_ecdh_start(p384_masked_scalar_t *private_key,
                          const p384_point_t *public_key) {
   // Load the ECDH/P-384 app. Fails if OTBN is non-idle.
   HARDENED_TRY(otbn_load_app(kOtbnAppP384));
@@ -362,11 +414,22 @@ status_t p384_ecdh_finalize(p384_ecdh_shared_key_t *shared_key) {
   }
   HARDENED_CHECK_EQ(ok, kHardenedBoolTrue);
 
+  // OTBN returned the status code OK, so check for the expected instr. count.
+  uint32_t ins_cnt;
+  ins_cnt = otbn_instruction_count_get();
+  if (launder32(ins_cnt) == kModeEcdhSideloadInsCnt) {
+    HARDENED_CHECK_EQ(ins_cnt, kModeEcdhSideloadInsCnt);
+  } else {
+    HARDENED_CHECK_EQ(ins_cnt, kModeEcdhInsCnt);
+  }
+
   // Read the shares of the key from OTBN dmem (at vars x and y).
   HARDENED_TRY_WIPE_DMEM(
       otbn_dmem_read(kP384CoordWords, kOtbnVarX, shared_key->share0));
   HARDENED_TRY_WIPE_DMEM(
       otbn_dmem_read(kP384CoordWords, kOtbnVarY, shared_key->share1));
+
+  shared_key->checksum = p384_ecdh_shared_key_checksum(shared_key);
 
   // Wipe DMEM.
   HARDENED_TRY(otbn_dmem_sec_wipe());

@@ -7,7 +7,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use crate::app::TransportWrapper;
+use crate::app::{TransportWrapper, UartRx};
 use crate::io::uart::Uart;
 use crate::rescue::xmodem::Xmodem;
 use crate::rescue::{EntryMode, Rescue, RescueError, RescueMode};
@@ -37,11 +37,11 @@ impl RescueSerial {
     const BAUD_1M33: [u8; 4] = *b"1M33";
     const BAUD_1M50: [u8; 4] = *b"1M50";
 
-    pub fn new(uart: Rc<dyn Uart>) -> Self {
+    pub fn new(uart: Rc<dyn Uart>, enter_delay: Option<Duration>) -> Self {
         RescueSerial {
             uart,
             reset_delay: Duration::from_millis(50),
-            enter_delay: Duration::from_secs(5),
+            enter_delay: enter_delay.unwrap_or(Duration::from_secs(5)),
             version: Cell::default(),
         }
     }
@@ -53,7 +53,7 @@ impl Rescue for RescueSerial {
         match mode {
             EntryMode::Reset => {
                 self.uart.set_break(true)?;
-                transport.reset_target(self.reset_delay, /*clear_uart=*/ true)?;
+                transport.reset_with_delay(UartRx::Clear, self.reset_delay)?;
             }
             EntryMode::Reboot => {
                 self.reboot()?;

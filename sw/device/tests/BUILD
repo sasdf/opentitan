@@ -1218,7 +1218,6 @@ opentitan_test(
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/crypto/drivers:otbn",
-        "//sw/device/lib/crypto/impl/rsa:rsa_3072_verify",
         "//sw/device/lib/dif:aes",
         "//sw/device/lib/dif:csrng",
         "//sw/device/lib/dif:edn",
@@ -1234,7 +1233,6 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:check",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/tests:otbn_randomness_impl",
-        "//sw/device/tests/crypto:rsa_3072_verify_testvectors_hardcoded_header",
     ],
 )
 
@@ -2362,10 +2360,19 @@ opentitan_test(
             "//hw/top_earlgrey:sim_dv": None,
             "//hw/top_earlgrey:sim_verilator": None,
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
+            "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+            "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             # This test is not expected to run on silicon, as it would require a very specific OTP configuration that is only useful for this test.
         },
     ),
     fpga = fpga_params(
+        otp = ":otp_ctrl_descrambling_otp_image",
+    ),
+    qemu = qemu_params(
         otp = ":otp_ctrl_descrambling_otp_image",
     ),
     deps = [
@@ -3868,12 +3875,19 @@ opentitan_test(
             "//hw/top_earlgrey:sim_verilator": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
         # This test requires the spi full duplex on the hyperdebug board.
-        tags = ["manual"],
         test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_tpm_test",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            "{firmware:elf}"
+        """,
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_tpm_test",
     ),
     silicon = silicon_params(
@@ -4344,11 +4358,20 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
         EARLGREY_CW340_TEST_ENVS,
     ),
     fpga = fpga_params(
         test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/spi_device_ottf_console",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
         test_harness = "//sw/host/tests/chip/spi_device_ottf_console",
     ),
     deps = [
@@ -4543,6 +4566,18 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        globals = {
+            # We do not need a full host for this test so just drive VBUS
+            # in override mode.
+            "ot-usbdev.vbus-override": "true",
+        },
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4718,6 +4753,14 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        # Require the PHY_PINS_SENSE register.
+        tags = ["broken"],
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4748,6 +4791,12 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     fpga = fpga_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
         test_cmd = """
             --no-wait-for-usb-device
         """,
@@ -5633,6 +5682,12 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/spi_device:spi_passthru",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_passthru",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5741,6 +5796,7 @@ _RV_DM_TEST_CONFIGURATIONS = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             needs_jtag = True,
@@ -5750,6 +5806,21 @@ _RV_DM_TEST_CONFIGURATIONS = [
                 "lc_{}".format(test_cfg["lc_state"]),
             ],
             test_cmd = """
+                {rv_dm_delayed_en}
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:csr_rw",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = test_cfg["otp"],
+            rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
+            tags = [
+                "lc_{}".format(test_cfg["lc_state"]),
+                # Delayed enable currently not working in QEMU.
+                "broken" if test_cfg["rv_dm_delayed_en"] != "" else "",
+            ],
+            test_cmd = """
+                --bootstrap="{firmware}"
                 {rv_dm_delayed_en}
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:csr_rw",
@@ -7217,6 +7288,7 @@ opentitan_test(
         "//sw/device/lib/testing:flash_ctrl_testutils",
         "//sw/device/lib/testing:rstmgr_testutils",
         "//sw/device/lib/testing:sram_ctrl_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )

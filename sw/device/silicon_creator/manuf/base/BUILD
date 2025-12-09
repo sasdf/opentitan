@@ -65,6 +65,7 @@ opentitan_binary(
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:macros",
+        "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/dif:lc_ctrl",
         "//sw/device/lib/dif:otp_ctrl",
@@ -104,6 +105,7 @@ opentitan_binary(
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:macros",
+        "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/dif:gpio",
         "//sw/device/lib/dif:lc_ctrl",
@@ -185,6 +187,7 @@ opentitan_test(
             "//sw/device/lib/arch:device",
             "//sw/device/lib/base:abs_mmio",
             "//sw/device/lib/base:macros",
+            "//sw/device/lib/crypto/drivers:entropy",
             "//sw/device/lib/dif:flash_ctrl",
             "//sw/device/lib/dif:gpio",
             "//sw/device/lib/dif:otp_ctrl",
@@ -240,6 +243,7 @@ cc_library(
     srcs = ["tpm_personalize_ext.c"],
     deps = [
         ":personalize_ext",
+        "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/dif:flash_ctrl",
         "//sw/device/lib/runtime:print",
         "//sw/device/lib/testing/test_framework:status",
@@ -296,8 +300,8 @@ manifest(d = {
     "manuf_state_creator": hex(CONST.MANUF_STATE.PERSO_INITIAL),
     "visibility": ["//visibility:private"],
     "version_major": "0",
-    # Release: 2025-09-16-RC00
-    "version_minor": "2025091600",
+    # Release: 2025-10-29-RC00
+    "version_minor": "2025102900",
     "security_version": "0xFFFFFFFF",
 })
 

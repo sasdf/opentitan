@@ -11,12 +11,14 @@ set -e
 qemu=__qemu__
 qemu_args=( __qemu_args__  )
 test_harness="__test_harness__"
-mutable_flash="__mutable_flash__"
-mutable_otp="__mutable_otp__"
 otp="__otp__"
 flash="__flash__"
 test_cmd=( __test_cmd__ )
 args=( __args__ )
+
+mutable_flash="flash_img.bin"
+mutable_otp="otp_img.raw"
+spiflash0="spiflash0.bin"
 
 test_args=( "$@" )
 qemu_test_args=()
@@ -40,8 +42,18 @@ for this_arg in "${test_args[@]}"; do
     fi
 done
 
+qemu_pid=""
+
 cleanup() {
+    set +e
+    echo "Stopping QEMU: $qemu_pid"
+    # Ask nicely QEMU to stop and then kill it after one second.
+    ( sleep 1 ; echo "Killing QEMU"; kill -KILL "$qemu_pid" ) &
+    kill "$qemu_pid"
+    wait "$qemu_pid"
+
     rm -f "${mutable_otp}" "${mutable_flash}"
+    rm -f "${spiflash0}"
     rm -f qemu-monitor qemu.log
 }
 trap cleanup EXIT
@@ -53,12 +65,16 @@ if [ -n "${flash}" ]; then
     cp "${flash}" "${mutable_flash}" && chmod +w "${mutable_flash}"
 fi
 
+# create backing storage for flash device on SPI Host 0/SPI Device SPI bus
+dd if=/dev/zero of="${spiflash0}" bs=1M count=32 status=none && chmod +w "${spiflash0}"
+
 # QEMU disconnects from `stdout` when it daemonizes so we need to stream
 # the log through a pipe:
 mkfifo qemu.log && cat qemu.log &
 
 echo "Starting QEMU: ${qemu} ${qemu_test_args[*]} ${qemu_args[*]}"
 "${qemu}" "${qemu_test_args[@]}" "${qemu_args[@]}"
+qemu_pid=$!
 
 echo "Invoking test: ${test_harness} ${args[*]} ${harness_test_args[*]} ${test_cmd[*]}"
 "${test_harness}" "${args[@]}" "${harness_test_args[@]}" "${test_cmd[@]}"

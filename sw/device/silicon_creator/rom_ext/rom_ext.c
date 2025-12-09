@@ -41,6 +41,7 @@
 #include "sw/device/silicon_creator/lib/manifest.h"
 #include "sw/device/silicon_creator/lib/manifest_def.h"
 #include "sw/device/silicon_creator/lib/ownership/isfb.h"
+#include "sw/device/silicon_creator/lib/ownership/owner_block.h"
 #include "sw/device/silicon_creator/lib/ownership/owner_verify.h"
 #include "sw/device/silicon_creator/lib/ownership/ownership.h"
 #include "sw/device/silicon_creator/lib/ownership/ownership_activate.h"
@@ -484,6 +485,14 @@ static rom_error_t rom_ext_advance_secver(boot_data_t *boot_data,
   return kErrorOk;
 }
 
+// This weak function allows downstream ROM_EXT builds to override whether or
+// not boot_svc runs after a low-power wakeup.  This is a mitigation for a
+// late-added confiuration item to the owner configuration.
+OT_WEAK
+hardened_bool_t rom_ext_allow_boot_svc_after_wakeup(void) {
+  return owner_config.boot_svc_after_wakeup;
+}
+
 static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   HARDENED_RETURN_IF_ERROR(rom_ext_init(boot_data));
   const manifest_t *self = rom_ext_manifest();
@@ -524,7 +533,7 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   HARDENED_RETURN_IF_ERROR(dice_chain_rom_ext_check());
 
   // Initialize the boot_log in retention RAM.
-  const chip_info_t *rom_chip_info = (const chip_info_t *)_chip_info_start;
+  const build_info_t *rom_chip_info = (const build_info_t *)_chip_info_start;
   boot_log_check_or_init(boot_log, rom_ext_current_slot(), rom_chip_info);
   boot_log->rom_ext_major = self->version_major;
   boot_log->rom_ext_minor = self->version_minor;
@@ -540,6 +549,9 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   // Initialize the chip ownership state.
   rom_error_t error;
   error = ownership_init(boot_data, &owner_config, &keyring);
+  dbg_printf("owner_page: %u-%C/%u-%C\r\n", owner_page[0].config_version,
+             owner_page_valid[0], owner_page[1].config_version,
+             owner_page_valid[1]);
   if (error == kErrorWriteBootdataThenReboot) {
     return error;
   }
@@ -564,8 +576,13 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
       reset_reasons & (1 << kRstmgrReasonLowPowerExit) ? kHardenedBoolTrue
                                                        : kHardenedBoolFalse;
 
-  // We don't want to execute boot_svc requests if this is a low-power wakeup.
-  if (waking_from_low_power != kHardenedBoolTrue) {
+  // Determine if we want to execute boot_svc requests if this is a low-power
+  // wakeup.
+  hardened_bool_t want_boot_svc = waking_from_low_power == kHardenedBoolTrue
+                                      ? rom_ext_allow_boot_svc_after_wakeup()
+                                      : kHardenedBoolTrue;
+
+  if (want_boot_svc == kHardenedBoolTrue) {
     boot_svc_msg_t *boot_svc_msg = &retention_sram_get()->creator.boot_svc_msg;
     error =
         boot_svc_handler(boot_svc_msg, boot_data, boot_log, lc_state, &keyring,

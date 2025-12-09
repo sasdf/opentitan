@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use opentitanlib::app::TransportWrapper;
+use opentitanlib::app::{TransportWrapper, UartRx};
 use opentitanlib::chip::boot_svc::{BootSlot, UnlockMode};
 use opentitanlib::chip::device_id::DeviceId;
 use opentitanlib::chip::rom_error::RomError;
@@ -88,6 +88,8 @@ struct Opts {
         help = "Load a firmware payload via rescue after activating ownership"
     )]
     rescue_after_activate: Option<PathBuf>,
+    #[arg(long, value_parser = humantime::parse_duration, help = "Max timeout to enter rescue mode")]
+    rescue_enter_delay: Option<Duration>,
 
     #[arg(long, default_value_t = false, action = clap::ArgAction::Set, help = "Use an invalid device id to trigger ownership unlock request")]
     invalid_device_id: bool,
@@ -122,7 +124,7 @@ fn remember(haystack: &str, re: &str, memory: &mut Vec<String>) -> bool {
 
 fn transfer_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     let uart = transport.uart("console")?;
-    let rescue = RescueSerial::new(Rc::clone(&uart));
+    let rescue = RescueSerial::new(Rc::clone(&uart), opts.rescue_enter_delay);
 
     let mut keygen = Vec::new();
 
@@ -204,7 +206,7 @@ fn transfer_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
         log::info!("###### Boot in Dual-Owner Mode ######");
         // At this point, the device should be unlocked and should have accepted the owner
         // configuration.  Owner code should run and report the ownership state.
-        transport.reset_target(Duration::from_millis(50), /*clear_uart=*/ true)?;
+        transport.reset_with_delay(UartRx::Clear, Duration::from_millis(50))?;
         let capture = UartConsole::wait_for(
             &*uart,
             r"(?msR)Running.*ownership_state = (\w+)$.*ownership_transfers = (\d+)$.*PASS!$|BFV:([0-9A-Fa-f]{8})$",
@@ -250,7 +252,7 @@ fn transfer_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
 
     log::info!("###### Boot After Transfer Complete ######");
     // After the activate command, the device should report the ownership state as `OWND`.
-    transport.reset_target(Duration::from_millis(50), /*clear_uart=*/ true)?;
+    transport.reset_with_delay(UartRx::Clear, Duration::from_millis(50))?;
     let capture = UartConsole::wait_for(
         &*uart,
         r"(?msR)Running.*ownership_state = (\w+)$.*ownership_transfers = (\d+)$.*PASS!$|BFV:([0-9A-Fa-f]{8})$",

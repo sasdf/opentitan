@@ -158,6 +158,7 @@ sim_qemu(
     slot_spec = EARLGREY_SLOTS,
     test_cmd = """
         --exec="transport init"
+        {bootstrap_cmd}
         --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
         no-op
     """,
@@ -171,6 +172,18 @@ sim_qemu(
     exec_env = "sim_qemu_rom_with_fake_keys",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     rom = "//sw/device/silicon_creator/rom:mask_rom",
+)
+
+sim_qemu(
+    name = "sim_qemu_sival",
+    testonly = True,
+    base = ":sim_qemu_base",
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = "sim_qemu_sival",
+    manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+    otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
+    rom = "//sw/device/silicon_creator/rom:mask_rom",
+    spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:spx_keyset": "prod_key_0"},
 )
 
 sim_qemu(

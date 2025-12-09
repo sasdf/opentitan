@@ -14,7 +14,7 @@ def secver_write_selection():
 # because of how the bazel rule accepts attributes.
 ROM_EXT_VERSION = struct(
     MAJOR = "0",
-    MINOR = "115",
+    MINOR = "117",
     SECURITY = "0",
 )
 
@@ -34,6 +34,10 @@ SLOTS = [
 ]
 
 TEST_OWNER_CONFIGS = {
+    "boot_svc_after_wakeup": {
+        "owner_defines": ["TEST_OWNER_BOOT_SVC_AFTER_WAKEUP=kHardenedBoolTrue"],
+        "rescue_module": ["//sw/device/silicon_creator/lib/rescue:rescue_xmodem"],
+    },
     "hybrid_owner_keys": {
         # Enable hybrid ECDSA/SPX+ ownership.
         "owner_defines": ["TEST_OWNER_KEY_ALG_HYBRID_SPX_PURE=1"],

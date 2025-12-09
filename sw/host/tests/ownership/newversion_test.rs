@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use opentitanlib::app::TransportWrapper;
+use opentitanlib::app::{TransportWrapper, UartRx};
 use opentitanlib::chip::rom_error::RomError;
 use opentitanlib::ownership::OwnershipKeyAlg;
 use opentitanlib::rescue::serial::RescueSerial;
@@ -49,6 +49,9 @@ struct Opts {
     #[arg(long, help = "Next Owner unlock private key (SPX)")]
     next_unlock_key_spx: Option<PathBuf>,
 
+    #[arg(long, value_parser = humantime::parse_duration, help = "Max timeout to enter rescue mode")]
+    rescue_enter_delay: Option<Duration>,
+
     #[arg(
         long,
         default_value_t = transfer_lib::TEST_OWNER_CONFIG_VERSION,
@@ -79,7 +82,7 @@ struct Opts {
 
 fn newversion_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     let uart = transport.uart("console")?;
-    let rescue = RescueSerial::new(Rc::clone(&uart));
+    let rescue = RescueSerial::new(Rc::clone(&uart), opts.rescue_enter_delay);
 
     log::info!("###### Get Device Info ######");
     rescue.enter(transport, EntryMode::Reset)?;
@@ -121,7 +124,7 @@ fn newversion_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     )?;
 
     log::info!("###### Boot After Update Complete ######");
-    transport.reset_target(Duration::from_millis(50), /*clear_uart=*/ true)?;
+    transport.reset_with_delay(UartRx::Clear, Duration::from_millis(50))?;
     let capture = UartConsole::wait_for(
         &*uart,
         r"(?msR)Running.*PASS!$|BFV:([0-9A-Fa-f]{8})$",

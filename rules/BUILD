@@ -5,7 +5,7 @@
 load("//rules:autogen.bzl", "autogen_stamp_include")
 load("//rules:stamp.bzl", "stamp_flag")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_PLATFORM")
-load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -42,4 +42,16 @@ string_flag(
 config_setting(
     name = "use_cw340",
     flag_values = {":fpga": "hyper340"},
+)
+
+bool_flag(
+    name = "static_link_host_tools",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "static_link_host_tools_enabled",
+    flag_values = {
+        ":static_link_host_tools": "True",
+    },
 )

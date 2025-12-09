@@ -244,7 +244,7 @@
     },
     "//third_party/hsm:extensions.bzl%hsm": {
       "general": {
-        "bzlTransitiveDigest": "j2GwGdc7Oxlja02plc7IXvFl0HZEyDDmWbrXkP9J/ns=",
+        "bzlTransitiveDigest": "2vzJYK+vywiCbF9s0lHu/wrZWmgeAz0wXuHdAO2k+5w=",
         "usagesDigest": "uEk6dTktgdMfLQN5bAE4Sorkuuxcz3nEbPEKZLUjpak=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -287,9 +287,9 @@
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
               "build_file": "@@//third_party/hsm:BUILD.cloud_kms_hsm.bazel",
-              "url": "https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/pkcs11-v1.2/libkmsp11-1.2-linux-amd64.tar.gz",
-              "strip_prefix": "libkmsp11-1.2-linux-amd64",
-              "sha256": "81fff58d5835f05d550ff86c88fa6fb92a733bde8b232e1482d85a3cf07c6396"
+              "url": "https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/pkcs11-v1.8/libkmsp11-1.8-linux-amd64.tar.gz",
+              "strip_prefix": "libkmsp11-1.8-linux-amd64",
+              "sha256": "3b932f22a8abb631442c3276e9c309554c81855526b74fbc9edaddcb57a557f7"
             }
           }
         },
@@ -607,7 +607,7 @@
     },
     "//third_party/qemu:extensions.bzl%qemu": {
       "general": {
-        "bzlTransitiveDigest": "6hXQNGbuHkxQNuqeVDPcCEDYm1xo2zeQJLJ7aEuvY8g=",
+        "bzlTransitiveDigest": "xc6qyklU0sMBGaiB4C9nkCNMzvHli5rToc57xIeAlW4=",
         "usagesDigest": "le4nFQIsMEytUZA5Dz/GdRTwr0Ri5kyC+VIeW4HnJLI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -616,9 +616,9 @@
           "qemu_opentitan_src": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "url": "https://github.com/lowRISC/qemu/releases/download/v9.2.0-2025-10-07/qemu-ot-earlgrey-v9.2.0-2025-10-07-x86_64-unknown-linux-gnu.tar.gz",
+              "url": "https://github.com/lowRISC/qemu/releases/download/v9.2.0-2025-11-10/qemu-ot-earlgrey-v9.2.0-2025-11-10-x86_64-unknown-linux-gnu.tar.gz",
               "build_file": "@@//third_party/qemu:BUILD.qemu_opentitan.bazel",
-              "sha256": "00698f197f4582f03989b5c488b554fb3808f1f9b6b1e92f54b28c264ae3ba72",
+              "sha256": "46037913a160c46f1a12ff8fe4eb746bf37d390848ace88b6401876c4c064669",
               "patch_cmds": [
                 "touch .this.is.the.archive"
               ]
@@ -720,6 +720,42 @@
             "",
             "lowrisc_opentitan",
             ""
+          ]
+        ]
+      }
+    },
+    "//third_party/system_libs:extensions.bzl%system_libs": {
+      "general": {
+        "bzlTransitiveDigest": "wcQYu1dZpYyGXIIbtQeVPI1qzQ0LQu3g9hxYIH2zAcg=",
+        "usagesDigest": "qjd0+Tgdi27wMz5qse8P7OKE8M5wWJ1wy1s+GXHmsiE=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "libudev_zero": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@//third_party/system_libs:BUILD.libudev_zero.bazel",
+              "url": "https://github.com/illiliti/libudev-zero/archive/refs/tags/1.0.3.tar.gz",
+              "strip_prefix": "libudev-zero-1.0.3",
+              "sha256": "0bd89b657d62d019598e6c7ed726ff8fed80e8ba092a83b484d66afb80b77da5"
+            }
+          },
+          "libelf": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@//third_party/system_libs:BUILD.libelf.bazel",
+              "url": "https://sourceware.org/elfutils/ftp/0.193/elfutils-0.193.tar.bz2",
+              "strip_prefix": "elfutils-0.193",
+              "sha256": "7857f44b624f4d8d421df851aaae7b1402cfe6bcdd2d8049f15fc07d3dde7635"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "bazel_tools",
+            "bazel_tools"
           ]
         ]
       }
@@ -11959,8 +11995,8 @@
     },
     "@@toolchains_llvm+//toolchain/extensions:llvm.bzl%llvm": {
       "general": {
-        "bzlTransitiveDigest": "gIValQjM+EWFJiJontPjnV18YMBMwraBayY+hWCfPzA=",
-        "usagesDigest": "Jb6PotMQZN8Bkcci0RaeWREszi3XXYBWBTFcB5sQmMw=",
+        "bzlTransitiveDigest": "HxwEOKblzgkrBdJaod2DqZgHCmDnoIAnw4pLFpW2a/4=",
+        "usagesDigest": "/yZpIK389LcD3BpkqnUmSFqWnZPfvj79qXg9o1m0rzA=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -11979,9 +12015,17 @@
                 "": "10.0.0"
               },
               "netrc": "",
-              "sha256": {},
-              "strip_prefix": {},
-              "urls": {}
+              "sha256": {
+                "": "b25f592a0c00686f03e3b7db68ca6dc87418f681f4ead4df4745a01d9be63843"
+              },
+              "strip_prefix": {
+                "": "clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04"
+              },
+              "urls": {
+                "": [
+                  "https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz"
+                ]
+              }
             }
           },
           "llvm_toolchain": {

@@ -88,10 +88,24 @@ status_t hardened_memshred(uint32_t *dest, size_t word_len);
  *
  * @param lhs The first buffer to compare.
  * @param rhs The second buffer to compare.
- * @param word_len The number of words to write.
+ * @param word_len The number of words to compare.
  */
 hardened_bool_t hardened_memeq(const uint32_t *lhs, const uint32_t *rhs,
                                size_t word_len);
+
+/**
+ * Constant time memeq implementation that can also handle non 32-bit aligned
+ * buffers.
+ *
+ * Important: not hardened against SCA leakage, only guarantees constant time
+ * execution.
+ *
+ * @param lhs The first buffer to compare.
+ * @param rhs The second buffer to compare.
+ * @param word_len The number of bytes to compare.
+ */
+hardened_bool_t consttime_memeq_byte(const void *lhs, const void *rhs,
+                                     size_t len);
 
 /**
  * Combines two word buffers with XOR and store the result in the dest. buffer.
@@ -127,6 +141,40 @@ status_t hardened_xor(const uint32_t *OT_RESTRICT x,
  */
 status_t hardened_xor_in_place(uint32_t *OT_RESTRICT x,
                                const uint32_t *OT_RESTRICT y, size_t word_len);
+
+/**
+ * Copy memory between non-overlapping regions with a randomized byte traversal.
+ *
+ * CAUTION! This function is not considered as secure as `hardened_memcpy` due
+ * to the byte-sized memory accesses vs. 32b word accesses. After this function,
+ * a `consttime_memeq_byte(src, dest, byte_len)` should follow to check if the
+ * bytecopy was successful (see lowRISC/opentitan#8815). Switch the function
+ * arguments as shown in the example to also cover faults directly on the
+ * pointers.
+ *
+ * @param dest the region to copy to.
+ * @param src the region to copy from.
+ * @param byte_len, the number of bytes to copy.
+ * @return Result of the operation (OK or error).
+ */
+status_t randomized_bytecopy(void *OT_RESTRICT dest,
+                             const void *OT_RESTRICT src, size_t byte_len);
+
+/**
+ * In-place XOR of two non-overlapping memory regions with a randomized byte
+ * traversal.
+ *
+ * CAUTION! This function is not considered as secure as `hardened_xor_in_place`
+ * due to the byte-sized memory accesses vs. 32b word accesses.
+ *
+ * @param x Pointer to the first operand (modified in-place).
+ * @param y Pointer to the second operand.
+ * @param byte_len, the number of bytes to XOR.
+ * @return Result of the operation (OK or error).
+ */
+status_t randomized_bytexor_in_place(void *OT_RESTRICT x,
+                                     const void *OT_RESTRICT y,
+                                     size_t byte_len);
 
 #ifdef __cplusplus
 }  // extern "C"

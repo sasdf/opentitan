@@ -46,6 +46,12 @@ EX_CW310_TEST_ROM_TESTS=(
 //sw/device/tests:usbdev_deep_resume_test_fpga_cw310_test_rom
 //sw/device/tests:usbdev_sleep_reset_test_fpga_cw310_test_rom
 //sw/device/tests:usbdev_sleep_resume_test_fpga_cw310_test_rom
+
+//sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw310_test_rom
+//sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw310_test_rom
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw310_test_rom
+//sw/device/tests:uart_smoketest_fpga_cw310_test_rom
+
 # //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_test_rom
 # //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_test_rom
 
@@ -87,6 +93,10 @@ EX_CW340_TEST_ROM_TESTS=(
 //sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw340_test_rom
 
 //sw/device/tests:crt_test_fpga_cw340_test_rom
+
+//sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw340_test_rom
+//sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw340_test_rom
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw340_test_rom
 
 # //sw/device/silicon_creator/lib/sigverify/sigverify_tests:sigverify_cryptotest_fpga_cw340_test_rom
 # //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_test_rom
@@ -286,7 +296,6 @@ EX_CW310_FAKE_KEYS_TESTS=(
 //sw/device/tests/crypto:rsa_3072_encryption_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_3072_keygen_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_3072_signature_functest_fpga_cw310_rom_with_fake_keys
-//sw/device/tests/crypto:rsa_3072_verify_functest_hardcoded_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_4096_encryption_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:rsa_4096_signature_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:sha256_functest_fpga_cw310_rom_with_fake_keys
@@ -320,13 +329,12 @@ EX_CW310_FAKE_KEYS_TESTS=(
 //sw/device/tests:usbdev_vbus_test_fpga_cw310_rom_with_fake_keys
 //sw/device/silicon_creator/lib/drivers:usb_functest_fpga_cw310_rom_with_fake_keys
 
-//sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw340_rom_with_fake_keys
-//sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw340_rom_with_fake_keys
-
 //sw/device/tests:ottf_alert_catch_test_fpga_cw310_rom_with_fake_keys
 //sw/device/lib/crypto/drivers:rv_core_ibex_test_fpga_cw310_rom_with_fake_keys
 
 //sw/device/tests:keymgr_sideload_otbn_simple_test_fpga_cw310_rom_with_fake_keys
+//sw/device/lib/crypto/impl:status_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw310_rom_with_fake_keys
 
 # //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_rom_with_fake_keys
 # //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_rom_with_fake_keys
@@ -373,6 +381,8 @@ EX_CW340_CRYPTO_TESTS=(
 //sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw340_sival_rom_ext
 //sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw340_sival_rom_ext
 //sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw340_sival_rom_ext
 
 # //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_sival_rom_ext
 )
@@ -475,6 +485,9 @@ EX_CW340_SIVAL_TESTS=(
 //sw/device/tests:ast_clk_outs_test_fpga_cw340_sival
 //sw/device/tests:clkmgr_reset_frequency_test_fpga_cw340_sival
 //sw/device/tests:keymgr_derive_sealing_test_fpga_cw340_sival
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw340_sival
+//sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival
+
 # //sw/device/tests:otbn_smoketest_fpga_cw340_sival
 
 # //sw/device/tests:rv_dm_csr_rw_dev_rv_dm_default_enabled_fpga_cw340_sival
@@ -587,7 +600,6 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_aba_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_next_abb_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_primary_test_fpga_cw340_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_wakeup_test_fpga_cw340_rom_ext
 
 //sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_code_first_word_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_corrupt_b_valid_manifest_code_end_fpga_cw340_rom_ext
@@ -638,7 +650,6 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/ownership:flash_permission_test_slot_ab_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:flash_permission_test_slot_ba_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:flash_permission_test_slot_bb_fpga_cw340_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/ownership:fpga_owner_upgrade_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:good_appkey_constraint_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:locked_update_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:newversion_badlock_test_fpga_cw340_rom_ext
@@ -709,6 +720,10 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:debug_mode_on_dice_cwt_test_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:debug_mode_on_dice_x509_test_fpga_cw340_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_disabled_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_enabled_test_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/ownership:install_owner_upgrade_test_fpga_cw340_rom_ext
+
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
 )
 
@@ -724,6 +739,10 @@ EX_CW340_FAKE_KEYS_TESTS=(
 //sw/device/tests:uart_smoketest_fpga_cw340_rom_with_fake_keys
 //sw/device/tests:flash_ctrl_mem_protection_test_fpga_cw340_rom_with_fake_keys
 //sw/device/tests:flash_ctrl_test_fpga_cw340_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:hmac_functest_fpga_cw340_rom_with_fake_keys
+//sw/device/silicon_creator/lib/drivers:kmac_functest_fpga_cw340_rom_with_fake_keys
+//sw/device/tests:otp_ctrl_descrambling_test_fpga_cw340_rom_with_fake_keys
+
 )
 
 EX_CW340_SIVAL_ROM_EXT_TESTS=(
@@ -748,7 +767,6 @@ EX_CW340_SIVAL_ROM_EXT_TESTS=(
 //sw/device/tests:ottf_alert_catch_test_fpga_cw340_sival_rom_ext
 
 # //sw/device/tests:otbn_smoketest_fpga_cw340_sival_rom_ext
-# //sw/device/tests/crypto:rsa_3072_verify_functest_wycheproof_fpga_cw340_sival_rom_ext
 )
 
 EX_INS_ROM_TESTS=(
@@ -1281,19 +1299,6 @@ EX_INS_ROM_TESTS=(
 # //sw/device/silicon_creator/rom/e2e/sigverify_spx:sigverify_spx_test_unlocked0_enabled_zero_fpga_cw340_instrumented_rom
 )
 
-EX_CW340_A2_ROM_EXT_TESTS=(
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_imm_section_virtual_a_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_a_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_slot_b_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_a_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_owner_virtual_b_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_b_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_a_with_imm_romext_enabled_fpga_cw340_A2_rom_ext
-//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_cw340_A2_rom_ext
-)
-
 EX_UNSUPPORTED_TESTS=(
 )
 
@@ -1306,6 +1311,7 @@ EX_OTHER_FAILED_TESTS=(
 # //sw/device/tests:ottf_dual_console_test_fpga_cw340_test_rom
 )
 
+
 EX_TEST_GROUPS=(
     "EX_CW310_TEST_ROM_TESTS"
     "EX_CW340_TEST_ROM_TESTS"
@@ -1317,6 +1323,5 @@ EX_TEST_GROUPS=(
     "EX_CW340_ROM_EXT_TESTS"
     "EX_CW340_FAKE_KEYS_TESTS"
     "EX_CW340_SIVAL_ROM_EXT_TESTS"
-    "EX_CW340_A2_ROM_EXT_TESTS"
     "EX_INS_ROM_TESTS"
 )

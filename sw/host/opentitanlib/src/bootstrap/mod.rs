@@ -11,7 +11,7 @@ use humantime::parse_duration;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::app::{NoProgressBar, TransportWrapper};
+use crate::app::{NoProgressBar, TransportWrapper, UartRx};
 use crate::impl_serializable_error;
 use crate::io::gpio::GpioPin;
 use crate::io::spi::SpiParams;
@@ -87,9 +87,6 @@ pub struct BootstrapOptions {
     /// Whether to reset target and clear UART RX buffer after bootstrap. For Chip Whisperer board only.
     #[arg(long)]
     pub clear_uart: Option<bool>,
-    /// Duration of the reset pulse.
-    #[arg(long, value_parser = parse_duration, default_value = "100ms")]
-    pub reset_delay: Duration,
     /// If set, keep the bootstrap strapping applied and do not perform the post-bootstrap reset
     /// sequence.
     #[arg(long)]
@@ -112,7 +109,6 @@ pub struct Bootstrap<'a> {
     pub uart_params: &'a UartParams,
     pub spi_params: &'a SpiParams,
     reset_pin: Rc<dyn GpioPin>,
-    reset_delay: Duration,
     leave_in_reset: bool,
     leave_in_bootstrap: bool,
 }
@@ -165,7 +161,6 @@ impl<'a> Bootstrap<'a> {
             uart_params: &options.uart_params,
             spi_params: &options.spi_params,
             reset_pin: transport.gpio_pin("RESET")?,
-            reset_delay: options.reset_delay,
             leave_in_reset: options.leave_in_reset,
             leave_in_bootstrap: options.leave_in_bootstrap,
         }
@@ -186,10 +181,21 @@ impl<'a> Bootstrap<'a> {
         if perform_bootstrap_reset {
             log::info!("Asserting bootstrap pins...");
             rom_boot_strapping.apply()?;
-            transport.reset_target(self.reset_delay, self.clear_uart_rx)?;
+            let uart_rx = match self.clear_uart_rx {
+                true => UartRx::Clear,
+                false => UartRx::Keep,
+            };
+            transport.reset(uart_rx)?;
             log::info!("Performing bootstrap...");
         }
         let result = updater.update(self, transport, payload, progress);
+
+        #[cfg(feature = "ot_coverage_enabled")]
+        {
+            log::info!("Receiving report...");
+            let uart = transport.uart("console")?;
+            UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
+        }
 
         if !self.leave_in_bootstrap && perform_bootstrap_reset {
             if self.leave_in_reset {
@@ -201,18 +207,11 @@ impl<'a> Bootstrap<'a> {
                 // control when the newly flashed image gets to boot the first time.
                 rom_boot_strapping.remove()?;
             } else {
-                log::info!("Releasing bootstrap pins");
+                log::info!("Releasing bootstrap pins, resetting device...");
                 rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
-                #[cfg(feature = "ot_coverage_enabled")]
-                {
-                    log::info!("Receiving report...");
-                    let uart = transport.uart("console")?;
-                    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
-                }
-                log::info!("Resetting device...");
-                transport.reset_target(self.reset_delay, false)?;
+                transport.reset(UartRx::Keep)?;
             }
         }
         result
