@@ -166,6 +166,22 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
     for case in BOOT_DATA_RECOVERY_CASES
 ]
 
+opentitan_test(
+    name = "boot_data_corrupt_test",
+    srcs = ["boot_data_corrupt_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//sw/device/lib/base:status",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+    ],
+)
+
 test_suite(
     name = "rom_e2e_boot_data_recovery",
     tags = ["manual"],
