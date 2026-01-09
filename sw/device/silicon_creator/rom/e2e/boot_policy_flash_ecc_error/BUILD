@@ -193,6 +193,7 @@ otp_image(
             otp = ":otp_img_boot_policy_flash_ecc_error",
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
+            tags = ["rom_coverage"],
         ),
     )
     for t in BOOT_POLICY_FLASH_ECC_ERROR_TESTS
@@ -217,6 +218,7 @@ opentitan_test(
         otp = ":otp_img_flash_exc_handler_disabled",
         slot_a = SLOTS["a"],
         slot_b = SLOTS["b"],
+        tags = ["rom_coverage"],
     ),
 )
 

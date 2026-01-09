@@ -411,6 +411,8 @@ opentitan_binary = rv_rule(
 def _testing_bitstream_impl(settings, attr):
     rom = attr.rom if attr.rom else "//hw/bitstream/universal:none"
     otp = attr.otp if attr.otp else "//hw/bitstream/universal:none"
+    if "rom_coverage" in attr.tags and settings["//rules/coverage:enabled_flag"]:
+        rom = "//hw/bitstream/universal:use_flash_rom"
     return {
         "//hw/bitstream/universal:rom": rom,
         "//hw/bitstream/universal:otp": otp,
@@ -419,7 +421,9 @@ def _testing_bitstream_impl(settings, attr):
 
 _testing_bitstream = transition(
     implementation = _testing_bitstream_impl,
-    inputs = [],
+    inputs = [
+        "//rules/coverage:enabled_flag",
+    ],
     outputs = [
         "//hw/bitstream/universal:rom",
         "//hw/bitstream/universal:otp",

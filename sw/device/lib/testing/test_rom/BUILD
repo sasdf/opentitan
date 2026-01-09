@@ -26,27 +26,19 @@ ld_library(
 )
 
 cc_library(
-    name = "instrumented_rom_loader_enabled",
-    srcs = ["instrumented_rom_loader_enabled.S"],
+    name = "flash_rom_loader_impl",
+    srcs = ["flash_rom_loader_impl.S"],
     target_compatible_with = [OPENTITAN_CPU],
     deps = [
         "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:macros",
     ],
     alwayslink = True,
 )
 
-cc_library(
-    name = "instrumented_rom_loader_disabled",
-    srcs = ["instrumented_rom_loader_disabled.S"],
-    target_compatible_with = [OPENTITAN_CPU],
-    alwayslink = True,
-)
-
 opentitan_binary(
-    name = "instrumented_rom_loader",
+    name = "flash_rom_loader",
     collect_code_coverage = 0,
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
@@ -59,7 +51,7 @@ opentitan_binary(
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
-        ":instrumented_rom_loader_enabled",
+        ":flash_rom_loader_impl",
         ":test_rom_lib",
     ],
 )
@@ -78,7 +70,6 @@ opentitan_binary(
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
-        ":instrumented_rom_loader_disabled",
         ":test_rom_lib",
     ],
 )
@@ -155,6 +146,7 @@ cc_library(
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/lib/drivers:retention_sram",
         "//sw/device/silicon_creator/rom:bootstrap",
+        "//sw/device/silicon_creator/rom:bootstrap_erase",
     ],
 )
 

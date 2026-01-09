@@ -251,7 +251,7 @@ BOOT_POLICY_BAD_MANIFEST_CASES = [
                 lc_state,
                 t.get("sec_ver", 0),
             ),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         manifest = ":{}_{}".format(

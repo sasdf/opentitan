@@ -85,7 +85,7 @@ opentitan_test(
     },
     fpga = fpga_params(
         otp = ":otp_img_default",
-        tags = maybe_skip_in_ci(CONST.LCV.RMA),
+        tags = maybe_skip_in_ci(CONST.LCV.RMA) + ["rom_coverage"],
     ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -289,6 +289,9 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
@@ -313,6 +316,7 @@ opentitan_test(
         # when it times out.
         exit_failure = "NO_FAILURE_MESSAGE",
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.INTERRUPT.INSTRUCTION_ACCESS)),
+        tags = ["rom_coverage"],
     ),
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     verilator = verilator_params(
@@ -341,6 +345,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     verilator = verilator_params(
         timeout = "eternal",
@@ -364,6 +371,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_verilator": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     verilator = verilator_params(
         timeout = "eternal",
@@ -386,6 +396,7 @@ opentitan_test(
     fpga = fpga_params(
         exit_failure = CONST.SHUTDOWN.PREFIX.BFV,
         exit_success = MSG_PASS,
+        tags = ["rom_coverage"],
     ),
     deps = [
         "//hw/ip/uart/data:uart_c_regs",
@@ -414,7 +425,10 @@ opentitan_test(
         otp = "//hw/ip/otp_ctrl/data:img_dev",
         # TODO(lowRISC/opentitan#13603): Remove this "manual" tag when the
         # bitstream target can fetch pre-spliced bitstream from GCP.
-        tags = ["manual"],
+        tags = [
+            "manual",
+            "rom_coverage",
+        ],
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     deps = [
@@ -438,6 +452,7 @@ opentitan_test(
     fpga = fpga_params(
         exit_failure = MSG_PASS,
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_KEY)),
+        tags = ["rom_coverage"],
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     deps = [
@@ -459,6 +474,7 @@ opentitan_test(
         # Fail if we see version 3, because the test has updated twice, FAIL, version 0 twice, or PASS
         exit_failure = "(min_security_version_rom_ext:[^01])|(FAIL)|((min_security_version_rom_ext:0(?s:.*)){2,})|(PASS)",
         exit_success = "min_security_version_rom_ext:0(?s:.*)min_security_version_rom_ext:1(?s:.*)" + MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.BOOT_POLICY.ROLLBACK)),
+        tags = ["rom_coverage"],
         # We clear the bitstream to force any subsequent test to load a
         # fresh bitstream and clear all memories (ie: flash-based boot policy).
         testopt_clear_after_test = "True",
@@ -483,6 +499,9 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
     },
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     deps = [
         "//sw/device/lib/testing:ret_sram_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",

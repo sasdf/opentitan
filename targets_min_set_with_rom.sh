@@ -21,31 +21,6 @@ CW340_A2_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_slot_a_fpga_cw340_A2_rom_ext'
 )
 
-CW340_INSTRUMENTED_ROM_TESTS=(
-  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_b_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_0_b_1_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_b_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_meas_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_with_fault_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/retention_ram:rom_e2e_ret_ram_keep_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_ecdsa_test_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_spx_dev_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_spx_dev_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_spx_test_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_dev_key_0_dev_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_dev_key_0_dev_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw340_instrumented_rom'
-)
-
-CW340_ROM_EXT_TESTS=(
-)
-
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext'
@@ -99,6 +74,34 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:bad_spx_manifest_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_dev_hybrid_spx_prehashed_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:key_unauthorized_fpga_hyper310_rom_ext'
+)
+
+INS_ROM_CW310_ROM_EXT_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw310_rom_ext'
+)
+
+INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_rma_rollback_b_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_bad_manifest:boot_policy_bad_manifest_test_unlocked0_resizable_rom_ext_b_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/boot_policy_rollback:boot_policy_rollback_rma_a_0_b_1_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/keymgr:rom_e2e_keymgr_init_otp_meas_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/reset_reason:reset_reason_check_enabled_with_fault_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/retention_ram:rom_e2e_ret_ram_keep_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_ecdsa_test_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_spx_dev_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_spx_dev_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_spx_test_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_rma_dev_key_0_dev_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_validity:sigverify_key_validity_spx_blank_test_unlocked0_dev_key_0_dev_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/watchdog:watchdog_disable_test_unlocked0_fpga_cw310_rom_with_fake_keys'
+)
+
+INS_ROM_CW310_SIVAL_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/immutable_rom_ext_section:immutable_section_exec_enabled_hash_valid_virtual_b_fpga_cw310_sival'
 )
 
 OTBN_TESTS=(
@@ -172,9 +175,10 @@ TEST_GROUPS=(
   'CW310_SIVAL_ROM_EXT_TESTS'
   'CW310_SIVAL_TESTS'
   'CW340_A2_ROM_EXT_TESTS'
-  'CW340_INSTRUMENTED_ROM_TESTS'
-  'CW340_ROM_EXT_TESTS'
   'HYPER310_ROM_EXT_TESTS'
+  'INS_ROM_CW310_ROM_EXT_TESTS'
+  'INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS'
+  'INS_ROM_CW310_SIVAL_TESTS'
   'OTBN_TESTS'
   'PROVISIONING_TESTS'
   'UNIT_TESTS'

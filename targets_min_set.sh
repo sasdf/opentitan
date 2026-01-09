@@ -18,16 +18,6 @@ CW310_SIVAL_TESTS=(
   '//sw/device/silicon_creator/lib:otbn_boot_services_functest_fpga_cw310_sival'
 )
 
-CW340_INSTRUMENTED_ROM_TESTS=(
-  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_spx_dev_key_0_fpga_cw340_instrumented_rom'
-  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_spx_dev_key_0_fpga_cw340_instrumented_rom'
-)
-
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_next_test_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_bad_primary_test_fpga_hyper310_rom_ext'
@@ -84,6 +74,19 @@ HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/verified_boot:position_romext_virtual_b_fpga_hyper310_rom_ext'
 )
 
+INS_ROM_CW310_ROM_EXT_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/address_translation:rom_ext_a_flash_a_bad_addr_trans_fpga_cw310_rom_ext'
+)
+
+INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/bootstrap:e2e_bootstrap_rma_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/clkmgr:jitter_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:alert_info_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/rstmgr:cpu_info_enabled_test_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_dev_spx_dev_key_0_fpga_cw310_rom_with_fake_keys'
+  '//sw/device/silicon_creator/rom/e2e/sigverify_key_type:sigverify_key_type_prod_end_spx_dev_key_0_fpga_cw310_rom_with_fake_keys'
+)
+
 PROVISIONING_TESTS=(
   '//sw/host/provisioning/orchestrator/tests:e2e_emulation_dice_cwt_cw340_test'
 )
@@ -128,8 +131,9 @@ TEST_GROUPS=(
   'CW310_ROM_EXT_TESTS'
   'CW310_SIVAL_ROM_EXT_TESTS'
   'CW310_SIVAL_TESTS'
-  'CW340_INSTRUMENTED_ROM_TESTS'
   'HYPER310_ROM_EXT_TESTS'
+  'INS_ROM_CW310_ROM_EXT_TESTS'
+  'INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS'
   'PROVISIONING_TESTS'
   'UNIT_TESTS'
 )

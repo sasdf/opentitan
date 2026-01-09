@@ -132,7 +132,7 @@ WATCHDOG_OTP = {
                 ): "firmware",
             },
             otp = WATCHDOG_OTP[watchdog_config].format(lc_state),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         verilator = verilator_params(
             timeout = "eternal",

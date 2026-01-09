@@ -12,23 +12,20 @@ use opentitanlib::bootstrap::{Bootstrap, BootstrapOptions};
 use opentitanlib::transport::common::fpga;
 use opentitanlib::util::parse_int::ParseInt;
 
-/// Clear the instrumented ROM.
+/// Clear the flash ROM.
 #[derive(Debug, Args)]
-pub struct ClearInstrumentedRomCommand {
+pub struct ClearFlashRomCommand {
     #[command(flatten)]
     bootstrap_options: BootstrapOptions,
-    /// The byte offset to the instrumented rom slot.
-    #[arg(long, value_parser = usize::from_str)]
-    slot: usize,
-    /// The byte offset to the magic bytes in the instrumented rom.
-    #[arg(long, value_parser = usize::from_str, default_value = "0x180")]
+    /// The byte offset of the magic bytes from the beginning of the flash.
+    #[arg(long, value_parser = usize::from_str, default_value = "0x78")]
     magic_bytes_offset: usize,
 }
 
-impl ClearInstrumentedRomCommand {
+impl ClearFlashRomCommand {
     fn clear_by_bootstrap(&self, transport: &TransportWrapper) -> Result<()> {
         // Pad to magic bytes
-        let mut payload = vec![0xff; self.slot + self.magic_bytes_offset];
+        let mut payload = vec![0xff; self.magic_bytes_offset];
         // Clear magic bytes with zeros
         payload.extend_from_slice(&[0x00; 4]);
 
@@ -37,7 +34,7 @@ impl ClearInstrumentedRomCommand {
     }
 }
 
-impl CommandDispatch for ClearInstrumentedRomCommand {
+impl CommandDispatch for ClearFlashRomCommand {
     fn run(
         &self,
         _context: &dyn Any,
@@ -45,7 +42,7 @@ impl CommandDispatch for ClearInstrumentedRomCommand {
     ) -> Result<Option<Box<dyn erased_serde::Serialize>>> {
         if let Err(e) = self.clear_by_bootstrap(transport) {
             log::warn!(
-                "Could not clear instrumented ROM via bootstrap, falling back to clear bitstream: {e}"
+                "Could not clear flash ROM via bootstrap, falling back to clear bitstream: {e}"
             );
             transport.dispatch(&fpga::ClearBitstream)?;
         }

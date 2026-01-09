@@ -147,7 +147,7 @@ _reset_start:
   .global _start
   .type _start, @function
 _start:
-  call _try_instrumented_rom
+  call _try_flash_rom
 
 #if !OT_IS_ENGLISH_BREAKFAST
   // Check if AST initialization should be skipped.
@@ -279,6 +279,20 @@ _start:
   wfi
   j   .L_wfi_loop
   .size _start, .-_start
+
+// -----------------------------------------------------------------------------
+
+/**
+ * Skip the flash ROM loader if not overwritten.
+ *
+ */
+  .balign 4
+  .weak _try_flash_rom
+  .type _try_flash_rom, @function
+
+_try_flash_rom:
+  ret
+  .size _try_flash_rom, .-_try_flash_rom
 
 // -----------------------------------------------------------------------------
 

@@ -19,7 +19,8 @@ _FIELDS = {
     "manifest": ("file.manifest", False),
     "rom": ("attr.rom", False),
     "rom_ext": ("attr.rom_ext", False),
-    "instrumented_rom": ("attr.instrumented_rom", False),
+    "flash_rom_loader": ("attr.flash_rom_loader", False),
+    "flash_rom": ("attr.flash_rom", False),
     "otp": ("file.otp", False),
     "mmi": ("file.mmi", False),
     "base_bitstream": ("file.base_bitstream", False),
@@ -162,10 +163,15 @@ def exec_env_common_attrs(**kwargs):
             allow_files = True,
             doc = "ROM_EXT image to use in this environment",
         ),
-        "instrumented_rom": attr.label(
-            default = kwargs.get("instrumented_rom"),
+        "flash_rom_loader": attr.label(
+            default = kwargs.get("flash_rom_loader"),
             allow_files = True,
-            doc = "Instrumented ROM image to use in this environment",
+            doc = "Flash ROM loader image to use in this environment",
+        ),
+        "flash_rom": attr.label(
+            default = kwargs.get("flash_rom"),
+            allow_files = True,
+            doc = "Flash ROM image to use in this environment",
         ),
         "slot_spec": attr.string_dict(
             default = kwargs.get("slot_spec", {}),
@@ -397,8 +403,8 @@ def common_test_setup(ctx, exec_env, firmware):
     rom_ext = get_fallback(ctx, "attr.rom_ext", exec_env)
     update_file_attr("rom_ext", rom_ext, exec_env.provider, data_files, param, action_param)
 
-    instrumented_rom = get_fallback(ctx, "attr.instrumented_rom", exec_env)
-    update_file_attr("instrumented_rom", instrumented_rom, exec_env.provider, data_files, param, action_param)
+    flash_rom = get_fallback(ctx, "attr.flash_rom", exec_env)
+    update_file_attr("flash_rom", flash_rom, exec_env.provider, data_files, param, action_param)
 
     # Add the binaries built by the test or added to the test.
     update_file_provider("firmware", firmware, data_files, param, action_param)

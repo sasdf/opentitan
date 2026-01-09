@@ -228,7 +228,7 @@ KEY_VALIDITY_TESTS = [
                 test["name"],
                 lc_state,
             ),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         qemu = qemu_params(
             exit_failure = test["exit_failure"][lc_state],

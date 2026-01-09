@@ -166,6 +166,12 @@ def _get_test_commands(ctx, param, exec_env):
 
     test_cmd = get_fallback(ctx, "attr.test_cmd", exec_env)
 
+    use_flash_rom = False
+    if "rom_coverage" in ctx.attr.tags and ctx.var.get("ot_coverage_enabled", "false") == "true":
+        use_flash_rom = True
+        if "flash_rom" not in param:
+            fail("Missing Flash ROM while rom coverage is requested")
+
     # If no test_cmd or custom harness is specified, run the default console harness.
     if not test_cmd.strip() and not ctx.attr.test_harness:
         test_cmd = """
@@ -181,8 +187,8 @@ def _get_test_commands(ctx, param, exec_env):
         test_setup_cmd.append('--exec="fpga clear-bitstream"')
     if "bitstream" in param:
         test_setup_cmd.append('--exec="fpga load-bitstream {bitstream}"')
-    if "instrumented_rom" in param:
-        test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {instrumented_rom}"')
+    if use_flash_rom:
+        test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {flash_rom}"')
     if _get_bool(param, "testopt_bootstrap") and "firmware" in param:
         test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {firmware}"')
     test_setup_cmd = "\n".join(test_setup_cmd)
@@ -191,11 +197,11 @@ def _get_test_commands(ctx, param, exec_env):
     test_cleanup_cmd = []
     if _get_bool(param, "testopt_clear_after_test"):
         test_cleanup_cmd.append('--exec="fpga clear-bitstream"')
-    elif "instrumented_rom" in param:
-        # Cleanup instrumented ROM magic bytes.
+    elif use_flash_rom:
+        # Cleanup flash ROM magic bytes.
         test_cleanup_cmd.extend([
             '--exec="transport init"',
-            '--exec="fpga clear-instrumented-rom --clear-uart=true --slot={instrumented_rom_slot}"',
+            '--exec="fpga clear-flash-rom --clear-uart=true --magic-bytes-offset={flash_rom_magic}"',
         ])
 
     test_cleanup_cmd = "\n".join(test_cleanup_cmd)

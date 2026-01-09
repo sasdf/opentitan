@@ -51,6 +51,7 @@ opentitan_test(
     },
     fpga = fpga_params(
         otp = ":otp_img_reset_reason",
+        tags = ["rom_coverage"],
     ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -145,6 +146,7 @@ RESET_CORRUPTION_SCENARIOS = [
             exit_failure = t["exit_failure"],
             exit_success = t["exit_success"],
             otp = ":otp_img_reset_reason_{}".format(t["name"]),
+            tags = ["rom_coverage"],
             testopt_bootstrap = t["testopt_bootstrap"],
         ),
         deps = [

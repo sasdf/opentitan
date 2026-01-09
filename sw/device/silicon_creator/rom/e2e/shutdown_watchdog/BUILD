@@ -116,7 +116,7 @@ SHUTDOWN_WATCHDOG_CASES = [
             tags = maybe_skip_in_ci(getattr(
                 CONST.LCV,
                 t["lc_state"].upper(),
-            )),
+            )) + ["rom_coverage"],
         ),
         local_defines = [
             "HANG_SECS=2",
