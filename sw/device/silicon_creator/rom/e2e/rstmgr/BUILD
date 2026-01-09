@@ -39,7 +39,9 @@ otp_image(
 CPU_INFO_TESTCASES = [
     {
         "name": "disabled",
-        "fpga": fpga_params(),
+        "fpga": fpga_params(
+            tags = ["rom_coverage"],
+        ),
         "defines": ["TEST_CPU_INFO_DISABLED"],
     },
     {
@@ -51,6 +53,7 @@ CPU_INFO_TESTCASES = [
             # After the ROM is fixed, the test should report PASS.
             exit_success = "BFV:0152530d",
             otp = ":otp_img_cpu_info_enabled",
+            tags = ["rom_coverage"],
         ),
         "defines": ["TEST_CPU_INFO_ENABLED"],
     },
@@ -109,6 +112,7 @@ ALERT_INFO_TESTCASES = [
         "name": "disabled",
         "fpga": fpga_params(
             otp = "//sw/device/silicon_creator/rom/e2e/shutdown_alert:otp_img_shutdown_alert_rma",
+            tags = ["rom_coverage"],
         ),
         "defines": ["TEST_ALERT_INFO_DISABLED"],
     },
@@ -116,6 +120,7 @@ ALERT_INFO_TESTCASES = [
         "name": "enabled",
         "fpga": fpga_params(
             otp = ":otp_img_alert_info_enabled",
+            tags = ["rom_coverage"],
         ),
         "defines": ["TEST_ALERT_INFO_ENABLED"],
     },

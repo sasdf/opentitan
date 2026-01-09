@@ -317,7 +317,7 @@ ownership_transfer_test(
     fpga = fpga_params(
         timeout = "long",
         # We boot on Side B since rescue will rewrite side A.
-        assemble = "{rom_ext}@0 {firmware}@0x90000",
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_b}",
         test_cmd = """
             --unlock-mode=Any
             --unlock-key=$(location //sw/device/silicon_creator/lib/ownership/keys/fake:unlock_key)
@@ -386,7 +386,7 @@ _FLASH_PERMISSION_TESTS = {
         name = "flash_permission_test_slot_{}".format(name),
         srcs = ["flash_regions.c"],
         fpga = fpga_params(
-            assemble = "{rom_ext}@{rom_ext_offset} {firmware}@0x10000",
+            assemble = "{rom_ext}@{rom_ext_offset} {firmware}@{owner_slot_a}",
             binaries = {
                 ":flash_regions": "flash_regions",
             },

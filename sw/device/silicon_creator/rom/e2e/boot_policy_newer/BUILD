@@ -62,7 +62,6 @@ SEC_VERS = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:prod_key_0_ecdsa_p256": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
-            "//hw/top_earlgrey:fpga_cw340_instrumented_rom",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         local_defines = [
@@ -133,7 +132,7 @@ BOOT_POLICY_NEWER_CASES = [
             otp = ":otp_img_boot_policy_newer_{}".format(lc_state),
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
     )
     for lc_state, lc_state_val in get_lc_items()

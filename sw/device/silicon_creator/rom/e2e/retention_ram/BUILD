@@ -54,7 +54,7 @@ opentitan_test(
     },
     fpga = fpga_params(
         otp = ":otp_img_reset_ret_ram",
-        tags = maybe_skip_in_ci(CONST.LCV.RMA),
+        tags = maybe_skip_in_ci(CONST.LCV.RMA) + ["rom_coverage"],
     ),
     deps = [
         "//sw/device/lib/base:memory",
@@ -73,7 +73,7 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
-        tags = maybe_skip_in_ci(CONST.LCV.RMA),
+        tags = maybe_skip_in_ci(CONST.LCV.RMA) + ["rom_coverage"],
     ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",

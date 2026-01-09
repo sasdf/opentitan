@@ -17,7 +17,6 @@ def ownership_transfer_test(
         ecdsa_key = {
             "//sw/device/silicon_creator/lib/ownership/keys/dummy:app_prod_ecdsa": "app_prod",
         },
-        fpga = None,
         manifest = None,
         data = [
             "//sw/device/silicon_creator/lib/ownership/keys/dummy:activate_key",
@@ -41,20 +40,12 @@ def ownership_transfer_test(
             "//sw/device/silicon_creator/lib/ownership:datatypes",
         ],
         **kwargs):
-    if fpga == None:
-      fpga = fpga_params()
-    if not hasattr(fpga, "testopt_clear_after_test"):
-      fpga.testopt_clear_after_test = "True",
-    if not hasattr(fpga, "testopt_clear_before_test"):
-      fpga.testopt_clear_before_test = "True",
-    if not hasattr(fpga, "testopt_bootstrap"):
-      fpga.testopt_bootstrap = "True",
+    return  # Unsupported
     opentitan_test(
         name = name,
         srcs = srcs,
         exec_env = exec_env,
         ecdsa_key = ecdsa_key,
-        fpga = fpga,
         manifest = manifest,
         data = data,
         defines = defines,

@@ -126,6 +126,8 @@ fpga_cw310(
     base = ":fpga_cw310_test_rom",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_cw310_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     rom = "//sw/device/silicon_creator/rom:mask_rom",
 )
@@ -140,6 +142,8 @@ fpga_cw310(
         "//conditions:default": {"//signing:appkey": "0"},
     }),
     exec_env = "fpga_cw310_rom_ext",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     libs = [
         "//sw/device/lib/arch:boot_stage_owner",
         "//sw/device/lib/arch:fpga_cw310",
@@ -170,6 +174,8 @@ fpga_cw310(
     base_bitstream = "//hw/bitstream/hyperdebug:bitstream",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_hyper310_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     otp_mmi = "//hw/bitstream/hyperdebug:otp_mmi",
@@ -319,6 +325,8 @@ fpga_cw340(
     base_bitstream = "//hw/bitstream/cw340:bitstream",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_cw340_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     otp_mmi = "//hw/bitstream/cw340:otp_mmi",
@@ -393,31 +401,6 @@ fpga_cw340(
     otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
     rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
     tags = ["cw340_sival_rom_ext"],
-)
-
-fpga_cw340(
-    name = "fpga_cw340_instrumented_rom",
-    testonly = True,
-    base = ":fpga_cw340_rom_with_fake_keys",
-    exec_env = "fpga_cw340_instrumented_rom",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
-    otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
-    param = {
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
-    rom = "//sw/device/lib/testing/test_rom:flash_rom_loader",
-)
-
-fpga_cw340(
-    name = "fpga_cw340_instrumented_rom_prod",
-    testonly = True,
-    base = ":fpga_cw340_sival",
-    exec_env = "fpga_cw340_instrumented_rom_prod",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
-    param = {
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
-    rom = "//sw/device/lib/testing/test_rom:flash_rom_loader",
 )
 
 ###########################################################################

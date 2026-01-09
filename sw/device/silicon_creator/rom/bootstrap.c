@@ -17,7 +17,7 @@
 #include "otp_ctrl_regs.h"
 
 // Slot address defined in bazel
-extern char _instrumented_rom_slot[];
+extern char _flash_rom_slot[];
 
 rom_error_t bootstrap_chip_erase(void) {
   flash_ctrl_bank_erase_perms_set(kHardenedBoolTrue);
@@ -29,7 +29,7 @@ rom_error_t bootstrap_chip_erase(void) {
       .erase = kMultiBitBool4True,
   });
   for (uint32_t addr = FLASH_CTRL_PARAM_BYTES_PER_BANK;
-       addr < (uint32_t)_instrumented_rom_slot;
+       addr < (uint32_t)_flash_rom_slot;
        addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
     HARDENED_RETURN_IF_ERROR(
         flash_ctrl_data_erase(addr, kFlashCtrlEraseTypePage));
@@ -54,7 +54,7 @@ rom_error_t bootstrap_erase_verify(void) {
   rom_error_t err_0 = flash_ctrl_data_erase_verify(0, kFlashCtrlEraseTypeBank);
 #ifdef OT_COVERAGE_INSTRUMENTED
   for (uint32_t addr = FLASH_CTRL_PARAM_BYTES_PER_BANK;
-       addr < (uint32_t)_instrumented_rom_slot;
+       addr < (uint32_t)_flash_rom_slot;
        addr += FLASH_CTRL_PARAM_BYTES_PER_PAGE) {
     HARDENED_RETURN_IF_ERROR(
         flash_ctrl_data_erase_verify(addr, kFlashCtrlEraseTypePage));

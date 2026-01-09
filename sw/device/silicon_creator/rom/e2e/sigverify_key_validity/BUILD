@@ -226,7 +226,7 @@ KEY_VALIDITY_TESTS = [
                 test["name"],
                 lc_state,
             ),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         spx_key = {key.spx.label: key.spx.name},
         deps = [

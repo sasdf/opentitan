@@ -3472,6 +3472,9 @@ opentitan_test(
             "//hw/top_earlgrey:silicon_creator": None,
         },
     ),
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     verilator = verilator_params(
         timeout = "long",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -4080,6 +4083,9 @@ opentitan_test(
         {
             "//hw/top_earlgrey:silicon_creator": None,
         },
+    ),
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
     ),
     verilator = verilator_params(
         timeout = "eternal",

@@ -162,7 +162,7 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
             tags = maybe_skip_in_ci(getattr(
                 CONST.LCV,
                 case["lc_state"].upper(),
-            )),
+            )) + ["rom_coverage"],
         ),
         manifest = BOOT_DATA_RECOVERY_MANIFEST,
         deps = [

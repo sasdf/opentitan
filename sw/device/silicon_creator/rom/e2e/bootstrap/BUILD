@@ -83,6 +83,7 @@ opentitan_test(
         changes_otp = True,
         needs_jtag = True,
         otp = "otp_img_bootstrap_rma",
+        tags = ["rom_coverage"],
         test_harness = "//sw/host/tests/rom/e2e_bootstrap_rma",
     ),
     deps = [
@@ -107,6 +108,8 @@ opentitan_test(
             "//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware",
         },
         otp = "//hw/ip/otp_ctrl/data:img_bootstrap_disabled",
+        # Note: ROM coverage requires bootstrap to flash the instrumented ROM
+        tags = ["broken_rom_coverage"],
         test_harness = "//sw/host/tests/rom/e2e_bootstrap_disabled",
         testopt_bootstrap = "False",
     ),
