@@ -107,7 +107,7 @@ otp_json(
             otp = ":otp_img_boot_policy_rollback_{}".format(lc_state),
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
     )
     for lc_state, lc_state_val in get_lc_items()

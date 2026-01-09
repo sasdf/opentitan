@@ -10,6 +10,7 @@ import sys
 import zipfile
 import multiprocessing as mp
 import numpy as np
+import difflib
 from collections import namedtuple, defaultdict
 from pathlib import Path
 
@@ -618,3 +619,60 @@ class CoverageCollection:
   def save(self, output_path):
     with gzip.open(output_path, 'wt') as f:
       json.dump({ "tests": self.tests, "coverage": self.coverage }, f)
+
+def label_group(name):
+  if name.startswith('//sw/otbn/'):
+    return 'OTBN_TESTS'
+  if name.startswith('//sw/host/provisioning/'):
+    return 'PROVISIONING_TESTS'
+  if '_fpga_' in name:
+    group = name.rsplit('_fpga_')[-1].upper() + '_TESTS'
+    if '/rom/' in name:
+      group = 'INS_ROM_' + group
+    return group
+  return 'UNIT_TESTS'
+
+def gen_targets(tests):
+  test_groups = ['EXTRA_TESTS']
+  group_keys = map(label_group, tests.keys())
+  group_with_items = sorted(zip(group_keys, tests.items()))
+  group_with_items = it.groupby(group_with_items, key=lambda x: x[0])
+  output = []
+  for group, items in group_with_items:
+    output.append(f'{group}=(\n')
+    for _, item in items:
+      name, enabled = item
+      prefix = '' if enabled else '# '
+      output.append(f'  {prefix}{repr(name)}\n')
+    output.append(')\n')
+    output.append('\n')
+    test_groups.append(group)
+  output.append('\n')
+  output.append(f'TEST_GROUPS=(\n')
+  for group in test_groups:
+    output.append(f'  {repr(group)}\n')
+  output.append(')\n')
+  return ''.join(output)
+
+def save_with_diff(path, contents):
+  with open(path) as f:
+    old_output = f.read()
+
+  if old_output == contents:
+    print('[!] No diff')
+    return
+
+  print(''.join(difflib.unified_diff(
+      old_output.splitlines(True), contents.splitlines(True), fromfile='old', tofile='new')))
+
+  while True:
+    yesno = input('[>] Save? [y/n] ').lower()
+    if yesno == 'y':
+      break
+    elif yesno == 'n':
+      print('[!] User cancelled')
+      return
+
+  with open(path, 'w') as f:
+    f.write(contents)
+  print('[+] Saved')

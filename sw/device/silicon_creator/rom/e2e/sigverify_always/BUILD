@@ -99,7 +99,7 @@ SIGVERIFY_BAD_CASES = [
                 hex_digits(lc_state_val),
             ),
             otp = ":otp_img_sigverify_always_{}".format(lc_state),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         qemu = qemu_params(
             assemble = " ".join([

@@ -3,16 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey_memory.h"
-#include "sw/device/lib/base/macros.h"
 #include "sram_ctrl_regs.h"
 #include "flash_ctrl_regs.h"
 
 /**
- * Instrumented ROM loader.
+ * Flash ROM loader.
  *
- * The loader checks if the instrumented ROM is present on flash, and if so,
- * it will configure the hardware to allow its execution. Then it jumps to the
- * instrumented ROM. Otherwise, it will fall back to the default test ROM by
+ * The loader checks if the version magic of the Flash ROM is present, and if
+ * so, it will configure the hardware to allow its execution. Then it jumps to
+ * the Flash ROM. Otherwise, it will fall back to the default test ROM by
  * just returning.
  */
 
@@ -20,10 +19,10 @@
   // is allocated executable space in ROM by the linker.
   .section .crt, "ax"
   .balign 4
-  .global _try_instrumented_rom
-  .type _try_instrumented_rom, @function
+  .global _try_flash_rom
+  .type _try_flash_rom, @function
 
-_try_instrumented_rom:
+_try_flash_rom:
   /**
    * Unlock ePMP for Flash access
    */
@@ -38,8 +37,8 @@ _try_instrumented_rom:
   li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
   csrw pmpaddr15, t0
 
-  // Configure `pmpcfg0` in test ROM to enable instrumented ROM execution.
-  // Without this configuration, the instrumented ROM can not be executed due to
+  // Configure `pmpcfg0` in test ROM to enable flash ROM execution.
+  // Without this configuration, the flash ROM can not be executed due to
   // ePMP reconfiguration in `rom_epmp_init`.
   li   t0, (0x8f << 8) // Locked TOR read-write-execute.
   csrw pmpcfg0, t0
@@ -52,16 +51,16 @@ _try_instrumented_rom:
   csrw pmpcfg2, zero
 
   /**
-   * Reset flash protection on the instrumented ROM region
+   * Reset flash protection on the flash ROM region
    */
   li    t1, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
 
   // t0 = ( ((size / 2048) << 9) | (offset / 2048) )
-  la    t0, _instrumented_rom_size
+  la    t0, _flash_rom_size
   srli  t0, t0, 11 // Divide by 2048 (2^11)
   slli  t0, t0, 9  // Shift to bit 9 for size field
 
-  la    t3, _instrumented_rom_slot
+  la    t3, _flash_rom_slot
   srli  t3, t3, 11 // Divide by 2048 (2^11)
   or    t0, t0, t3
   sw    t0, FLASH_CTRL_MP_REGION_7_REG_OFFSET(t1)
@@ -72,20 +71,23 @@ _try_instrumented_rom:
   sw    t0, FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET(t1)
 
   /**
-   * Check if instrumented ROM is presented
+   * Check if flash ROM is presented
    */
-  la a0, (_instrumented_rom_slot + TOP_EARLGREY_EFLASH_BASE_ADDR)
+  li t0, (TOP_EARLGREY_EFLASH_BASE_ADDR + TOP_EARLGREY_EFLASH_SIZE_BYTES)
+  la t1, _chip_info_size
+  sub t0, t0, t1
 
-  // Continue test rom if the magic bytes are not 'IROM'
-  // The magic bytes is defined in the `instrumented_header.c`.
-  lw t0, 0x180(a0)
-  li t1, 0x4d4f5249
-  beq t0, t1, .L_boot_instrumented_rom
+  // Continue if the build version is `kBuildInfoVersion1`.
+  lw t0, 0x8(t0)
+  li t1, 0x4efecea6
+  beq t0, t1, .L_boot_flash_rom
   ret
 
-.L_boot_instrumented_rom:
+.L_boot_flash_rom:
+  la a0, (_flash_rom_slot + TOP_EARLGREY_EFLASH_BASE_ADDR)
+
   /**
-   * Initialize the hardware for running instrumented ROM
+   * Initialize the hardware for running flash ROM
    */
   // Initialize main memory (main SRAM).
   li    t1, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
@@ -105,9 +107,9 @@ _try_instrumented_rom:
   sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
 
   /**
-   * Jump to instrumented ROM
+   * Jump to flash ROM
    */
   jr 0x80(a0)
   unimp
 
-  .size _try_instrumented_rom, .-_try_instrumented_rom
+  .size _try_flash_rom, .-_try_flash_rom

@@ -34,7 +34,7 @@ package(default_visibility = ["//visibility:public"])
         },
         fpga = fpga_params(
             otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         local_defines = [
             "EXPECT_DEBUG={}".format(1 if lc_state_val in [

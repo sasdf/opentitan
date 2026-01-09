@@ -189,7 +189,7 @@ opentitan_binary(
                 lc_state,
                 t["name"],
             ),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         qemu = qemu_params(
             exit_success = t["exit_success"][lc_state],
@@ -240,6 +240,7 @@ opentitan_test(
     },
     fpga = fpga_params(
         otp = ":otp_img_sigverify_spx_prod_enabled_true",
+        tags = ["rom_coverage"],
     ),
     qemu = qemu_params(
         otp = ":otp_img_sigverify_spx_prod_enabled_true",

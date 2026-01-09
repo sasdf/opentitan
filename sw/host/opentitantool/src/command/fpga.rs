@@ -15,5 +15,5 @@ pub enum FpgaCommand {
     ResetSam3x(crate::command::sam3x::Reset),
     SetPll(crate::command::set_pll::SetPll),
     UpdateUsrAccess(crate::command::update_usr_access::UpdateUsrAccess),
-    ClearInstrumentedRom(crate::command::clear_instrumented_rom::ClearInstrumentedRomCommand),
+    ClearFlashRom(crate::command::clear_flash_rom::ClearFlashRomCommand),
 }

@@ -89,8 +89,8 @@ ld_library(
 )
 
 ld_library(
-    name = "linker_script_instrumented",
-    script = "instrumented_rom.ld",
+    name = "linker_script_flash",
+    script = "flash_rom.ld",
     deps = [
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
@@ -244,6 +244,7 @@ opentitan_binary(
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
+        ":bootstrap_erase",
         ":linker_script",
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
@@ -253,27 +254,17 @@ opentitan_binary(
     ],
 )
 
-cc_library(
-    name = "instrumented_header",
-    srcs = ["instrumented_header.c"],
-    deps = [
-        "//sw/device/lib/base:macros",
-    ],
-    alwayslink = True,
-)
-
 opentitan_binary(
-    name = "instrumented_mask_rom",
+    name = "flash_mask_rom",
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
-        "//hw/top_earlgrey:silicon_creator",
     ],
-    linker_script = ":linker_script_instrumented",
+    linker_script = ":linker_script_flash",
     manifest = "//hw/top_earlgrey:none_manifest",
     deps = [
-        ":instrumented_header",
-        ":linker_script_instrumented",
+        ":bootstrap_erase_for_flash_rom",
+        ":linker_script_flash",
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
@@ -283,18 +274,19 @@ opentitan_binary(
 )
 
 opentitan_binary_assemble(
-    name = "instrumented_rom_image",
+    name = "flash_rom_image",
     bins = {
-        ":instrumented_mask_rom": "{instrumented_rom_slot}",
+        ":flash_mask_rom": "{flash_rom_slot}",
     },
     exec_env = [
+        "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
     ],
 )
 
 coverage_view_test(
-    name = "instrumented_mask_rom_coverage_view",
-    elf = "instrumented_mask_rom",
+    name = "flash_mask_rom_coverage_view",
+    elf = "flash_mask_rom",
 )
 
 # Create the legacy ROM target names so that existing splicing rules can find
@@ -369,6 +361,7 @@ opentitan_test(
         "-Wl,--defsym=rom_test=1",
     ],
     deps = [
+        ":bootstrap_erase",
         ":mask_rom_lib",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//sw/device/lib/arch:device",
@@ -402,6 +395,7 @@ filegroup(
     srcs = [
         "bootstrap.c",
         "bootstrap.h",
+        "bootstrap_erase.c",
         "//sw/device/silicon_creator/lib:bootstrap_srcs",
     ],
 )
@@ -413,17 +407,41 @@ cc_library(
     deps = [
         "//hw/ip/gpio/data:gpio_c_regs",
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
-        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
-        "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:hardened",
         "//sw/device/silicon_creator/lib:bootstrap",
         "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/base:chip",
-        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/lib/drivers:otp",
     ],
+)
+
+cc_library(
+    name = "bootstrap_erase",
+    srcs = ["bootstrap_erase.c"],
+    deps = [
+        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:bootstrap",
+        "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+    ],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "bootstrap_erase_for_flash_rom",
+    srcs = ["bootstrap_erase.c"],
+    local_defines = ["BOOTSTRAP_FOR_FLASH_ROM=1"],
+    deps = [
+        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//sw/device/lib/base:hardened",
+        "//sw/device/silicon_creator/lib:bootstrap",
+        "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+    ],
+    alwayslink = True,
 )
 
 cc_test(
@@ -431,6 +449,7 @@ cc_test(
     srcs = ["bootstrap_unittest.cc"],
     deps = [
         ":bootstrap",
+        ":bootstrap_erase",
         "//hw/ip/gpio/data:gpio_c_regs",
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
@@ -450,6 +469,7 @@ cc_fuzz_test(
     ],
     deps = [
         ":bootstrap",
+        ":bootstrap_erase",
         "//sw/device/silicon_creator/lib:bootstrap_fuzzer_util",
         "@abseil-cpp//absl/types:span",
     ],

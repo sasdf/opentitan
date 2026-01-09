@@ -6,13 +6,13 @@ CW310_SIVAL_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/lib/ownership:owner_verify_functest_fpga_cw310_sival_rom_ext'
 )
 
-CW340_INSTRUMENTED_ROM_TESTS=(
-  '//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_match_fpga_cw340_instrumented_rom'
-)
-
 HYPER310_ROM_EXT_TESTS=(
   '//sw/device/silicon_creator/rom_ext/e2e/flash_ecc_error:a_valid_b_corrupt_manifest_ecdsa_public_key_fpga_hyper310_rom_ext'
   '//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_spidfu_fpga_hyper310_rom_ext'
+)
+
+INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS=(
+  '//sw/device/silicon_creator/rom/e2e/sigverify_usage_constraints:sigverify_usage_constraint_device_id_match_fpga_cw310_rom_with_fake_keys'
 )
 
 UNIT_TESTS=(
@@ -47,7 +47,7 @@ TEST_GROUPS=(
   'EXTRA_TESTS'
   'CW310_ROM_EXT_TESTS'
   'CW310_SIVAL_ROM_EXT_TESTS'
-  'CW340_INSTRUMENTED_ROM_TESTS'
   'HYPER310_ROM_EXT_TESTS'
+  'INS_ROM_CW310_ROM_WITH_FAKE_KEYS_TESTS'
   'UNIT_TESTS'
 )
