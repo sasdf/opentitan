@@ -405,7 +405,7 @@ fpga_cw340(
     param = {
         "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
     },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
+    rom = "//sw/device/lib/testing/test_rom:flash_rom_loader",
 )
 
 fpga_cw340(
@@ -417,7 +417,7 @@ fpga_cw340(
     param = {
         "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
     },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
+    rom = "//sw/device/lib/testing/test_rom:flash_rom_loader",
 )
 
 ###########################################################################
