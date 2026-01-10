@@ -62,9 +62,6 @@ _POSITIONS = {
             slot = position["slot"],
             tags = ["broken"],
             test_cmd = """
-                --exec="transport init"
-                --exec="fpga load-bitstream {bitstream}"
-                --exec="bootstrap --clear-uart=true {rom_ext}"
                 # First make sure the ROM_EXT is faulting because there is no firmware
                 --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
                 # Load firmware via rescue
@@ -91,9 +88,6 @@ opentitan_test(
         },
         tags = ["broken"],
         test_cmd = """
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
             # Set next slot via the rescue protocol
             --exec="rescue boot-svc set-next-bl0-slot --next=SlotB --get-response=false"
             # Check for firmware execution in slot B
@@ -120,9 +114,6 @@ opentitan_test(
         },
         tags = ["broken"],
         test_cmd = """
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
             # Set primary slot via the rescue protocol
             --exec="rescue boot-svc set-next-bl0-slot --primary=SlotB"
             # Check for firmware execution in slot B

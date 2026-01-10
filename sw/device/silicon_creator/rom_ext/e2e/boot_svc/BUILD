@@ -123,14 +123,7 @@ opentitan_test(
         assemble = "{rom_ext}@0 {firmware}@0x10000 {firmware}@0x90000",
         exit_failure = "BFV:.*|PASS|FAIL",
         exit_success = "FinalBootLog: 5:ABBBA\r\n",
-        test_cmd = """
-            --exec="transport init"
-            --exec="fpga clear-bitstream"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
-            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-            no-op
-        """,
+        testopt_clear_before_test = "True",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     deps = [
@@ -214,15 +207,8 @@ opentitan_test(
         binaries = {
             ":min_sec_ver_4": "min_sec_ver_4",
         },
-        test_cmd = """
-            --exec="transport init"
-            --exec="fpga clear-bitstream"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
-            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-            --exec="fpga clear-bitstream"
-            no-op
-        """,
+        testopt_clear_after_test = "True",
+        testopt_clear_before_test = "True",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     manifest = "//sw/device/silicon_owner:manifest",
