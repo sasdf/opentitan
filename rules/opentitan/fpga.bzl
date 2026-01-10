@@ -27,6 +27,7 @@ load(
     "convert_to_vmem",
 )
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 _TEST_SCRIPT = """#!/bin/bash
 set -e
@@ -126,6 +127,11 @@ def _test_dispatch(ctx, exec_env, firmware):
         fail("CW310 is not capable of executing ROM tests")
 
     test_harness, data_labels, data_files, param, action_param = common_test_setup(ctx, exec_env, firmware)
+
+    # FPGA override
+    if ctx.attr._fpga[BuildSettingInfo].value:
+        param["interface"] = ctx.attr._fpga[BuildSettingInfo].value
+        action_param["interface"] = ctx.attr._fpga[BuildSettingInfo].value
 
     # If the test requested an assembled image, then use opentitantool to
     # assemble the image.  Replace the firmware param with the newly assembled

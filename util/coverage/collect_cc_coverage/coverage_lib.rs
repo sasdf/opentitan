@@ -11,14 +11,14 @@
 use anyhow::{bail, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use object::{Object, ObjectSection};
-use runfiles::{Runfiles};
+use runfiles::Runfiles;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{Read, Seek, Write};
 use std::path::PathBuf;
 use std::process;
-use zerocopy::{AsBytes};
+use zerocopy::AsBytes;
 
 /// Size of SHA-1 build id.
 pub const BUILD_ID_SIZE: usize = 20;

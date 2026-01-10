@@ -107,7 +107,6 @@ def ot_binary(ctx, **kwargs):
     mapfile = kwargs.get("mapfile", "{}.map".format(name))
     mapfile = ctx.actions.declare_file(mapfile)
 
-
     extra_linkopts = (ctx.attr.linkopts or []) + kwargs.get("linkopts", [])
 
     linkopts = [
@@ -525,6 +524,7 @@ opentitan_test = rv_rule(
             executable = True,
             cfg = "exec",
         ),
+        "_fpga": attr.label(default = "//rules:fpga"),
     }.items()),
     fragments = ["cpp"],
     toolchains = ["@rules_cc//cc:toolchain_type"],

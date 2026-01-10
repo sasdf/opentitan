@@ -69,7 +69,8 @@ void hmac_sha256_start(void);
 #ifndef OT_PLATFORM_RV32
 static
 #endif
-inline void hmac_sha256_init(void) {
+    inline void
+    hmac_sha256_init(void) {
   hmac_sha256_configure(false);
   hmac_sha256_start();
 }
@@ -126,7 +127,8 @@ void hmac_sha256_final_truncated(uint32_t *digest, size_t len);
 #ifndef OT_PLATFORM_RV32
 static
 #endif
-inline void hmac_sha256_final(hmac_digest_t *digest) {
+    inline void
+    hmac_sha256_final(hmac_digest_t *digest) {
   hmac_sha256_final_truncated(digest->digest, ARRAYSIZE(digest->digest));
 }
 

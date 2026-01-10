@@ -19,10 +19,10 @@ static void _dbg_puts(const char *str) {
 }
 
 static void _pinmux_init_uart0_tx(void) {
-  abs_mmio_write32(
-      TOP_EARLGREY_PINMUX_AON_BASE_ADDR + PINMUX_MIO_OUTSEL_0_REG_OFFSET +
-      kTopEarlgreyPinmuxMioOutIoc4 * sizeof(uint32_t),
-      kTopEarlgreyPinmuxOutselUart0Tx);
+  abs_mmio_write32(TOP_EARLGREY_PINMUX_AON_BASE_ADDR +
+                       PINMUX_MIO_OUTSEL_0_REG_OFFSET +
+                       kTopEarlgreyPinmuxMioOutIoc4 * sizeof(uint32_t),
+                   kTopEarlgreyPinmuxOutselUart0Tx);
 }
 
 void coverage_transport_init(void) {

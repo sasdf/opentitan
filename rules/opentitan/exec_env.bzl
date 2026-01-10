@@ -397,7 +397,6 @@ def common_test_setup(ctx, exec_env, firmware):
     instrumented_rom = get_fallback(ctx, "attr.instrumented_rom", exec_env)
     update_file_attr("instrumented_rom", instrumented_rom, exec_env.provider, data_files, param, action_param)
 
-
     # Add the binaries built by the test or added to the test.
     update_file_provider("firmware", firmware, data_files, param, action_param)
     for attr, name in ctx.attr.binaries.items():

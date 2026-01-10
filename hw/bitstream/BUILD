@@ -58,7 +58,7 @@ config_setting(
 )
 
 filegroup(
-    name = "bitstream",
+    name = "_cw310_bitstream",
     testonly = True,
     srcs = select({
         "bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -69,8 +69,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "bitstream",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:bitstream",
+        "//conditions:default": ":_cw310_bitstream",
+    }),
+)
+
 filegroup(
-    name = "rom_mmi",
+    name = "_cw310_rom_mmi",
     testonly = True,
     srcs = select({
         "bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -81,8 +89,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "rom_mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:rom_mmi",
+        "//conditions:default": ":_cw310_rom_mmi",
+    }),
+)
+
 filegroup(
-    name = "otp_mmi",
+    name = "_cw310_otp_mmi",
     testonly = True,
     srcs = select({
         "bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -91,6 +107,14 @@ filegroup(
         "//conditions:default": ["@bitstreams//:chip_earlgrey_cw310_otp_mmi"],
     }),
     tags = ["manual"],
+)
+
+alias(
+    name = "otp_mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:otp_mmi",
+        "//conditions:default": ":_cw310_otp_mmi",
+    }),
 )
 
 # Build the Test ROM and splice it into the bitstream.

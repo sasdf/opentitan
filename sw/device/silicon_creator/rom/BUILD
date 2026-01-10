@@ -311,7 +311,6 @@ asm_library_with_coverage(
     ],
 )
 
-
 cc_library(
     name = "rom_epmp",
     srcs = ["rom_epmp.c"],
