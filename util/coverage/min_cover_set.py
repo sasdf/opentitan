@@ -20,6 +20,8 @@ from coverage_helper import (
   iter_lcov_files,
   collect_test_vectors,
   extract_tests,
+  gen_targets,
+  save_with_diff,
 )
 
 view_path = './bazel-out/_coverage/view/all_views.dat'
@@ -68,8 +70,6 @@ def main():
       cost *= 0.997
     elif '_fake_keys' in name:
       cost *= 0.998
-    elif '_instrumented_rom' in name:
-      cost *= 1.001
 
     if name in old_minset:
       # Prefer those tests in the old minset
@@ -100,33 +100,7 @@ def main():
       pred.append(i)
       pred_names.append(name)
 
-  def label_group(name):
-    if name.startswith('//sw/otbn/'):
-      return 'OTBN_TESTS', name
-    if name.startswith('//sw/host/provisioning/'):
-      return 'PROVISIONING_TESTS', name
-    if '_fpga_' in name:
-      return name.rsplit('_fpga_')[-1].upper() + '_TESTS', name
-    assert '_unittest' in name, name
-    return 'UNIT_TESTS', name
-
-  test_groups = ['EXTRA_TESTS']
-  group_with_names = sorted(map(label_group, pred_names))
-  group_with_names = it.groupby(group_with_names, key=lambda x: x[0])
-  output = []
-  for group, names in group_with_names:
-    output.append(f'{group}=(\n')
-    for _, name in names:
-      output.append(f'  {repr(name)}\n')
-    output.append(')\n')
-    output.append('\n')
-    test_groups.append(group)
-  output.append('\n')
-  output.append(f'TEST_GROUPS=(\n')
-  for group in test_groups:
-    output.append(f'  {repr(group)}\n')
-  output.append(')\n')
-  output = ''.join(output)
+  output = gen_targets(dict.fromkeys(pred_names, True))
 
   print(f"Problem solved in {solver.wall_time():d} milliseconds", file=sys.stderr)
   print(f"Problem solved in {solver.iterations():d} iterations", file=sys.stderr)
@@ -139,20 +113,7 @@ def main():
   filtered_values = test_values[pred].sum(0)
   assert (filtered_values > 0).all()
 
-  with open('./targets_min_set.sh') as f:
-    old_output = f.read()
-    print(''.join(difflib.unified_diff(
-        old_output.splitlines(True), output.splitlines(True), fromfile='old', tofile='new')))
-
-  while True:
-    yesno = input('[>] Save new min set? [y/n] ').lower()
-    if yesno == 'y':
-      break
-    elif yesno == 'n':
-      exit(-1)
-
-  with open('./targets_min_set.sh', 'w') as f:
-    f.write(output)
+  save_with_diff('./targets_min_set.sh', output)
 
 if __name__ == '__main__':
   main()

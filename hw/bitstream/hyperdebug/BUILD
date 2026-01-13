@@ -9,7 +9,7 @@ load("//rules:const.bzl", "KEY_AUTHENTICITY")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "bitstream",
+    name = "_hyper310_bitstream",
     testonly = True,
     srcs = select({
         "//hw/bitstream:bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -20,8 +20,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "bitstream",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:bitstream",
+        "//conditions:default": ":_hyper310_bitstream",
+    }),
+)
+
 filegroup(
-    name = "rom_mmi",
+    name = "_hyper310_rom_mmi",
     testonly = True,
     srcs = select({
         "//hw/bitstream:bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -32,8 +40,16 @@ filegroup(
     tags = ["manual"],
 )
 
+alias(
+    name = "rom_mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:rom_mmi",
+        "//conditions:default": ":_hyper310_rom_mmi",
+    }),
+)
+
 filegroup(
-    name = "otp_mmi",
+    name = "_hyper310_otp_mmi",
     testonly = True,
     srcs = select({
         "//hw/bitstream:bitstream_skip": ["//hw/bitstream/universal:none"],
@@ -42,6 +58,14 @@ filegroup(
         "//conditions:default": ["@bitstreams//:chip_earlgrey_cw310_hyperdebug_otp_mmi"],
     }),
     tags = ["manual"],
+)
+
+alias(
+    name = "otp_mmi",
+    actual = select({
+        "//rules:use_cw340": "//hw/bitstream/cw340:otp_mmi",
+        "//conditions:default": ":_hyper310_otp_mmi",
+    }),
 )
 
 # Build the Test ROM and splice it into the bitstream.

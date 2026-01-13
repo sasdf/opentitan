@@ -60,6 +60,7 @@ _TESTS = {
         },
         fpga = fpga_params(
             otp = param["otp"],
+            tags = ["rom_coverage"],
         ),
         deps = [
             "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",

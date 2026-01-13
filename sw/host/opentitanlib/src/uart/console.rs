@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Result, anyhow, bail};
-use crc::{CRC_32_ISO_HDLC, Crc};
+use anyhow::{anyhow, bail, Result};
+use crc::{Crc, CRC_32_ISO_HDLC};
 use mio::{Events, Interest, Poll, Token};
 use rand::Rng;
 use regex::{Captures, Regex};

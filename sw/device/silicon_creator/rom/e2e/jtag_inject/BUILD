@@ -49,12 +49,17 @@ package(default_visibility = ["//visibility:public"])
             },
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
-            tags = ["cw310_rom_with_fake_keys"],
+            tags = [
+                "cw310_rom_with_fake_keys",
+                "no_rom_coverage",
+            ],
             test_cmd = """
                 --elf={sram_program}
             """,
             test_harness = "//sw/host/tests/chip/jtag:sram_load",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -93,9 +98,12 @@ test_suite(
         fpga = fpga_params(
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
+            tags = ["no_rom_coverage"],
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -134,9 +142,12 @@ test_suite(
         fpga = fpga_params(
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
+            tags = ["no_rom_coverage"],
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:shutdown_execution_asm",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -175,10 +186,15 @@ test_suite(
         fpga = fpga_params(
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
-            tags = ["broken"],
+            tags = [
+                "broken",
+                "no_rom_coverage",
+            ],
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bark",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -217,10 +233,15 @@ test_suite(
         fpga = fpga_params(
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
-            tags = ["broken"],
+            tags = [
+                "broken",
+                "no_rom_coverage",
+            ],
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bite",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -266,9 +287,12 @@ LC_STATES_DEBUG_DISALLOWED = [
             timeout = "moderate",
             logging = "debug",
             needs_jtag = True,
+            # Note: ROM coverage is not compatible with EXEC-disabled OTP
             otp = ":img_{}_exec_disabled".format(lc_state),
+            tags = ["no_rom_coverage"],
             test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:debug_test",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//sw/device/lib/runtime:log",

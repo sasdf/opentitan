@@ -16,6 +16,11 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+CW340_OVERRIDE = select({
+    "//rules:use_cw340": {"FPGA": "cw340"},
+    "//conditions:default": {},
+})
+
 py_test(
     name = "db_test",
     srcs = ["db_test.py"],
@@ -75,13 +80,16 @@ sh_test(
     srcs = ["e2e_option_flags.sh"],
     data = [
         ":orchestrator_hyper310_zip",
+        "//util/coverage/collect_cc_coverage",
         "@//sw/host/provisioning/orchestrator/configs/skus:emulation.hjson",
         "@rules_python//python:current_py_toolchain",
     ],
     env = {
         "PYTHON": "$(PYTHON3)",
         "PACKAGE": "npcr11",
-    },
+        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+        "FPGA": "hyper310",
+    } | CW340_OVERRIDE,
     tags = [
         "changes_otp",
         "exclusive",
@@ -96,11 +104,14 @@ sh_test(
     srcs = ["e2e_multistage.sh"],
     data = [
         ":orchestrator_hyper310_zip",
+        "//util/coverage/collect_cc_coverage",
         "@rules_python//python:current_py_toolchain",
     ],
     env = {
         "PYTHON": "$(PYTHON3)",
-    },
+        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+        "FPGA": "hyper310",
+    } | CW340_OVERRIDE,
     tags = [
         "changes_otp",
         "exclusive",
@@ -123,8 +134,8 @@ sh_test(
         env = {
             "PYTHON": "$(PYTHON3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
-            "FPGA": "cw340",
-        },
+            "FPGA": "{}".format(fpga),
+        } | CW340_OVERRIDE,
         tags = [
             "changes_otp",
             "exclusive",

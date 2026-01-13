@@ -11,6 +11,11 @@ filegroup(
     srcs = ["skip.bit"],
 )
 
+filegroup(
+    name = "use_flash_rom",
+    srcs = ["skip.bit"],
+)
+
 label_flag(
     name = "rom",
     build_setting_default = ":none",

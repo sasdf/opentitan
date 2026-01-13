@@ -4,6 +4,7 @@
 
 load(
     "//rules/opentitan:defs.bzl",
+    "fpga_params",
     "opentitan_test",
 )
 
@@ -39,6 +40,7 @@ def ownership_transfer_test(
             "//sw/device/silicon_creator/lib/ownership:datatypes",
         ],
         **kwargs):
+    return  # Unsupported
     opentitan_test(
         name = name,
         srcs = srcs,

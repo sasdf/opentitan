@@ -12,6 +12,7 @@ load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "fpga_params", "opentitan_bi
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
+load("//rules/opentitan:cc.bzl", "opentitan_binary_assemble")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -82,8 +83,8 @@ ld_library(
 )
 
 ld_library(
-    name = "ld_instrumented_rom",
-    script = "instrumented_rom.ld",
+    name = "linker_script_flash",
+    script = "flash_rom.ld",
     deps = [
         ":ld_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
@@ -242,27 +243,17 @@ opentitan_binary(
     ],
 )
 
-cc_library(
-    name = "instrumented_header",
-    srcs = ["instrumented_header.c"],
-    deps = [
-        "//sw/device/lib/base:macros",
-    ],
-    alwayslink = True,
-)
-
 opentitan_binary(
-    name = "instrumented_mask_rom",
+    name = "flash_rom",
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
         "//hw/top_earlgrey:silicon_creator",
     ],
-    linker_script = ":ld_instrumented_rom",
+    linker_script = ":linker_script_flash",
     manifest = "//hw/top_earlgrey:none_manifest",
     deps = [
-        ":instrumented_header",
-        ":ld_instrumented_rom",
+        ":linker_script_flash",
         ":mask_rom_lib",
         # We depend on rom_isrs here rather than in mask_rom_lib so that the
         # `rom_exception_handler` symbol remains unresolved and can be supplied
@@ -271,9 +262,20 @@ opentitan_binary(
     ],
 )
 
+opentitan_binary_assemble(
+    name = "flash_rom_image",
+    bins = {
+        ":flash_rom": "{flash_rom_slot}",
+    },
+    exec_env = [
+        "//hw/top_earlgrey:fpga_cw310",
+        "//hw/top_earlgrey:fpga_cw340",
+    ],
+)
+
 coverage_view_test(
-    name = "instrumented_mask_rom_coverage_view",
-    elf = "instrumented_mask_rom",
+    name = "flash_rom_coverage_view",
+    elf = "flash_rom",
 )
 
 # Create the legacy ROM target names so that existing splicing rules can find
@@ -310,7 +312,6 @@ asm_library_with_coverage(
         "//sw/device/silicon_creator/lib:epmp_state",
     ],
 )
-
 
 cc_library(
     name = "rom_epmp",
@@ -396,7 +397,6 @@ cc_library(
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
-        "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:hardened",
         "//sw/device/silicon_creator/lib:bootstrap",
         "//sw/device/silicon_creator/lib:error",
@@ -621,9 +621,6 @@ opentitan_test(
             # This is a manual test.  Run it with:
             #     --test_output=streamed --copt=-DSTACK_UTILIZATION_CHECK
             ###########################################################################'"
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-
             --exec="no-op --info '### Measuring stack utilization for bootstrap slot A'"
             --exec="bootstrap --clear-uart=true --leave-in-bootstrap {good_a}"
             --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
@@ -665,6 +662,7 @@ opentitan_test(
             --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='PASS|FAIL'"
             no-op
         """,
+        testopt_bootstrap = "False",
     ),
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,

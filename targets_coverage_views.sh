@@ -1,5 +1,5 @@
 COVERAGE_VIEW_ROM=(
-    "//sw/device/silicon_creator/rom:instrumented_mask_rom_coverage_view"
+    "//sw/device/silicon_creator/rom:flash_rom_coverage_view"
 )
 
 COVERAGE_VIEW_GROUPS=(

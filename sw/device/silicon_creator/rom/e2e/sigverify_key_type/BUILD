@@ -163,7 +163,7 @@ otp_json(
             exit_failure = test["exit_failure"][lc_state],
             exit_success = test["exit_success"][lc_state],
             otp = "otp_img_sigverify_key_type_{}".format(lc_state),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         spx_key = test["spx_key"],
         deps = [

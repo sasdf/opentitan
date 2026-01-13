@@ -77,17 +77,6 @@ SECTIONS {
   } > rom_region
 
   /**
-   * Magic bytes to indicate the instrumented ROM's existence on Flash.
-   */
-  .instrumented_rom_magic : ALIGN(4) {
-    KEEP(*(.instrumented_rom_magic))
-
-    ASSERT(
-      DEFINED(_ot_coverage_enabled) || SIZEOF(.instrumented_rom_magic) == 0,
-      ".instrumented_rom_magic section must be empty when coverage is disabled.");
-  } > rom_region
-
-  /**
    * C runtime (CRT) section, containing program initialization code.
    *
    * This is a separate section to `.text` so that the jumps inside `.vectors`

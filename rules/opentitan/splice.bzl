@@ -114,8 +114,11 @@ def _bitstream_splice_impl(ctx):
     # Splice in a ROM image if we have one either in attrs or the exec_env.
     if not ctx.attr.rom or ctx.attr.rom.label.name == "none":
         rom = exec_env.rom
+    elif ctx.attr.rom.label.name == "use_flash_rom":
+        rom = exec_env.flash_rom_loader
     else:
         rom = ctx.attr.rom
+
     if rom and rom.label.name != "none":
         rom = get_one_binary_file(rom, field = "rom", providers = [exec_env.provider])
         mem = gen_vivado_mem_file(

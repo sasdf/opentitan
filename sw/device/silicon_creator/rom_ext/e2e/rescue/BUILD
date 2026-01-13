@@ -62,9 +62,6 @@ _POSITIONS = {
             slot = position["slot"],
             tags = ["broken"],
             test_cmd = """
-                --exec="transport init"
-                --exec="fpga load-bitstream {bitstream}"
-                --exec="bootstrap --clear-uart=true {rom_ext}"
                 # First make sure the ROM_EXT is faulting because there is no firmware
                 --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
                 # Load firmware via rescue
@@ -84,16 +81,13 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
     },
     fpga = fpga_params(
-        assemble = "{rom_ext}@0 {slot_a:signed_bin}@0x10000 {slot_b:signed_bin}@0x90000",
+        assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
         binaries = {
             ":boot_test_slot_a": "slot_a",
             ":boot_test_slot_b": "slot_b",
         },
         tags = ["broken"],
         test_cmd = """
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
             # Set next slot via the rescue protocol
             --exec="rescue boot-svc set-next-bl0-slot --next=SlotB --get-response=false"
             # Check for firmware execution in slot B
@@ -113,16 +107,13 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
     },
     fpga = fpga_params(
-        assemble = "{rom_ext}@0 {slot_a:signed_bin}@0x10000 {slot_b:signed_bin}@0x90000",
+        assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
         binaries = {
             ":boot_test_slot_a": "slot_a",
             ":boot_test_slot_b": "slot_b",
         },
         tags = ["broken"],
         test_cmd = """
-            --exec="transport init"
-            --exec="fpga load-bitstream {bitstream}"
-            --exec="bootstrap --clear-uart=true {firmware}"
             # Set primary slot via the rescue protocol
             --exec="rescue boot-svc set-next-bl0-slot --primary=SlotB"
             # Check for firmware execution in slot B

@@ -288,7 +288,7 @@ test_cases = device_id_test_cases + lc_state_test_cases + manuf_state_test_cases
             exit_failure = t["exit_failure"],
             exit_success = t["exit_success"],
             otp = t["otp"],
-            tags = maybe_skip_in_ci(t["lc_state_val"]),
+            tags = maybe_skip_in_ci(t["lc_state_val"]) + ["rom_coverage"],
         ),
         manifest = manifest(
             dict(
