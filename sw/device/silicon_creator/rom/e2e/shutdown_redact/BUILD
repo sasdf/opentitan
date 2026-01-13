@@ -98,7 +98,7 @@ REDACT.update({"INVALID": 0x0})
                 lc_state,
                 redact.lower(),
             ),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         # Skip signing by clearing the manifest configuration.
         manifest = None,

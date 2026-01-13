@@ -219,6 +219,7 @@ opentitan_test(
             --bootstrap={firmware}
         """,
         test_harness = "//sw/host/tests/manuf/individualize_sw_cfg_functest",
+        testopt_bootstrap = "False",
     ),
     deps = [
         ":flash_info_fields",
@@ -286,6 +287,7 @@ opentitan_test(
             --bootstrap={firmware}
         """,
         test_harness = "//sw/host/tests/manuf/personalize_functest",
+        testopt_bootstrap = "False",
     ),
     spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:dev_key_0_spx": "dev_key_0"},
     deps = [

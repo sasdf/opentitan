@@ -51,7 +51,8 @@ fn main() -> anyhow::Result<()> {
 
     execute_test!(test_no_rma_command, &opts, &transport);
 
-    // This testcase failed in coverage build
+    // This testcase failed in coverage build:
+    //   RMA wipes the flash data, which includes the instrumented flash rom.
     #[cfg(not(feature = "ot_coverage_enabled"))]
     {
         execute_test!(test_rma_command, &opts, &transport);

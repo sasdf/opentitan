@@ -12,22 +12,11 @@ def query_tests(path, extended=False):
   proc = subprocess.run([
     './bazelisk.sh', 'query',
       f'tests({path}) ' +
-      f'except attr("tags", "{skip_in_ci}manual|broken|sim|silicon|dv|verilator", //sw/device/...) ' +
+      f'except attr("tags", "\\b({skip_in_ci}manual|broken|silicon|verilator|qemu|dv)\\b", //sw/device/...) ' +
       f'',
   ], stdout=subprocess.PIPE, check=True)
   return dict.fromkeys(proc.stdout.decode().splitlines(), True)
 
-def fix_rom_e2e_env(tests):
-  env = '_fpga_cw340_instrumented_rom'
-  results = {}
-  for key, value in tests.items():
-    if '/rom/e2e' in key:
-      assert '_fpga_' in key, key
-      key = key.rsplit('_fpga_', 1)[0] + env
-    elif env in key:
-      continue
-    results[key] = value
-  return results
 
 def filter_tests(tests, pattern):
   return {k: v for k, v in tests.items() if pattern not in k}
@@ -75,7 +64,6 @@ def main():
   ]
   test_groups = [eval(name) for name in test_groups_names]
 
-  test_groups = [fix_rom_e2e_env(g) for g in test_groups]
   test_groups = [filter_tests(g, 'coverage_view') for g in test_groups]
   test_groups = [filter_tests(g, '/orchestrator/') for g in test_groups]
   test_groups = [filter_tests(g, '/penetrationtests') for g in test_groups]

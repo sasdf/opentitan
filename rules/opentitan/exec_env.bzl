@@ -18,9 +18,10 @@ _FIELDS = {
     "spx_key": ("attr.spx_key", False),
     "manifest": ("file.manifest", False),
     "rom": ("attr.rom", False),
-    "instrumented_rom": ("attr.instrumented_rom", False),
     "rom_mmi": ("file.rom_mmi", False),
     "rom_ext": ("attr.rom_ext", False),
+    "flash_rom_loader": ("attr.flash_rom_loader", False),
+    "flash_rom": ("attr.flash_rom", False),
     "otp": ("file.otp", False),
     "otp_mmi": ("file.otp_mmi", False),
     "base_bitstream": ("file.base_bitstream", False),
@@ -37,6 +38,10 @@ _FIELDS = {
     "openocd": ("attr.openocd", False),
     "openocd_adapter_config": ("attr.openocd_adapter_config", False),
     "slot_spec": ("attr.slot_spec", False),
+}
+
+_NESTED_FIELDS = {
+    "param": True,
 }
 
 ExecEnvInfo = provider(
@@ -88,14 +93,20 @@ def exec_env_as_dict(ctx):
     }
     for field, (path, required) in _FIELDS.items():
         val = getattr_path(ctx, path)
-        if not val and base:
+        if _NESTED_FIELDS.get(field, False) and base:
+            merged_val = dict(getattr(base, field) or {})
+            merged_val.update(val or {})
+            val = merged_val
+        elif not val and base:
             # If the value doesn't exist in the context object, get the value
             # from the base provider (if present).
             val = getattr(base, field)
 
         if required and not val:
             fail("No value for required field {} in {}".format(field, ctx.attr.name))
+
         result[field] = val
+
     return result
 
 def exec_env_common_attrs(**kwargs):
@@ -159,10 +170,15 @@ def exec_env_common_attrs(**kwargs):
             allow_files = True,
             doc = "ROM_EXT image to use in this environment",
         ),
-        "instrumented_rom": attr.label(
-            default = kwargs.get("instrumented_rom"),
+        "flash_rom_loader": attr.label(
+            default = kwargs.get("flash_rom_loader"),
             allow_files = True,
-            doc = "Instrumented ROM image to use in this environment",
+            doc = "Flash ROM loader image to use in this environment",
+        ),
+        "flash_rom": attr.label(
+            default = kwargs.get("flash_rom"),
+            allow_files = True,
+            doc = "Flash ROM image to use in this environment",
         ),
         "slot_spec": attr.string_dict(
             default = kwargs.get("slot_spec", {}),
@@ -394,9 +410,8 @@ def common_test_setup(ctx, exec_env, firmware):
     rom_ext = get_fallback(ctx, "attr.rom_ext", exec_env)
     update_file_attr("rom_ext", rom_ext, exec_env.provider, data_files, param, action_param)
 
-    instrumented_rom = get_fallback(ctx, "attr.instrumented_rom", exec_env)
-    update_file_attr("instrumented_rom", instrumented_rom, exec_env.provider, data_files, param, action_param)
-
+    flash_rom = get_fallback(ctx, "attr.flash_rom", exec_env)
+    update_file_attr("flash_rom", flash_rom, exec_env.provider, data_files, param, action_param)
 
     # Add the binaries built by the test or added to the test.
     update_file_provider("firmware", firmware, data_files, param, action_param)

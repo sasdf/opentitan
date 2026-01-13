@@ -15,7 +15,7 @@
 INCLUDE hw/top_earlgrey/sw/autogen/top_earlgrey_memory.ld
 
 _rom_end_address = ORIGIN(eflash) + LENGTH(eflash);
-_rom_boot_address = _rom_end_address - _instrumented_rom_size;
+_rom_boot_address = _rom_end_address - _flash_rom_size;
 
 _chip_info_end = _rom_end_address;
 _chip_info_start = _chip_info_end - _chip_info_size;

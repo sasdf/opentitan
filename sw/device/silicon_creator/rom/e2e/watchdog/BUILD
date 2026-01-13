@@ -96,7 +96,6 @@ WATCHDOG_TEST_CASES = {
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310",
             "//hw/top_earlgrey:sim_verilator",
-            "//hw/top_earlgrey:fpga_cw340_instrumented_rom",
         ],
         local_defines = [
             "EXPECT_WATCHDOG_{}".format(watchdog_config.upper()),
@@ -141,7 +140,7 @@ WATCHDOG_OTP = {
                 ): "firmware",
             },
             otp = WATCHDOG_OTP[watchdog_config].format(lc_state),
-            tags = maybe_skip_in_ci(lc_state_val),
+            tags = maybe_skip_in_ci(lc_state_val) + ["rom_coverage"],
         ),
         verilator = verilator_params(
             timeout = "eternal",

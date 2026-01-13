@@ -179,7 +179,6 @@ SEC_VERS = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:prod_key_0_ecdsa_p256": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
-            "//hw/top_earlgrey:fpga_cw340_instrumented_rom",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         # This image always get the lower security version as we want the image that self-corrupts the ECC
@@ -208,7 +207,6 @@ SEC_VERS = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:prod_key_0_ecdsa_p256": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
-            "//hw/top_earlgrey:fpga_cw340_instrumented_rom",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         local_defines = [
@@ -261,6 +259,7 @@ SEC_VERS = [
             otp = ":otp_img_boot_policy_flash_ecc_error",
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
+            tags = ["rom_coverage"],
         ),
     )
     for t in BOOT_POLICY_FLASH_ECC_ERROR_TESTS
@@ -285,6 +284,7 @@ opentitan_test(
         otp = ":otp_img_flash_exc_handler_disabled",
         slot_a = SLOTS["a"],
         slot_b = SLOTS["b"],
+        tags = ["rom_coverage"],
     ),
 )
 

@@ -45,13 +45,16 @@ otp_image(
 JITTER_TESTCASES = [
     {
         "name": "disabled",
-        "fpga": fpga_params(),
+        "fpga": fpga_params(
+            tags = ["rom_coverage"],
+        ),
         "defines": ["TEST_JITTER_DISABLED"],
     },
     {
         "name": "enabled",
         "fpga": fpga_params(
             otp = ":otp_img_jitter_enabled",
+            tags = ["rom_coverage"],
         ),
         "defines": ["TEST_JITTER_ENABLED"],
     },

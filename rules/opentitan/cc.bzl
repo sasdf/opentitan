@@ -107,7 +107,6 @@ def ot_binary(ctx, **kwargs):
     mapfile = kwargs.get("mapfile", "{}.map".format(name))
     mapfile = ctx.actions.declare_file(mapfile)
 
-
     extra_linkopts = (ctx.attr.linkopts or []) + kwargs.get("linkopts", [])
 
     linkopts = [
@@ -409,6 +408,8 @@ opentitan_binary = rv_rule(
 def _testing_bitstream_impl(settings, attr):
     rom = attr.rom if attr.rom else "//hw/bitstream/universal:none"
     otp = attr.otp if attr.otp else "//hw/bitstream/universal:none"
+    if "rom_coverage" in attr.tags and settings["//rules/coverage:enabled_flag"]:
+        rom = "//hw/bitstream/universal:use_flash_rom"
     return {
         "//hw/bitstream/universal:rom": rom,
         "//hw/bitstream/universal:otp": otp,
@@ -417,7 +418,9 @@ def _testing_bitstream_impl(settings, attr):
 
 _testing_bitstream = transition(
     implementation = _testing_bitstream_impl,
-    inputs = [],
+    inputs = [
+        "//rules/coverage:enabled_flag",
+    ],
     outputs = [
         "//hw/bitstream/universal:rom",
         "//hw/bitstream/universal:otp",
@@ -525,6 +528,7 @@ opentitan_test = rv_rule(
             executable = True,
             cfg = "exec",
         ),
+        "_fpga": attr.label(default = "//rules:fpga"),
     }.items()),
     fragments = ["cpp"],
     toolchains = ["@rules_cc//cc:toolchain_type"],
@@ -558,7 +562,16 @@ def _opentitan_binary_assemble_impl(ctx):
         img = assemble_for_test(ctx, name, spec, input_bins, tc.tools.opentitantool)
         result.append(exec_env_provider(default = img, kind = "flash"))
         assembled_bins.append(img)
-    return result + [DefaultInfo(files = depset(assembled_bins))]
+
+    # Propagate runfiles
+    runfiles = ctx.runfiles()
+    for binary in ctx.attr.bins.keys():
+        runfiles = runfiles.merge(binary[DefaultInfo].default_runfiles)
+        if ctx.var.get("ot_coverage_enabled", "false") == "true":
+            # Add elf files to runfiles for coverage
+            runfiles = runfiles.merge(ctx.runfiles(binary.files.to_list()))
+
+    return result + [DefaultInfo(files = depset(assembled_bins), runfiles = runfiles)]
 
 opentitan_binary_assemble = rule(
     implementation = _opentitan_binary_assemble_impl,

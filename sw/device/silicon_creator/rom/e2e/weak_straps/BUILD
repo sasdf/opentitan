@@ -4,6 +4,7 @@
 load(
     "//rules/opentitan:defs.bzl",
     "CLEAR_TEST_CMD",
+    "fpga_params",
     "opentitan_binary",
     "opentitan_test",
     "silicon_params",
@@ -65,6 +66,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_verilator": None,
         "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
     },
+    fpga = fpga_params(
+        tags = ["rom_coverage"],
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"

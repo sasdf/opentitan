@@ -14,6 +14,7 @@ load(
 )
 load(
     "//rules/opentitan:defs.bzl",
+    "CLEAR_TEST_CMD",
     "DEFAULT_TEST_FAILURE_MSG",
     "DEFAULT_TEST_SUCCESS_MSG",
     "fpga_cw305",
@@ -72,7 +73,6 @@ CLEAR_MANIFEST = manifest(d = {
     "name": "none_manifest",
 })
 
-
 ###########################################################################
 # FPGA CW310 Environments
 ###########################################################################
@@ -85,6 +85,11 @@ fpga_cw310(
         "//sw/device/lib/arch:fpga_cw310",
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
+    param = {
+        "interface": "cw310",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+    },
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
     slot_spec = EARLGREY_SLOTS,
     test_cmd = "testing-not-supported",
@@ -97,29 +102,22 @@ fpga_cw310(
         "--rcfile=",
         "--logging=info",
         "--interface={interface}",
+        "--drop-reset",
     ] + select({
         "@//ci:lowrisc_fpga_cw310": ["--uarts=/dev/ttyACM_CW310_1,/dev/ttyACM_CW310_0"],
         "//conditions:default": [],
     }),
     base = ":fpga_cw310",
-    base_bitstream = "//hw/bitstream/cw340:bitstream",
+    base_bitstream = "//hw/bitstream:bitstream",
     exec_env = "fpga_cw310_test_rom",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
-    otp_mmi = "//hw/bitstream/cw340:otp_mmi",
+    otp_mmi = "//hw/bitstream:otp_mmi",
     param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "testopt_bootstrap": "True",
     },
     rom = "//sw/device/lib/testing/test_rom:test_rom",
-    rom_mmi = "//hw/bitstream/cw340:rom_mmi",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    rom_mmi = "//hw/bitstream:rom_mmi",
+    test_cmd = CLEAR_TEST_CMD,
 )
 
 fpga_cw310(
@@ -128,6 +126,8 @@ fpga_cw310(
     base = ":fpga_cw310_test_rom",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_cw310_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     rom = "//sw/device/silicon_creator/rom:mask_rom",
 )
@@ -142,6 +142,8 @@ fpga_cw310(
         "//conditions:default": {"//signing:appkey": "0"},
     }),
     exec_env = "fpga_cw310_rom_ext",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     libs = [
         "//sw/device/lib/arch:boot_stage_owner",
         "//sw/device/lib/arch:fpga_cw310",
@@ -150,9 +152,6 @@ fpga_cw310(
     manifest = "//sw/device/silicon_owner:manifest",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
     param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
     },
     rom = "//sw/device/silicon_creator/rom:mask_rom",
@@ -169,28 +168,24 @@ fpga_cw310(
         "--rcfile=",
         "--logging=info",
         "--interface={interface}",
+        "--drop-reset",
     ],
     base = ":fpga_cw310",
-    base_bitstream = "//hw/bitstream/cw340:bitstream",
+    base_bitstream = "//hw/bitstream/hyperdebug:bitstream",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_hyper310_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
-    otp_mmi = "//hw/bitstream/cw340:otp_mmi",
+    otp_mmi = "//hw/bitstream/hyperdebug:otp_mmi",
     param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "interface": "hyper310",
+        "testopt_bootstrap": "True",
     },
     rom = "//sw/device/silicon_creator/rom:mask_rom",
-    rom_mmi = "//hw/bitstream/cw340:rom_mmi",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    rom_mmi = "//hw/bitstream/hyperdebug:rom_mmi",
+    test_cmd = CLEAR_TEST_CMD,
 )
 
 fpga_cw310(
@@ -207,9 +202,6 @@ fpga_cw310(
     manifest = "//sw/device/silicon_owner:manifest",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
     param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
     },
     rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
@@ -288,6 +280,7 @@ fpga_cw340(
         "--rcfile=",
         "--logging=info",
         "--interface={interface}",
+        "--drop-reset",
     ] + select({
         "@//ci:lowrisc_fpga_cw340": ["--uarts=/dev/ttyACM_CW340_1,/dev/ttyACM_CW340_0"],
         "//conditions:default": [],
@@ -317,15 +310,12 @@ fpga_cw340(
     exec_env = "fpga_cw340_test_rom",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     otp_mmi = "//hw/bitstream/cw340:otp_mmi",
+    param = {
+        "testopt_bootstrap": "True",
+    },
     rom = "//sw/device/lib/testing/test_rom:test_rom",
     rom_mmi = "//hw/bitstream/cw340:rom_mmi",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    test_cmd = CLEAR_TEST_CMD,
 )
 
 fpga_cw340(
@@ -335,18 +325,17 @@ fpga_cw340(
     base_bitstream = "//hw/bitstream/cw340:bitstream",
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:test_key_0_ecdsa_p256": "test_key_0"},
     exec_env = "fpga_cw340_rom_with_fake_keys",
+    flash_rom = "//sw/device/silicon_creator/rom:flash_rom_image",
+    flash_rom_loader = "//sw/device/lib/testing/test_rom:flash_rom_loader",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     otp = "//hw/ip/otp_ctrl/data:img_rma",
     otp_mmi = "//hw/bitstream/cw340:otp_mmi",
+    param = {
+        "testopt_bootstrap": "True",
+    },
     rom = "//sw/device/silicon_creator/rom:mask_rom",
     rom_mmi = "//hw/bitstream/cw340:rom_mmi",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    test_cmd = CLEAR_TEST_CMD,
 )
 
 fpga_cw340(
@@ -367,9 +356,6 @@ fpga_cw340(
     manifest = "//sw/device/silicon_owner:manifest",
     otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
     param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
         "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
     },
     rom_ext = select({
@@ -415,51 +401,6 @@ fpga_cw340(
     otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
     rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
     tags = ["cw340_sival_rom_ext"],
-)
-
-fpga_cw340(
-    name = "fpga_cw340_instrumented_rom",
-    testonly = True,
-    base = ":fpga_cw340_rom_with_fake_keys",
-    exec_env = "fpga_cw340_instrumented_rom",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
-    otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
-    param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
-)
-
-fpga_cw340(
-    name = "fpga_cw340_instrumented_rom_prod",
-    testonly = True,
-    base = ":fpga_cw340_sival",
-    exec_env = "fpga_cw340_instrumented_rom_prod",
-    instrumented_rom = "//sw/device/silicon_creator/rom:instrumented_mask_rom",
-    param = {
-        "interface": "hyper340",
-        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
-        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
-        "assemble": "{firmware}@{rom_ext_slot_a} {instrumented_rom}@{instrumented_rom_slot}",
-    },
-    rom = "//sw/device/lib/testing/test_rom:test_rom",
-    test_cmd = """
-        --exec="transport init"
-        --exec="fpga load-bitstream {bitstream}"
-        --exec="bootstrap --clear-uart=true {firmware}"
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
 )
 
 ###########################################################################
