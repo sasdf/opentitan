@@ -92,6 +92,35 @@ def obj_transform(ctx, strip_llvm_prf_cnts = False, **kwargs):
 
     return output
 
+def obj_patch(ctx, **kwargs):
+    """Patch an object file.
+
+    Args:
+      ctx: The context object for this rule.
+      kwargs: Overrides of values normally retrived from the context object.
+        output: The name of the output file.  Constructed from `name` and `suffix`
+                 if not specified.
+        src: The src File object.
+    Returns:
+      The patched File.
+    """
+    output = kwargs.get("output")
+    if not output:
+        name = get_override(ctx, "attr.name", kwargs)
+        suffix = get_override(ctx, "attr.suffix", kwargs)
+        output = "{}.{}".format(name, suffix)
+
+    output = ctx.actions.declare_file(output)
+    src = get_override(ctx, "attr.src", kwargs)
+
+    ctx.actions.run(
+        outputs = [output],
+        inputs = [src],
+        arguments = [src.path, output.path],
+        executable = ctx.executable._patch_elf,
+    )
+    return output
+
 def obj_disassemble(ctx, **kwargs):
     """Disassemble an input file.
 

@@ -7,6 +7,7 @@ load(
     "convert_to_vmem",
     "obj_disassemble",
     "obj_transform",
+    "obj_patch",
 )
 load("@lowrisc_opentitan//rules:signing.bzl", "sign_binary")
 load("@lowrisc_opentitan//rules/opentitan:exec_env.bzl", "ExecEnvInfo")
@@ -115,7 +116,15 @@ def ot_binary(ctx, **kwargs):
         additional_outputs = [mapfile],
     )
 
-    return lout.executable, mapfile
+    elf = lout.executable
+    elf = obj_patch(
+        ctx,
+        name = name + ".patched",
+        src = elf,
+        suffix = "elf",
+    )
+
+    return elf, mapfile
 
 def _as_group_info(name, items):
     """Prepare a dict of files for OutputGroupInfo.
@@ -351,6 +360,12 @@ common_binary_attrs = {
     "_check_initial_coverage": attr.label(
         doc = "Tool to check the coverage counter initialization.",
         default = "//util/coverage:check_initial_coverage",
+        executable = True,
+        cfg = "exec",
+    ),
+    "_patch_elf": attr.label(
+        doc = "Tool to apply patch to elf.",
+        default = "//util/fault:patch",
         executable = True,
         cfg = "exec",
     ),

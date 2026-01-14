@@ -1123,3 +1123,29 @@ ownership_transfer_test(
         "test_harness": "//sw/host/tests/ownership:newversion_test",
     },
 )
+
+ownership_transfer_test(
+    name = "newversion_self_signed_update_test",
+    ecdsa_key = {
+        "//sw/device/silicon_creator/lib/ownership/keys/fake:ecdsa_keyset": "app_prod_0",
+    },
+    # fpga = {"changes_otp": True},
+    shared_params = {
+        "rom_ext": "//sw/device/silicon_creator/rom_ext:rom_ext_owner_update_newversion",
+        "test_cmd": """
+            --bootstrap={firmware}
+            --next-owner-key=$(location //sw/device/silicon_creator/lib/ownership/keys/dummy:owner_key)
+            --next-unlock-key=$(location //sw/device/silicon_creator/lib/ownership/keys/fake:unlock_key)
+            --next-activate-key=$(location //sw/device/silicon_creator/lib/ownership/keys/fake:activate_key)
+            --next-application-key=sw/device/silicon_creator/lib/ownership/keys/fake/app_prod_ecdsa_p256.pub.der
+            --config-version=2
+            # With fault, we expect to see the version updated and the owner key changes.
+            --expect "config_version = 2"
+            --expect "owner_key = 665ff5e3"
+            # It should not updated when there's no fault
+            # --expect "config_version = 1"
+            # --expect "owner_key = 8e3dcb50"
+        """,
+        "test_harness": "//sw/host/tests/ownership:newversion_test",
+    },
+)

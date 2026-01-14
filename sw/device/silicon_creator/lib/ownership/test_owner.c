@@ -37,7 +37,9 @@
 #define TEST_OWNER_CONFIG_VERSION 1
 
 #ifndef TEST_OWNER_UPDATE_MODE
-#define TEST_OWNER_UPDATE_MODE kOwnershipUpdateModeOpen
+// #define TEST_OWNER_UPDATE_MODE kOwnershipUpdateModeOpen
+// #define TEST_OWNER_UPDATE_MODE kOwnershipUpdateModeNewVersion
+#define TEST_OWNER_UPDATE_MODE kOwnershipUpdateModeSelfVersion
 #endif
 
 #if defined(TEST_OWNER_KEY_ALG_HYBRID_SPX_PURE) || \
