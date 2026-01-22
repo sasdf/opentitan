@@ -13,7 +13,6 @@
 #include "otp_ctrl_regs.h"
 #include "sensor_ctrl_regs.h"
 #include "sram_ctrl_regs.h"
-#include "flash_ctrl_regs.h"
 
 /**
  * Test ROM interrupt vectors.
@@ -87,8 +86,8 @@ _test_rom_interrupt_vector:
   .balign 4
   .global _reset_start
   .type _reset_start, @function
-
 _reset_start:
+
   // Set up the global pointer. This requires that we disable linker relaxations
   // (or it will be relaxed to `mv gp, gp`).
   .option push
