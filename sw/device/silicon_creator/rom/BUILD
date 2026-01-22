@@ -254,7 +254,7 @@ opentitan_binary(
 )
 
 opentitan_binary(
-    name = "flash_mask_rom",
+    name = "flash_rom",
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
         "//hw/top_earlgrey:fpga_cw340",
@@ -275,7 +275,7 @@ opentitan_binary(
 opentitan_binary_assemble(
     name = "flash_rom_image",
     bins = {
-        ":flash_mask_rom": "{flash_rom_slot}",
+        ":flash_rom": "{flash_rom_slot}",
     },
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310",
@@ -284,8 +284,8 @@ opentitan_binary_assemble(
 )
 
 coverage_view_test(
-    name = "flash_mask_rom_coverage_view",
-    elf = "flash_mask_rom",
+    name = "flash_rom_coverage_view",
+    elf = "flash_rom",
 )
 
 # Create the legacy ROM target names so that existing splicing rules can find
