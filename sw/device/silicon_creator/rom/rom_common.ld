@@ -16,12 +16,6 @@ OUTPUT_ARCH(riscv)
 __DYNAMIC = 0;
 
 /**
- * The boot address, which indicates the location of the initial interrupt
- * vector.
- */
-/*_rom_boot_address = ORIGIN(rom);*/
-
-/**
  * Symbols to be used in the setup of the address translation for ROM_EXT.
  */
 _rom_ext_virtual_start_address = ORIGIN(rom_ext_virtual);
@@ -156,19 +150,17 @@ SECTIONS {
   /**
    * OpenTitan ROM does not have a mutable `.data` section.
    */
-  .data : ALIGN(4) {
+  .data (NOLOAD) : {
     *(.sdata)
     *(.sdata.*)
     *(.data)
     *(.data.*)
 
     /* Tests are an exception to the rule that .data must be empty */
-    /*
     ASSERT(
         (DEFINED(rom_test) ? 0 : SIZEOF(.data)) == 0,
         "Error: .data section must be empty");
-    */
-  } > ram_main AT> rom_region
+  } > ram_main
 
   /**
    * Standard BSS section. This will be zeroed at runtime by the CRT.

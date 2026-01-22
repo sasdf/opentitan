@@ -3,13 +3,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /**
- * Linker script for an OpenTitan ROM_EXT.
+ * Linker script for an OpenTitan Flash ROM.
  *
  * Portions of this file are Ibex-specific.
  *
- * The ROM_EXT is actually kept in flash, rather than ROM. While a ROM_EXT can
- * be loaded into either Slot A (the start of flash), or Slot B (the start of
- * the upper half of flash), this linker script only targets Slot A.
+ * The Flash ROM is a ROM variant that is stored at the end of the flash region.
  */
 
 INCLUDE hw/top_earlgrey/sw/autogen/top_earlgrey_memory.ld

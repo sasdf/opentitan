@@ -71,7 +71,7 @@ cc_test(
 )
 
 ld_library(
-    name = "ld_common",
+    name = "linker_script_common",
     includes = ["rom_common.ld"],
     deps = [
         "//sw/device:info_sections",
@@ -83,7 +83,7 @@ ld_library(
     name = "linker_script",
     script = "rom.ld",
     deps = [
-        ":ld_common",
+        ":linker_script_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
     ],
 )
@@ -92,7 +92,7 @@ ld_library(
     name = "linker_script_flash",
     script = "flash_rom.ld",
     deps = [
-        ":ld_common",
+        ":linker_script_common",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey_memory",
     ],
 )
