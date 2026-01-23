@@ -20,12 +20,13 @@
 #include "sw/device/silicon_creator/rom_ext/rom_ext_boot_policy.h"
 
 OT_WARN_UNUSED_RESULT
-rom_error_t rom_ext_verify(const manifest_t *manifest,
+rom_error_t rom_ext_verify(const manifest_t *manifest, char slot_id,
                            const boot_data_t *boot_data, uint32_t *flash_exec,
                            owner_application_keyring_t *keyring,
                            size_t *verify_key, owner_config_t *owner_config,
                            uint32_t *isfb_check_count) {
-  RETURN_IF_ERROR(rom_ext_boot_policy_manifest_check(manifest, boot_data));
+  HARDENED_RETURN_IF_ERROR(
+      rom_ext_boot_policy_manifest_check(manifest, boot_data));
 
   uint32_t key_id =
       sigverify_ecdsa_p256_key_id_get(&manifest->ecdsa_public_key);
@@ -50,8 +51,10 @@ rom_error_t rom_ext_verify(const manifest_t *manifest,
   RETURN_IF_ERROR(owner_keyring_find_key(keyring, key_id, verify_key));
   uint32_t key_alg = keyring->key[*verify_key]->key_alg;
 
-  dbg_printf("verify: key%u;%C;%C\r\n", (uint32_t)*verify_key, key_alg,
-             keyring->key[*verify_key]->key_domain);
+  if (slot_id) {
+    dbg_printf("verify: Slot%c;key%u;%C;%C\r\n", slot_id, (uint32_t)*verify_key,
+               key_alg, keyring->key[*verify_key]->key_domain);
+  }
 
   memset(boot_measurements.bl0.data, (int)rnd_uint32(),
          sizeof(boot_measurements.bl0.data));

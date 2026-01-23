@@ -23,7 +23,6 @@ load(
     "otp_partition",
 )
 load("//rules:rom_e2e.bzl", "maybe_skip_in_ci")
-load("//rules:splice.bzl", "bitstream_splice")
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 
 package(default_visibility = ["//visibility:public"])
@@ -142,26 +141,6 @@ opentitan_binary(
         overlays = STD_OTP_OVERLAYS + [
             ":otp_json_sigverify_spx_{}".format(t["name"]),
         ],
-        visibility = ["//visibility:private"],
-    )
-    for lc_state, _ in get_lc_items()
-    for t in SIGVERIFY_SPX_CASES
-]
-
-[
-    bitstream_splice(
-        name = "bitstream_sigverify_spx_{}_{}".format(
-            lc_state,
-            t["name"],
-        ),
-        src = "//hw/bitstream:mask_rom",
-        data = ":otp_img_sigverify_spx_{}_{}".format(
-            lc_state,
-            t["name"],
-        ),
-        instance = "otp",
-        meminfo = "//hw/bitstream:cw310_mmi",
-        update_usr_access = True,
         visibility = ["//visibility:private"],
     )
     for lc_state, _ in get_lc_items()

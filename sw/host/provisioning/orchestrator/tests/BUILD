@@ -98,26 +98,36 @@ sh_test(
     ],
 )
 
-sh_test(
-    name = "e2e_multistage_test",
-    srcs = ["e2e_multistage.sh"],
-    data = [
-        ":orchestrator_hyper310_zip",
-        "//util/coverage/collect_cc_coverage",
-        "@python3",
-    ],
-    env = {
-        "PYTHON": "$(location @python3//:python3)",
-        "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
-        "FPGA": "hyper310",
-    } | CW340_OVERRIDE,
-    tags = [
-        "changes_otp",
-        "exclusive",
+[
+    sh_test(
+        name = "e2e_multistage_{}_{}_test".format(sku, fpga),
+        srcs = ["e2e_multistage.sh"],
+        data = [
+            ":orchestrator_{}_zip".format(fpga),
+            "//util/coverage/collect_cc_coverage",
+            "@python3",
+            cfg["orchestrator_cfg"],
+        ],
+        env = {
+            "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+            "PYTHON": "$(location @python3//:python3)",
+            "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
+            "FPGA": "{}".format(fpga),
+        } | CW340_OVERRIDE,
+        tags = [
+            "changes_otp",
+            "exclusive",
+            "manuf",
+        ] + [fpga] + ([
+            "manual",
+        ] if cfg.get("offline", False) else []),
+    )
+    for sku, cfg in EARLGREY_SKUS.items()
+    for fpga in [
         "hyper310",
-        "manuf",
-    ],
-)
+        "cw340",
+    ]
+]
 
 sh_test(
     name = "e2e_ate_individ_test",

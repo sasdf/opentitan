@@ -24,6 +24,8 @@
 #include "sw/device/tests/penetrationtests/firmware/lib/pentest_lib.h"
 #include "sw/device/tests/penetrationtests/json/cryptolib_fi_asym_commands.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+
 // OAEP label for testing.
 static const unsigned char kTestLabel[] = "Test label.";
 static const size_t kTestLabelLen = sizeof(kTestLabel) - 1;
@@ -181,7 +183,7 @@ status_t cryptolib_fi_rsa_enc_impl(cryptolib_fi_asym_rsa_enc_in_t uj_input,
         .key_mode = kOtcryptoKeyModeRsaEncryptOaep,
         .key_length = private_key_bytes,
         .hw_backed = kHardenedBoolFalse,
-        .security_level = kOtcryptoKeySecurityLevelLow,
+        .security_level = kOtcryptoKeySecurityLevelHigh,
     };
     size_t keyblob_words = ceil_div(private_key_blob_bytes, sizeof(uint32_t));
     uint32_t keyblob[keyblob_words];
@@ -332,7 +334,7 @@ status_t cryptolib_fi_rsa_sign_impl(
       .key_mode = key_mode,
       .key_length = private_key_bytes,
       .hw_backed = kHardenedBoolFalse,
-      .security_level = kOtcryptoKeySecurityLevelLow,
+      .security_level = kOtcryptoKeySecurityLevelHigh,
   };
   size_t keyblob_words = ceil_div(private_key_blob_bytes, sizeof(uint32_t));
   uint32_t keyblob[keyblob_words];
@@ -594,7 +596,7 @@ status_t cryptolib_fi_p256_ecdh_impl(
               .key_length = kPentestP256Bytes,
               .hw_backed = kHardenedBoolFalse,
               .exportable = kHardenedBoolTrue,
-              .security_level = kOtcryptoKeySecurityLevelLow,
+              .security_level = kOtcryptoKeySecurityLevelHigh,
           },
       .keyblob_length = sizeof(private_keyblob),
       .keyblob = private_keyblob,
@@ -625,7 +627,7 @@ status_t cryptolib_fi_p256_ecdh_impl(
               .key_length = kPentestP256Bytes,
               .hw_backed = kHardenedBoolFalse,
               .exportable = kHardenedBoolTrue,
-              .security_level = kOtcryptoKeySecurityLevelLow,
+              .security_level = kOtcryptoKeySecurityLevelHigh,
           },
       .keyblob_length = sizeof(shared_secretblob),
       .keyblob = shared_secretblob,
@@ -662,7 +664,7 @@ status_t cryptolib_fi_p256_sign_impl(
       .key_mode = kOtcryptoKeyModeEcdsaP256,
       .key_length = kPentestP256Bytes,
       .hw_backed = kHardenedBoolFalse,
-      .security_level = kOtcryptoKeySecurityLevelLow,
+      .security_level = kOtcryptoKeySecurityLevelHigh,
   };
 
   // Create the private key.
@@ -820,7 +822,7 @@ status_t cryptolib_fi_p384_ecdh_impl(
               .key_length = kPentestP384Bytes,
               .hw_backed = kHardenedBoolFalse,
               .exportable = kHardenedBoolTrue,
-              .security_level = kOtcryptoKeySecurityLevelLow,
+              .security_level = kOtcryptoKeySecurityLevelHigh,
           },
       .keyblob_length = sizeof(private_keyblob),
       .keyblob = private_keyblob,
@@ -851,7 +853,7 @@ status_t cryptolib_fi_p384_ecdh_impl(
               .key_length = kPentestP384Bytes,
               .hw_backed = kHardenedBoolFalse,
               .exportable = kHardenedBoolTrue,
-              .security_level = kOtcryptoKeySecurityLevelLow,
+              .security_level = kOtcryptoKeySecurityLevelHigh,
           },
       .keyblob_length = sizeof(shared_secretblob),
       .keyblob = shared_secretblob,
@@ -888,7 +890,7 @@ status_t cryptolib_fi_p384_sign_impl(
       .key_mode = kOtcryptoKeyModeEcdsaP384,
       .key_length = kPentestP384Bytes,
       .hw_backed = kHardenedBoolFalse,
-      .security_level = kOtcryptoKeySecurityLevelLow,
+      .security_level = kOtcryptoKeySecurityLevelHigh,
   };
 
   // Create the private key.

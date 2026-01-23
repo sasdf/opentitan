@@ -16,9 +16,9 @@
 #include "sw/device/lib/crypto/impl/aes_gcm/ghash.h"
 #include "sw/device/lib/crypto/impl/integrity.h"
 #include "sw/device/lib/crypto/impl/keyblob.h"
-#include "sw/device/lib/crypto/impl/security_config.h"
 #include "sw/device/lib/crypto/impl/status.h"
 #include "sw/device/lib/crypto/include/datatypes.h"
+#include "sw/device/lib/crypto/include/security_config.h"
 
 // Module ID for status codes.
 #define MODULE_ID MAKE_MODULE_ID('a', 'g', 'c')
@@ -86,12 +86,10 @@ status_t gcm_remask_key(aes_gcm_context_t *internal_ctx) {
     HARDENED_TRY(hardened_memshred(mask, internal_ctx->key.key_len));
 
     // XOR each share with the mask.
-    HARDENED_TRY(
-        hardened_xor_in_place((uint32_t *)internal_ctx->key.key_shares[0], mask,
-                              internal_ctx->key.key_len));
-    HARDENED_TRY(
-        hardened_xor_in_place((uint32_t *)internal_ctx->key.key_shares[1], mask,
-                              internal_ctx->key.key_len));
+    hardened_xor_in_place((uint32_t *)internal_ctx->key.key_shares[0], mask,
+                          internal_ctx->key.key_len);
+    hardened_xor_in_place((uint32_t *)internal_ctx->key.key_shares[1], mask,
+                          internal_ctx->key.key_len);
     // Update the checksum.
     internal_ctx->key.checksum = aes_key_integrity_checksum(&internal_ctx->key);
   } else {
@@ -120,8 +118,6 @@ static status_t aes_gcm_key_construct(otcrypto_blinded_key_t *blinded_key,
       kHardenedBoolTrue) {
     return OTCRYPTO_BAD_ARGS;
   }
-  HARDENED_CHECK_EQ(integrity_blinded_key_check(blinded_key),
-                    kHardenedBoolTrue);
 
   // Check the key mode.
   if (launder32((uint32_t)blinded_key->config.key_mode) !=
@@ -172,6 +168,12 @@ static status_t aes_gcm_key_construct(otcrypto_blinded_key_t *blinded_key,
 
   // Create the checksum of the key and store it in the key structure.
   aes_key->checksum = aes_key_integrity_checksum(aes_key);
+
+  // Second integrity check of the key we got passed into the cryptolib.
+  // This check is placed here to catch any corruptions that might have
+  // happen after the first check when assembling the `aes_key`.
+  HARDENED_CHECK_EQ(integrity_blinded_key_check(blinded_key),
+                    kHardenedBoolTrue);
 
   return OTCRYPTO_OK;
 }
@@ -291,6 +293,9 @@ otcrypto_status_t otcrypto_aes_gcm_encrypt(otcrypto_blinded_key_t *key,
     return OTCRYPTO_BAD_ARGS;
   }
 
+  // Randomize the tag before the operation.
+  HARDENED_TRY(hardened_memshred(auth_tag.data, auth_tag.len));
+
   // Ensure entropy complex is initialized.
   HARDENED_TRY(entropy_complex_check());
 
@@ -392,9 +397,6 @@ otcrypto_status_t otcrypto_aes_gcm_encrypt_init(
   if (key == NULL || key->keyblob == NULL || iv.data == NULL || ctx == NULL) {
     return OTCRYPTO_BAD_ARGS;
   }
-
-  // Check the security config of the device.
-  HARDENED_TRY(security_config_check(key->config.security_level));
 
   // Ensure entropy complex is initialized.
   HARDENED_TRY(entropy_complex_check());
@@ -560,6 +562,9 @@ otcrypto_status_t otcrypto_aes_gcm_encrypt_final(
     return OTCRYPTO_BAD_ARGS;
   }
   *ciphertext_bytes_written = 0;
+
+  // Randomize the tag before the operation.
+  HARDENED_TRY(hardened_memshred(auth_tag.data, auth_tag.len));
 
   // Ensure entropy complex is initialized.
   HARDENED_TRY(entropy_complex_check());

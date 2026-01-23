@@ -428,6 +428,9 @@ static status_t init_ref_otp_data(void) {
 static status_t read_otp_partitions(ujson_t *uj) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -467,6 +470,8 @@ static status_t read_otp_partitions(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -510,9 +515,13 @@ static status_t read_otp_partitions(ujson_t *uj) {
   uj_output.result = res;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -527,6 +536,9 @@ status_t handle_ibex_fi_address_translation(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -588,6 +600,8 @@ status_t handle_ibex_fi_address_translation(ujson_t *uj)
   pentest_set_trigger_low();
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -611,9 +625,14 @@ status_t handle_ibex_fi_address_translation(ujson_t *uj)
   uj_output.result = res;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -621,6 +640,9 @@ status_t handle_ibex_fi_address_translation_config(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -660,6 +682,8 @@ status_t handle_ibex_fi_address_translation_config(ujson_t *uj)
   pentest_set_trigger_low();
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -697,9 +721,14 @@ status_t handle_ibex_fi_address_translation_config(ujson_t *uj)
   uj_output.result = res;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -707,6 +736,9 @@ status_t handle_ibex_fi_char_addi_single_beq(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -753,6 +785,8 @@ status_t handle_ibex_fi_char_addi_single_beq(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -782,9 +816,14 @@ status_t handle_ibex_fi_char_addi_single_beq(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -792,6 +831,9 @@ status_t handle_ibex_fi_char_addi_single_beq_cm(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -849,6 +891,8 @@ status_t handle_ibex_fi_char_addi_single_beq_cm(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -863,9 +907,13 @@ status_t handle_ibex_fi_char_addi_single_beq_cm(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_rf_dump_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -874,6 +922,9 @@ status_t handle_ibex_fi_char_addi_single_beq_cm2(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -938,6 +989,8 @@ status_t handle_ibex_fi_char_addi_single_beq_cm2(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -952,9 +1005,13 @@ status_t handle_ibex_fi_char_addi_single_beq_cm2(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_rf_dump_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -963,6 +1020,9 @@ status_t handle_ibex_fi_char_addi_single_beq_neg(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1008,6 +1068,8 @@ status_t handle_ibex_fi_char_addi_single_beq_neg(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1037,9 +1099,14 @@ status_t handle_ibex_fi_char_addi_single_beq_neg(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1047,6 +1114,9 @@ status_t handle_ibex_fi_char_addi_single_bne(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1092,6 +1162,8 @@ status_t handle_ibex_fi_char_addi_single_bne(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1121,9 +1193,14 @@ status_t handle_ibex_fi_char_addi_single_bne(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1131,6 +1208,9 @@ status_t handle_ibex_fi_char_addi_single_bne_neg(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1176,6 +1256,8 @@ status_t handle_ibex_fi_char_addi_single_bne_neg(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1205,9 +1287,14 @@ status_t handle_ibex_fi_char_addi_single_bne_neg(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1216,6 +1303,9 @@ status_t handle_ibex_fi_char_combi(ujson_t *uj) __attribute__((optnone)) {
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1426,6 +1516,8 @@ status_t handle_ibex_fi_char_combi(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1435,12 +1527,6 @@ status_t handle_ibex_fi_char_combi(ujson_t *uj) __attribute__((optnone)) {
   TRY(dif_rv_core_ibex_get_error_status(&rv_core_ibex, &codes));
 
   ibex_fi_combi_data_t uj_test_output;
-
-  // Return errors and alerts.
-  uj_test_output.err_status = codes;
-  memcpy(uj_test_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
-  memcpy(uj_test_output.ast_alerts, sensor_alerts.alerts,
-         sizeof(sensor_alerts.alerts));
 
   // Return the results for the first test.
   // Preset buffers to 0.
@@ -1489,11 +1575,15 @@ status_t handle_ibex_fi_char_combi(ujson_t *uj) __attribute__((optnone)) {
   // Send loop counters & ERR_STATUS to host.
   uj_test_output.err_status = codes;
   memcpy(uj_test_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_test_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_test_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
 
   // Send over the response
   RESP_OK(ujson_serialize_ibex_fi_combi_data_t, uj, &uj_test_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -1502,6 +1592,9 @@ status_t handle_ibex_fi_char_conditional_branch_beq(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1557,6 +1650,8 @@ status_t handle_ibex_fi_char_conditional_branch_beq(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1570,9 +1665,14 @@ status_t handle_ibex_fi_char_conditional_branch_beq(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1580,6 +1680,9 @@ status_t handle_ibex_fi_char_conditional_branch_bge(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1635,6 +1738,8 @@ status_t handle_ibex_fi_char_conditional_branch_bge(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1648,9 +1753,14 @@ status_t handle_ibex_fi_char_conditional_branch_bge(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1658,6 +1768,9 @@ status_t handle_ibex_fi_char_conditional_branch_bgeu(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1713,6 +1826,8 @@ status_t handle_ibex_fi_char_conditional_branch_bgeu(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1726,9 +1841,14 @@ status_t handle_ibex_fi_char_conditional_branch_bgeu(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1736,6 +1856,9 @@ status_t handle_ibex_fi_char_conditional_branch_blt(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1791,6 +1914,8 @@ status_t handle_ibex_fi_char_conditional_branch_blt(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1804,9 +1929,14 @@ status_t handle_ibex_fi_char_conditional_branch_blt(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1814,6 +1944,9 @@ status_t handle_ibex_fi_char_conditional_branch_bltu(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1869,6 +2002,8 @@ status_t handle_ibex_fi_char_conditional_branch_bltu(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1882,9 +2017,14 @@ status_t handle_ibex_fi_char_conditional_branch_bltu(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -1892,6 +2032,9 @@ status_t handle_ibex_fi_char_conditional_branch_bne(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -1947,6 +2090,8 @@ status_t handle_ibex_fi_char_conditional_branch_bne(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -1960,15 +2105,23 @@ status_t handle_ibex_fi_char_conditional_branch_bne(ujson_t *uj)
   uj_output.result2 = result2;
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_csr_read(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2000,6 +2153,8 @@ status_t handle_ibex_fi_char_csr_read(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2031,15 +2186,23 @@ status_t handle_ibex_fi_char_csr_read(ujson_t *uj) __attribute__((optnone)) {
   // Send alerts back to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_csr_write(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2081,6 +2244,8 @@ status_t handle_ibex_fi_char_csr_write(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2102,15 +2267,23 @@ status_t handle_ibex_fi_char_csr_write(ujson_t *uj) __attribute__((optnone)) {
   // Send res & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_csr_combi(ujson_t *uj) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2238,6 +2411,8 @@ status_t handle_ibex_fi_char_csr_combi(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2262,9 +2437,14 @@ status_t handle_ibex_fi_char_csr_combi(ujson_t *uj) {
   // Send alerts back to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_csr_combi_out_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -2279,6 +2459,9 @@ status_t handle_ibex_fi_char_flash_read(ujson_t *uj) __attribute__((optnone)) {
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2358,6 +2541,8 @@ status_t handle_ibex_fi_char_flash_read(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2391,9 +2576,128 @@ status_t handle_ibex_fi_char_flash_read(ujson_t *uj) __attribute__((optnone)) {
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
+  return OK_STATUS();
+}
+
+status_t handle_ibex_fi_char_flash_read_static(ujson_t *uj)
+    __attribute__((optnone)) {
+  // Set the flash region we want to test.
+  ibex_fi_flash_set_region_t uj_data;
+  TRY(ujson_deserialize_ibex_fi_flash_set_region_t(uj, &uj_data));
+
+  // Clear registered alerts in alert handler.
+  pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
+  // Clear the AST recoverable alerts.
+  pentest_clear_sensor_recov_alerts();
+
+  // Configure the data flash.
+  // Flash configuration with ECC and scramble disabled
+  dif_flash_ctrl_region_properties_t region_properties = {
+      .rd_en = kMultiBitBool4True,
+      .prog_en = kMultiBitBool4True,
+      .erase_en = kMultiBitBool4True,
+      .scramble_en = kMultiBitBool4False,
+      .ecc_en = kMultiBitBool4False,
+      .high_endurance_en = kMultiBitBool4False};
+
+  dif_flash_ctrl_data_region_properties_t data_region = {
+      .base = FLASH_PAGES_PER_BANK,
+      .size = 0x1,
+      .properties = region_properties};
+
+  dif_result_t res_prop = dif_flash_ctrl_set_data_region_properties(
+      &flash, uj_data.flash_region, data_region);
+  if (res_prop == kDifLocked) {
+    LOG_INFO("Flash region locked, aborting!");
+    ibex_fi_empty_t uj_output;
+    uj_output.success = false;
+    RESP_OK(ujson_serialize_ibex_fi_empty_t, uj, &uj_output);
+    return OK_STATUS();
+  }
+
+  uint32_t flash_addr = data_region.base * FLASH_PAGE_SZ;
+  mmio_region_t flash_test_page = mmio_region_from_addr(
+      TOP_EARLGREY_FLASH_CTRL_MEM_BASE_ADDR + (uintptr_t)flash_addr);
+
+  if (uj_data.init) {
+    dif_result_t res_en = dif_flash_ctrl_set_data_region_enablement(
+        &flash, uj_data.flash_region, kDifToggleEnabled);
+    if (res_en == kDifLocked) {
+      LOG_INFO("Flash region locked, aborting!");
+      ibex_fi_empty_t uj_output;
+      uj_output.success = false;
+      RESP_OK(ujson_serialize_ibex_fi_empty_t, uj, &uj_output);
+      return OK_STATUS();
+    }
+
+    // Prepare page and write reference values into it.
+    uint32_t input_page[FLASH_UINT32_WORDS_PER_PAGE];
+    memset(input_page, 0x0, FLASH_UINT32_WORDS_PER_PAGE * sizeof(uint32_t));
+    for (int i = 0; i < kNumRefValues; i++) {
+      input_page[i] = ref_values[i];
+    }
+
+    // Erase flash and write page with reference values.
+    TRY(flash_ctrl_testutils_erase_and_write_page(
+        &flash, flash_addr, /*partition_id=*/0, input_page,
+        kDifFlashCtrlPartitionTypeData, FLASH_UINT32_WORDS_PER_PAGE));
+  }
+
+  PENTEST_ASM_TRIGGER_HIGH
+  asm volatile(NOP1000);
+  PENTEST_ASM_TRIGGER_LOW
+
+  uint32_t flash_reads[IBEXFI_MAX_FAULTY_ADDRESSES_DATA] = {0};
+
+  for (int idx = 0; idx < IBEXFI_MAX_FAULTY_ADDRESSES_DATA; idx++) {
+    flash_reads[idx] =
+        mmio_region_read32(flash_test_page, idx * (ptrdiff_t)sizeof(uint32_t));
+  }
+
+  // Get registered alerts from alert handler.
+  reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
+  // Get fatal and recoverable AST alerts from sensor controller.
+  pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
+
+  ibex_fi_faulty_pure_data_t uj_output;
+  // Preset buffers to 0.
+  memset(uj_output.data_faulty, false, sizeof(uj_output.data_faulty));
+  memset(uj_output.data, 0, sizeof(uj_output.data));
+
+  // Check if one or multiple values are faulty.
+  for (size_t it = 0; it < IBEXFI_MAX_FAULTY_ADDRESSES_DATA; it++) {
+    if (flash_reads[it] != ref_values[it]) {
+      // If there is a mismatch, set data_faulty to true and return the
+      // faulty value.
+      uj_output.data_faulty[it] = true;
+      uj_output.data[it] = flash_reads[it];
+    }
+  }
+
+  // Read ERR_STATUS register.
+  dif_rv_core_ibex_error_status_t codes;
+  TRY(dif_rv_core_ibex_get_error_status(&rv_core_ibex, &codes));
+
+  // Send result & ERR_STATUS to host.
+  uj_output.err_status = codes;
+  memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
+  memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
+         sizeof(sensor_alerts.alerts));
+  RESP_OK(ujson_serialize_ibex_fi_faulty_pure_data_t, uj, &uj_output);
   return OK_STATUS();
 }
 
@@ -2408,6 +2712,9 @@ status_t handle_ibex_fi_char_flash_write(ujson_t *uj) __attribute__((optnone)) {
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2462,6 +2769,8 @@ status_t handle_ibex_fi_char_flash_write(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2486,9 +2795,14 @@ status_t handle_ibex_fi_char_flash_write(ujson_t *uj) __attribute__((optnone)) {
   uj_output.err_status = codes;
   memset(uj_output.registers, 0, sizeof(uj_output.registers));
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -2496,6 +2810,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_complement_branch(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2517,6 +2834,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_complement_branch(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2529,9 +2848,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_complement_branch(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2540,6 +2863,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_unimp(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2558,6 +2884,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_unimp(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2570,9 +2898,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_unimp(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2581,6 +2913,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_2_unimps(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2599,6 +2934,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_2_unimps(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2611,9 +2948,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_2_unimps(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2622,6 +2963,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_3_unimps(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2640,6 +2984,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_3_unimps(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2652,9 +2998,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_3_unimps(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2663,6 +3013,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_4_unimps(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2681,6 +3034,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_4_unimps(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2693,9 +3048,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_4_unimps(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2704,6 +3063,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_5_unimps(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2722,6 +3084,8 @@ status_t handle_ibex_fi_char_hardened_check_eq_5_unimps(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2734,9 +3098,13 @@ status_t handle_ibex_fi_char_hardened_check_eq_5_unimps(ujson_t *uj)
   uj_output.result1 = value1;
   uj_output.result2 = value2;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_mult_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2744,6 +3112,9 @@ status_t handle_ibex_fi_char_hardened_check_eq_5_unimps(ujson_t *uj)
 status_t handle_ibex_fi_char_mem_op_loop(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2767,6 +3138,8 @@ status_t handle_ibex_fi_char_mem_op_loop(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2785,9 +3158,13 @@ status_t handle_ibex_fi_char_mem_op_loop(ujson_t *uj) __attribute__((optnone)) {
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_array_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -2796,6 +3173,9 @@ status_t handle_ibex_fi_char_register_file(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2812,6 +3192,8 @@ status_t handle_ibex_fi_char_register_file(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2845,9 +3227,14 @@ status_t handle_ibex_fi_char_register_file(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -2855,6 +3242,9 @@ status_t handle_ibex_fi_char_register_file_read(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -2939,6 +3329,8 @@ status_t handle_ibex_fi_char_register_file_read(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -2970,15 +3362,23 @@ status_t handle_ibex_fi_char_register_file_read(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_reg_op_loop(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3002,6 +3402,8 @@ status_t handle_ibex_fi_char_reg_op_loop(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3029,15 +3431,23 @@ status_t handle_ibex_fi_char_reg_op_loop(ujson_t *uj) __attribute__((optnone)) {
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_single_beq(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3063,6 +3473,8 @@ status_t handle_ibex_fi_char_single_beq(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3092,15 +3504,23 @@ status_t handle_ibex_fi_char_single_beq(ujson_t *uj) __attribute__((optnone)) {
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_single_bne(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3125,6 +3545,8 @@ status_t handle_ibex_fi_char_single_bne(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3154,15 +3576,23 @@ status_t handle_ibex_fi_char_single_bne(ujson_t *uj) __attribute__((optnone)) {
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_sram_read(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3203,6 +3633,8 @@ status_t handle_ibex_fi_char_sram_read(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3234,9 +3666,14 @@ status_t handle_ibex_fi_char_sram_read(ujson_t *uj) __attribute__((optnone)) {
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3254,6 +3691,9 @@ status_t handle_ibex_fi_char_sram_read_ret(ujson_t *uj)
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3295,6 +3735,8 @@ status_t handle_ibex_fi_char_sram_read_ret(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3331,9 +3773,14 @@ status_t handle_ibex_fi_char_sram_read_ret(ujson_t *uj)
   uj_output.err_status = codes;
   uj_output.sram_err_status = ret_sram_codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_sram_codes_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3352,6 +3799,9 @@ status_t handle_ibex_fi_char_sram_static(ujson_t *uj) __attribute__((optnone)) {
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3381,6 +3831,8 @@ status_t handle_ibex_fi_char_sram_static(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3415,15 +3867,23 @@ status_t handle_ibex_fi_char_sram_static(ujson_t *uj) __attribute__((optnone)) {
   // Send res & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_addresses_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_char_sram_write(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3455,6 +3915,8 @@ status_t handle_ibex_fi_char_sram_write(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3474,9 +3936,14 @@ status_t handle_ibex_fi_char_sram_write(ujson_t *uj) __attribute__((optnone)) {
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_sram_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3484,6 +3951,9 @@ status_t handle_ibex_fi_char_sram_write_read(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3595,6 +4065,8 @@ status_t handle_ibex_fi_char_sram_write_read(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3624,9 +4096,14 @@ status_t handle_ibex_fi_char_sram_write_read(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_faulty_data_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3634,6 +4111,9 @@ status_t handle_ibex_fi_char_sram_write_read_alt(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3692,6 +4172,8 @@ status_t handle_ibex_fi_char_sram_write_read_alt(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3714,9 +4196,14 @@ status_t handle_ibex_fi_char_sram_write_read_alt(ujson_t *uj)
   // Send result & ERR_STATUS to host.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_sram_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3724,6 +4211,9 @@ status_t handle_ibex_fi_char_sram_write_static_unrolled(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3880,6 +4370,8 @@ status_t handle_ibex_fi_char_sram_write_static_unrolled(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3899,9 +4391,14 @@ status_t handle_ibex_fi_char_sram_write_static_unrolled(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_sram_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3909,6 +4406,9 @@ status_t handle_ibex_fi_char_unconditional_branch(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -3958,6 +4458,8 @@ status_t handle_ibex_fi_char_unconditional_branch(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -3974,9 +4476,14 @@ status_t handle_ibex_fi_char_unconditional_branch(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -3984,6 +4491,9 @@ status_t handle_ibex_fi_char_unconditional_branch_nop(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -4033,6 +4543,8 @@ status_t handle_ibex_fi_char_unconditional_branch_nop(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -4049,9 +4561,14 @@ status_t handle_ibex_fi_char_unconditional_branch_nop(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -4059,6 +4576,9 @@ status_t handle_ibex_fi_char_unrolled_mem_op_loop(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -4085,6 +4605,8 @@ status_t handle_ibex_fi_char_unrolled_mem_op_loop(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -4100,9 +4622,14 @@ status_t handle_ibex_fi_char_unrolled_mem_op_loop(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -4110,6 +4637,9 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -4138,6 +4668,8 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -4154,9 +4686,14 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
+
   return OK_STATUS();
 }
 
@@ -4164,6 +4701,9 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop_chain(ujson_t *uj)
     __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -4193,6 +4733,8 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop_chain(ujson_t *uj)
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -4215,53 +4757,18 @@ status_t handle_ibex_fi_char_unrolled_reg_op_loop_chain(ujson_t *uj)
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_array_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
 
 status_t handle_ibex_fi_init(ujson_t *uj) {
-  penetrationtest_cpuctrl_t uj_cpuctrl_data;
-  TRY(ujson_deserialize_penetrationtest_cpuctrl_t(uj, &uj_cpuctrl_data));
-  penetrationtest_sensor_config_t uj_sensor_data;
-  TRY(ujson_deserialize_penetrationtest_sensor_config_t(uj, &uj_sensor_data));
-  penetrationtest_alert_config_t uj_alert_data;
-  TRY(ujson_deserialize_penetrationtest_alert_config_t(uj, &uj_alert_data));
-
-  pentest_select_trigger_type(kPentestTriggerTypeSw);
-  // As we are using the software defined trigger, the first argument of
-  // pentest_init is not needed. kPentestTriggerSourceAes is selected as a
-  // placeholder.
-  pentest_init(kPentestTriggerSourceAes,
-               kPentestPeripheralIoDiv4 | kPentestPeripheralEdn |
-                   kPentestPeripheralCsrng | kPentestPeripheralEntropy |
-                   kPentestPeripheralAes | kPentestPeripheralHmac |
-                   kPentestPeripheralKmac | kPentestPeripheralOtbn,
-               uj_sensor_data.sensor_ctrl_enable,
-               uj_sensor_data.sensor_ctrl_en_fatal);
-
-  // Configure the alert handler. Alerts triggered by IP blocks are captured
-  // and reported to the test.
-  pentest_configure_alert_handler(
-      uj_alert_data.alert_classes, uj_alert_data.enable_alerts,
-      uj_alert_data.enable_classes, uj_alert_data.accumulation_thresholds,
-      uj_alert_data.signals, uj_alert_data.duration_cycles,
-      uj_alert_data.ping_timeout);
-
-  // Configure the CPU for the pentest.
-  penetrationtest_device_info_t uj_output;
-  TRY(pentest_configure_cpu(
-      uj_cpuctrl_data.enable_icache, &uj_output.icache_en,
-      uj_cpuctrl_data.enable_dummy_instr, &uj_output.dummy_instr_en,
-      uj_cpuctrl_data.dummy_instr_count, uj_cpuctrl_data.enable_jittery_clock,
-      uj_cpuctrl_data.enable_sram_readback, &uj_output.clock_jitter_locked,
-      &uj_output.clock_jitter_en, &uj_output.sram_main_readback_locked,
-      &uj_output.sram_ret_readback_locked, &uj_output.sram_main_readback_en,
-      &uj_output.sram_ret_readback_en, uj_cpuctrl_data.enable_data_ind_timing,
-      &uj_output.data_ind_timing_en));
-
   // Enable the flash.
   flash_info = dif_flash_ctrl_get_device_info();
   TRY(dif_flash_ctrl_init_state(
@@ -4272,27 +4779,6 @@ status_t handle_ibex_fi_init(ujson_t *uj) {
   TRY(dif_otp_ctrl_init(
       mmio_region_from_addr(TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR), &otp));
 
-  // Configure Ibex to allow reading ERR_STATUS register.
-  TRY(dif_rv_core_ibex_init(
-      mmio_region_from_addr(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR),
-      &rv_core_ibex));
-
-  // Read rom digest.
-  TRY(pentest_read_rom_digest(uj_output.rom_digest));
-
-  // Read device ID and return to host.
-  TRY(pentest_read_device_id(uj_output.device_id));
-  RESP_OK(ujson_serialize_penetrationtest_device_info_t, uj, &uj_output);
-
-  // Read the sensor config.
-  TRY(pentest_send_sensor_config(uj));
-
-  // Read the alert config.
-  TRY(pentest_send_alert_config(uj));
-
-  // Read different SKU config fields and return to host.
-  TRY(pentest_send_sku_config(uj));
-
   // Initialize flash for the flash test and write reference values into page.
   flash_init = false;
   flash_data_valid = false;
@@ -4300,6 +4786,27 @@ status_t handle_ibex_fi_init(ujson_t *uj) {
   sram_ret_init = false;
   // Fetch reference values from OTP before OTP tests.
   otp_ref_init = false;
+
+  // Configure the device.
+  pentest_setup_device(uj, true, false);
+
+  pentest_select_trigger_type(kPentestTriggerTypeSw);
+  // As we are using the software defined trigger, the first argument of
+  // pentest_init is not needed. kPentestTriggerSourceAes is selected as a
+  // placeholder.
+  pentest_init(kPentestTriggerSourceAes,
+               kPentestPeripheralIoDiv4 | kPentestPeripheralEdn |
+                   kPentestPeripheralCsrng | kPentestPeripheralEntropy |
+                   kPentestPeripheralAes | kPentestPeripheralHmac |
+                   kPentestPeripheralKmac | kPentestPeripheralOtbn);
+
+  // Configure Ibex to allow reading ERR_STATUS register.
+  TRY(dif_rv_core_ibex_init(
+      mmio_region_from_addr(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR),
+      &rv_core_ibex));
+
+  // Read different SKU config fields and return to host.
+  TRY(pentest_send_sku_config(uj));
 
   return OK_STATUS();
 }
@@ -4324,6 +4831,9 @@ status_t handle_ibex_fi_otp_read_lock(ujson_t *uj) __attribute__((optnone)) {
 status_t handle_ibex_fi_otp_write_lock(ujson_t *uj) __attribute__((optnone)) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -4341,6 +4851,8 @@ status_t handle_ibex_fi_otp_write_lock(ujson_t *uj) __attribute__((optnone)) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -4354,9 +4866,13 @@ status_t handle_ibex_fi_otp_write_lock(ujson_t *uj) __attribute__((optnone)) {
       0;  // Writing to the locked OTP partition crashes the chip.
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_ibex_fi_test_result_t, uj, &uj_output);
+
+  // Signal to Verilator that the test completed.
+  pentest_verilator_signal_test_end();
 
   return OK_STATUS();
 }
@@ -4403,6 +4919,8 @@ status_t handle_ibex_fi(ujson_t *uj) {
       return handle_ibex_fi_char_csr_combi(uj);
     case kIbexFiSubcommandCharFlashRead:
       return handle_ibex_fi_char_flash_read(uj);
+    case kIbexFiSubcommandCharFlashReadStatic:
+      return handle_ibex_fi_char_flash_read_static(uj);
     case kIbexFiSubcommandCharFlashWrite:
       return handle_ibex_fi_char_flash_write(uj);
     case kIbexFiSubcommandCharHardenedCheckComplementBranch:

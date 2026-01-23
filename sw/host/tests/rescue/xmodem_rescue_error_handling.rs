@@ -400,9 +400,7 @@ fn rescue_image_too_big(
     let image_too_big = [0u8; 1026 * 1024];
     match rescue.update_firmware(BootSlot::SlotB, &image_too_big) {
         Ok(_) => {
-            return Err(anyhow!(
-                "Expects cancel during firmware rescue, but got OK."
-            ));
+            return Err(anyhow!("Expects cancel during firmware rescue, but got OK."));
         }
         Err(e) => {
             if e.to_string().contains("Cancelled") {

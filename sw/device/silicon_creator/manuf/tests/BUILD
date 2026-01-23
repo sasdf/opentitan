@@ -17,6 +17,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "spx_key_for_lc_state",
 )
@@ -79,6 +80,7 @@ _MANUF_TEST_LOCKED_KEY = None
         ecdsa_key = _MANUF_TEST_LOCKED_KEY if (lc_state, lc_val) in _TEST_LOCKED_LC_ITEMS else ecdsa_key_for_lc_state(ECDSA_SPX_KEY_STRUCTS, lc_val),
         exec_env = {
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
@@ -91,6 +93,18 @@ _MANUF_TEST_LOCKED_KEY = None
             test_cmd = "--initial-lc-state={lc_state}",
             test_harness = "//sw/host/tests/manuf/manuf_scrap",
             testopt_bootstrap = str((lc_state, lc_val) not in _TEST_LOCKED_LC_ITEMS),
+        ),
+        qemu = qemu_params(
+            lc_state = lc_state,  # will be expanded in test_cmd
+            needs_jtag = True,
+            otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = (
+                "" if (
+                    (lc_state, lc_val) in _TEST_LOCKED_LC_ITEMS
+                ) else "--bootstrap={firmware}"
+            ) + " --initial-lc-state={lc_state}",
+            test_harness = "//sw/host/tests/manuf/manuf_scrap",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -117,6 +131,7 @@ opentitan_test(
     name = "manuf_cp_unlock_raw_functest",
     srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_sival": None,
         "//hw/top_earlgrey:fpga_cw340_sival": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
     },
@@ -127,6 +142,12 @@ opentitan_test(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_unlock_raw",
         testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/ip/otp_ctrl/data:img_raw",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_cp_unlock_raw",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -142,6 +163,7 @@ opentitan_test(
     srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         changes_otp = True,
@@ -150,6 +172,12 @@ opentitan_test(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_volatile_unlock_raw",
         testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/ip/otp_ctrl/data:img_raw",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_cp_volatile_unlock_raw",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -179,6 +207,7 @@ opentitan_test(
         name = "manuf_cp_yield_test_functest_{}".format(lc_state.lower()),
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
         exec_env = {
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
@@ -191,6 +220,14 @@ opentitan_test(
             test_cmd = "--initial-lc-state={lc_state}",
             test_harness = "//sw/host/tests/manuf/manuf_cp_yield_test",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            lc_state = lc_state,  # will be expanded in test_cmd
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = "--initial-lc-state={lc_state}",
+            test_harness = "//sw/host/tests/manuf/manuf_cp_yield_test",
         ),
         deps = [
             "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -252,6 +289,7 @@ cc_library(
         name = "manuf_sram_program_crc_{}_functest".format(lc_state.lower()),
         srcs = ["sram_empty_functest.c"],
         exec_env = {
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:silicon_creator": None,
@@ -266,6 +304,13 @@ cc_library(
         ),
         kind = "ram",
         linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":otp_img_sram_exec_en_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = "--elf={firmware}",
+            test_harness = "//sw/host/tests/manuf/manuf_sram_program_crc_check",
+        ),
         silicon = silicon_params(
             interface = "hyper310",
             needs_jtag = True,
@@ -303,6 +348,8 @@ opentitan_binary(
     srcs = ["sram_device_info_flash_wr_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     kind = "ram",
     linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
@@ -343,6 +390,7 @@ opentitan_binary(
             CONST.LCV.PROD,
         ),
         exec_env = {
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
@@ -362,6 +410,21 @@ opentitan_binary(
             """,
             test_harness = "//sw/host/tests/manuf/manuf_cp_device_info_flash_wr",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            binaries = {
+                ":sram_device_info_flash_wr_functest": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(init_lc_state.lower()),
+            tags = ["manuf"],
+            target_lc_state = target_lc_state,  # will be expanded in test_cmd
+            test_cmd = """
+                --bootstrap={firmware}
+                --target-lc-state={target_lc_state}
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/manuf/manuf_cp_device_info_flash_wr",
         ),
         spx_key = spx_key_for_lc_state(
             ECDSA_SPX_KEY_STRUCTS,
@@ -400,6 +463,8 @@ opentitan_binary(
     srcs = ["sram_exec_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
+        "//hw/top_earlgrey:fpga_cw340": None,
     },
     kind = "ram",
     linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
@@ -429,6 +494,7 @@ opentitan_binary(
         srcs = ["idle_functest.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
@@ -467,6 +533,7 @@ opentitan_test(
     name = "manuf_cp_test_lock_functest",
     srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_sival": None,
         "//hw/top_earlgrey:fpga_cw340_sival": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
     },
@@ -477,6 +544,12 @@ opentitan_test(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_test_lock",
         testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":otp_img_otp_ctrl_functest",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_cp_test_lock",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -498,6 +571,7 @@ opentitan_test(
     srcs = [":empty_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         changes_otp = True,
@@ -506,6 +580,12 @@ opentitan_test(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/otp_ctrl:otp_ctrl",
         testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":otp_img_otp_ctrl_functest",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/otp_ctrl:otp_ctrl",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -557,11 +637,19 @@ opentitan_test(
     name = "ujson_msg_size_functest",
     srcs = ["ujson_msg_size_functest.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_sival": None,
         "//hw/top_earlgrey:fpga_cw340_sival": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_size",
+    ),
+    qemu = qemu_params(
+        tags = ["manuf"],
+        test_cmd = """
+            --bootstrap={firmware}
+        """,
         test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_size",
     ),
     deps = [
@@ -576,11 +664,19 @@ opentitan_test(
     name = "ujson_msg_padding_functest",
     srcs = ["ujson_msg_padding_functest.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_sival": None,
         "//hw/top_earlgrey:fpga_cw340_sival": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_padding",
+    ),
+    qemu = qemu_params(
+        tags = ["manuf"],
+        test_cmd = """
+            --bootstrap={firmware}
+        """,
         test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_padding",
     ),
     deps = [

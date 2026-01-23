@@ -75,6 +75,7 @@ opentitan_test(
         ),
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         },
     ),
     verilator = verilator_params(
@@ -97,6 +98,7 @@ cc_library(
     deps = [
         ":boot_data",
         ":nonce",
+        "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:macros",
         "//sw/device/silicon_creator/lib:build_info",
         "//sw/device/silicon_creator/lib:error",
@@ -379,6 +381,7 @@ dual_cc_library(
             ":stack_utilization",
             "//sw/device/lib/base:hardened",
             "//sw/device/lib/base:macros",
+            "//sw/device/lib/coverage:api",
             "//sw/device/silicon_creator/lib/drivers:lifecycle",
             "//hw/ip/keymgr/data:keymgr_c_regs",
             "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
@@ -400,7 +403,6 @@ dual_cc_library(
             "//sw/device/lib/base:stdasm",
             "//sw/device/silicon_creator/lib/drivers:alert",
             "//sw/device/silicon_creator/lib/drivers:otp",
-            "//sw/device/lib/coverage:api",
         ],
     ),
 )

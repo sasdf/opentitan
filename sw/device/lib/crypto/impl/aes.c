@@ -13,9 +13,9 @@
 #include "sw/device/lib/crypto/drivers/keymgr.h"
 #include "sw/device/lib/crypto/impl/integrity.h"
 #include "sw/device/lib/crypto/impl/keyblob.h"
-#include "sw/device/lib/crypto/impl/security_config.h"
 #include "sw/device/lib/crypto/impl/status.h"
 #include "sw/device/lib/crypto/include/datatypes.h"
+#include "sw/device/lib/crypto/include/security_config.h"
 
 // Module ID for status codes.
 #define MODULE_ID MAKE_MODULE_ID('a', 'e', 's')
@@ -50,8 +50,6 @@ static status_t aes_key_construct(otcrypto_blinded_key_t *blinded_key,
   if (integrity_blinded_key_check(blinded_key) != kHardenedBoolTrue) {
     return OTCRYPTO_BAD_ARGS;
   }
-  HARDENED_CHECK_EQ(launder32(integrity_blinded_key_check(blinded_key)),
-                    kHardenedBoolTrue);
 
   if (blinded_key->config.hw_backed == kHardenedBoolTrue) {
     // Call keymgr to sideload the key into AES.
@@ -130,6 +128,12 @@ static status_t aes_key_construct(otcrypto_blinded_key_t *blinded_key,
     // Create the checksum of the key and store it in the key structure.
     aes_key->checksum = aes_key_integrity_checksum(aes_key);
   }
+
+  // Second integrity check of the key we got passed into the cryptolib.
+  // This check is placed here to catch any corruptions that might have
+  // happen after the first check when assembling the `aes_key`.
+  HARDENED_CHECK_EQ(launder32(integrity_blinded_key_check(blinded_key)),
+                    kHardenedBoolTrue);
 
   return OTCRYPTO_OK;
 }
@@ -249,9 +253,10 @@ static status_t get_block(otcrypto_const_byte_buf_t input,
     // block.
     // Byte buffers passed as input may not be word-aligned, so we cannot
     // use `hardened_memcpy`.
-    // This is acceptable because the data is non-sensitive.
-    memcpy(block->data, &input.data[index * kAesBlockNumBytes],
-           kAesBlockNumBytes);
+    // Hence, use `randomized_bytecopy` instead.
+    HARDENED_TRY(randomized_bytecopy(block->data,
+                                     &input.data[index * kAesBlockNumBytes],
+                                     kAesBlockNumBytes));
     return OTCRYPTO_OK;
   }
   HARDENED_CHECK_GE(launder32(index), num_full_blocks);
@@ -259,7 +264,8 @@ static status_t get_block(otcrypto_const_byte_buf_t input,
   // If we get here, this block is the one with padding. It may be a partial
   // block or an empty block that will be entirely filled with padded bytes.
   size_t partial_data_len = input.len % kAesBlockNumBytes;
-  memcpy(block->data, &input.data[index * kAesBlockNumBytes], partial_data_len);
+  HARDENED_TRY(randomized_bytecopy(
+      block->data, &input.data[index * kAesBlockNumBytes], partial_data_len));
 
   // Apply padding.
   HARDENED_TRY(aes_padding_apply(padding, partial_data_len, block));
@@ -299,9 +305,6 @@ static otcrypto_status_t otcrypto_aes_impl(
       cipher_input.data == NULL || cipher_output.data == NULL) {
     return OTCRYPTO_BAD_ARGS;
   }
-
-  // Check the security config of the device.
-  HARDENED_TRY(security_config_check(key->config.security_level));
 
   // Ensure the entropy complex is initialized.
   HARDENED_TRY(entropy_complex_check());
@@ -418,9 +421,10 @@ static otcrypto_status_t otcrypto_aes_impl(
     HARDENED_TRY(aes_update(&block_out, &block_in));
     // Byte buffers passed as input may not be word-aligned, so we cannot
     // use `hardened_memcpy`.
-    // This is acceptable because the data is non-sensitive.
-    memcpy(&cipher_output.data[(i - block_offset) * kAesBlockNumBytes],
-           block_out.data, kAesBlockNumBytes);
+    // Hence, use `randomized_bytecopy` instead.
+    HARDENED_TRY(randomized_bytecopy(
+        &cipher_output.data[(i - block_offset) * kAesBlockNumBytes],
+        block_out.data, kAesBlockNumBytes));
   }
   // Check that the loop ran for the correct number of iterations.
   HARDENED_CHECK_EQ(i, input_nblocks);
@@ -431,9 +435,10 @@ static otcrypto_status_t otcrypto_aes_impl(
     HARDENED_TRY(aes_update(&block_out, /*src=*/NULL));
     // Byte buffers passed as input may not be word-aligned, so we cannot
     // use `hardened_memcpy`.
-    // This is acceptable because the data is non-sensitive.
-    memcpy(&cipher_output.data[(input_nblocks - i) * kAesBlockNumBytes],
-           block_out.data, kAesBlockNumBytes);
+    // Hence, use `randomized_bytecopy` instead.
+    HARDENED_TRY(randomized_bytecopy(
+        &cipher_output.data[(input_nblocks - i) * kAesBlockNumBytes],
+        block_out.data, kAesBlockNumBytes));
   }
   // Check that the loop ran for the correct number of iterations.
   HARDENED_CHECK_EQ(launder32(i), 0);
@@ -487,8 +492,10 @@ otcrypto_status_t otcrypto_aes(otcrypto_blinded_key_t *key,
     // plaintexts after the actual AES operation and compares it to the input.
 
     // Copy the IV for the second AES computation.
-    uint32_t iv_data[iv.len];
-    memcpy(iv_data, iv.data, sizeof(iv_data));
+    // No FI protection with HARDENED_TRY() is needed as this is the redundant
+    // IV.
+    uint32_t iv_data[kAesBlockNumWords];
+    hardened_memcpy(iv_data, iv.data, kAesBlockNumWords);
     otcrypto_word32_buf_t iv_redundant = {
         .data = iv_data,
         .len = iv.len,

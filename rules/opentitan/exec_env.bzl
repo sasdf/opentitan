@@ -336,6 +336,7 @@ def update_file_attr(name, attr, provider, data_files, param, action_param = Non
         _update(name, attr, data_files, param, action_param)
         return
 
+    # Propagate runfiles
     if DefaultInfo in attr:
         data_files.extend(attr[DefaultInfo].default_runfiles.files.to_list() or [])
 

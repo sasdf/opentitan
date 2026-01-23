@@ -14,7 +14,6 @@ load(
     "otp_partition",
 )
 load("//rules:rom_e2e.bzl", "maybe_skip_in_ci")
-load("//rules:splice.bzl", "bitstream_splice")
 load(
     "//sw/device/silicon_creator/rom/e2e:defs.bzl",
     "MSG_PASS",
@@ -63,17 +62,6 @@ otp_image(
     name = "otp_img_default",
     src = ":otp_json_default",
     overlays = OTP_SIGVERIFY_FAKE_KEYS,
-    visibility = ["//visibility:private"],
-)
-
-bitstream_splice(
-    name = "bitstream_default_otp",
-    src = "//hw/bitstream:mask_rom",
-    data = ":otp_img_default",
-    instance = "otp",
-    meminfo = "//hw/bitstream:cw310_mmi",
-    tags = maybe_skip_in_ci(CONST.LCV.RMA),
-    update_usr_access = True,
     visibility = ["//visibility:private"],
 )
 

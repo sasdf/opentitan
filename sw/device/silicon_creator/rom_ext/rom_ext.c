@@ -388,11 +388,15 @@ static rom_error_t rom_ext_try_next_stage(boot_data_t *boot_data,
   rom_error_t slot[2] = {0, 0};
   for (size_t i = 0; i < ARRAYSIZE(manifests.ordered); ++i) {
     uint32_t flash_exec = 0;
+    char slot_id =
+        (manifests.ordered[i] == rom_ext_boot_policy_manifest_a_get()) ? 'A'
+                                                                       : 'B';
     error =
-        rom_ext_verify(manifests.ordered[i], boot_data, &flash_exec, &keyring,
-                       &verify_key, &owner_config, &isfb_check_count);
+        rom_ext_verify(manifests.ordered[i], slot_id, boot_data, &flash_exec,
+                       &keyring, &verify_key, &owner_config, &isfb_check_count);
     slot[i] = error;
     if (error != kErrorOk) {
+      dbg_printf("verifyfail: Slot%c;%x\r\n", slot_id, error);
       continue;
     }
     HARDENED_CHECK_EQ(flash_exec, kSigverifyFlashExec);
@@ -497,6 +501,10 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   HARDENED_RETURN_IF_ERROR(rom_ext_init(boot_data));
   const manifest_t *self = rom_ext_manifest();
 
+  // Security version self-check
+  HARDENED_CHECK_GE(self->security_version,
+                    boot_data->min_security_version_rom_ext);
+
   lifecycle_claim(kMultiBitBool8True);
   lifecycle_set_status(kLifecycleStatusWordRomExtVersion, self->version_minor);
   lifecycle_set_status(kLifecycleStatusWordRomExtSecVersion,
@@ -528,6 +536,13 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   // Maybe advance the security version.
   HARDENED_RETURN_IF_ERROR(rom_ext_advance_secver(boot_data, self));
 
+  // Fix the boot data if needed
+  rom_error_t boot_data_validity = boot_data_redundancy_check();
+  if (boot_data_validity != kErrorOk) {
+    // Ignore the result to prevent unnecessary bootloop.
+    OT_DISCARD(boot_data_write(boot_data));
+  }
+
   // Prepare dice chain builder for CDI_1.
   HARDENED_RETURN_IF_ERROR(dice_chain_init());
   HARDENED_RETURN_IF_ERROR(dice_chain_rom_ext_check());
@@ -542,6 +557,9 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   // it here so the "SetNextBl0" can do a one-time override of the RAM copy
   // of `boot_data`.
   boot_log->primary_bl0_slot = boot_data->primary_bl0_slot;
+  boot_log->events =
+      bitfield_bit32_write(boot_log->events, BOOT_LOG_EVENT_REDUNDANCY,
+                           boot_data_validity != kErrorOk);
 
   // Protect the flash pages where the ROM_EXT is located.
   rom_ext_flash_protect_self(boot_log->rom_ext_slot);

@@ -4,13 +4,14 @@
 
 pub mod gpio;
 pub mod i2c;
+pub mod jtag;
 pub mod monitor;
 pub mod reset;
 pub mod spi;
 pub mod uart;
 pub mod usbdev;
 
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -21,20 +22,21 @@ use std::time::Duration;
 use anyhow::{Context, bail};
 
 use crate::backend::qemu::QemuOpts;
-use crate::debug::openocd::OpenOcdJtagChain;
 use crate::io::gpio::{GpioError, GpioPin};
 use crate::io::jtag::{JtagChain, JtagParams};
 use crate::io::uart::Uart;
+use crate::io::usb::UsbContext;
 use crate::transport::Bus;
 use crate::transport::Target;
 use crate::transport::common::uart::SerialPortUart;
 use crate::transport::qemu::gpio::{QemuGpio, QemuGpioPin};
 use crate::transport::qemu::i2c::QemuI2c;
+use crate::transport::qemu::jtag::QemuJtag;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
 use crate::transport::qemu::reset::QemuReset;
 use crate::transport::qemu::spi::QemuSpi;
 use crate::transport::qemu::uart::QemuUart;
-use crate::transport::qemu::usbdev::QemuVbusSense;
+use crate::transport::qemu::usbdev::{QemuUsbHost, QemuVbusSense};
 use crate::transport::{
     Capabilities, Capability, Transport, TransportError, TransportInterfaceType,
 };
@@ -73,11 +75,20 @@ pub struct Qemu {
     /// VBUS sense pin (actually goes via the `usbdev-cmd` chardev).
     vbus_sense: Option<Rc<dyn GpioPin>>,
 
+    /// USB host TTY port name (`usbdev-host` chardev).
+    usb_host_tty: Option<String>,
+
+    /// USB host.
+    usb_host: RefCell<Option<Rc<dyn UsbContext>>>,
+
     /// QEMU log modelled as a UART.
     log: Option<Rc<dyn Uart>>,
 
     /// Debug module JTAG.
-    jtag_sock: Option<PathBuf>,
+    jtag_rv_dm_sock: Option<PathBuf>,
+
+    /// Lifecycle controller JTAG.
+    jtag_lc_ctrl_sock: Option<PathBuf>,
 }
 
 impl Qemu {
@@ -97,7 +108,7 @@ impl Qemu {
     /// match what OpenTitanLib expects to be accepted.
     pub fn from_options(options: QemuOpts) -> anyhow::Result<Self> {
         let monitor = Rc::new(RefCell::new(Monitor::new(
-            options.qemu_monitor_tty.unwrap(),
+            options.qemu_monitor_socket.clone().unwrap(),
             options.qemu_quit,
         )?));
 
@@ -119,6 +130,9 @@ impl Qemu {
             let ChardevKind::Pty { ref path } = chardev.kind else {
                 continue;
             };
+            let path = options
+                .device_path(&chardev.id)
+                .unwrap_or(path.to_path_buf());
 
             let serial_port = SerialPortUart::open_pseudo(path.to_str().unwrap(), CONSOLE_BAUDRATE)
                 .context("failed to open QEMU console PTY")?;
@@ -136,6 +150,9 @@ impl Qemu {
         // USBDEV control:
         let vbus_sense = match find_chardev(&chardevs, "usbdev-cmd") {
             Some(ChardevKind::Pty { path }) => {
+                let path = options
+                    .device_path("usbdev-cmd")
+                    .unwrap_or(path.to_path_buf());
                 let tty = serialport::new(
                     path.to_str().context("TTY path not UTF8")?,
                     CONSOLE_BAUDRATE,
@@ -152,9 +169,21 @@ impl Qemu {
             }
         };
 
+        // USBDEV host:
+        let usb_host_tty = match find_chardev(&chardevs, "usbdev-host") {
+            Some(ChardevKind::Pty { path }) => {
+                Some(path.to_str().context("TTY path not UTF8")?.to_string())
+            }
+            _ => {
+                log::info!("could not find pty chardev with id=usbdev-host, skipping USBDEV");
+                None
+            }
+        };
+
         // QEMU log, not really a UART but modelled as one:
         let log = match find_chardev(&chardevs, "log") {
             Some(ChardevKind::Pty { path }) => {
+                let path = options.device_path("log").unwrap_or(path.to_path_buf());
                 let log: Rc<dyn Uart> = Rc::new(
                     SerialPortUart::open_pseudo(path.to_str().unwrap(), CONSOLE_BAUDRATE)
                         .context("failed to open QEMU log PTY")?,
@@ -170,6 +199,7 @@ impl Qemu {
         // If there's a chardev called `spidev`, configure it as a PTY and use as the SPI bus.
         let spi = match find_chardev(&chardevs, "spidev") {
             Some(ChardevKind::Pty { path }) => {
+                let path = options.device_path("spidev").unwrap_or(path.to_path_buf());
                 let spi = QemuSpi::new(path).context("failed to connect to QEMU SPI PTY")?;
                 let spi: Rc<dyn Target> = Rc::new(spi);
                 Some(spi)
@@ -190,6 +220,9 @@ impl Qemu {
             let ChardevKind::Pty { ref path } = chardev.kind else {
                 continue;
             };
+            let path = options
+                .device_path(&chardev.id)
+                .unwrap_or(path.to_path_buf());
 
             let i2c = QemuI2c::new(path).context("failed to connect to QEMU I2C PTY")?;
             let i2c: Rc<dyn Bus> = Rc::new(i2c);
@@ -204,22 +237,40 @@ impl Qemu {
 
         // If there's a chardev called `gpio`, configure it as a PTY and use as the GPIO pins.
         let gpio = match find_chardev(&chardevs, "gpio") {
-            Some(ChardevKind::Pty { path }) => {
-                let gpio = QemuGpio::new(path).context("failed to connect to QEMU GPIO PTY")?;
+            Some(ChardevKind::Socket { path }) => {
+                let path = options.device_path("gpio").unwrap_or(path.to_path_buf());
+                let gpio = QemuGpio::new(path).context("failed to connect to QEMU GPIO Socket")?;
                 let gpio = Rc::new(RefCell::new(gpio));
                 Some(gpio)
             }
             _ => {
-                log::info!("could not find pty chardev with id=gpio, GPIO support disabled");
+                log::info!("could not find socket chardev with id=gpio, GPIO support disabled");
                 None
             }
         };
 
         // Debug module JTAG tap:
-        let jtag_sock = match find_chardev(&chardevs, "taprbb") {
-            Some(ChardevKind::Socket { path }) => Some(path.clone()),
+        let jtag_rv_dm_sock = match find_chardev(&chardevs, "taprbb") {
+            Some(ChardevKind::Socket { path }) => {
+                Some(options.device_path("taprbb").unwrap_or(path.to_path_buf()))
+            }
             _ => {
-                log::info!("could not find socket chardev with id=taprbb, skipping JTAG");
+                log::info!("could not find socket chardev with id=taprbb, skipping RV_DM JTAG");
+                None
+            }
+        };
+
+        // Lifecycle controller JTAG tap:
+        let jtag_lc_ctrl_sock = match find_chardev(&chardevs, "taprbb-lc-ctrl") {
+            Some(ChardevKind::Socket { path }) => Some(
+                options
+                    .device_path("taprbb-lc-ctrl")
+                    .unwrap_or(path.to_path_buf()),
+            ),
+            _ => {
+                log::info!(
+                    "could not find socket chardev with id=taprbb-lc-ctrl, skipping LC JTAG"
+                );
                 None
             }
         };
@@ -237,11 +288,14 @@ impl Qemu {
             reset,
             uarts,
             vbus_sense,
+            usb_host_tty,
+            usb_host: RefCell::new(None),
             log,
             spi,
             i2cs,
             gpio,
-            jtag_sock,
+            jtag_rv_dm_sock,
+            jtag_lc_ctrl_sock,
         })
     }
 }
@@ -263,6 +317,10 @@ impl Transport for Qemu {
 
         if !self.i2cs.is_empty() {
             cap |= Capability::I2C;
+        }
+
+        if self.usb_host_tty.is_some() {
+            cap |= Capability::USB;
         }
 
         Ok(Capabilities::new(cap))
@@ -325,14 +383,36 @@ impl Transport for Qemu {
     }
 
     fn jtag(&self, opts: &JtagParams) -> anyhow::Result<Box<dyn JtagChain>> {
-        let jtag = OpenOcdJtagChain::new(
-            &format!(
-                "adapter driver remote_bitbang; remote_bitbang port 0; remote_bitbang host {sock}",
-                sock = self.jtag_sock.as_ref().unwrap().display(),
-            ),
-            opts,
-        )?;
+        let rv_dm_sock = self
+            .jtag_rv_dm_sock
+            .clone()
+            .context("RV_DM JTAG socket not connected")?;
+        let lc_ctrl_sock = self
+            .jtag_lc_ctrl_sock
+            .clone()
+            .context("LC_CTRL JTAG socket not connected")?;
+
+        let jtag = QemuJtag::new(opts.clone(), rv_dm_sock, lc_ctrl_sock);
 
         Ok(Box::new(jtag))
+    }
+
+    fn usb(&self) -> anyhow::Result<Rc<dyn UsbContext>> {
+        if self.usb_host.borrow().is_none() {
+            let tty = serialport::new(
+                self.usb_host_tty
+                    .as_ref()
+                    .context("USB is not supported (no usbdev-host chardev found)")?,
+                CONSOLE_BAUDRATE,
+            )
+            .open_native()
+            .context("failed to open QEMU usbdev-host PTY")?;
+
+            let usb_host: Rc<dyn UsbContext> = Rc::new(QemuUsbHost::new(tty));
+            self.usb_host.replace(Some(usb_host));
+        }
+        let usb_host = self.usb_host.borrow();
+        let usb_host = Ref::map(usb_host, |d| d.as_ref().expect("usb host"));
+        Ok(usb_host.clone())
     }
 }

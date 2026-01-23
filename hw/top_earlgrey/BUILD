@@ -140,7 +140,7 @@ sim_qemu(
         "--rcfile=",
         "--logging=info",
         "--interface={interface}",
-        "--qemu-monitor-tty=qemu-monitor",
+        "--qemu-monitor-socket=qemu-monitor",
         "--qemu-quit",
     ],
     design = "earlgrey",

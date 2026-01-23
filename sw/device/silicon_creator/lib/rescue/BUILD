@@ -6,6 +6,7 @@ load(
     "@bazel_skylib//lib:dicts.bzl",
     "dicts",
 )
+load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load(
     "//rules/opentitan:defs.bzl",
     "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
@@ -58,15 +59,57 @@ cc_library(
     ] + RESCUE_DEPS,
 )
 
-cc_library(
-    name = "xmodem",
-    srcs = ["xmodem.c"],
-    hdrs = ["xmodem.h"],
-    deps = [
-        "//sw/device/lib/base:hardened",
-        "//sw/device/silicon_creator/lib:error",
-        "//sw/device/silicon_creator/lib/drivers:uart",
+cc_test(
+    name = "rescue_xmodem_unittest",
+    srcs = [
+        "device_host.c",
+        "rescue.c",
+        "rescue_xmodem.c",
+        "rescue_xmodem_unittest.cc",
     ],
+    deps = [
+        ":rescue",
+        ":xmodem",
+        "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
+        "//sw/device/lib/base:macros",
+        "//sw/device/lib/base:memory",
+        "//sw/device/silicon_creator/lib:manifest",
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+        "//sw/device/silicon_creator/lib/drivers:ibex",
+        "//sw/device/silicon_creator/lib/drivers:lifecycle",
+        "//sw/device/silicon_creator/lib/drivers:pinmux",
+        "//sw/device/silicon_creator/lib/drivers:retention_sram",
+        "//sw/device/silicon_creator/lib/drivers:rstmgr",
+        "//sw/device/silicon_creator/lib/ownership:owner_block",
+        "//sw/device/silicon_creator/testing:rom_test",
+        "@googletest//:gtest_main",
+    ],
+)
+
+dual_cc_library(
+    name = "xmodem",
+    srcs = dual_inputs(
+        device = ["xmodem.c"],
+        host = ["mock_xmodem.cc"],
+    ),
+    hdrs = dual_inputs(
+        host = ["mock_xmodem.h"],
+        shared = ["xmodem.h"],
+    ),
+    deps = dual_inputs(
+        device = [
+            "//sw/device/silicon_creator/lib/drivers:uart",
+        ],
+        host = [
+            "//sw/device/lib/base:global_mock",
+            "//sw/device/silicon_creator/testing:rom_test",
+            "@googletest//:gtest",
+        ],
+        shared = [
+            "//sw/device/lib/base:hardened",
+            "//sw/device/silicon_creator/lib:error",
+        ],
+    ),
 )
 
 cc_library(

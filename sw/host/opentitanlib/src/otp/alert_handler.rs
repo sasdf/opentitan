@@ -315,7 +315,7 @@ impl AlertRegs {
 }
 
 trait Crc32Add {
-    fn crc32_add(self, diegst: &mut Digest<u32>);
+    fn crc32_add(self, digest: &mut Digest<u32>);
 }
 
 impl Crc32Add for u32 {
@@ -326,7 +326,7 @@ impl Crc32Add for u32 {
 
 impl<T: Crc32Add, const N: usize> Crc32Add for [T; N] {
     fn crc32_add(self, digest: &mut Digest<u32>) {
-        self.map(|v| v.crc32_add(digest));
+        self.into_iter().for_each(|v| v.crc32_add(digest));
     }
 }
 

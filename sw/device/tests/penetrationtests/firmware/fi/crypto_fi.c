@@ -172,6 +172,9 @@ status_t handle_crypto_fi_aes(ujson_t *uj) {
 
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -232,6 +235,8 @@ status_t handle_crypto_fi_aes(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -244,6 +249,7 @@ status_t handle_crypto_fi_aes(ujson_t *uj) {
   uj_output.err_status = codes;
   memcpy(uj_output.ciphertext, ciphertext.data, 16);
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_crypto_fi_aes_ciphertext_t, uj, &uj_output);
@@ -251,40 +257,15 @@ status_t handle_crypto_fi_aes(ujson_t *uj) {
 }
 
 status_t handle_crypto_fi_init(ujson_t *uj) {
-  penetrationtest_cpuctrl_t uj_cpuctrl_data;
-  TRY(ujson_deserialize_penetrationtest_cpuctrl_t(uj, &uj_cpuctrl_data));
-  penetrationtest_sensor_config_t uj_sensor_data;
-  TRY(ujson_deserialize_penetrationtest_sensor_config_t(uj, &uj_sensor_data));
-  penetrationtest_alert_config_t uj_alert_data;
-  TRY(ujson_deserialize_penetrationtest_alert_config_t(uj, &uj_alert_data));
+  // Configure the device.
+  pentest_setup_device(uj, true, false);
 
   pentest_select_trigger_type(kPentestTriggerTypeSw);
   pentest_init(kPentestTriggerSourceAes,
                kPentestPeripheralIoDiv4 | kPentestPeripheralAes |
                    kPentestPeripheralKmac | kPentestPeripheralEdn |
                    kPentestPeripheralCsrng | kPentestPeripheralEntropy |
-                   kPentestPeripheralHmac,
-               uj_sensor_data.sensor_ctrl_enable,
-               uj_sensor_data.sensor_ctrl_en_fatal);
-  // Configure the alert handler. Alerts triggered by IP blocks are captured
-  // and reported to the test.
-  pentest_configure_alert_handler(
-      uj_alert_data.alert_classes, uj_alert_data.enable_alerts,
-      uj_alert_data.enable_classes, uj_alert_data.accumulation_thresholds,
-      uj_alert_data.signals, uj_alert_data.duration_cycles,
-      uj_alert_data.ping_timeout);
-
-  // Configure the CPU for the pentest.
-  penetrationtest_device_info_t uj_output;
-  TRY(pentest_configure_cpu(
-      uj_cpuctrl_data.enable_icache, &uj_output.icache_en,
-      uj_cpuctrl_data.enable_dummy_instr, &uj_output.dummy_instr_en,
-      uj_cpuctrl_data.dummy_instr_count, uj_cpuctrl_data.enable_jittery_clock,
-      uj_cpuctrl_data.enable_sram_readback, &uj_output.clock_jitter_locked,
-      &uj_output.clock_jitter_en, &uj_output.sram_main_readback_locked,
-      &uj_output.sram_ret_readback_locked, &uj_output.sram_main_readback_en,
-      &uj_output.sram_ret_readback_en, uj_cpuctrl_data.enable_data_ind_timing,
-      &uj_output.data_ind_timing_en));
+                   kPentestPeripheralHmac);
 
   // Init the AES block.
   TRY(dif_aes_init(mmio_region_from_addr(TOP_EARLGREY_AES_BASE_ADDR), &aes));
@@ -314,19 +295,6 @@ status_t handle_crypto_fi_init(ujson_t *uj) {
       mmio_region_from_addr(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR),
       &rv_core_ibex));
 
-  // Read rom digest.
-  TRY(pentest_read_rom_digest(uj_output.rom_digest));
-
-  // Read device ID and return to host.
-  TRY(pentest_read_device_id(uj_output.device_id));
-  RESP_OK(ujson_serialize_penetrationtest_device_info_t, uj, &uj_output);
-
-  // Read the sensor config.
-  TRY(pentest_send_sensor_config(uj));
-
-  // Read the alert config.
-  TRY(pentest_send_alert_config(uj));
-
   // Read different SKU config fields and return to host.
   TRY(pentest_send_sku_config(uj));
 
@@ -339,6 +307,9 @@ status_t handle_crypto_fi_kmac(ujson_t *uj) {
   TRY(ujson_deserialize_crypto_fi_kmac_mode_t(uj, &uj_data));
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -399,6 +370,8 @@ status_t handle_crypto_fi_kmac(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -414,6 +387,7 @@ status_t handle_crypto_fi_kmac(ujson_t *uj) {
   memcpy(uj_output.digest, (uint8_t *)digest, 8);
   memcpy(uj_output.digest_2nd, (uint8_t *)digest_2nd, 8);
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_crypto_fi_kmac_digest_t, uj, &uj_output);
@@ -423,6 +397,9 @@ status_t handle_crypto_fi_kmac(ujson_t *uj) {
 status_t handle_crypto_fi_kmac_state(ujson_t *uj) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -450,6 +427,8 @@ status_t handle_crypto_fi_kmac_state(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -472,6 +451,7 @@ status_t handle_crypto_fi_kmac_state(ujson_t *uj) {
   uj_output.err_status = codes;
   memcpy(uj_output.digest, (uint8_t *)digest, 8);
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
 
@@ -490,6 +470,9 @@ status_t handle_crypto_fi_hmac(ujson_t *uj) {
   TRY(ujson_deserialize_crypto_fi_hmac_mode_t(uj, &uj_data));
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
 
   // hash_mode 0 equals SHA256, 1 equals SHA384, and 2 equals SHA512
   uint32_t digest_cfg_size = 0;
@@ -625,6 +608,8 @@ status_t handle_crypto_fi_hmac(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -638,6 +623,7 @@ status_t handle_crypto_fi_hmac(ujson_t *uj) {
   memset(uj_output.tag, 0, sizeof(uj_output.tag));
   memcpy(uj_output.tag, digest, digest_word_size * 4);
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_crypto_fi_hmac_tag_t, uj, &uj_output);
@@ -647,6 +633,9 @@ status_t handle_crypto_fi_hmac(ujson_t *uj) {
 status_t handle_crypto_fi_shadow_reg_access(ujson_t *uj) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -682,6 +671,8 @@ status_t handle_crypto_fi_shadow_reg_access(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -699,6 +690,7 @@ status_t handle_crypto_fi_shadow_reg_access(ujson_t *uj) {
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_crypto_fi_test_result_mult_t, uj, &uj_output);
@@ -709,6 +701,9 @@ status_t handle_crypto_fi_shadow_reg_access(ujson_t *uj) {
 status_t handle_crypto_fi_shadow_reg_read(ujson_t *uj) {
   // Clear registered alerts in alert handler.
   pentest_registered_alerts_t reg_alerts = pentest_get_triggered_alerts();
+  // Clear registered local alerts in alert handler.
+  pentest_registered_loc_alerts_t reg_loc_alerts =
+      pentest_get_triggered_loc_alerts();
   // Clear the AST recoverable alerts.
   pentest_clear_sensor_recov_alerts();
 
@@ -767,6 +762,8 @@ status_t handle_crypto_fi_shadow_reg_read(ujson_t *uj) {
 
   // Get registered alerts from alert handler.
   reg_alerts = pentest_get_triggered_alerts();
+  // Get registered local alerts from alert handler.
+  reg_loc_alerts = pentest_get_triggered_loc_alerts();
   // Get fatal and recoverable AST alerts from sensor controller.
   pentest_sensor_alerts_t sensor_alerts = pentest_get_sensor_alerts();
 
@@ -789,6 +786,7 @@ status_t handle_crypto_fi_shadow_reg_read(ujson_t *uj) {
 
   uj_output.err_status = codes;
   memcpy(uj_output.alerts, reg_alerts.alerts, sizeof(reg_alerts.alerts));
+  uj_output.loc_alerts = reg_loc_alerts.loc_alerts;
   memcpy(uj_output.ast_alerts, sensor_alerts.alerts,
          sizeof(sensor_alerts.alerts));
   RESP_OK(ujson_serialize_crypto_fi_test_result_mult_t, uj, &uj_output);

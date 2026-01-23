@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use opentitanlib::test_utils::init::InitializeTest;
+use opentitanlib::transport::Capability;
 use opentitanlib::uart::console::UartConsole;
 
 use usb::{UsbDeviceHandle, UsbOpts, port_path_string};
@@ -76,10 +77,21 @@ fn main() -> Result<()> {
     opts.init.init_logging();
     let transport = opts.init.init_target()?;
 
+    transport
+        .capabilities()?
+        .request(Capability::USB)
+        .ok()
+        .context("This transport does not support USB")?;
+
+    // Certain backends such as QEMU will not enumerate USB device until
+    // we request the USB context.
+    let _usb_context = transport.usb().context("Cannot get USB context")?;
+
     // Wait until test is running.
     let uart = transport.uart("console")?;
     UartConsole::wait_for(&*uart, r"Running [^\r\n]*", opts.timeout)?;
 
+    opts.usb.apply_strappings(&transport, true)?;
     // Enable VBUS sense on the board if necessary.
     if opts.usb.vbus_control_available() {
         opts.usb.enable_vbus(&transport, true)?;

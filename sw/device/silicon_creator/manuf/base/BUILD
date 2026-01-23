@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("@//rules:manuf.bzl", "device_id_header")
-load("@//rules:signing.bzl", "offline_presigning_artifacts", "offline_signature_attach")
+load("@lowrisc_opentitan//rules:manuf.bzl", "device_id_header")
+load("@lowrisc_opentitan//rules:signing.bzl", "offline_presigning_artifacts", "offline_signature_attach")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//rules:const.bzl", "CONST", "hex")
 load("//rules:manifest.bzl", "manifest")
@@ -13,6 +13,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/manuf/base:provisioning_inputs.bzl",
@@ -52,6 +53,7 @@ opentitan_binary(
     srcs = ["sram_cp_provision.c"],
     collect_code_coverage = 0,  # No space for sram binaries
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:silicon_creator": None,
@@ -92,6 +94,7 @@ opentitan_binary(
     srcs = ["sram_cp_provision_functest.c"],
     collect_code_coverage = 0,  # No space for sram binaries
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:silicon_creator": None,
@@ -131,6 +134,7 @@ opentitan_binary(
 opentitan_test(
     name = "cp_provision_functest",
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
     },
@@ -150,6 +154,24 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/manuf/cp_provision_functest",
         testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        timeout = "long",
+        binaries = {
+            ":sram_cp_provision": "sram_cp_provision",
+            ":sram_cp_provision_functest": "sram_cp_provision_functest",
+        },
+        needs_jtag = True,
+        otp = "//hw/ip/otp_ctrl/data:img_raw",
+        tags = ["manuf"],
+        # NOTE: QEMU's GPIO interface goes directly to the peripheral and
+        # not via pins. We set the console TX indicator to use GPIO 3.
+        test_cmd = """
+            --provisioning-sram-elf={sram_cp_provision}
+            --test-sram-elf={sram_cp_provision_functest}
+            --console-tx-indicator-pin=3
+        """,
+        test_harness = "//sw/host/tests/manuf/cp_provision_functest",
     ),
 )
 
@@ -175,6 +197,7 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:silicon_creator": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         kind = "ram",
         linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
@@ -200,6 +223,7 @@ opentitan_test(
             "//sw/device/lib/testing/test_framework:ottf_test_config",
             "//sw/device/lib/testing/test_framework:status",
             "//sw/device/lib/testing/test_framework:ujson_ottf",
+            "//sw/device/silicon_creator/lib:boot_data",
             "//sw/device/silicon_creator/manuf/lib:individualize",
             "//sw/device/silicon_creator/manuf/lib:otp_fields",
             "//sw/device/silicon_creator/manuf/lib:sram_start",
@@ -300,8 +324,8 @@ manifest(d = {
     "manuf_state_creator": hex(CONST.MANUF_STATE.PERSO_INITIAL),
     "visibility": ["//visibility:private"],
     "version_major": "0",
-    # Release: 2025-10-29-RC00
-    "version_minor": "2025102900",
+    # Release: 2026-01-05-RC00
+    "version_minor": "2026010500",
     "security_version": "0xFFFFFFFF",
 })
 
@@ -315,6 +339,7 @@ manifest(d = {
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:silicon_creator": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
         manifest = ":manifest_perso",

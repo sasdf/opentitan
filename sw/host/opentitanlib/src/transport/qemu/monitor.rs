@@ -3,24 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use anyhow::{Context, bail, ensure};
 use serde::Deserialize;
-use serialport::TTYPort;
-
-/// QEMU can take some time to startup and send the greeting.
-/// There's no real harm in waiting a while for that message.
-const CONNECT_TIMEOUT_S: u64 = 5;
 
 /// Interface to QEMU's monitor.
 ///
 /// The monitor is expected to be configured in `control` mode for the JSON QMP
 /// protocol, not "human" mode.
 pub struct Monitor {
-    /// TTY port connected to QEMU's monitor.
-    tty: BufReader<TTYPort>,
+    /// Unix Stream (socket) connected to QEMU's monitor.
+    stream: BufReader<UnixStream>,
 
     /// Incrementing ID attached to each command and checked with each response.
     id_counter: usize,
@@ -29,22 +24,30 @@ pub struct Monitor {
     quit_qemu: bool,
 }
 
-impl Monitor {
-    /// Connect to the QEMU monitor over a given TTY.
-    pub fn new<P: AsRef<Path>>(tty_path: P, quit_qemu: bool) -> anyhow::Result<Self> {
-        let tty = serialport::new(
-            tty_path.as_ref().to_str().context("TTY path not UTF8")?,
-            115200,
-        )
-        .timeout(Duration::from_secs(CONNECT_TIMEOUT_S))
-        .open_native()
-        .context("failed to open QEMU monitor PTY")?;
+/// A value of a property on an object in the QEMU Object Model (QOM)
+pub enum QomPropertyValue {
+    String(String),
+    Int(u64),
+    Bool(bool),
+}
 
-        let mut tty = BufReader::new(tty);
+impl Monitor {
+    /// Connect to the QEMU monitor over a given socket.
+    pub fn new<P: AsRef<Path>>(socket_path: P, quit_qemu: bool) -> anyhow::Result<Self> {
+        let socket_path = socket_path
+            .as_ref()
+            .to_str()
+            .context("monitor socket path not UTF8")?;
+        let stream =
+            UnixStream::connect(socket_path).context("failed to connect to QEMU Monitor socket")?;
+        stream.set_read_timeout(None)?;
+
+        let mut stream = BufReader::new(stream);
 
         // QMP sends us a greeting line on every connection:
         let mut greeting = String::new();
-        tty.read_line(&mut greeting)
+        stream
+            .read_line(&mut greeting)
             .context("expected greeting line from QEMU monitor")?;
 
         // Check the greeting:
@@ -59,7 +62,7 @@ impl Monitor {
         );
 
         let mut monitor = Monitor {
-            tty,
+            stream,
             id_counter: 0,
             quit_qemu,
         };
@@ -115,10 +118,39 @@ impl Monitor {
         Ok(chardevs)
     }
 
+    // Send a break condition over a specified CharDev
     pub fn send_chardev_break(&mut self, id: &str) -> anyhow::Result<()> {
         self.send_cmd(
             "chardev-send-break",
             Some(format!(r#"{{"id": "{id}"}}"#).as_str()),
+        )?;
+
+        Ok(())
+    }
+
+    // Set a QOM Property of a QEMU device
+    pub fn set_property(
+        &mut self,
+        object_path: Option<&str>,
+        property: &str,
+        value: &QomPropertyValue,
+    ) -> anyhow::Result<()> {
+        let path = object_path.unwrap_or("/machine");
+        let value = match value {
+            QomPropertyValue::String(s) => format!(r#""{s}""#),
+            QomPropertyValue::Int(i) => format!("{i}"),
+            QomPropertyValue::Bool(b) => format!("{b}"),
+        };
+        self.send_cmd(
+            "qom-set",
+            Some(
+                format!(
+                    r#"{{"path": "{path}",
+                    "property": "{property}",
+                    "value": {value}}}"#
+                )
+                .as_str(),
+            ),
         )?;
 
         Ok(())
@@ -144,7 +176,7 @@ impl Monitor {
             None => format!(r#"{{ "execute": "{cmd}", "id": {id} }}"#),
         };
 
-        writeln!(self.tty.get_mut(), "{}", command.as_str())?;
+        writeln!(self.stream.get_mut(), "{}", command.as_str())?;
 
         // Increment the ID for the next message.
         self.id_counter += 1;
@@ -153,7 +185,7 @@ impl Monitor {
         // before we sent our command.
         let response = loop {
             let mut line = String::new();
-            self.tty.read_line(&mut line)?;
+            self.stream.read_line(&mut line)?;
 
             let response: MonitorResponse = serde_json::from_str(&line)
                 .with_context(|| format!("unexpected response: {line}"))?;

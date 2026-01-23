@@ -15,13 +15,14 @@ use super::board::Board;
 use crate::collection;
 use crate::io::gpio::GpioError;
 use crate::io::spi::SpiError;
+use crate::io::usb::{UsbContext, UsbDevice};
+use crate::transport::common::usb::RusbContext;
 use crate::transport::{ProgressIndicator, TransportError, TransportInterfaceType};
 use crate::util::parse_int::ParseInt;
-use crate::util::usb::UsbBackend;
 
 /// The `Backend` struct provides high-level access to the Chip Whisperer board.
 pub struct Backend<B: Board> {
-    usb: UsbBackend,
+    usb: Box<dyn UsbDevice>,
     _marker: PhantomData<B>,
 }
 
@@ -108,8 +109,9 @@ impl<B: Board> Backend<B> {
         usb_pid: Option<u16>,
         usb_serial: Option<&str>,
     ) -> Result<Self> {
+        let usb_context = RusbContext::new();
         Ok(Backend {
-            usb: UsbBackend::new(
+            usb: usb_context.device_by_id(
                 usb_vid.unwrap_or(B::VENDOR_ID),
                 usb_pid.unwrap_or(B::PRODUCT_ID),
                 usb_serial,
@@ -146,7 +148,9 @@ impl<B: Board> Backend<B> {
 
     /// Gets the usb serial number of the device.
     pub fn get_serial_number(&self) -> &str {
-        self.usb.get_serial_number()
+        self.usb
+            .get_serial_number()
+            .expect("The chip whisperer does not have a serial number!")
     }
 
     /// Get the firmware build date as a string.
