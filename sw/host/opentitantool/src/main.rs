@@ -26,6 +26,7 @@ enum RootCommandHierarchy {
     Bfv(command::bfv::BfvCommand),
     // Not flattened because `Bootstrap` is a leaf command.
     Bootstrap(command::bootstrap::BootstrapCommand),
+    ClearFlashRom(command::clear_flash_rom::ClearFlashRomCommand),
     // Not flattened because `Console` is a leaf command.
     Console(command::console::Console),
 

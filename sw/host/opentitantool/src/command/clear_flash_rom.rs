@@ -18,7 +18,7 @@ pub struct ClearFlashRomCommand {
     #[command(flatten)]
     bootstrap_options: BootstrapOptions,
     /// The byte offset of the magic bytes from the beginning of the flash.
-    #[arg(long, value_parser = usize::from_str, default_value = "0x78")]
+    #[arg(long, value_parser = usize::from_str)]
     magic_bytes_offset: usize,
 }
 
