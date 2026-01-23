@@ -1,7 +1,11 @@
-import subprocess
 import re
+import subprocess
+import sys
 
-base_commit = '12a2262bfe5b2336e2c7e0eeae0aac7e608c29e4'
+base_commit = subprocess.check_output(
+    ['git', 'merge-base', 'earlgrey_1.0.0', 'HEAD'],
+    encoding='utf-8').strip()
+print(f"Diff after commit {base_commit}", file=sys.stderr)
 
 with open('./bazel-out/_coverage/view/all_views.dat') as f:
   files = re.findall(r'SF:(.*)\n', f.read())
