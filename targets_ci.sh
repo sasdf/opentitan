@@ -131,6 +131,7 @@ UNIT_TESTS=(
 //sw/device/silicon_creator/manuf/base:perso_tlv_data_unittest
 //sw/device/silicon_creator/lib/ownership:ownership_unittest
 //sw/device/lib/base:random_order_unittest
+//sw/device/silicon_creator/lib/rescue:rescue_xmodem_unittest
 
 # CE: variable-sized object may not be initialized
 # //sw/device/lib/crypto/impl:keyblob_unittest
@@ -556,6 +557,7 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/lib/crypto/drivers:rv_core_ibex_test_fpga_cw310_sival_rom_ext
 //sw/device/tests:keymgr_sideload_otbn_simple_test_fpga_cw310_sival_rom_ext
 //sw/device/lib/crypto/impl:status_functest_fpga_cw310_sival_rom_ext
+//sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_sival_rom_ext
 
 # //sw/device/tests:ottf_alert_catch_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:rv_core_ibex_isa_test_test_unlocked0_fpga_cw310_sival_rom_ext
@@ -577,8 +579,6 @@ CW310_SIVAL_ROMEXT_TESTS=(
 
 
 # Failed
-# //sw/device/tests:usbdev_deep_disconnect_test_fpga_cw310_sival_rom_ext
-# //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:gpio_intr_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:gpio_pinmux_test_fpga_cw310_sival_rom_ext
 # //sw/device/tests:otbn_smoketest_fpga_cw310_sival_rom_ext
@@ -916,6 +916,7 @@ CW310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:debug_mode_off_dice_x509_test_fpga_cw310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:debug_mode_on_dice_cwt_test_fpga_cw310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/dice_chain:debug_mode_on_dice_x509_test_fpga_cw310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/boot_data:redundancy_fix_test_fpga_cw310_rom_ext
 )
 
 CW340_SIVAL_TESTS=(
@@ -962,6 +963,45 @@ UNSUPPORTED_TESTS=(
 # //sw/device/silicon_creator/rom_ext/sival/binaries:sival_signature_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_signature_test
 # //sw/device/tests:spi_device_tpm_tx_rx_test_fpga_cw340_sival_rom_ext
+)
+
+UNRELATED_HARDENED_COMPARISON_TESTS=(
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_cwt_slot_a_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_cwt_slot_b_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_cwt_slot_virtual_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_x509_slot_a_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_x509_slot_b_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext/imm_section:main_binaries_dice_x509_slot_virtual_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_boot_svc_after_wakeup_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_corrupted_owner_key_alg_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_default_ownership_state_recovery_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_default_ownership_state_unlock_any_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_cwt_slot_a_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_cwt_slot_b_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_cwt_slot_virtual_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a_bad_address_translation_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_b_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_hybrid_owner_keys_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_hybrid_owner_update_newversion_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_invalid_key_alg_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_isfb_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_owner_sram_exec_disabled_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_owner_sram_exec_enabled_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_owner_update_newversion_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_rescue_config_module_mismatch_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spidfu_flash_limit_zero_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spidfu_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spidfu_rescue_boot_svc_req_disability_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spidfu_rescue_disability_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spidfu_restricted_commands_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_spx_pure_owner_keys_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_usbdfu_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_enter_on_watchdog_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_rescue_disability_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_restricted_commands_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout_hardened_comparison_test
 )
 
 # ./bazelisk.sh query 'tests(//sw/otbn/...) except attr("tags", "skip_in_ci|manual|broken", //sw/otbn/...)'

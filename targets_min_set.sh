@@ -114,6 +114,7 @@ UNIT_TESTS=(
   '//sw/device/silicon_creator/lib/ownership:ownership_activate_unittest'
   '//sw/device/silicon_creator/lib/ownership:ownership_unittest'
   '//sw/device/silicon_creator/lib/ownership:ownership_unlock_unittest'
+  '//sw/device/silicon_creator/lib/rescue:rescue_xmodem_unittest'
   '//sw/device/silicon_creator/lib:boot_data_unittest'
   '//sw/device/silicon_creator/lib:boot_log_unittest'
   '//sw/device/silicon_creator/lib:dbg_print_unittest'
