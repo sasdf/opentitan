@@ -174,7 +174,7 @@ static rom_error_t rom_ext_init(boot_data_t *boot_data) {
 }
 
 void rom_ext_sram_exec(owner_sram_exec_mode_t mode) {
-  switch (mode) {
+  switch (launder32(mode)) {
     case kOwnerSramExecModeEnabled:
       // In enabled mode, we do not lock the register so owner code can disable
       // SRAM exec at some later time.
@@ -236,7 +236,7 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   owner_block_measurement(owner_block_key_page(key), &owner_measurement);
 
   keymgr_binding_value_t sealing_binding;
-  if (boot_data->ownership_state == kOwnershipStateLockedOwner) {
+  if (launder32(boot_data->ownership_state) == kOwnershipStateLockedOwner) {
     HARDENED_CHECK_EQ(boot_data->ownership_state, kOwnershipStateLockedOwner);
     // If we're in LockedOwner, initialize the sealing binding with the
     // diversification constant associated with key applicaiton key that
@@ -251,6 +251,10 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
     // sealing keys, so set the binding constant to a nonsense value.
     memset(&sealing_binding, 0x55, sizeof(sealing_binding));
   }
+
+  // Prepare dice chain builder for CDI_1.
+  HARDENED_RETURN_IF_ERROR(dice_chain_init());
+  HARDENED_RETURN_IF_ERROR(dice_chain_rom_ext_check());
 
   // Generate CDI_1 attestation keys and certificate.
   HARDENED_RETURN_IF_ERROR(dice_chain_attestation_owner(
@@ -497,6 +501,11 @@ hardened_bool_t rom_ext_allow_boot_svc_after_wakeup(void) {
   return owner_config.boot_svc_after_wakeup;
 }
 
+// This weak function allows downstream ROM_EXT builds to provide
+// sku-specific initialization.
+OT_WEAK
+void rom_ext_sku_init(void) {}
+
 static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   HARDENED_RETURN_IF_ERROR(rom_ext_init(boot_data));
   const manifest_t *self = rom_ext_manifest();
@@ -536,16 +545,14 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
   // Maybe advance the security version.
   HARDENED_RETURN_IF_ERROR(rom_ext_advance_secver(boot_data, self));
 
+  rom_ext_sku_init();
+
   // Fix the boot data if needed
   rom_error_t boot_data_validity = boot_data_redundancy_check();
   if (boot_data_validity != kErrorOk) {
     // Ignore the result to prevent unnecessary bootloop.
     OT_DISCARD(boot_data_write(boot_data));
   }
-
-  // Prepare dice chain builder for CDI_1.
-  HARDENED_RETURN_IF_ERROR(dice_chain_init());
-  HARDENED_RETURN_IF_ERROR(dice_chain_rom_ext_check());
 
   // Initialize the boot_log in retention RAM.
   const build_info_t *rom_chip_info = (const build_info_t *)_chip_info_start;
@@ -671,7 +678,7 @@ void rom_ext_main(void) {
   boot_log_t *boot_log = &retention_sram_get()->creator.boot_log;
 
   rom_error_t error = rom_ext_start(&boot_data, boot_log);
-  if (error == kErrorWriteBootdataThenReboot) {
+  if (launder32(error) == kErrorWriteBootdataThenReboot) {
     HARDENED_CHECK_EQ(error, kErrorWriteBootdataThenReboot);
     error = boot_data_write(&boot_data);
   }

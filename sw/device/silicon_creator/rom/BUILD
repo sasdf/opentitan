@@ -19,6 +19,7 @@ load("//rules/opentitan:cc.bzl", "opentitan_binary_assemble")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
+load("//util/design:hardened.bzl", "hardened_comparison_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -251,6 +252,12 @@ opentitan_binary(
         # by tests such as `rom_epmp_test`.
         ":rom_isrs",
     ],
+)
+
+hardened_comparison_test(
+    name = "mask_rom_hardened_comparison_test",
+    srcs = [":mask_rom"],
+    tags = ["broken"],
 )
 
 opentitan_binary(
