@@ -763,6 +763,16 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/tests:usbdev_suspend_resume_test_fpga_cw340_rom_ext
 //sw/device/tests:usbdev_toggle_restore_test_fpga_cw340_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_fault_to_fallback_owner_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
 )
 

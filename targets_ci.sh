@@ -892,6 +892,16 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/boot_svc:boot_svc_after_wakeup_enabled_test_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/ownership:install_owner_upgrade_test_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/rescue:next_slot_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:primary_slot_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_enter_on_fail_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_a_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_firmware_slot_b_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_boot_log_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_fault_to_fallback_owner_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
+
 # FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
 
@@ -1002,6 +1012,8 @@ UNRELATED_HARDENED_COMPARISON_TESTS=(
 # //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_rescue_disability_hardened_comparison_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_restricted_commands_hardened_comparison_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_custom_fallback_owner_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_fault_to_fallback_owner_hardened_comparison_test
 )
 
 # ./bazelisk.sh query 'tests(//sw/otbn/...) except attr("tags", "skip_in_ci|manual|broken", //sw/otbn/...)'
