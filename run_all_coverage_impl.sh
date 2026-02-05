@@ -163,4 +163,5 @@ echo "Save ToE source diff"
 python3 util/coverage/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
 
 base_commit="$(git merge-base earlgrey_1.0.0 HEAD)"
-git log -n 5 "${base_commit}" > "${COVERAGE_OUTPUT_DIR}/base_commit.log"
+git log -n 5 "${base_commit}" > "${COVERAGE_OUTPUT_DIR}/commit_base.log"
+git log -n 5 > "${COVERAGE_OUTPUT_DIR}/commit_coverage.log"
