@@ -11,6 +11,8 @@ import zipfile
 import multiprocessing as mp
 import numpy as np
 import difflib
+import subprocess
+from datetime import datetime
 from collections import namedtuple, defaultdict
 from pathlib import Path
 
@@ -533,6 +535,8 @@ class CoverageCollection:
 
   Format:
     {
+      "timestamp": "iso datetime string",
+      "commit": "commit hash",
       "tests": [ list of test label ],
       "coverage": {
         "source file path": {
@@ -545,7 +549,10 @@ class CoverageCollection:
             ...
           ],
           "f": { // functions
-            "funcname": bool, // whether the line is hit.
+            "funcname": {
+              "l": lineno,
+              "t": [ idx of the hit tests  ]
+            },
             ...
           }
         },
@@ -557,6 +564,11 @@ class CoverageCollection:
     self.tests = []
     self.coverage = {}
     self.loaded_sources = {}
+    self.timestamp = datetime.now().replace(microsecond=0).isoformat()
+    try:
+      self.commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+      self.commit = None
 
   def add_test(self, test_label, test_lcov):
     test_idx = len(self.tests)
@@ -611,14 +623,20 @@ class CoverageCollection:
         lineno -= 1
 
         if func_name not in funcs:
-          funcs[func_name] = False
+          funcs[func_name] = {"l": lineno, "t": []}
 
-        if file_profile.fnda.get(func_name, 0) > 0 or file_profile.da.get(lineno, 0) > 0:
-          funcs[func_name] = True
+        if file_profile.fnda.get(func_name, 0) > 0 or file_profile.da.get(lineno + 1, 0) > 0:
+          if test_idx not in funcs[func_name]["t"]:
+            funcs[func_name]["t"].append(test_idx)
 
   def save(self, output_path):
     with gzip.open(output_path, 'wt') as f:
-      json.dump({ "tests": self.tests, "coverage": self.coverage }, f)
+      json.dump({
+        "timestamp": self.timestamp,
+        "commit": self.commit,
+        "tests": self.tests,
+        "coverage": self.coverage
+      }, f)
 
 def label_group(name):
   if name.startswith('//sw/otbn/'):

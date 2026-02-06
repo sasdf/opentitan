@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Coverage Viewer</title>
+    <title>OpenTitan Coverage Viewer</title>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css"
@@ -104,8 +104,19 @@
         background-color: #555; /* Lighter on hover */
       }
 
-      /* Filter & Search Section */
-      #filter-and-search {
+      #main-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 0;
+      }
+      #header-timestamp {
+        font-family: monospace;
+        font-size: 0.8em;
+        color: #888;
+      }
+
+      /* Tools Section */
+      #tools {
         padding: 10px;
         border-bottom: 1px solid #3c3c3c; /* Darker border */
         display: flex;
@@ -166,14 +177,15 @@
       /* View Test Checkboxes */
       #view-test-checkboxes {
         font-family: monospace;
+      }
+      #view-test-list {
+        margin-left: 25px;
         max-height: 150px;
         overflow-y: auto;
-        margin-top: 10px;
-        margin-left: 10px;
       }
       .view-test-checkbox-item label {
         display: inline-block;
-        margin-right: 5px;
+        margin-left: 5px;
         cursor: pointer;
       }
       .view-test-checkbox-item {
@@ -183,6 +195,27 @@
       }
       .view-test-checkbox-item input[type="checkbox"] {
         accent-color: #4caf50; /* Green accent for checkboxes */
+      }
+
+      #view-test-header {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        user-select: none;
+      }
+      #view-test-header:hover {
+        background-color: #333;
+      }
+      #view-test-toggle-icon {
+        margin-right: 5px;
+        font-size: 0.8em;
+        transition: transform 0.2s;
+      }
+      #view-test-checkboxes.collapsed #view-test-list {
+        display: none;
+      }
+      #view-test-checkboxes.collapsed #view-test-toggle-icon {
+        transform: rotate(-90deg);
       }
 
       /* Syntax Highlight Switch */
@@ -521,13 +554,17 @@
       <div>Loading Coverage Data...</div>
     </div>
     <div id="sidebar">
-      <div id="filter-and-search">
+      <div id="tools">
+        <h1 id="main-title">OpenTitan Coverage</h1>
+        <div id="header-timestamp"></div>
         <div id="view-test-filter-controls">
-          <label>Coverage View:</label>
           <div id="view-test-checkboxes">
-            <div class="view-test-checkbox-item">
-              <input type="checkbox" id="view-test-select-all" />
-              <label for="view-test-select-all" style="font-weight: bold">(Select All)</label>
+            <div id="view-test-header">
+              <span id="view-test-toggle-icon">▼</span>
+              <div class="view-test-checkbox-item">
+                <input type="checkbox" id="view-test-select-all" />
+                <label for="view-test-select-all">Coverage views</label>
+              </div>
             </div>
             <div id="view-test-list">
               <!-- View test checkboxes are dynamically populated by JavaScript -->
@@ -628,10 +665,13 @@
         resetTestFilterButton: document.getElementById("reset-test-filter"),
         viewTestListDiv: document.getElementById("view-test-list"),
         viewTestSelectAll: document.getElementById("view-test-select-all"),
+        viewTestHeader: document.getElementById("view-test-header"),
+        viewTestCheckboxes: document.getElementById("view-test-checkboxes"),
         sidebar: document.getElementById("sidebar"),
         sidebarSplitter: document.getElementById("sidebar-splitter"),
         syntaxHighlightToggle: document.getElementById("syntax-highlight-toggle"),
         loadingOverlay: document.getElementById("loading-overlay"),
+        headerTimestamp: document.getElementById("header-timestamp"),
       };
 
       // --- Sorting State ---
@@ -682,6 +722,14 @@
             dom.sourceCodeElement.textContent =
               "Error: Incomplete coverage data. Check console for details.";
             return;
+          }
+
+          if (coverageData.timestamp) {
+            dom.headerTimestamp.textContent = `Generated at ${coverageData.timestamp}`;
+            document.title = `OpenTitan Coverage - ${coverageData.timestamp.split("T")[0]}`;
+          }
+          if (coverageData.commit) {
+            dom.headerTimestamp.textContent += ` with commit ${coverageData.commit.slice(0, 8)}`
           }
 
           // Populate reverse lookup maps for quick index access
@@ -957,6 +1005,11 @@
             if (cb) cb.checked = e.target.checked;
           });
           updateStateAndReload(true);
+        });
+
+        dom.viewTestHeader.addEventListener("click", (e) => {
+          if (e.target === dom.viewTestSelectAll || e.target.tagName === 'LABEL') return;
+          dom.viewTestCheckboxes.classList.toggle("collapsed");
         });
 
         viewData.tests.forEach((testName, index) => {
@@ -1299,6 +1352,8 @@
       function updateSelectAllStatus() {
         dom.viewTestSelectAll.checked =
           filteredViewTests.length === viewData.tests.length && viewData.tests.length > 0;
+        dom.viewTestSelectAll.indeterminate = filteredViewTests.length > 0 &&
+          filteredViewTests.length != viewData.tests.length;
       }
 
       /**
