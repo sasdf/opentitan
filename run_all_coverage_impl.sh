@@ -163,4 +163,6 @@ echo "Save ToE source diff"
 python3 util/coverage/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
 
 echo "Save git commits log"
-git log Earlgrey-PROD-A2-M6-ROM-RC1^.. > "${COVERAGE_OUTPUT_DIR}/git_commits.log"
+base_commit="Earlgrey-PROD-A2-M6-ROM-RC1"
+git log "${base_commit}"^.. > "${COVERAGE_OUTPUT_DIR}/commit_coverage.log"
+git log -n 5 "${base_commit}" > "${COVERAGE_OUTPUT_DIR}/commit_base.log"
