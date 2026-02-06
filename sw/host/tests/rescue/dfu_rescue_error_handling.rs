@@ -11,7 +11,7 @@ use std::time::Duration;
 use opentitanlib::app::TransportWrapper;
 use opentitanlib::io::eeprom::{AddressMode, MODE_111, Transaction};
 use opentitanlib::io::spi::SpiParams;
-use opentitanlib::rescue::dfu::{DfuOperations, DfuRequest, DfuRequestType};
+use opentitanlib::rescue::dfu::{DfuOperations, DfuRequestType};
 use opentitanlib::rescue::{EntryMode, Rescue, RescueMode, RescueParams, SpiDfu, UsbDfu};
 use opentitanlib::spiflash::SpiFlash;
 use opentitanlib::test_utils::init::InitializeTest;
@@ -187,9 +187,6 @@ fn spi_dfu_state_transitions(params: &RescueParams, transport: &TransportWrapper
     let uart = transport.uart("console")?;
     UartConsole::wait_for(&*uart, r"Finished", Duration::from_secs(5))?;
 
-    #[cfg(feature = "ot_coverage_enabled")]
-    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -329,9 +326,6 @@ fn usb_dfu_out_chunk_too_big(params: &RescueParams, transport: &TransportWrapper
 
     let uart = transport.uart("console")?;
     UartConsole::wait_for(&*uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_enabled")]
-    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
 
     Ok(())
 }

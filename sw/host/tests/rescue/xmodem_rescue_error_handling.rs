@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::bool_assert_comparison)]
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::Parser;
 
 use std::rc::Rc;
@@ -55,9 +55,6 @@ fn send_packet_timeout(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
     Ok(())
 }
 
@@ -76,10 +73,6 @@ fn send_data_timeout(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -102,10 +95,6 @@ fn send_crc_timeout(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -134,10 +123,6 @@ fn send_data_crc_error_cancel(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -173,10 +158,6 @@ fn send_packet_bad_len(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_enabled")]
-    UartConsole::wait_for_coverage(&*uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -192,10 +173,6 @@ fn recv_start_timeout(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -210,10 +187,6 @@ fn recv_start_cancel(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -228,10 +201,6 @@ fn recv_start_nak(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -247,10 +216,6 @@ fn recv_data_timeout(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -266,10 +231,6 @@ fn recv_data_cancel(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -285,10 +246,6 @@ fn recv_data_nak(
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
-
     Ok(())
 }
 
@@ -380,14 +337,10 @@ fn recv_finish_nak(
             return Err(XmodemError::ExhaustedRetries(errors).into());
         }
     }
-
     rescue.reboot()?;
 
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
     Ok(())
 }
 
@@ -397,7 +350,7 @@ fn rescue_image_too_big(
     rescue: &RescueSerial,
 ) -> Result<()> {
     rescue.enter(transport, EntryMode::Reset)?;
-    let image_too_big = [0u8; 1026 * 1024];
+    let image_too_big = [0u8; 1026*1024];
     match rescue.update_firmware(BootSlot::SlotB, &image_too_big) {
         Ok(_) => {
             return Err(anyhow!("Expects cancel during firmware rescue, but got OK."));
@@ -414,9 +367,6 @@ fn rescue_image_too_big(
     UartConsole::wait_for(uart, r"BFV:02525309", Duration::from_secs(5))?;
     // Ensure we can still boot into Owner SW.
     UartConsole::wait_for(uart, r"Finished", Duration::from_secs(5))?;
-
-    #[cfg(feature = "ot_coverage_build")]
-    UartConsole::wait_for_coverage(uart, Duration::from_secs(5))?;
     Ok(())
 }
 
