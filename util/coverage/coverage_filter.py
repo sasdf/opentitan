@@ -38,7 +38,7 @@ def main():
   coverage = filter_coverage(coverage, view)
 
   # Keep asm coverage unmodified
-  for key in original_coverage.keys():
+  for key in coverage.keys():
     if key.upper().endswith('.S'):
       coverage[key] = original_coverage[key]
 
