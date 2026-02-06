@@ -37,8 +37,13 @@ def main():
   coverage = merge_inlined_copies(coverage)
   coverage = filter_coverage(coverage, view)
 
-  # Keep asm coverage unmodified
+  # Keep otbn asm coverage unfiltered
   for key in original_coverage.keys():
+    if 'sw/otbn/' in key and key.upper().endswith('.S'):
+      coverage[key] = original_coverage[key]
+
+  # Keep asm coverage unmodified
+  for key in coverage.keys():
     if key.upper().endswith('.S'):
       coverage[key] = original_coverage[key]
 

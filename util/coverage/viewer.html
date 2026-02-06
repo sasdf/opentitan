@@ -1,518 +1,794 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Coverage Viewer</title>
-  <style>
-    /* Base Layout */
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-      background-color: #1e1e1e; /* Dark background */
-      color: #cccccc; /* Light text */
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenTitan Coverage Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css"
+      integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/prism.min.js"
+      integrity="sha512-HiD3V4nv8fcjtouznjT9TqDNDm1EXngV331YGbfVGeKUoH+OLkRTCMzA34ecjlgSQZpdHZupdSrqHY+Hz3l6uQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism-dark.min.css"
+      integrity="sha512-Njdz7T/p6Ud1FiTMqH87bzDxaZBsVNebOWmacBjMdgWyeIhUSFU4V52oGwo3sT+ud+lyIE98sS291/zxBfozKw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <style>
+      /* Base Layout */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        background-color: #1e1e1e; /* Dark background */
+        color: #cccccc; /* Light text */
+      }
 
-    /* Sidebar Styles */
-    #sidebar {
-      width: 400px; /* Initial width */
-      display: flex;
-      flex-direction: column;
-      background-color: #252526; /* Darker sidebar */
-      position: relative; /* For splitter positioning */
-      flex-shrink: 0; /* Prevent sidebar from shrinking */
-      color: #cccccc;
-    }
+      /* Loading Overlay */
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #1e1e1e;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #333;
+        border-top: 5px solid #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
 
-    /* Splitter Styles */
-    #sidebar-splitter {
-      width: 5px;
-      cursor: ew-resize;
-      background-color: #333; /* Dark splitter */
-      flex-shrink: 0;
-    }
-    #sidebar-splitter:hover {
+      /* Scrollbar Styles for Dark Mode */
+      ::-webkit-scrollbar {
+        -webkit-appearance: none;
+        width: 0;
+        height: 0;
+      }
+
+      /* Selection Styles for Dark Mode */
+      ::selection {
+        background-color: #4a4a4a; /* Darker grey for selection background */
+      }
+
+      /* Sidebar Styles */
+      #sidebar {
+        width: 400px; /* Initial width */
+        display: flex;
+        flex-direction: column;
+        background-color: #252526; /* Darker sidebar */
+        position: relative; /* For splitter positioning */
+        flex-shrink: 0; /* Prevent sidebar from shrinking */
+        color: #cccccc;
+      }
+
+      /* Splitter Styles */
+      #sidebar-splitter {
+        width: 5px;
+        cursor: ew-resize;
+        background-color: #333; /* Dark splitter */
+        flex-shrink: 0;
+      }
+      #sidebar-splitter:hover {
         background-color: #555; /* Lighter on hover */
-    }
+      }
 
-    /* Filter & Search Section */
-    #filter-and-search {
-      padding: 10px;
-      border-bottom: 1px solid #3c3c3c; /* Darker border */
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    #search-input {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      border: 1px solid #444; /* Darker border */
-      border-radius: 44px; /* Pill shape */
-      background-color: #333; /* Dark input background */
-      color: #cccccc; /* Light input text */
-    }
+      #main-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 0;
+      }
+      #header-timestamp {
+        font-family: monospace;
+        font-size: 0.8em;
+        color: #888;
+      }
 
-    /* Test Filter Controls */
-    #test-filter-controls {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      width: 100%;
-      position: relative;
-    }
-    #filter-by-test {
-      padding: 8px 30px 8px 8px; /* Room for reset button */
-      box-sizing: border-box;
-      border: 1px solid #444; /* Darker border */
-      border-radius: 4px;
-      width: 100%;
-      -webkit-appearance: none; /* Remove default dropdown arrow */
-      -moz-appearance: none;
-      appearance: none;
-      background-color: #333; /* Dark select background */
-      color: #cccccc; /* Light select text */
-    }
-    #reset-test-filter {
-      position: absolute;
-      right: 5px;
-      top: 50%;
-      width: 1.5em;
-      height: 1.5em;
-      transform: translateY(-50%);
-      background-color: #555; /* Darker button */
-      border-radius: 50%; /* Circle shape */
-      border: none;
-      color: #fff;
-      cursor: pointer;
-      font-size: 0.7em;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #reset-test-filter:hover {
-      background-color: #777; /* Lighter on hover */
-    }
+      /* Tools Section */
+      #tools {
+        padding: 10px;
+        border-bottom: 1px solid #3c3c3c; /* Darker border */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #search-input {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        border: 1px solid #444; /* Darker border */
+        border-radius: 44px; /* Pill shape */
+        background-color: #333; /* Dark input background */
+        color: #cccccc; /* Light input text */
+      }
 
-    /* View Test Checkboxes */
-    #view-test-checkboxes {
-      font-family: monospace;
-      max-height: 150px;
-      overflow-y: auto;
-      padding: 5px;
-    }
-    #view-test-checkboxes label {
-      display: inline-block;
-      margin-right: 5px;
-      cursor: pointer;
-    }
-    #view-test-checkboxes div {
+      /* Test Filter Controls */
+      #test-filter-controls {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        position: relative;
+      }
+      #filter-by-test {
+        padding: 8px 30px 8px 8px; /* Room for reset button */
+        box-sizing: border-box;
+        border: 1px solid #444; /* Darker border */
+        border-radius: 100px;
+        width: 100%;
+        -webkit-appearance: none; /* Remove default dropdown arrow */
+        -moz-appearance: none;
+        appearance: none;
+        background-color: #333; /* Dark select background */
+        color: #cccccc; /* Light select text */
+      }
+      #reset-test-filter {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        width: 1.5em;
+        height: 1.5em;
+        transform: translateY(-50%);
+        background-color: #555; /* Darker button */
+        border-radius: 50%; /* Circle shape */
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.7em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #reset-test-filter:hover {
+        background-color: #777; /* Lighter on hover */
+      }
+
+      /* View Test Checkboxes */
+      #view-test-checkboxes {
+        font-family: monospace;
+      }
+      #view-test-list {
+        margin-left: 25px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      .view-test-checkbox-item label {
+        display: inline-block;
+        margin-left: 5px;
+        cursor: pointer;
+      }
+      .view-test-checkbox-item {
         display: flex;
         align-items: center;
         margin-bottom: 3px;
-    }
-    #view-test-checkboxes input[type="checkbox"] {
-        accent-color: #4CAF50; /* Green accent for checkboxes */
-    }
+      }
+      .view-test-checkbox-item input[type="checkbox"] {
+        accent-color: #4caf50; /* Green accent for checkboxes */
+      }
 
-    /* File List Table */
-    #file-list-container {
-      flex-grow: 1;
-      overflow-y: auto;
-      margin: 0;
-      padding: 0;
-    }
-    #file-list {
-      width: 100%;
-      border-collapse: collapse;
-      font-family: monospace;
-      font-size: 0.9em;
-    }
-    #file-list thead {
-      position: sticky;
-      top: 0;
-      background-color: #333; /* Darker header */
-      z-index: 1;
-    }
-    #file-list th {
-      padding: 8px 10px;
-      border-bottom: 1px solid #444; /* Darker border */
-      text-align: left;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    #file-list th.sort-asc::after {
-      content: " ▲";
-    }
-    #file-list th.sort-desc::after {
-      content: " ▼";
-    }
-    #file-list td {
-      padding: 8px 10px;
-      border-bottom: 1px solid #3c3c3c; /* Darker border */
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #file-list tr {
-      cursor: pointer;
-    }
-    #file-list tbody tr:hover {
-      background-color: #3a3a3a; /* Darker on hover */
-    }
-    #file-list tbody tr.active {
-      background-color: #3f51b5; /* Deeper blue for active */
-      font-weight: bold;
-    }
-    #file-list .coverage-ratio {
-      text-align: right;
-      width: 60px;
-    }
-    #file-list .coverage-ratio.high {
-      color: #66bb6a; /* Lighter green */
-    }
-    #file-list .coverage-ratio.medium {
-      color: #ffb300; /* Lighter orange */
-    }
-    #file-list .coverage-ratio.low {
-      color: #ef5350; /* Lighter red */
-    }
-    #file-list .missed-count {
-      text-align: right;
-      width: 40px;
-    }
-    #file-list .missed-count.nonzero {
-      color: #ef5350; /* Lighter red */
-    }
-    #file-list .filename {
-      width: calc(100% - 100px); /* Adjust to fill space */
-    }
+      #view-test-header {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        user-select: none;
+      }
+      #view-test-header:hover {
+        background-color: #333;
+      }
+      #view-test-toggle-icon {
+        margin-right: 5px;
+        font-size: 0.8em;
+        transition: transform 0.2s;
+      }
+      #view-test-checkboxes.collapsed #view-test-list {
+        display: none;
+      }
+      #view-test-checkboxes.collapsed #view-test-toggle-icon {
+        transform: rotate(-90deg);
+      }
 
-    /* Main Content Area */
-    #content {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-    }
-    #source-header {
-      padding: 10px;
-      border-bottom: 1px solid #3c3c3c; /* Darker border */
-      background-color: #2d2d2d; /* Darker header */
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #cccccc;
-    }
-    #current-file-name {
-      font-weight: bold;
-      font-family: monospace;
-    }
-    #source-code-container {
-      flex-grow: 1;
-      overflow: auto;
-      background-color: #1e1e1e; /* Dark code background */
-      padding: 10px;
-      color: #aaaaaa;
-    }
-    pre {
-      margin: 0;
-    }
-    code {
-      display: block;
-      white-space: pre;
-    }
+      /* Syntax Highlight Switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 34px;
+        height: 20px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #555;
+        -webkit-transition: 0.4s;
+        transition: 0.4s;
+        border-radius: 20px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: 0.4s;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #4caf50;
+      }
+      input:focus + .slider {
+        box-shadow: 0 0 1px #4caf50;
+      }
+      input:checked + .slider:before {
+        -webkit-transform: translateX(14px);
+        -ms-transform: translateX(14px);
+        transform: translateX(14px);
+      }
+      /* END Syntax Highlight Switch */
 
-    /* Code Line Styling */
-    .line {
-      display: block;
-      white-space: pre;
-      position: relative;
-    }
+      /* File List Table */
+      #file-list-container {
+        flex-grow: 1;
+        overflow-y: auto;
+        margin: 0;
+        padding: 0;
+      }
+      #file-list {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: monospace;
+        font-size: 0.9em;
+      }
+      #file-list-headers {
+        background-color: #333; /* Darker header */
+        border-bottom: 1px solid #444; /* Darker border */
+        display: flex;
+        font-family: monospace;
+        font-size: 0.9em;
+        font-weight: bold;
+        width: 100%;
+        z-index: 10;
+      }
+      #file-list-headers span {
+        padding: 4px 8px;
+        text-align: left;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #file-list-headers .sort-asc::after {
+        content: " ▲";
+      }
+      #file-list-headers .sort-desc::after {
+        content: " ▼";
+      }
+      #file-list-headers ::after {
+        vertical-align: 1px;
+        line-height: 1em;
+      }
+      #file-list td {
+        padding: 8px 16px 8px 0px;
+        border-bottom: 1px solid #3c3c3c; /* Darker border */
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      #file-list tr {
+        cursor: pointer;
+      }
+      #file-list tbody tr:hover {
+        background-color: #3a3a3a; /* Darker on hover */
+      }
+      #file-list tbody tr.active {
+        background-color: #3f51b5; /* Deeper blue for active */
+        font-weight: bold;
+      }
+      #file-list tbody tr.active td {
+        background-color: #3f51b5;
+      }
+      #file-list .coverage-ratio {
+        text-align: right;
+        min-width: 50px;
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background-color: #252526;
+        padding-left: 8px;
+      }
+      #th-coverage {
+        min-width: 40px;
+      }
+      #file-list .coverage-ratio.high {
+        color: #66bb6a; /* Lighter green */
+      }
+      #file-list .coverage-ratio.medium {
+        color: #ffb300; /* Lighter orange */
+      }
+      #file-list .coverage-ratio.low {
+        color: #ef5350; /* Lighter red */
+      }
+      #file-list .missed-count {
+        text-align: right;
+        position: sticky;
+        left: 74px;
+        z-index: 2;
+        background-color: #252526;
+      }
+      #file-list .missed-count.nonzero {
+        color: #ef5350; /* Lighter red */
+      }
+      #file-list .filename {
+        width: calc(100% - 100px); /* Adjust to fill space */
+      }
+      .filename mark {
+        background-color: #ffeb3b;
+        color: #000;
+        padding: 0;
+        border-radius: 2px;
+      }
 
-    .hit-count {
-      display: inline-block;
-      width: 25px;
-      text-align: right;
-      margin-right: 5px;
-      color: #888; /* Slightly lighter gray */
-      user-select: none;
-      font-size: 0.8em;
-      cursor: help;
-    }
-    .line-number {
-      display: inline-block;
-      width: 40px;
-      text-align: right;
-      margin-right: 10px;
-      color: #666; /* Darker gray */
-      user-select: none;
-      cursor: pointer;
-    }
-    .line-number:hover {
-      text-decoration: underline;
-    }
-    .line-content {
-      display: inline-block;
-      vertical-align: top;
-      font-family: monospace;
-    }
+      /* Main Content Area */
+      #content {
+        flex-grow: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      #source-header {
+        padding: 10px;
+        border-bottom: 1px solid #3c3c3c; /* Darker border */
+        background-color: #2d2d2d; /* Darker header */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #cccccc;
+      }
+      #current-file-name {
+        font-family: monospace;
+      }
+      #highlight-toggle-container {
+        /* Style for the moved switch */
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #highlight-toggle-container label {
+        /* Style for the moved switch */
+        font-family: monospace;
+        font-size: 0.8em;
+      }
+      #source-code-container {
+        position: relative;
+        flex-grow: 1;
+        overflow-x: hidden;
+        overflow-y: auto;
+        background-color: #1e1e1e; /* Dark code background */
+        padding: 10px;
+        box-sizing: border-box;
+        color: #aaaaaa;
+      }
+      #source-code-container pre {
+        margin: 0;
+        width: 100%;
+        overflow: auto;
+        display: inline-block;
+      }
+      #source-code-container code {
+        font-family: monospace;
+        line-height: 1.35;
+        font-size: 1em;
+        text-shadow: none;
+        display: inline-block;
+        min-width: 100%;
+        white-space: pre;
+        color: #bbb;
+      }
+      #source-content-pre {
+        position: absolute;
+        width: calc(100% - 110px) !important;
+        top: 10px;
+        left: 100px;
+      }
+      #source-content-pre.no-highlight * {
+        color: inherit !important;
+        background: inherit !important;
+        text-shadow: none !important;
+      }
+      #source-content-pre * {
+        background: transparent;
+      }
+      #source-content-pre *::selection {
+        background-color: inherit;
+      }
 
-    /* Coverage Highlighting */
-    .line:hover {
-      background-color: #3a3a3a; /* Darker on hover */
-    }
-    .line.highlighted {
-      background-color: #4a4a2a; /* Selected line highlight (darker yellow) */
-    }
-    .line.highlighted:hover {
-      background-color: #5a5a3a; /* Darker on hover */
-    }
-    .hit {
-      background-color: #203320; /* Darker green for hit lines */
-    }
-    .hit.highlighted {
+      /* Code Line Styling */
+      .line {
+        display: block;
+        white-space: pre;
+        position: relative;
+      }
+
+      .hit-count {
+        display: inline-block;
+        width: 25px;
+        text-align: right;
+        margin-right: 5px;
+        color: #888; /* Slightly lighter gray */
+        user-select: none;
+        font-size: 0.8em;
+        cursor: help;
+      }
+      .line-number {
+        display: inline-block;
+        width: 40px;
+        text-align: right;
+        margin-right: 10px;
+        color: #666; /* Darker gray */
+        user-select: none;
+        cursor: pointer;
+      }
+      .line-number:hover {
+        text-decoration: underline;
+      }
+      .line-content {
+        display: inline-block;
+        vertical-align: top;
+        font-family: monospace;
+      }
+
+      /* Coverage Highlighting */
+      .line:hover {
+        background-color: #3a3a3a; /* Darker on hover */
+      }
+      .line.highlighted {
+        background-color: #4a4a2a; /* Selected line highlight (darker yellow) */
+      }
+      .line.highlighted:hover {
+        background-color: #5a5a3a; /* Darker on hover */
+      }
+      .hit {
+        background-color: #203320; /* Darker green for hit lines */
+      }
+      .hit.highlighted {
         background-color: #405320; /* Selected line highlight (darker yellow) */
-    }
-    .hit:hover {
-      background-color: #336633; /* Darker green for hit lines */
-    }
-    .hit.highlighted:hover {
-      background-color: #538633; /* Darker green for hit lines */
-    }
-    .not-hit {
-      background-color: #382020; /* Darker red for not hit lines */
-    }
-    .not-hit.highlighted {
-      background-color: #584020; /* Darker red for not hit lines */
-    }
-    .not-hit:hover {
-      background-color: #663333; /* Darker red for not hit lines */
-    }
-    .not-hit.highlighted:hover {
-      background-color: #865333; /* Darker red for not hit lines */
-    }
+      }
+      .hit:hover {
+        background-color: #336633; /* Darker green for hit lines */
+      }
+      .hit.highlighted:hover {
+        background-color: #538633; /* Darker green for hit lines */
+      }
+      .not-hit {
+        background-color: #402020; /* Darker red for not hit lines */
+      }
+      .not-hit.highlighted {
+        background-color: #604020; /* Darker red for not hit lines */
+      }
+      .not-hit:hover {
+        background-color: #663333; /* Darker red for not hit lines */
+      }
+      .not-hit.highlighted:hover {
+        background-color: #865333; /* Darker red for not hit lines */
+      }
 
-    /* Test Info Panel */
-    #test-info-panel {
-      position: fixed;
-      background-color: #333; /* Dark panel background */
-      border: 1px solid #444; /* Darker border */
-      padding: 1em 2em;
-      box-shadow: 2px 2px 5px rgba(0,0,0,0.5); /* Darker shadow */
-      z-index: 1000;
-      display: none;
-      max-height: 300px;
-      overflow-y: auto;
-      min-width: 200px;
-      white-space: nowrap;
-      color: #cccccc;
-    }
-    #test-info-panel .test-item { /* Changed from li to test-item class */
-      margin-bottom: 5px;
-      font-family: monospace;
-      cursor: pointer;
-    }
-    #test-info-panel .test-item:hover { /* Changed from li to test-item class */
-      text-decoration: underline;
-      color: #ffffff;
-    }
-    #test-info-title {
-      margin-block-start: 0.5em;
-    }
-    #test-list-popup {
-      overflow: auto;
-      width: 100%;
-    }
-    .highlight-test {
-      background-color: #3f51b5; /* Deeper blue for highlight */
-    }
-  </style>
-</head>
-<body>
-  <div id="sidebar">
-    <div id="filter-and-search">
-      <div id="view-test-filter-controls">
-        <label>Filter by View Tests:</label>
-        <div id="view-test-checkboxes">
-          <!-- View test checkboxes are dynamically populated by JavaScript -->
+      /* Test Info Panel */
+      #test-info-panel {
+        position: fixed;
+        background-color: #333; /* Dark panel background */
+        border: 1px solid #444; /* Darker border */
+        padding: 1em 2em;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5); /* Darker shadow */
+        z-index: 1000;
+        display: none;
+        max-height: 300px;
+        overflow-y: auto;
+        min-width: 200px;
+        white-space: nowrap;
+        color: #cccccc;
+      }
+      #test-info-panel .test-item {
+        /* Changed from li to test-item class */
+        margin-bottom: 5px;
+        font-family: monospace;
+        cursor: pointer;
+      }
+      #test-info-panel .test-item:hover {
+        /* Changed from li to test-item class */
+        text-decoration: underline;
+        color: #ffffff;
+      }
+      #test-info-title {
+        margin-block-start: 0.5em;
+      }
+      #test-list-popup {
+        overflow: auto;
+        width: 100%;
+      }
+      .highlight-test {
+        background-color: #3f51b5; /* Deeper blue for highlight */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <div>Loading Coverage Data...</div>
+    </div>
+    <div id="sidebar">
+      <div id="tools">
+        <h1 id="main-title">OpenTitan Coverage</h1>
+        <div id="header-timestamp"></div>
+        <div id="view-test-filter-controls">
+          <div id="view-test-checkboxes">
+            <div id="view-test-header">
+              <span id="view-test-toggle-icon">▼</span>
+              <div class="view-test-checkbox-item">
+                <input type="checkbox" id="view-test-select-all" />
+                <label for="view-test-select-all">Coverage views</label>
+              </div>
+            </div>
+            <div id="view-test-list">
+              <!-- View test checkboxes are dynamically populated by JavaScript -->
+            </div>
+          </div>
+        </div>
+        <div id="test-filter-controls">
+          <select id="filter-by-test">
+            <option value="">All Tests</option>
+            <!-- Test options are dynamically populated by JavaScript -->
+          </select>
+          <button id="reset-test-filter">X</button>
+        </div>
+        <div id="search-box">
+          <input type="text" id="search-input" placeholder="Search files..." />
         </div>
       </div>
-      <div id="test-filter-controls">
-        <select id="filter-by-test">
-          <option value="">All Tests</option>
-          <!-- Test options are dynamically populated by JavaScript -->
-        </select>
-        <button id="reset-test-filter">X</button>
+
+      <div id="file-list-headers">
+        <span id="th-coverage" data-sort-key="ratio" class="sortable">Ratio</span>
+        <span id="th-missed" data-sort-key="missed" class="sortable">Miss</span>
+        <span id="th-filename" data-sort-key="filename" class="sortable">Filename</span>
       </div>
-      <div id="search-box">
-        <input type="text" id="search-input" placeholder="Search files...">
+      <div id="file-list-container">
+        <table id="file-list">
+          <tbody>
+            <!-- File list is dynamically populated by JavaScript -->
+          </tbody>
+        </table>
       </div>
     </div>
-    <div id="file-list-container">
-      <table id="file-list">
-        <thead>
-          <tr>
-            <th data-sort-key="ratio" class="sortable">Coverage</th>
-            <th data-sort-key="missed" class="sortable">Missed</th>
-            <th data-sort-key="filename" class="sortable">Filename</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- File list is dynamically populated by JavaScript -->
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div id="sidebar-splitter"></div>
-  <div id="content">
-    <div id="source-header">
-      <span id="current-file-name"></span>
-    </div>
-    <div id="source-code-container">
-      <pre><code id="source-code">
+    <div id="sidebar-splitter"></div>
+    <div id="content">
+      <div id="source-header">
+        <span id="current-file-name"></span>
+        <div id="highlight-toggle-container">
+          <label for="syntax-highlight-toggle">&lt;/&gt;</label>
+          <label class="switch">
+            <input type="checkbox" id="syntax-highlight-toggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div id="source-code-container">
+        <pre><code id="source-code">
         <!-- Source code is loaded here by JavaScript -->
       </code></pre>
+        <pre id="source-content-pre"><code id="source-content">
+        <!-- Source code is loaded here by JavaScript -->
+      </code></pre>
+      </div>
     </div>
-  </div>
 
-  <div id="test-info-panel">
-    <p id="test-info-title">Covered by:</p>
-    <div id="test-list-popup">
-      <!-- Test names for the hovered line are populated here by JavaScript -->
+    <div id="test-info-panel">
+      <p id="test-info-title">Covered by:</p>
+      <div id="test-list-popup">
+        <!-- Test names for the hovered line are populated here by JavaScript -->
+      </div>
     </div>
-  </div>
 
-  <script>
-    var bundledData = new Map();
-    // -- Bundled data --
-  </script>
+    <script>
+      var bundledData = new Map();
+      // -- Bundled data --
+    </script>
 
-  <script>
-    // --- Global State Variables ---
-    let coverageData; // Main coverage data from coverage.json.gz
-    let viewData;     // Coverage data for views from view.json.gz
-    let currentFilePath = null; // The path of the currently displayed source file
-    let currentLineNumber = null; // The currently highlighted line number (1-based)
-    let filteredTests = [];       // Array of *names* of tests selected for filtering the main coverage
-    let filteredViewTests = [];   // Array of *names* of view tests selected for filtering the view coverage
-    let hidePanelTimeout = null;  // Timer for hiding the test info panel
-    let allFilePathsMetadata = []; // Stores path for all files from coverageData
-    let displayedFilePathsMetadata = []; // Stores metadata for files currently displayed in the list (after search/filters)
+    <script>
+      // --- Global State Variables ---
+      let coverageData; // Main coverage data from coverage.json.gz
+      let viewData; // Coverage data for views from view.json.gz
+      let currentFilePath = null; // The path of the currently displayed source file
+      let currentLineNumber = null; // The currently highlighted line number (1-based)
+      let filteredTests = []; // Array of *names* of tests selected for filtering the main coverage
+      let filteredViewTests = []; // Array of *names* of view tests selected for filtering the view coverage
+      let hidePanelTimeout = null; // Timer for hiding the test info panel
+      let allFilePathsMetadata = []; // Stores path for all files from coverageData
+      let displayedFilePathsMetadata = []; // Stores metadata for files currently displayed in the list (after search/filters)
+      let syntaxHighlightEnabled = true; // New state for syntax highlighting
 
-    // Reverse lookup maps: test name <-> index
-    const testNameToIndex = {};
-    const viewTestNameToIndex = {};
+      // Reverse lookup maps: test name <-> index
+      const testNameToIndex = {};
+      const viewTestNameToIndex = {};
 
-    // --- DOM Element References ---
-    const dom = {
-      fileListTable: document.getElementById('file-list'),
-      fileListBody: document.querySelector('#file-list tbody'),
-      fileListThead: document.querySelector('#file-list thead'),
-      searchInput: document.getElementById('search-input'),
-      currentFileNameSpan: document.getElementById('current-file-name'),
-      sourceCodeContainer: document.getElementById('source-code-container'),
-      sourceCodeElement: document.getElementById('source-code'),
-      testInfoPanel: document.getElementById('test-info-panel'),
-      testListPopup: document.getElementById('test-list-popup'),
-      filterByTestSelect: document.getElementById('filter-by-test'),
-      resetTestFilterButton: document.getElementById('reset-test-filter'),
-      viewTestCheckboxesDiv: document.getElementById('view-test-checkboxes'),
-      sidebar: document.getElementById('sidebar'),
-      sidebarSplitter: document.getElementById('sidebar-splitter'),
-    };
+      // --- DOM Element References ---
+      const dom = {
+        fileListContainer: document.getElementById("file-list-container"),
+        fileListTable: document.getElementById("file-list"),
+        fileListBody: document.querySelector("#file-list tbody"),
+        fileListHeaders: document.querySelector("#file-list-headers"),
+        searchInput: document.getElementById("search-input"),
+        currentFileNameSpan: document.getElementById("current-file-name"),
+        sourceCodeContainer: document.getElementById("source-code-container"),
+        sourceCodeElement: document.getElementById("source-code"),
+        sourceContentPre: document.getElementById("source-content-pre"),
+        sourceContentElement: document.getElementById("source-content"),
+        testInfoPanel: document.getElementById("test-info-panel"),
+        testListPopup: document.getElementById("test-list-popup"),
+        filterByTestSelect: document.getElementById("filter-by-test"),
+        resetTestFilterButton: document.getElementById("reset-test-filter"),
+        viewTestListDiv: document.getElementById("view-test-list"),
+        viewTestSelectAll: document.getElementById("view-test-select-all"),
+        viewTestHeader: document.getElementById("view-test-header"),
+        viewTestCheckboxes: document.getElementById("view-test-checkboxes"),
+        sidebar: document.getElementById("sidebar"),
+        sidebarSplitter: document.getElementById("sidebar-splitter"),
+        syntaxHighlightToggle: document.getElementById("syntax-highlight-toggle"),
+        loadingOverlay: document.getElementById("loading-overlay"),
+        headerTimestamp: document.getElementById("header-timestamp"),
+      };
 
-    // --- Sorting State ---
-    let currentSortKey = 'filename'; // Default sort key
-    let currentSortOrder = 'asc';    // Default sort order
+      // --- Sorting State ---
+      let currentSortKey = "filename"; // Default sort key
+      let currentSortOrder = "asc"; // Default sort order
 
-    // --- Event Listeners for Test Info Panel ---
-    dom.testInfoPanel.addEventListener('mouseenter', () => clearTimeout(hidePanelTimeout));
-    dom.testInfoPanel.addEventListener('mouseleave', () => {
-      hidePanelTimeout = setTimeout(hideTestInfo, 100);
-    });
+      // --- Event Listeners for Test Info Panel ---
+      dom.testInfoPanel.addEventListener("mouseenter", () => clearTimeout(hidePanelTimeout));
+      dom.testInfoPanel.addEventListener("mouseleave", () => {
+        hidePanelTimeout = setTimeout(hideTestInfo, 100);
+      });
 
-    // --- Data Loading and Initialization ---
+      // --- Data Loading and Initialization ---
 
-    /**
-     * Loads a gzipped JSON file and decompresses it.
-     * @param {string} gz_path - The path to the gzipped JSON file.
-     * @returns {Promise<object>} The parsed JSON data.
-     */
-    async function loadGzippedJson(gz_path) {
-      let stream = null;
-      if (bundledData.has(gz_path)) {
+      /**
+       * Loads a gzipped JSON file and decompresses it.
+       * @param {string} gz_path - The path to the gzipped JSON file.
+       * @returns {Promise<object>} The parsed JSON data.
+       */
+      async function loadGzippedJson(gz_path) {
+        let stream = null;
+        if (bundledData.has(gz_path)) {
           const array = Uint8Array.fromBase64(bundledData.get(gz_path));
           const blob = new Blob([array]);
           stream = blob.stream();
-      } else {
+        } else {
           const response = await fetch(gz_path);
           if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status} for ${gz_path}`);
+            throw new Error(`HTTP error! status: ${response.status} for ${gz_path}`);
           }
           stream = response.body;
+        }
+        const decompressedStream = stream.pipeThrough(new DecompressionStream("gzip"));
+        const decompressedResponse = new Response(decompressedStream);
+        return await decompressedResponse.json();
       }
-      const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
-      const decompressedResponse = new Response(decompressedStream);
-      return await decompressedResponse.json();
-    }
 
-    /**
-     * Loads all necessary coverage data and initializes the viewer.
-     */
-    async function initializeViewer() {
-      try {
-        viewData = await loadGzippedJson('view.json.gz');
-        coverageData = await loadGzippedJson('coverage.json.gz');
+      /**
+       * Loads all necessary coverage data and initializes the viewer.
+       */
+      async function initializeViewer() {
+        try {
+          viewData = await loadGzippedJson("view.json.gz");
+          coverageData = await loadGzippedJson("coverage.json.gz");
 
-        if (!viewData?.coverage || !coverageData?.coverage) {
-            console.error('Incomplete coverage data loaded.');
-            dom.sourceCodeElement.textContent = 'Error: Incomplete coverage data. Check console for details.';
+          if (!viewData?.coverage || !coverageData?.coverage) {
+            console.error("Incomplete coverage data loaded.");
+            dom.sourceCodeElement.textContent =
+              "Error: Incomplete coverage data. Check console for details.";
             return;
+          }
+
+          if (coverageData.timestamp) {
+            dom.headerTimestamp.textContent = `Generated at ${coverageData.timestamp}`;
+            document.title = `OpenTitan Coverage - ${coverageData.timestamp.split("T")[0]}`;
+          }
+          if (coverageData.commit) {
+            dom.headerTimestamp.textContent += ` with commit ${coverageData.commit.slice(0, 8)}`
+          }
+
+          // Populate reverse lookup maps for quick index access
+          coverageData.tests.forEach((name, index) => {
+            testNameToIndex[name] = index;
+          });
+          viewData.tests.forEach((name, index) => {
+            viewTestNameToIndex[name] = index;
+          });
+
+          // Initialize metadata for all files (stats will be calculated on filter application)
+          allFilePathsMetadata = Object.keys(coverageData.coverage).map((path) => ({ path }));
+          allFilePathsMetadata.sort((a, b) => a.path.localeCompare(b.path)); // Initial sort by filename
+
+          // Process URL hash to restore state (file, line, filters, sort, highlight)
+          processUrlHash(false);
+
+          populateTestFilterDropdown();
+          populateViewTestCheckboxes();
+
+          // After processing hash, apply filters and load initial file if necessary
+          applyFileAndSortFilters();
+
+          if (!currentFilePath && displayedFilePathsMetadata.length > 0) {
+            loadSourceFile(displayedFilePathsMetadata[0].path, false);
+          } else if (!currentFilePath && displayedFilePathsMetadata.length === 0) {
+            displayNoFilesMessage();
+          }
+
+          // Highlight the active file in the list *after* the file list has been rendered.
+          if (currentFilePath) {
+            updateActiveFileInList(currentFilePath);
+          }
+        } catch (error) {
+          console.error("Failed to load coverage data:", error);
+          dom.sourceCodeElement.textContent = `Error loading coverage data: ${error.message}. Please ensure 'coverage.json.gz' and 'view.json.gz' are available.`;
         }
 
-        // Populate reverse lookup maps for quick index access
-        coverageData.tests.forEach((name, index) => { testNameToIndex[name] = index; });
-        viewData.tests.forEach((name, index) => { viewTestNameToIndex[name] = index; });
-
-        // Initialize metadata for all files (stats will be calculated on filter application)
-        allFilePathsMetadata = Object.keys(coverageData.coverage).map(path => ({ path }));
-        allFilePathsMetadata.sort((a, b) => a.path.localeCompare(b.path)); // Initial sort by filename
-
-        populateTestFilterDropdown();
-        populateViewTestCheckboxes();
-
-        // Process URL hash to restore state (file, line, filters, sort)
-        processUrlHash(false);
-
-        // After processing hash, apply filters and load initial file if necessary
-        applyFileAndSortFilters();
-
-        if (!currentFilePath && displayedFilePathsMetadata.length > 0) {
-          loadSourceFile(displayedFilePathsMetadata[0].path, false);
-        } else if (!currentFilePath && displayedFilePathsMetadata.length === 0) {
-          displayNoFilesMessage();
-        }
-
-      } catch (error) {
-        console.error('Failed to load coverage data:', error);
-        dom.sourceCodeElement.textContent = `Error loading coverage data: ${error.message}. Please ensure 'coverage.json.gz' and 'view.json.gz' are available.`;
+        // Hide splash screen
+        dom.loadingOverlay.style.opacity = "0";
+        setTimeout(() => {
+          dom.loadingOverlay.style.display = "none";
+        }, 500);
       }
-    }
 
-    // --- Coverage Calculation Logic ---
+      // --- Coverage Calculation Logic ---
 
-    /**
-     * Calculates coverage statistics for a given file path based on current filters.
-     * @param {string} filePath - The path of the file.
-     * @param {string[]} currentFilteredTests - Array of test names currently selected for the main coverage filter.
-     * @param {string[]} currentFilteredViewTests - Array of view test names currently selected for the view filter.
-     * @returns {{ratio: number, missed: number, total: number}} Coverage statistics.
-     */
-    function calculateCoverageStatsForFile(filePath, currentFilteredTests, currentFilteredViewTests) {
+      /**
+       * Calculates coverage statistics for a given file path based on current filters.
+       * @param {string} filePath - The path of the file.
+       * @param {string[]} currentFilteredTests - Array of test names currently selected for the main coverage filter.
+       * @param {string[]} currentFilteredViewTests - Array of view test names currently selected for the view filter.
+       * @returns {{ratio: number, missed: number, total: number}} Coverage statistics.
+       */
+      function calculateCoverageStatsForFile(
+        filePath,
+        currentFilteredTests,
+        currentFilteredViewTests,
+      ) {
         const fileProfile = coverageData.coverage[filePath];
         const viewFileProfile = viewData.coverage[filePath];
 
@@ -520,335 +796,446 @@
         let totalExecutableLines = 0;
 
         if (!fileProfile) {
-            // If the file is not in the main coverage data, it has 0 coverage.
-            return { ratio: 0, missed: 0, total: 0 };
+          // If the file is not in the main coverage data, it has 0 coverage.
+          return { ratio: 0, missed: 0, total: 0 };
         }
 
         const filteredViewTestIndices = currentFilteredViewTests
-            .map(name => viewTestNameToIndex[name])
-            .filter(idx => idx !== undefined); // Ensure valid indices
+          .map((name) => viewTestNameToIndex[name])
+          .filter((idx) => idx !== undefined); // Ensure valid indices
 
         const filteredTestIndices = currentFilteredTests
-            .map(name => testNameToIndex[name])
-            .filter(idx => idx !== undefined); // Ensure valid indices
+          .map((name) => testNameToIndex[name])
+          .filter((idx) => idx !== undefined); // Ensure valid indices
 
         fileProfile.l.forEach((lineData, index) => {
-            const viewLineData = viewFileProfile?.l[index]; // Use optional chaining for view data
-            const skippedByViewFilter = isLineSkippedByViewFilter(lineData, viewLineData, filteredViewTestIndices);
+          const viewLineData = viewFileProfile?.l[index]; // Use optional chaining for view data
+          const skippedByViewFilter = isLineSkippedByViewFilter(
+            lineData,
+            viewLineData,
+            filteredViewTestIndices,
+          );
 
-            if (!skippedByViewFilter) {
-                totalExecutableLines++;
-                const isHit = lineData.t.some(testIdx =>
-                    currentFilteredTests.length === 0 || filteredTestIndices.includes(testIdx)
-                );
-                if (isHit) {
-                    hitLines++;
-                }
+          if (!skippedByViewFilter) {
+            totalExecutableLines++;
+            const isHit = lineData.t.some(
+              (testIdx) =>
+                currentFilteredTests.length === 0 || filteredTestIndices.includes(testIdx),
+            );
+            if (isHit) {
+              hitLines++;
             }
+          }
         });
 
         const missedLines = totalExecutableLines - hitLines;
         const ratio = totalExecutableLines > 0 ? (hitLines / totalExecutableLines) * 100 : 100;
         return { ratio: ratio, missed: missedLines, total: totalExecutableLines };
-    }
+      }
 
-    /**
-     * Determines if a line should be considered "skipped" by the view filter.
-     * A line is skipped if no view test (that is currently filtered) covers it.
-     * If no view filter is active, it uses the original 's' (skipped) status.
-     * @param {object} lineData - The line data from `coverageData`.
-     * @param {object|null} viewLineData - The corresponding line data from `viewData`, or null if not available.
-     * @param {number[]} filteredViewTestIndices - Indices of selected view tests.
-     * @returns {boolean} True if the line is skipped by the view filter, false otherwise.
-     */
-    function isLineSkippedByViewFilter(lineData, viewLineData, filteredViewTestIndices) {
+      /**
+       * Determines if a line should be considered "skipped" by the view filter.
+       * A line is skipped if no view test (that is currently filtered) covers it.
+       * If no view filter is active, it uses the original 's' (skipped) status.
+       * @param {object} lineData - The line data from `coverageData`.
+       * @param {object|null} viewLineData - The corresponding line data from `viewData`, or null if not available.
+       * @param {number[]} filteredViewTestIndices - Indices of selected view tests.
+       * @returns {boolean} True if the line is skipped by the view filter, false otherwise.
+       */
+      function isLineSkippedByViewFilter(lineData, viewLineData, filteredViewTestIndices) {
         if (filteredViewTests.length === 0) {
-            return lineData.s; // Use original skipped status if no view filter is active
+          return lineData.s; // Use original skipped status if no view filter is active
         }
 
         if (viewLineData) {
-            // If any selected view test covers this line, it's NOT skipped by the view filter
-            const hitBySelectedViewTest = viewLineData.t.some(viewTestIdx => filteredViewTestIndices.includes(viewTestIdx));
-            return !hitBySelectedViewTest;
+          // If any selected view test covers this line, it's NOT skipped by the view filter
+          const hitBySelectedViewTest = viewLineData.t.some((viewTestIdx) =>
+            filteredViewTestIndices.includes(viewTestIdx),
+          );
+          return !hitBySelectedViewTest;
         }
         // If there's no view data for this specific line, and a view filter is active, it's considered skipped.
         return true;
-    }
-
-    // --- UI Rendering Functions ---
-
-    /**
-     * Renders the file list table based on the provided file metadata.
-     * @param {object[]} fileInfos - Array of file metadata objects to display.
-     */
-    function renderFileList(fileInfos) {
-      dom.fileListBody.innerHTML = '';
-      if (fileInfos.length === 0) {
-          displayNoFilesMessage();
-          return;
       }
 
-      fileInfos.forEach((fileInfo) => {
-        const tr = document.createElement('tr');
-        tr.dataset.filePath = fileInfo.path;
-        tr.addEventListener('click', () => {
+      function fileSearchRegex(flags) {
+        // Return a regex of segmented search input
+        const searchTerm = dom.searchInput.value.trim();
+        if (!searchTerm) return null;
+        const regexParts = searchTerm
+          .split(/([ \/_])/)
+          .filter((e) => e !== " ")
+          .map((e) => `(${RegExp.escape(e)})`);
+        return new RegExp(`${regexParts.join("(.*?)")}`, flags);
+      }
+
+      function fileSearchHighlight(str) {
+        // find all matches and mark odd capture groups
+        const searchRegex = fileSearchRegex("gi");
+        if (!searchRegex) return str;
+        return str.replace(searchRegex, (match, ...groups) => {
+          const result = [];
+          for (let i = 0; i < groups.length - 2; i++) {
+            if (i % 2 === 0) {
+              result.push(`<mark>${groups[i]}</mark>`);
+            } else {
+              result.push(groups[i]);
+            }
+          }
+          return result.join("").replace(/<\/mark><mark>/g, "");
+        });
+      }
+
+      // --- UI Rendering Functions ---
+
+      /**
+       * Renders the file list table based on the provided file metadata.
+       * @param {object[]} fileInfos - Array of file metadata objects to display.
+       */
+      function renderFileList(fileInfos) {
+        dom.fileListBody.innerHTML = "";
+        if (fileInfos.length === 0) {
+          displayNoFilesMessage();
+          return;
+        }
+
+        fileInfos.forEach((fileInfo) => {
+          const tr = document.createElement("tr");
+          tr.dataset.filePath = fileInfo.path;
+          tr.addEventListener("click", () => {
             currentLineNumber = null; // Reset line number when changing file via file list
             // Always push state when clicking a file in the list
             loadSourceFile(fileInfo.path, true);
+          });
+
+          const ratioTd = document.createElement("td");
+          ratioTd.classList.add("coverage-ratio");
+          ratioTd.textContent = `${fileInfo.ratio.toFixed(2)}%`;
+          if (fileInfo.ratio > 90) ratioTd.classList.add("high");
+          else if (fileInfo.ratio > 75) ratioTd.classList.add("medium");
+          else ratioTd.classList.add("low");
+          tr.appendChild(ratioTd);
+
+          const missedTd = document.createElement("td");
+          missedTd.classList.add("missed-count");
+          if (fileInfo.missed > 0) missedTd.classList.add("nonzero");
+          missedTd.textContent = fileInfo.missed;
+          tr.appendChild(missedTd);
+
+          const filenameTd = document.createElement("td");
+          filenameTd.classList.add("filename");
+          filenameTd.innerHTML = fileSearchHighlight(fileInfo.path);
+          tr.appendChild(filenameTd);
+
+          dom.fileListBody.appendChild(tr);
         });
-
-        const ratioTd = document.createElement('td');
-        ratioTd.classList.add('coverage-ratio');
-        ratioTd.textContent = `${fileInfo.ratio.toFixed(2)}%`;
-        if (fileInfo.ratio > 90) ratioTd.classList.add('high');
-        else if (fileInfo.ratio > 75) ratioTd.classList.add('medium');
-        else ratioTd.classList.add('low');
-        tr.appendChild(ratioTd);
-
-        const missedTd = document.createElement('td');
-        missedTd.classList.add('missed-count');
-        if (fileInfo.missed > 0) missedTd.classList.add('nonzero');
-        missedTd.textContent = fileInfo.missed;
-        tr.appendChild(missedTd);
-
-        const filenameTd = document.createElement('td');
-        filenameTd.classList.add('filename');
-        filenameTd.textContent = fileInfo.path;
-        tr.appendChild(filenameTd);
-
-        dom.fileListBody.appendChild(tr);
-      });
-    }
-
-    /**
-     * Displays a message in the source code area when no files match the current filters.
-     */
-    function displayNoFilesMessage() {
-        dom.currentFileNameSpan.textContent = 'No files match criteria.';
-        dom.sourceCodeElement.innerHTML = '';
-        currentFilePath = null;
-        currentLineNumber = null;
-    }
-
-    /**
-     * Populates the "Filter by Test" dropdown with available test names from coverageData.
-     */
-    function populateTestFilterDropdown() {
-      dom.filterByTestSelect.innerHTML = '<option value="">All Tests</option>';
-      coverageData.tests.forEach((testName) => {
-        const option = document.createElement('option');
-        option.value = testName;
-        option.textContent = testName;
-        dom.filterByTestSelect.appendChild(option);
-      });
-    }
-
-    /**
-     * Populates the "Filter by View Tests" checkboxes with available view test names from viewData.
-     */
-    function populateViewTestCheckboxes() {
-      dom.viewTestCheckboxesDiv.innerHTML = '';
-      viewData.tests.forEach((testName, index) => {
-        const div = document.createElement('div');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `view-test-${index}`;
-        checkbox.value = testName;
-        // Check if the checkbox should be pre-checked based on filteredViewTests state
-        checkbox.checked = filteredViewTests.includes(testName);
-
-        const label = document.createElement('label');
-        label.htmlFor = `view-test-${index}`;
-        // Display only the test name part after the last colon and remove _coverage_view suffix
-        let displayName = testName.substring(testName.lastIndexOf(':') + 1).replace(/_coverage_view$/, '');
-        label.textContent = displayName;
-
-        checkbox.addEventListener('change', handleViewTestFilterChange);
-
-        div.appendChild(checkbox);
-        div.appendChild(label);
-        dom.viewTestCheckboxesDiv.appendChild(div);
-      });
-    }
-
-    /**
-     * Loads and displays the source code for a given file path, applying current filters.
-     * @param {string} filePath - The path of the file to load.
-     * @param {boolean} pushState - Whether to push a new state to browser history.
-     */
-    function loadSourceFile(filePath, pushState = true) {
-      // Validate filePath and check if coverage data exists
-      if (!filePath || !coverageData.coverage[filePath]) {
-        currentFilePath = null;
-        currentLineNumber = null;
-        dom.currentFileNameSpan.textContent = 'No file selected or file not found.';
-        dom.sourceCodeElement.innerHTML = '';
-        updateUrlHash(pushState);
-        return;
+        // After rendering, update the active file visually
+        if (currentFilePath) {
+          updateActiveFileInList(currentFilePath);
+        }
       }
 
-      currentFilePath = filePath;
-      // Update hash *before* rendering to ensure `currentFilePath` and `currentLineNumber` are finalized for the hash.
-      updateUrlHash(pushState);
+      /**
+       * Updates the visual 'active' state for a file in the file list.
+       * @param {string} filePath - The path of the file to mark as active.
+       */
+      function updateActiveFileInList(filePath) {
+        Array.from(dom.fileListBody.children).forEach((tr) => {
+          if (tr.dataset.filePath === filePath) {
+            tr.classList.add("active");
+            // Scroll to make active file visible
+            const mark = tr.querySelector("mark:last-of-type");
+            if (mark) {
+              mark.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "center",
+              });
+            } else {
+              tr.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          } else {
+            tr.classList.remove("active");
+          }
+        });
+      }
 
-      const fileProfile = coverageData.coverage[filePath];
-      const viewFileProfile = viewData.coverage[filePath];
-      dom.currentFileNameSpan.textContent = filePath;
-      const newSourceCodeElement = document.createElement('code');
+      /**
+       * Displays a message in the source code area when no files match the current filters.
+       */
+      function displayNoFilesMessage() {
+        dom.currentFileNameSpan.textContent = "No files match criteria.";
+        dom.sourceCodeElement.innerHTML = "";
+        dom.sourceContentElement.innerHTML = "";
+        currentFilePath = null;
+        currentLineNumber = null;
+      }
 
-      // Update active file highlight in the file list
-      Array.from(dom.fileListBody.children).forEach(tr => {
-        if (tr.dataset.filePath === filePath) {
-          tr.classList.add('active');
-          tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Scroll to make active file visible
-        } else {
-          tr.classList.remove('active');
+      /**
+       * Populates the "Filter by Test" dropdown with available test names from coverageData.
+       */
+      function populateTestFilterDropdown() {
+        dom.filterByTestSelect.innerHTML = '<option value="">All Tests</option>';
+        coverageData.tests.forEach((testName) => {
+          const option = document.createElement("option");
+          option.value = testName;
+          option.textContent = testName;
+          dom.filterByTestSelect.appendChild(option);
+        });
+      }
+
+      /**
+       * Populates the "Filter by View Tests" checkboxes with available view test names from viewData.
+       */
+      function populateViewTestCheckboxes() {
+        dom.viewTestListDiv.innerHTML = "";
+
+        dom.viewTestSelectAll.addEventListener("change", (e) => {
+          if (e.target.checked) {
+            filteredViewTests = [...viewData.tests];
+          } else {
+            filteredViewTests = [];
+          }
+          // Update individual checkboxes
+          viewData.tests.forEach((_, index) => {
+            const cb = document.getElementById(`view-test-${index}`);
+            if (cb) cb.checked = e.target.checked;
+          });
+          updateStateAndReload(true);
+        });
+
+        dom.viewTestHeader.addEventListener("click", (e) => {
+          if (e.target === dom.viewTestSelectAll || e.target.tagName === 'LABEL') return;
+          dom.viewTestCheckboxes.classList.toggle("collapsed");
+        });
+
+        viewData.tests.forEach((testName, index) => {
+          const div = document.createElement("div");
+          div.classList.add("view-test-checkbox-item");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.id = `view-test-${index}`;
+          checkbox.value = testName;
+          // Check if the checkbox should be pre-checked based on filteredViewTests state
+          checkbox.checked = filteredViewTests.includes(testName);
+
+          const label = document.createElement("label");
+          label.htmlFor = `view-test-${index}`;
+          // Display only the test name part after the last colon and remove _coverage_view suffix
+          let displayName = testName
+            .substring(testName.lastIndexOf(":") + 1)
+            .replace(/_coverage_view$/, "");
+          label.textContent = displayName;
+
+          checkbox.addEventListener("change", handleViewTestFilterChange);
+
+          div.appendChild(checkbox);
+          div.appendChild(label);
+          dom.viewTestListDiv.appendChild(div);
+        });
+        // Initial state of Select All
+        updateSelectAllStatus();
+      }
+
+      /**
+       * Loads and displays the source code for a given file path, applying current filters.
+       * @param {string} filePath - The path of the file to load.
+       * @param {boolean} pushState - Whether to push a new state to browser history.
+       */
+      function loadSourceFile(filePath, pushState = true) {
+        // Validate filePath and check if coverage data exists
+        if (!filePath || !coverageData.coverage[filePath]) {
+          currentFilePath = null;
+          currentLineNumber = null;
+          dom.currentFileNameSpan.textContent = "No file selected or file not found.";
+          dom.sourceCodeElement.innerHTML = "";
+          dom.sourceContentElement.innerHTML = "";
+          updateUrlHash(pushState);
+          return;
         }
-      });
 
-      // Prepare indices for faster filtering
-      const filteredViewTestIndices = filteredViewTests
-          .map(name => viewTestNameToIndex[name])
-          .filter(idx => idx !== undefined);
+        currentFilePath = filePath;
+        // Update hash *before* rendering to ensure `currentFilePath` and `currentLineNumber` are finalized for the hash.
+        updateUrlHash(pushState);
 
-      const filteredTestNames = new Set(filteredTests);
+        const fileProfile = coverageData.coverage[filePath];
+        const viewFileProfile = viewData.coverage[filePath];
+        dom.currentFileNameSpan.textContent = filePath;
+        const newSourceCodeElement = document.createElement("code");
+        const newSourceContentElement = document.createElement("code");
+        newSourceContentElement.classList.add("language-clike");
 
-      fileProfile.l.forEach((lineData, index) => {
-        const lineNumber = index + 1; // 1-based line number for display
-        const lineDiv = document.createElement('div');
-        lineDiv.classList.add('line');
-        lineDiv.dataset.lineNumber = lineNumber;
+        // Update active file highlight in the file list
+        updateActiveFileInList(filePath);
 
-        // Apply highlight if this is the currently selected line
-        if (lineNumber === currentLineNumber) {
-            lineDiv.classList.add('highlighted');
-        }
+        // Prepare indices for faster filtering
+        const filteredViewTestIndices = filteredViewTests
+          .map((name) => viewTestNameToIndex[name])
+          .filter((idx) => idx !== undefined);
 
-        const hitCountSpan = document.createElement('span');
-        hitCountSpan.classList.add('hit-count');
+        const filteredTestNames = new Set(filteredTests);
 
-        // Filter tests relevant to this line based on the main test filter
-        const relevantTestsForLine = lineData.t.filter(testIdx =>
-            filteredTestNames.size === 0 || filteredTestNames.has(coverageData.tests[testIdx])
-        );
+        fileProfile.l.forEach((lineData, index) => {
+          const lineNumber = index + 1; // 1-based line number for display
+          const lineDiv = document.createElement("div");
+          lineDiv.classList.add("line");
+          lineDiv.dataset.lineNumber = lineNumber;
 
-        const viewLineData = viewFileProfile?.l[index];
-        const skippedByViewFilter = isLineSkippedByViewFilter(lineData, viewLineData, filteredViewTestIndices);
+          // Apply highlight if this is the currently selected line
+          if (lineNumber === currentLineNumber) {
+            lineDiv.classList.add("highlighted");
+          }
 
-        if (relevantTestsForLine.length > 0 && !skippedByViewFilter) {
+          const hitCountSpan = document.createElement("span");
+          hitCountSpan.classList.add("hit-count");
+
+          // Filter tests relevant to this line based on the main test filter
+          const relevantTestsForLine = lineData.t.filter(
+            (testIdx) =>
+              filteredTestNames.size === 0 || filteredTestNames.has(coverageData.tests[testIdx]),
+          );
+
+          const viewLineData = viewFileProfile?.l[index];
+          const skippedByViewFilter = isLineSkippedByViewFilter(
+            lineData,
+            viewLineData,
+            filteredViewTestIndices,
+          );
+
+          if (relevantTestsForLine.length > 0 && !skippedByViewFilter) {
             // Display hit count and add event listeners for the info panel
             hitCountSpan.textContent = relevantTestsForLine.length;
-            hitCountSpan.addEventListener('mouseenter', (event) => showTestInfo(event, relevantTestsForLine, hitCountSpan));
-            hitCountSpan.addEventListener('mouseleave', () => hidePanelTimeout = setTimeout(hideTestInfo, 100));
-        } else if (relevantTestsForLine.length === 0 && !skippedByViewFilter && !lineData.s) {
+            hitCountSpan.addEventListener("mouseenter", (event) =>
+              showTestInfo(event, relevantTestsForLine, hitCountSpan),
+            );
+            hitCountSpan.addEventListener(
+              "mouseleave",
+              () => (hidePanelTimeout = setTimeout(hideTestInfo, 100)),
+            );
+          } else if (relevantTestsForLine.length === 0 && !skippedByViewFilter && !lineData.s) {
             // If not hit but not skipped by view filter and originally executable, show '0'
-            hitCountSpan.textContent = '0';
-        } else {
+            hitCountSpan.textContent = "0";
+          } else {
             // Otherwise, no hit count shown (e.g., skipped line, or hit count 0 and not originally executable)
-            hitCountSpan.textContent = '';
-        }
-        lineDiv.appendChild(hitCountSpan);
+            hitCountSpan.textContent = "";
+          }
+          lineDiv.appendChild(hitCountSpan);
 
-        const lineNumberSpan = document.createElement('span');
-        lineNumberSpan.classList.add('line-number');
-        lineNumberSpan.textContent = lineNumber;
-        // Add event listener to toggle line highlighting
-        lineNumberSpan.addEventListener('click', (event) => {
+          const lineNumberSpan = document.createElement("span");
+          lineNumberSpan.classList.add("line-number");
+          lineNumberSpan.textContent = lineNumber;
+          // Add event listener to toggle line highlighting
+          lineNumberSpan.addEventListener("click", (event) => {
             event.stopPropagation(); // Prevent event from bubbling up to lineDiv click if any
             toggleLineHighlight(lineNumber);
-        });
-        lineDiv.appendChild(lineNumberSpan);
+          });
+          lineDiv.appendChild(lineNumberSpan);
 
-        const lineContentSpan = document.createElement('span');
-        lineContentSpan.classList.add('line-content');
-        lineContentSpan.textContent = lineData.c; // Display the actual source code content
-        lineDiv.appendChild(lineContentSpan);
+          newSourceContentElement.textContent += lineData.c + "\n";
 
-        // Apply CSS classes for visual indication of coverage status
-        if (skippedByViewFilter) {
-          lineDiv.classList.add('skipped'); // Line is skipped by the active view filter
-        } else {
-          if (relevantTestsForLine.length > 0) {
-            lineDiv.classList.add('hit'); // Line is hit by at least one relevant test
+          // Apply CSS classes for visual indication of coverage status
+          if (skippedByViewFilter) {
+            lineDiv.classList.add("skipped"); // Line is skipped by the active view filter
           } else {
-            lineDiv.classList.add('not-hit'); // Line is not hit by any relevant test
+            if (relevantTestsForLine.length > 0) {
+              lineDiv.classList.add("hit"); // Line is hit by at least one relevant test
+            } else {
+              lineDiv.classList.add("not-hit"); // Line is not hit by any relevant test
+            }
+          }
+          newSourceCodeElement.appendChild(lineDiv);
+        });
+
+        // Only highlight if syntaxHighlightEnabled is true
+        if (syntaxHighlightEnabled) {
+          Prism.highlightElement(newSourceContentElement);
+        }
+
+        // Replace the old source code element with the new one
+        dom.sourceCodeElement.replaceWith(newSourceCodeElement);
+        dom.sourceCodeElement = newSourceCodeElement; // Update the DOM reference
+        dom.sourceContentElement.replaceWith(newSourceContentElement);
+        dom.sourceContentElement = newSourceContentElement; // Update the DOM reference
+
+        // Scroll to the specific line if currentLineNumber is set
+        if (currentLineNumber !== null) {
+          const lineElement = dom.sourceCodeElement.querySelector(
+            `.line[data-line-number="${currentLineNumber}"]`,
+          );
+          if (lineElement) {
+            // Calculate scroll position to center the line in the container
+            dom.sourceCodeContainer.scrollTop =
+              lineElement.offsetTop -
+              dom.sourceCodeContainer.offsetTop -
+              dom.sourceCodeContainer.clientHeight / 2 +
+              lineElement.clientHeight / 2;
           }
         }
-        newSourceCodeElement.appendChild(lineDiv);
-      });
-
-      // Replace the old source code element with the new one
-      dom.sourceCodeElement.replaceWith(newSourceCodeElement);
-      dom.sourceCodeElement = newSourceCodeElement; // Update the DOM reference
-
-      // Scroll to the specific line if currentLineNumber is set
-      if (currentLineNumber !== null) {
-          const lineElement = dom.sourceCodeElement.querySelector(`.line[data-line-number="${currentLineNumber}"]`);
-          if (lineElement) {
-              // Calculate scroll position to center the line in the container
-              dom.sourceCodeContainer.scrollTop = lineElement.offsetTop - dom.sourceCodeContainer.offsetTop - (dom.sourceCodeContainer.clientHeight / 2) + (lineElement.clientHeight / 2);
-          }
       }
-    }
 
-    /**
-     * Toggles the highlight for a specific line number.
-     * Updates `currentLineNumber` and the URL hash.
-     * @param {number} lineNumber - The 1-based line number to highlight/unhighlight.
-     */
-    function toggleLineHighlight(lineNumber) {
+      /**
+       * Toggles the highlight for a specific line number.
+       * Updates `currentLineNumber` and the URL hash.
+       * @param {number} lineNumber - The 1-based line number to highlight/unhighlight.
+       */
+      function toggleLineHighlight(lineNumber) {
         if (currentFilePath === null) return;
 
-        const prevHighlightedLine = dom.sourceCodeElement.querySelector('.line.highlighted');
+        const prevHighlightedLine = dom.sourceCodeElement.querySelector(".line.highlighted");
         if (prevHighlightedLine) {
-            prevHighlightedLine.classList.remove('highlighted');
+          prevHighlightedLine.classList.remove("highlighted");
         }
 
         if (currentLineNumber === lineNumber) {
-            currentLineNumber = null; // Unhighlight if clicked again
+          currentLineNumber = null; // Unhighlight if clicked again
         } else {
-            currentLineNumber = lineNumber; // Highlight the new line
-            const newLineElement = dom.sourceCodeElement.querySelector(`.line[data-line-number="${currentLineNumber}"]`);
-            if (newLineElement) {
-                newLineElement.classList.add('highlighted');
-            }
+          currentLineNumber = lineNumber; // Highlight the new line
+          const newLineElement = dom.sourceCodeElement.querySelector(
+            `.line[data-line-number="${currentLineNumber}"]`,
+          );
+          if (newLineElement) {
+            newLineElement.classList.add("highlighted");
+          }
         }
         updateUrlHash(true); // Push new state to history
-    }
+      }
 
-    /**
-     * Shows the test information panel for a given line, listing tests that cover it.
-     * @param {MouseEvent} event - The mouse event that triggered the panel.
-     * @param {number[]} testIndices - Array of indices of tests covering the line (from coverageData.tests).
-     * @param {HTMLElement} targetElement - The element that triggered the panel (e.g., hit count span).
-     */
-    function showTestInfo(event, testIndices, targetElement) {
+      /**
+       * Shows the test information panel for a given line, listing tests that cover it.
+       * @param {MouseEvent} event - The mouse event that triggered the panel.
+       * @param {number[]} testIndices - Array of indices of tests covering the line (from coverageData.tests).
+       * @param {HTMLElement} targetElement - The element that triggered the panel (e.g., hit count span).
+       */
+      function showTestInfo(event, testIndices, targetElement) {
         clearTimeout(hidePanelTimeout); // Clear any pending hide actions
-        dom.testListPopup.innerHTML = ''; // Clear previous list
+        dom.testListPopup.innerHTML = ""; // Clear previous list
 
         // Populate the list with test names
-        testIndices.forEach(idx => {
-            const testName = coverageData.tests[idx];
-            const div = document.createElement('div');
-            div.classList.add('test-item');
-            div.textContent = testName;
-            div.dataset.testName = testName;
-            if (filteredTests.includes(testName)) {
-                div.classList.add('highlight-test'); // Highlight if this test is currently filtered
-            }
-            div.addEventListener('click', (e) => {
-              e.stopPropagation(); // Prevent click from bubbling up
-              applyTestFilter(testName); // Apply this test as the main filter
-              hideTestInfo();
-            });
-            dom.testListPopup.appendChild(div);
+        testIndices.forEach((idx) => {
+          const testName = coverageData.tests[idx];
+          const div = document.createElement("div");
+          div.classList.add("test-item");
+          div.textContent = testName;
+          div.dataset.testName = testName;
+          if (filteredTests.includes(testName)) {
+            div.classList.add("highlight-test"); // Highlight if this test is currently filtered
+          }
+          div.addEventListener("click", (e) => {
+            e.stopPropagation(); // Prevent click from bubbling up
+            applyTestFilter(testName); // Apply this test as the main filter
+            hideTestInfo();
+          });
+          dom.testListPopup.appendChild(div);
         });
 
         // Make panel visible to calculate its dimensions correctly
-        dom.testInfoPanel.style.display = 'block';
+        dom.testInfoPanel.style.display = "block";
         // Reset positioning to allow recalculation
-        dom.testInfoPanel.style.left = 'auto';
-        dom.testInfoPanel.style.right = 'auto';
+        dom.testInfoPanel.style.left = "auto";
+        dom.testInfoPanel.style.right = "auto";
 
         // Position the panel relative to the target element and viewport
         const rect = targetElement.getBoundingClientRect();
@@ -859,373 +1246,426 @@
 
         // Default to right of target
         dom.testInfoPanel.style.left = `${rect.right + 5}px`;
-        dom.testInfoPanel.style.right = 'auto'; // Clear right positioning
+        dom.testInfoPanel.style.right = "auto"; // Clear right positioning
 
         // Adjust if it goes off screen to the right
         if (rect.right + 5 + panelWidth > viewportWidth - 30) {
-            dom.testInfoPanel.style.right = '30px';
-            dom.testInfoPanel.style.left = `${rect.right + 5}px`;
+          dom.testInfoPanel.style.right = "30px";
+          dom.testInfoPanel.style.left = `${rect.right + 5}px`;
         }
 
         // Default to align with target's top
         dom.testInfoPanel.style.top = `${rect.top}px`;
-        dom.testInfoPanel.style.bottom = 'auto'; // Clear bottom positioning
+        dom.testInfoPanel.style.bottom = "auto"; // Clear bottom positioning
 
         // Adjust if it goes off screen to the bottom
         if (rect.bottom + panelHeight > viewportHeight - 10) {
-            dom.testInfoPanel.style.top = `${rect.top - panelHeight}px`; // Move above target
-            if (rect.top - panelHeight < 10) { // If it still goes off screen to the top
-                dom.testInfoPanel.style.top = '10px';
-                dom.testInfoPanel.style.bottom = '10px';
-            }
+          dom.testInfoPanel.style.top = `${rect.top - panelHeight}px`; // Move above target
+          if (rect.top - panelHeight < 10) {
+            // If it still goes off screen to the top
+            dom.testInfoPanel.style.top = "10px";
+            dom.testInfoPanel.style.bottom = "10px";
+          }
         }
-    }
+      }
 
-    /**
-     * Hides the test information panel.
-     */
-    function hideTestInfo() {
-      clearTimeout(hidePanelTimeout);
-      hidePanelTimeout = null;
-      dom.testInfoPanel.style.display = 'none';
-    }
+      /**
+       * Hides the test information panel.
+       */
+      function hideTestInfo() {
+        clearTimeout(hidePanelTimeout);
+        hidePanelTimeout = null;
+        dom.testInfoPanel.style.display = "none";
+      }
 
-    // --- Filter and Sort Logic ---
+      // --- Filter and Sort Logic ---
 
-    /**
-     * Applies all current file, search, and sort filters, then re-renders the file list.
-     * Also updates the current displayed file if necessary.
-     */
-    function applyFileAndSortFilters() {
-      // Calculate coverage stats for all files based on current filters
-      let filesToDisplay = allFilePathsMetadata.map(fileInfo => {
-          return {
+      /**
+       * Applies all current file, search, and sort filters, then re-renders the file list.
+       * Also updates the current displayed file if necessary.
+       */
+      function applyFileAndSortFilters() {
+        // Calculate coverage stats for all files based on current filters
+        let filesToDisplay = allFilePathsMetadata
+          .map((fileInfo) => {
+            return {
               path: fileInfo.path,
-              ...calculateCoverageStatsForFile(fileInfo.path, filteredTests, filteredViewTests)
-          };
-      }).filter(fileInfo => {
-          // Only display files with at least one executable line (after view filter)
-          return fileInfo.total > 0;
-      });
+              ...calculateCoverageStatsForFile(fileInfo.path, filteredTests, filteredViewTests),
+            };
+          })
+          .filter((fileInfo) => {
+            // Only display files with at least one executable line (after view filter)
+            return fileInfo.total > 0;
+          });
 
-      // Apply search term filter
-      const searchTerm = dom.searchInput.value.toLowerCase();
-      if (searchTerm) {
-          filesToDisplay = filesToDisplay.filter(fileInfo =>
-              fileInfo.path.toLowerCase().includes(searchTerm)
-          );
-      }
-
-      // Sort filesToDisplay based on current sort key and order
-      filesToDisplay.sort((a, b) => {
-        let valA, valB;
-        if (currentSortKey === 'ratio') {
-          valA = a.ratio;
-          valB = b.ratio;
-        } else if (currentSortKey === 'missed') {
-          valA = a.missed;
-          valB = b.missed;
-        } else { // filename (default)
-          valA = a.path.toLowerCase();
-          valB = b.path.toLowerCase();
+        // Apply search term filter
+        const searchRegex = fileSearchRegex("i");
+        if (searchRegex) {
+          filesToDisplay = filesToDisplay.filter((fileInfo) => searchRegex.test(fileInfo.path));
         }
 
-        if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
-        if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
-        return 0;
-      });
+        // Sort filesToDisplay based on current sort key and order
+        filesToDisplay.sort((a, b) => {
+          let valA, valB;
+          if (currentSortKey === "ratio") {
+            valA = a.ratio;
+            valB = b.ratio;
+          } else if (currentSortKey === "missed") {
+            valA = a.missed;
+            valB = b.missed;
+          } else {
+            // filename (default)
+            valA = a.path.toLowerCase();
+            valB = b.path.toLowerCase();
+          }
 
-      displayedFilePathsMetadata = filesToDisplay;
-      renderFileList(displayedFilePathsMetadata);
-    }
+          if (valA < valB) return currentSortOrder === "asc" ? -1 : 1;
+          if (valA > valB) return currentSortOrder === "asc" ? 1 : -1;
+          return 0;
+        });
 
-    /**
-     * Handles changes to the "Filter by Test" dropdown.
-     * Updates `filteredTests` and triggers a UI reload.
-     */
-    function handleTestFilterChange() {
-      const selectedTestName = dom.filterByTestSelect.value;
-      // If "All Tests" is selected, clear the filter; otherwise, set to the selected test
-      filteredTests = selectedTestName === "" ? [] : [selectedTestName];
-      updateStateAndReload(true);
-    }
-
-    /**
-     * Handles clicks on the "Reset Test Filter" button.
-     * Clears `filteredTests` and resets the dropdown, then triggers a UI reload.
-     */
-    function handleResetTestFilter() {
-      dom.filterByTestSelect.value = ""; // Reset dropdown to "All Tests"
-      filteredTests = [];
-      updateStateAndReload(true);
-    }
-
-    /**
-     * Handles changes to the "Filter by View Tests" checkboxes.
-     * Adds or removes the test name from `filteredViewTests` and triggers a UI reload.
-     * @param {Event} event - The change event from the checkbox.
-     */
-    function handleViewTestFilterChange(event) {
-      const changedTestName = event.target.value;
-      if (event.target.checked) {
-        filteredViewTests.push(changedTestName);
-      } else {
-        filteredViewTests = filteredViewTests.filter(name => name !== changedTestName);
+        displayedFilePathsMetadata = filesToDisplay;
+        renderFileList(displayedFilePathsMetadata);
       }
-      updateStateAndReload(true);
-    }
 
-    /**
-     * Applies a specific test filter (e.g., from the test info panel popup).
-     * Sets the main test filter to the provided test name and reloads the UI.
-     * @param {string} testName - The name of the test to filter by.
-     */
-    function applyTestFilter(testName) {
-      dom.filterByTestSelect.value = testName; // Update dropdown
-      filteredTests = [testName];
-      updateStateAndReload(true);
-      hideTestInfo(); // Hide the panel after selection
-    }
+      /**
+       * Handles changes to the "Filter by Test" dropdown.
+       * Updates `filteredTests` and triggers a UI reload.
+       */
+      function handleTestFilterChange() {
+        const selectedTestName = dom.filterByTestSelect.value;
+        // If "All Tests" is selected, clear the filter; otherwise, set to the selected test
+        filteredTests = selectedTestName === "" ? [] : [selectedTestName];
+        updateStateAndReload(true);
+      }
 
-    /**
-     * Re-evaluates the current file display, filters, and loads/reloads the source code.
-     * @param {boolean} pushState - Whether to push a new state to browser history.
-     */
-    function updateStateAndReload(pushState) {
+      /**
+       * Handles clicks on the "Reset Test Filter" button.
+       * Clears `filteredTests` and resets the dropdown, then triggers a UI reload.
+       */
+      function handleResetTestFilter() {
+        dom.filterByTestSelect.value = ""; // Reset dropdown to "All Tests"
+        filteredTests = [];
+        updateStateAndReload(true);
+      }
+
+      function updateSelectAllStatus() {
+        dom.viewTestSelectAll.checked =
+          filteredViewTests.length === viewData.tests.length && viewData.tests.length > 0;
+        dom.viewTestSelectAll.indeterminate = filteredViewTests.length > 0 &&
+          filteredViewTests.length != viewData.tests.length;
+      }
+
+      /**
+       * Handles changes to the "Filter by View Tests" checkboxes.
+       * Adds or removes the test name from `filteredViewTests` and triggers a UI reload.
+       * @param {Event} event - The change event from the checkbox.
+       */
+      function handleViewTestFilterChange(event) {
+        const changedTestName = event.target.value;
+        if (event.target.checked) {
+          filteredViewTests.push(changedTestName);
+        } else {
+          filteredViewTests = filteredViewTests.filter((name) => name !== changedTestName);
+        }
+        updateSelectAllStatus();
+        updateStateAndReload(true);
+      }
+
+      /**
+       * Applies a specific test filter (e.g., from the test info panel popup).
+       * Sets the main test filter to the provided test name and reloads the UI.
+       * @param {string} testName - The name of the test to filter by.
+       */
+      function applyTestFilter(testName) {
+        dom.filterByTestSelect.value = testName; // Update dropdown
+        filteredTests = [testName];
+        updateStateAndReload(true);
+        hideTestInfo(); // Hide the panel after selection
+      }
+
+      /**
+       * Handles changes to the syntax highlight toggle.
+       * Updates `syntaxHighlightEnabled` and reloads the current source file.
+       */
+      function handleSyntaxHighlightToggle() {
+        syntaxHighlightEnabled = dom.syntaxHighlightToggle.checked;
+        updateStateAndReload(true);
+      }
+
+      /**
+       * Re-evaluates the current file display, filters, and loads/reloads the source code.
+       * @param {boolean} pushState - Whether to push a new state to browser history.
+       */
+      function updateStateAndReload(pushState) {
         updateUrlHash(pushState); // Update URL hash with current state
         applyFileAndSortFilters(); // Re-sort and re-render the file list
 
         // Check if the current file is still relevant after filters
-        const currentFileStillDisplayed = currentFilePath ? displayedFilePathsMetadata.some(info => info.path === currentFilePath) : false;
+        const currentFileStillDisplayed = currentFilePath
+          ? displayedFilePathsMetadata.some((info) => info.path === currentFilePath)
+          : false;
 
         if (currentFilePath && currentFileStillDisplayed) {
-            // If the current file is still valid, reload it to update highlighting/coverage status
-            loadSourceFile(currentFilePath, pushState);
+          // If the current file is still valid, reload it to update highlighting/coverage status
+          loadSourceFile(currentFilePath, pushState);
         } else if (displayedFilePathsMetadata.length > 0) {
-            // If the current file is no longer displayed, load the first available file
-            currentLineNumber = null; // Reset line number when implicitly changing files
-            loadSourceFile(displayedFilePathsMetadata[0].path, pushState);
+          // If the current file is no longer displayed, load the first available file
+          currentLineNumber = null; // Reset line number when implicitly changing files
+          loadSourceFile(displayedFilePathsMetadata[0].path, pushState);
         } else {
-            // No files match current filters
-            displayNoFilesMessage();
-            updateUrlHash(pushState); // Ensure URL hash reflects no file/line
+          // No files match current filters
+          displayNoFilesMessage();
+          updateUrlHash(pushState); // Ensure URL hash reflects no file/line
         }
         hideTestInfo(); // Ensure test info panel is hidden after UI updates
-    }
+      }
 
-    // --- URL Hash Management ---
+      // --- URL Hash Management ---
 
-    /**
-     * Updates the URL hash to reflect the current viewer state.
-     * @param {boolean} pushState - Whether to push a new state to browser history (true) or replace the current state (false).
-     */
-    function updateUrlHash(pushState = true) {
-      const params = new URLSearchParams();
-      if (currentFilePath) {
-        params.set('file', currentFilePath);
-        if (currentLineNumber !== null) {
-            params.set('line', currentLineNumber);
+      /**
+       * Updates the URL hash to reflect the current viewer state.
+       * @param {boolean} pushState - Whether to push a new state to browser history (true) or replace the current state (false).
+       */
+      function updateUrlHash(pushState = true) {
+        const params = new URLSearchParams();
+        if (currentFilePath) {
+          params.set("file", currentFilePath);
+          if (currentLineNumber !== null) {
+            params.set("line", currentLineNumber);
+          }
+        }
+        if (filteredTests.length > 0) {
+          params.set("test", filteredTests[0]);
+        }
+        params.set("view_tests", JSON.stringify(filteredViewTests));
+        if (dom.searchInput.value) {
+          params.set("search", dom.searchInput.value);
+        }
+        // Only add sort parameters if they deviate from defaults
+        if (currentSortKey !== "filename" || currentSortOrder !== "asc") {
+          params.set("sort_key", currentSortKey);
+          params.set("sort_order", currentSortOrder);
+        }
+        // Add syntax highlight state if it's disabled (default is enabled)
+        if (!syntaxHighlightEnabled) {
+          params.set("highlight", "off");
+        }
+
+        const newHash = params.toString();
+        const newUrl = newHash ? `#${newHash}` : window.location.pathname; // If no params, remove hash
+
+        // Only update history if the hash actually changes
+        if (window.location.hash !== `#${newHash}`) {
+          if (pushState) {
+            window.history.pushState(null, "", newUrl);
+          } else {
+            window.history.replaceState(null, "", newUrl);
+          }
         }
       }
-      if (filteredTests.length > 0) {
-        params.set('test', filteredTests[0]);
-      }
-      if (filteredViewTests.length > 0) {
-        params.set('view_tests', JSON.stringify(filteredViewTests));
-      }
-      if (dom.searchInput.value) {
-        params.set('search', dom.searchInput.value);
-      }
-      // Only add sort parameters if they deviate from defaults
-      if (currentSortKey !== 'filename' || currentSortOrder !== 'asc') {
-          params.set('sort_key', currentSortKey);
-          params.set('sort_order', currentSortOrder);
-      }
 
-      const newHash = params.toString();
-      const newUrl = newHash ? `#${newHash}` : window.location.pathname; // If no params, remove hash
+      /**
+       * Processes the URL hash to restore the viewer's state upon initial load or popstate event.
+       * @param {boolean} pushState - Whether to push a new state to browser history (true) or replace the current state (false).
+       */
+      function processUrlHash(pushState = false) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
 
-      // Only update history if the hash actually changes
-      if (window.location.hash !== `#${newHash}`) {
-          if (pushState) {
-              window.history.pushState(null, '', newUrl);
-          } else {
-              window.history.replaceState(null, '', newUrl);
-          }
-      }
-    }
+        const filePathFromHash = params.get("file");
+        const lineFromHash = params.get("line");
+        const testFromHash = params.get("test");
+        const viewTestsFromHash = params.get("view_tests");
+        const searchFromHash = params.get("search");
+        const sortKeyFromHash = params.get("sort_key");
+        const sortOrderFromHash = params.get("sort_order");
+        const highlightFromHash = params.get("highlight"); // New: Syntax highlight state
 
-    /**
-     * Processes the URL hash to restore the viewer's state upon initial load or popstate event.
-     * @param {boolean} pushState - Whether to push a new state to browser history (true) or replace the current state (false).
-     */
-    function processUrlHash(pushState = false) {
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
+        let stateChanged = false; // Flag to indicate if any part of the state has changed from current UI
 
-      const filePathFromHash = params.get('file');
-      const lineFromHash = params.get('line');
-      const testFromHash = params.get('test');
-      const viewTestsFromHash = params.get('view_tests');
-      const searchFromHash = params.get('search');
-      const sortKeyFromHash = params.get('sort_key');
-      const sortOrderFromHash = params.get('sort_order');
-
-      let stateChanged = false; // Flag to indicate if any part of the state has changed from current UI
-
-      // --- Process File Path and Line Number ---
-      let newCurrentLineNumber = null;
-      if (filePathFromHash && coverageData.coverage[filePathFromHash]) {
-        if (lineFromHash) {
+        // --- Process File Path and Line Number ---
+        let newCurrentLineNumber = null;
+        if (filePathFromHash && coverageData.coverage[filePathFromHash]) {
+          if (lineFromHash) {
             const parsedLine = parseInt(lineFromHash);
             // Validate line number against the file's content length
-            if (!isNaN(parsedLine) && parsedLine > 0 && parsedLine <= coverageData.coverage[filePathFromHash].l.length) {
-                newCurrentLineNumber = parsedLine;
+            if (
+              !isNaN(parsedLine) &&
+              parsedLine > 0 &&
+              parsedLine <= coverageData.coverage[filePathFromHash].l.length
+            ) {
+              newCurrentLineNumber = parsedLine;
             }
-        }
-        if (currentFilePath !== filePathFromHash || currentLineNumber !== newCurrentLineNumber) {
+          }
+          if (currentFilePath !== filePathFromHash || currentLineNumber !== newCurrentLineNumber) {
             currentFilePath = filePathFromHash;
             currentLineNumber = newCurrentLineNumber;
             stateChanged = true;
-        }
-      } else if (currentFilePath !== null || currentLineNumber !== null) {
+          }
+        } else if (currentFilePath !== null || currentLineNumber !== null) {
           // If hash has no valid file path but UI does, clear UI state
           currentFilePath = null;
           currentLineNumber = null;
           stateChanged = true;
-      }
+        }
 
-      // --- Process Main Test Filter ---
-      let newFilteredTests = [];
-      if (testFromHash && testNameToIndex[testFromHash] !== undefined) {
+        // --- Process Main Test Filter ---
+        let newFilteredTests = [];
+        if (testFromHash && testNameToIndex[testFromHash] !== undefined) {
           newFilteredTests = [testFromHash];
-      }
-      // Compare stringified arrays for deep equality check
-      if (JSON.stringify(filteredTests) !== JSON.stringify(newFilteredTests)) {
+        }
+        // Compare stringified arrays for deep equality check
+        if (JSON.stringify(filteredTests) !== JSON.stringify(newFilteredTests)) {
           filteredTests = newFilteredTests;
           // Update the dropdown to reflect the filter
           dom.filterByTestSelect.value = filteredTests.length > 0 ? filteredTests[0] : "";
           stateChanged = true;
-      }
-
-      // --- Process View Test Filter ---
-      let newFilteredViewTests = [];
-      if (viewTestsFromHash) {
-        try {
-          const parsedViewTests = JSON.parse(viewTestsFromHash);
-          if (Array.isArray(parsedViewTests)) {
-            // Filter out any view tests that are not actually in viewData
-            newFilteredViewTests = parsedViewTests.filter(name => viewTestNameToIndex[name] !== undefined);
-          }
-        } catch (e) {
-          console.error("Failed to parse view_tests from URL hash:", e);
         }
-      }
-      // Compare stringified arrays for deep equality check
-      if (JSON.stringify(filteredViewTests) !== JSON.stringify(newFilteredViewTests)) {
+
+        // --- Process View Test Filter ---
+        let newFilteredViewTests = null;
+        if (viewTestsFromHash) {
+          try {
+            const parsedViewTests = JSON.parse(viewTestsFromHash);
+            if (Array.isArray(parsedViewTests)) {
+              // Filter out any view tests that are not actually in viewData
+              newFilteredViewTests = parsedViewTests.filter(
+                (name) => viewTestNameToIndex[name] !== undefined,
+              );
+            }
+          } catch (e) {
+            console.error("Failed to parse view_tests from URL hash:", e);
+          }
+        }
+        // Select all views by default unless an array is specified in the urlhash
+        if (newFilteredViewTests === null) {
+          if (viewData && viewData.tests) {
+            newFilteredViewTests = [...viewData.tests];
+          } else {
+            newFilteredViewTests = [];
+          }
+        }
+        // Compare stringified arrays for deep equality check
+        if (JSON.stringify(filteredViewTests) !== JSON.stringify(newFilteredViewTests)) {
           filteredViewTests = newFilteredViewTests;
           // Update all view test checkboxes to reflect the filter
-          viewData.tests.forEach((testName, index) => {
+          if (viewData && viewData.tests) {
+            viewData.tests.forEach((testName, index) => {
               const checkbox = document.getElementById(`view-test-${index}`);
               if (checkbox) checkbox.checked = filteredViewTests.includes(testName);
+            });
+            updateSelectAllStatus();
+          }
+          stateChanged = true;
+        }
+
+        // --- Process Search Term ---
+        if (dom.searchInput.value !== (searchFromHash || "")) {
+          dom.searchInput.value = searchFromHash || "";
+          stateChanged = true;
+        }
+
+        // --- Process Sort State ---
+        const validSortKeys = ["ratio", "missed", "filename"];
+        const newSortKey = validSortKeys.includes(sortKeyFromHash) ? sortKeyFromHash : "filename"; // Default
+        const newSortOrder =
+          sortOrderFromHash === "asc" || sortOrderFromHash === "desc" ? sortOrderFromHash : "asc"; // Default
+
+        if (currentSortKey !== newSortKey || currentSortOrder !== newSortOrder) {
+          currentSortKey = newSortKey;
+          currentSortOrder = newSortOrder;
+          // Update table header classes to show sort indicator
+          dom.fileListHeaders.querySelectorAll("span").forEach((header) => {
+            header.classList.remove("sort-asc", "sort-desc");
+            if (header.dataset.sortKey === currentSortKey) {
+              header.classList.add(`sort-${currentSortOrder}`);
+            }
           });
           stateChanged = true;
-      }
+        }
 
-      // --- Process Search Term ---
-      if (dom.searchInput.value !== (searchFromHash || '')) {
-          dom.searchInput.value = searchFromHash || '';
+        // --- Process Syntax Highlight State ---
+        const newSyntaxHighlightEnabled = highlightFromHash !== "off"; // 'off' means disabled, anything else means enabled/default
+        if (syntaxHighlightEnabled !== newSyntaxHighlightEnabled) {
+          syntaxHighlightEnabled = newSyntaxHighlightEnabled;
+          dom.syntaxHighlightToggle.checked = newSyntaxHighlightEnabled;
           stateChanged = true;
-      }
+        }
 
-      // --- Process Sort State ---
-      const validSortKeys = ['ratio', 'missed', 'filename'];
-      const newSortKey = validSortKeys.includes(sortKeyFromHash) ? sortKeyFromHash : 'filename'; // Default
-      const newSortOrder = (sortOrderFromHash === 'asc' || sortOrderFromHash === 'desc') ? sortOrderFromHash : 'asc'; // Default
+        // If any state changed (or if it's initial load), re-apply filters and update UI
+        if (stateChanged) {
+          applyFileAndSortFilters();
 
-      if (currentSortKey !== newSortKey || currentSortOrder !== newSortOrder) {
-        currentSortKey = newSortKey;
-        currentSortOrder = newSortOrder;
-        // Update table header classes to show sort indicator
-        dom.fileListThead.querySelectorAll('th').forEach(header => {
-            header.classList.remove('sort-asc', 'sort-desc');
-            if (header.dataset.sortKey === currentSortKey) {
-                header.classList.add(`sort-${currentSortOrder}`);
-            }
-        });
-        stateChanged = true;
-      }
+          const currentFileStillDisplayed = currentFilePath
+            ? displayedFilePathsMetadata.some((info) => info.path === currentFilePath)
+            : false;
 
-      // If any state changed (or if it's initial load), re-apply filters and update UI
-      if (stateChanged) {
-        applyFileAndSortFilters();
-
-        const currentFileStillDisplayed = currentFilePath ? displayedFilePathsMetadata.some(info => info.path === currentFilePath) : false;
-
-        if (currentFilePath && currentFileStillDisplayed) {
+          if (currentFilePath && currentFileStillDisplayed) {
             loadSourceFile(currentFilePath, pushState);
-        } else if (displayedFilePathsMetadata.length > 0) {
+          } else if (displayedFilePathsMetadata.length > 0) {
             // If the file from hash is no longer valid/displayed, load the first visible file
             currentLineNumber = null; // Implicit file change resets line number
             loadSourceFile(displayedFilePathsMetadata[0].path, pushState);
-        } else {
+          } else {
             // No files match the filters, display message
             displayNoFilesMessage();
+          }
+          updateUrlHash(pushState); // Ensure the URL hash reflects the final state after processing
         }
-        updateUrlHash(pushState); // Ensure the URL hash reflects the final state after processing
       }
-    }
 
-    // --- Event Listeners for UI Interactions ---
+      // --- Event Listeners for UI Interactions ---
 
-    // Event listener for sorting table columns
-    dom.fileListThead.addEventListener('click', (event) => {
-        const th = event.target.closest('th'); // Find the nearest 'th' ancestor
-        if (!th?.classList.contains('sortable')) return; // Only act on sortable headers
+      // Event listener for sorting table columns
+      dom.fileListHeaders.addEventListener("click", (event) => {
+        const th = event.target.closest("span"); // Find the nearest 'span' ancestor
+        if (!th?.classList.contains("sortable")) return; // Only act on sortable headers
 
         const sortKey = th.dataset.sortKey;
 
         if (currentSortKey === sortKey) {
-            // Toggle sort order if clicking the same column
-            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+          // Toggle sort order if clicking the same column
+          currentSortOrder = currentSortOrder === "asc" ? "desc" : "asc";
         } else {
-            // Set new sort key and default to ascending order
-            currentSortKey = sortKey;
-            currentSortOrder = 'asc';
+          // Set new sort key and default to ascending order
+          currentSortKey = sortKey;
+          currentSortOrder = "asc";
         }
 
         // Update header classes to reflect the current sort state visually
-        dom.fileListThead.querySelectorAll('th').forEach(header => {
-            header.classList.remove('sort-asc', 'sort-desc');
+        dom.fileListHeaders.querySelectorAll("span").forEach((header) => {
+          header.classList.remove("sort-asc", "sort-desc");
         });
         th.classList.add(`sort-${currentSortOrder}`);
 
         updateStateAndReload(true); // Re-apply filters and reload UI
-    });
+      });
 
-    // Event listeners for filter controls
-    dom.filterByTestSelect.addEventListener('change', handleTestFilterChange);
-    dom.resetTestFilterButton.addEventListener('click', handleResetTestFilter);
-    dom.searchInput.addEventListener('input', () => updateStateAndReload(true));
+      // Event listeners for filter controls
+      dom.filterByTestSelect.addEventListener("change", handleTestFilterChange);
+      dom.resetTestFilterButton.addEventListener("click", handleResetTestFilter);
+      dom.searchInput.addEventListener("input", () => updateStateAndReload(true));
+      dom.syntaxHighlightToggle.addEventListener("change", handleSyntaxHighlightToggle);
 
-    // --- Sidebar Resize Logic ---
-    let isResizing = false;
-    let initialX;
-    let initialWidth;
-    let originalUserSelect; // To store original user-select style
+      // --- Sidebar Resize Logic ---
+      let isResizing = false;
+      let initialX;
+      let initialWidth;
+      let originalUserSelect; // To store original user-select style
 
-    dom.sidebarSplitter.addEventListener('mousedown', (e) => {
+      dom.sidebarSplitter.addEventListener("mousedown", (e) => {
         isResizing = true;
         initialX = e.clientX;
         initialWidth = dom.sidebar.offsetWidth;
-        document.addEventListener('mousemove', resizeSidebar);
-        document.addEventListener('mouseup', stopSidebarResize);
-        document.body.style.cursor = 'ew-resize'; // Change cursor for resizing
+        document.addEventListener("mousemove", resizeSidebar);
+        document.addEventListener("mouseup", stopSidebarResize);
+        document.body.style.cursor = "ew-resize"; // Change cursor for resizing
         originalUserSelect = document.body.style.userSelect;
-        document.body.style.userSelect = 'none'; // Prevent text selection during resize
-    });
+        document.body.style.userSelect = "none"; // Prevent text selection during resize
+      });
 
-    function resizeSidebar(e) {
+      function resizeSidebar(e) {
         if (!isResizing) return;
         const deltaX = e.clientX - initialX;
         let newWidth = initialWidth + deltaX;
@@ -1235,22 +1675,22 @@
 
         newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth)); // Clamp width within bounds
         dom.sidebar.style.width = `${newWidth}px`;
-    }
+      }
 
-    function stopSidebarResize() {
+      function stopSidebarResize() {
         isResizing = false;
-        document.removeEventListener('mousemove', resizeSidebar);
-        document.removeEventListener('mouseup', stopSidebarResize);
-        document.body.style.cursor = ''; // Reset cursor
+        document.removeEventListener("mousemove", resizeSidebar);
+        document.removeEventListener("mouseup", stopSidebarResize);
+        document.body.style.cursor = ""; // Reset cursor
         document.body.style.userSelect = originalUserSelect; // Restore user-select
-    }
+      }
 
-    // --- Browser History Integration ---
-    // Listen for 'popstate' events (e.g., back/forward browser buttons)
-    window.addEventListener('popstate', () => processUrlHash(false));
+      // --- Browser History Integration ---
+      // Listen for 'popstate' events (e.g., back/forward browser buttons)
+      window.addEventListener("popstate", () => processUrlHash(false));
 
-    // --- Initial Load ---
-    initializeViewer(); // Start the application
-  </script>
-</body>
+      // --- Initial Load ---
+      initializeViewer(); // Start the application
+    </script>
+  </body>
 </html>
