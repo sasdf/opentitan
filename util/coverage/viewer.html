@@ -810,7 +810,7 @@
         return true;
       }
 
-      function fileSearchRegex() {
+      function fileSearchRegex(flags) {
         // Return a regex of segmented search input
         const searchTerm = dom.searchInput.value.trim();
         if (!searchTerm) return null;
@@ -818,12 +818,12 @@
           .split(/([ \/_])/)
           .filter((e) => e !== " ")
           .map((e) => `(${RegExp.escape(e)})`);
-        return new RegExp(`${regexParts.join("(.*?)")}`, "gi");
+        return new RegExp(`${regexParts.join("(.*?)")}`, flags);
       }
 
       function fileSearchHighlight(str) {
         // find all matches and mark odd capture groups
-        const searchRegex = fileSearchRegex();
+        const searchRegex = fileSearchRegex("gi");
         if (!searchRegex) return str;
         return str.replace(searchRegex, (match, ...groups) => {
           const result = [];
@@ -850,8 +850,6 @@
           displayNoFilesMessage();
           return;
         }
-
-        const searchRegex = fileSearchRegex();
 
         fileInfos.forEach((fileInfo) => {
           const tr = document.createElement("tr");
@@ -1248,7 +1246,7 @@
           });
 
         // Apply search term filter
-        const searchRegex = fileSearchRegex();
+        const searchRegex = fileSearchRegex("i");
         if (searchRegex) {
           filesToDisplay = filesToDisplay.filter((fileInfo) => searchRegex.test(fileInfo.path));
         }

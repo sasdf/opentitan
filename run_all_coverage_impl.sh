@@ -79,8 +79,7 @@ rm -f "${COVERAGE_DAT}"
 python3 ./util/coverage/collect_coverage_json.py \
     --output="${VIEWER_DIR}/coverage.json.gz"
 
-python3 ./util/coverage/viewer_bundler.py \
-    --viewer_html=./util/coverage/viewer.html \
+python3 ./util/coverage/viewer_bundler.py bundle \
     --coverage_json="${VIEWER_DIR}/coverage.json.gz" \
     --view_json="${VIEWER_DIR}/view.json.gz" \
     --output_html="${VIEWER_DIR}/index.html"
