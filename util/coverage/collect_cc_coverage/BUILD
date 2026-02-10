@@ -38,6 +38,11 @@ rust_binary(
     srcs = ["generate_coverage_view.rs"],
     deps = [
         ":coverage_lib",
+        "@crate_index//:addr2line",
         "@crate_index//:anyhow",
+        "@crate_index//:clap",
+        "@crate_index//:object",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
     ],
 )

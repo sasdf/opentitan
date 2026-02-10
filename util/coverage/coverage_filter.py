@@ -17,13 +17,13 @@ def main():
   parser = argparse.ArgumentParser(description='Filter related coverage based on a view.')
   parser.add_argument('--view', type=str, nargs='+', required=True, help='Path to the view coverage file.')
   parser.add_argument('--coverage', type=str, help='Path to the coverage file to filter.')
-  parser.add_argument('--use_disassembly', action='store_true', help='Filter with disassembly.')
   parser.add_argument('--output', type=str, help='Path to the output file.')
   args = parser.parse_args()
 
   all_views = {}
-  for zip_path in args.view:
-    view = load_view_zip(zip_path, args.use_disassembly)
+  for view_dat in args.view:
+    with open(view_dat, 'r') as f:
+      view = parse_lcov(f.readlines())
     all_views = or_coverage(all_views, view)
   view = all_views
 

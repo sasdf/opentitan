@@ -570,7 +570,7 @@ class CoverageCollection:
     except (subprocess.CalledProcessError, FileNotFoundError):
       self.commit = None
 
-  def add_test(self, test_label, test_lcov):
+  def add_test(self, test_label, test_lcov, add_uncovered=False):
     test_idx = len(self.tests)
     self.tests.append(test_label)
     for sf_key, file_profile in test_lcov.items():
@@ -611,7 +611,7 @@ class CoverageCollection:
 
         lines[lineno]['s'] = False
         # Only add test index if the line was actually hit (count > 0).
-        if count > 0:
+        if add_uncovered or count > 0:
           if test_idx not in lines[lineno]['t']:
             lines[lineno]['t'].append(test_idx)
 
@@ -625,7 +625,9 @@ class CoverageCollection:
         if func_name not in funcs:
           funcs[func_name] = {"l": lineno, "t": []}
 
-        if file_profile.fnda.get(func_name, 0) > 0 or file_profile.da.get(lineno + 1, 0) > 0:
+        fnda_count =  file_profile.fnda.get(func_name, 0)
+        da_count = file_profile.da.get(lineno + 1, 0)
+        if add_uncovered or fnda_count > 0 or da_count > 0:
           if test_idx not in funcs[func_name]["t"]:
             funcs[func_name]["t"].append(test_idx)
 

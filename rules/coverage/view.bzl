@@ -3,79 +3,79 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load(
-    "@lowrisc_opentitan//rules:rv.bzl",
-    "rv_rule",
-)
-load(
     "//rules/opentitan:providers.bzl",
     "SiliconBinaryInfo",
-    "get_one_binary_file",
+    "get_binary_files",
 )
 
 _TEST_SCRIPT = """\
-env
-elf="$(realpath "{elf_file}")"
-ln -s "$elf" "${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.elf"
-ls -lah "$elf"
-echo "Linking"
-echo "  $elf"
-echo "To"
-echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.elf"
-
-dis="$(realpath "{dis_file}")"
-ln -s "$dis" "${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.dis"
-ls -lah "$dis"
-echo "Linking"
-echo "  $dis"
-echo "To"
-echo "  ${{TEST_UNDECLARED_OUTPUTS_DIR}}/test.dis"
+{generate_coverage_view} \
+  --elf="{elf_file}" \
+  --kind="{kind}" \
+  --output="$COVERAGE_OUTPUT_FILE" \
+  --temp-dir="$TEST_UNDECLARED_OUTPUTS_DIR" \
 """
 
 def _coverage_view_test(ctx):
-    # Get the elf to be tested
-    elf_label = ctx.attr.elf
-    elf = get_one_binary_file(elf_label, field = "elf", providers = [SiliconBinaryInfo])
-    dis = get_one_binary_file(elf_label, field = "disassembly", providers = [SiliconBinaryInfo])
+    # This suffix is required to distinguish the coverage view LCOV files from
+    # the coverage data of other tests.
+    if not ctx.label.name.endswith("_coverage_view"):
+        fail("The name of the coverage_view_test rule must end with '_coverage_view'")
 
-    # Nop test
-    script = ctx.actions.declare_file(ctx.attr.name + ".bash")
-    ctx.actions.write(
-        script,
-        _TEST_SCRIPT.format(
+    elf_label = ctx.attr.elf
+    groups = elf_label.output_groups
+
+    if "silicon_creator_elf" in groups:
+        elf_list = groups["silicon_creator_elf"].to_list()
+    elif "elf" in ctx.attr.elf.output_groups:
+        elf_list = groups["elf"].to_list()
+    else:
+        elf_list = get_binary_files(elf_label, field = "elf", providers = [SiliconBinaryInfo])
+
+    if len(elf_list) != 1:
+        fail("The target must have exactly one elf file.")
+    elf = elf_list[0]
+
+    runfiles = ctx.runfiles()
+
+    # Coverage view tests are only applicable when coverage is enabled.
+    if ctx.var.get("ot_coverage_enabled", "false") == "true":
+        runfiles = runfiles.merge(ctx.runfiles(files = [elf]))
+        runfiles = runfiles.merge(ctx.attr._generate_coverage_view[DefaultInfo].default_runfiles)
+
+        script_content = _TEST_SCRIPT.format(
+            generate_coverage_view = ctx.executable._generate_coverage_view.short_path,
             elf_file = elf.short_path,
-            dis_file = dis.short_path,
-        ),
+            kind = ctx.attr.kind,
+        )
+    else:
+        script_content = ""
+
+    script = ctx.actions.declare_file(ctx.label.name + ".sh")
+    ctx.actions.write(
+        output = script,
+        content = script_content,
         is_executable = True,
     )
-
-    # Propagate all runfiles from elf attr
-    runfiles = ctx.runfiles(files = ctx.files.elf + [elf, dis])
-    runfiles = runfiles.merge(ctx.attr.elf[DefaultInfo].default_runfiles)
-
-    if ctx.var.get("ot_coverage_enabled", "false") == "true":
-        coverage_runfiles = ctx.attr._collect_cc_coverage[DefaultInfo].default_runfiles
-    else:
-        coverage_runfiles = ctx.runfiles()
-    runfiles = runfiles.merge(coverage_runfiles)
 
     return DefaultInfo(
         executable = script,
         runfiles = runfiles,
     )
 
-coverage_view_test = rv_rule(
+coverage_view_test = rule(
     implementation = _coverage_view_test,
     attrs = {
         "elf": attr.label(
             allow_files = True,
             doc = "ELF file to extract coverage view",
         ),
-        "_lcov_merger": attr.label(
-            default = configuration_field(fragment = "coverage", name = "output_generator"),
-            executable = True,
-            cfg = "exec",
+        "kind": attr.string(
+            doc = "Kind of given elf file",
+            default = "ibex",
+            values = ["ibex", "otbn"],
         ),
-        "_collect_cc_coverage": attr.label(
+        "_generate_coverage_view": attr.label(
             default = "//util/coverage/collect_cc_coverage:generate_coverage_view",
             executable = True,
             cfg = "exec",

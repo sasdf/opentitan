@@ -8,7 +8,6 @@ load("//rules:const.bzl", "CONST", "hex")
 load("//rules:cross_platform.bzl", "dual_cc_device_library_of", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load("//rules/coverage:view.bzl", "coverage_view_test")
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load(
@@ -364,15 +363,6 @@ ROM_EXT_LABELS.extend([
 ])
 
 [
-    coverage_view_test(
-        name = "rom_ext_{}_slot_{}_coverage_view".format(variation_name, slot),
-        elf = "rom_ext_{}_slot_{}".format(variation_name, slot),
-    )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
-    for slot in SLOTS
-]
-
-[
     opentitan_binary(
         name = "rom_ext_{}".format(name),
         testonly = True,
@@ -404,57 +394,6 @@ ROM_EXT_LABELS.extend([
     "rom_ext_{}".format(name)
     for name, param in TEST_OWNER_CONFIGS.items()
 ])
-
-opentitan_binary(
-    name = "rom_ext_prod_dice_cwt_spidfu",
-    testonly = True,
-    exec_env = [
-        "//hw/top_earlgrey:silicon_creator",
-    ],
-    extra_bazel_features = [
-        "minsize",
-        "use_lld",
-    ],
-    linker_script = ":ld_slot_virtual",
-    manifest = ":manifest",
-    deps = [
-        ":rom_ext_dice_cwt",
-        "//sw/device/lib/crt",
-        "//sw/device/silicon_creator/lib:manifest_def",
-        "//sw/device/silicon_creator/lib/rescue:rescue_spidfu",
-        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_cwt_slot_virtual",
-    ],
-)
-
-coverage_view_test(
-    name = "rom_ext_prod_dice_cwt_spidfu_coverage_view",
-    elf = "rom_ext_prod_dice_cwt_spidfu",
-)
-
-opentitan_binary(
-    name = "rom_ext_prod_dice_x509_xmodem",
-    exec_env = [
-        "//hw/top_earlgrey:silicon_creator",
-    ],
-    extra_bazel_features = [
-        "minsize",
-        "use_lld",
-    ],
-    linker_script = ":ld_slot_virtual",
-    manifest = ":manifest",
-    deps = [
-        ":rom_ext_dice_x509",
-        "//sw/device/lib/crt",
-        "//sw/device/silicon_creator/lib:manifest_def",
-        "//sw/device/silicon_creator/lib/rescue:rescue_xmodem",
-        "//sw/device/silicon_creator/rom_ext/imm_section:main_section_dice_x509_slot_virtual",
-    ],
-)
-
-coverage_view_test(
-    name = "rom_ext_prod_dice_x509_xmodem_coverage_view",
-    elf = "rom_ext_prod_dice_x509_xmodem",
-)
 
 manifest(d = {
     "name": "manifest_bad_address_translation",

@@ -1,6 +1,7 @@
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
 VIEW_CACHE_DIR="bazel-out/_coverage/view/"
+TEST_LOGS_DIR="bazel-out/k8-fastbuild/testlogs/"
 VIEWER_DIR="${COVERAGE_OUTPUT_DIR}/viewer"
 
 # FPGA checks
@@ -36,27 +37,6 @@ fi
 python3 ./util/coverage/collect_view_json.py \
     --output="${VIEWER_DIR}/view.json.gz"
 
-CACHED_VIEWS=()
-
-rm -rf "${VIEW_CACHE_DIR}"
-mkdir -p "${VIEW_CACHE_DIR}"
-
-view_files="$(cat "${LCOV_FILES}" | grep "/coverage.dat$")"
-for view_dat in $view_files; do
-    view_dir="${view_dat%/*}"
-    view_name="${view_dir##*/}"
-    outputs_dir="${view_dir}/test.outputs"
-    outputs_zip="${outputs_dir}/outputs.zip"
-    cached_zip="${VIEW_CACHE_DIR}/${view_name}.zip"
-    CACHED_VIEWS+=( "${cached_zip}" )
-    if [[ -f "$outputs_zip" ]]; then
-        cp "${outputs_zip}" "${cached_zip}"
-    else
-        zip -q -0 -j "${cached_zip}" -r "${outputs_dir}"
-    fi
-    echo "INFO: Baseline coverage cached to '${cached_zip}'."
-done
-
 if [[ "${#TARGETS[@]}" == "0" ]]; then
     for test_group_name in "${TEST_GROUPS[@]}"; do
         test_group_expr="${test_group_name}[@]"
@@ -74,7 +54,7 @@ fi
 
 echo "Collect overall coverage"
 rm -f "${COVERAGE_DAT}"
-./bazelisk.sh coverage "${TARGETS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
+./bazelisk.sh coverage "${TARGETS[@]}" "${COVERAGE_VIEWS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
 python3 ./util/coverage/collect_coverage_json.py \
     --output="${VIEWER_DIR}/coverage.json.gz"
@@ -84,72 +64,58 @@ python3 ./util/coverage/viewer_bundler.py bundle \
     --view_json="${VIEWER_DIR}/view.json.gz" \
     --output_html="${VIEWER_DIR}/index.html"
 
-if [[ "${#CACHED_VIEWS[@]}" == "0" ]]; then
+if [[ "${#COVERAGE_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
         "${COVERAGE_DAT}" \
         "${COVERAGE_OUTPUT_DIR}/no_view/"
 else
-    for cached_zip in "${CACHED_VIEWS[@]}"; do
-        view_name="${cached_zip##*/}"
-        view_name="${view_name%.zip}"
-        filtered_dat="${VIEW_CACHE_DIR}/${view_name}.dat"
+    function generate_report() {
+        view_name="$1"
+        shift
+        view_dats=("$@")
+
         output_dir="${COVERAGE_OUTPUT_DIR}/${view_name}"
+        temp_dat="${output_dir}.dat"
+        output_dat="${output_dir}/coverage.dat"
         echo "Filter with view '${view_name}'"
+        echo mkdir -p "${output_dir}"
+        mkdir -p "${output_dir}"
 
         python3 util/coverage/coverage_filter.py \
-          --view="${cached_zip}" \
-          --coverage="${COVERAGE_DAT}" \
-          --use_disassembly \
-          --output="${filtered_dat}"
+            --view "${view_dats[@]}" \
+            --coverage="${COVERAGE_DAT}" \
+            --output="${temp_dat}"
 
         bash ./run_genhtml.sh \
-            "${filtered_dat}" \
+            "${temp_dat}" \
             "${output_dir}"
 
         python3 util/coverage/gen_coverage_csv.py \
-          --path="${filtered_dat}" \
+          --path="${temp_dat}" \
           > "${output_dir}/coverage.csv"
+
+        mv "${temp_dat}" "${output_dat}"
+    }
+
+    view_files="$(cat "${LCOV_FILES}" | grep "_coverage_view/coverage.dat$")"
+    for view_dat in $view_files; do
+        view_dir="${view_dat%/*}"
+        view_name="${view_dir##*/}"
+        generate_report "${view_name}" "${view_dat}"
     done
 
     for group_name in "${COVERAGE_VIEW_GROUPS[@]}"; do
         group_expr="${group_name}[@]"
-        group=( "${!group_expr##*:}" )
-        group_zip=( "${group[@]/#/${VIEW_CACHE_DIR}}" )
-        group_zip=( "${group_zip[@]/%/.zip}" )
-        filtered_dat="${VIEW_CACHE_DIR}/${group_name,,}.dat"
-        output_dir="${COVERAGE_OUTPUT_DIR}/${group_name,,}"
-        echo "Filter with view group '${group_name,,}'"
+        group=( "${!group_expr}" )
+        group=( "${group[@]//:/\/}" )  # replace : with /
+        group=( "${group[@]/#\/\//$TEST_LOGS_DIR}" )  # TEST_LOGS_DIR prefix
+        group=( "${group[@]/%/\/coverage.dat}" )  # coverage.dat suffix
+        group_name="${group_name,,}"
 
-        python3 util/coverage/coverage_filter.py \
-          --view "${group_zip[@]}" \
-          --coverage="${COVERAGE_DAT}" \
-          --use_disassembly \
-          --output="${filtered_dat}"
-
-        bash ./run_genhtml.sh \
-            "${filtered_dat}" \
-            "${output_dir}"
-
-        python3 util/coverage/gen_coverage_csv.py \
-          --path="${filtered_dat}" \
-          > "${output_dir}/coverage.csv"
+        generate_report "${group_name}" "${group[@]}"
     done
 
-    filtered_dat="${VIEW_CACHE_DIR}/all_views.dat"
-    output_dir="${COVERAGE_OUTPUT_DIR}/all_views"
-    python3 util/coverage/coverage_filter.py \
-      --view "${CACHED_VIEWS[@]}" \
-      --coverage="${COVERAGE_DAT}" \
-      --use_disassembly \
-      --output="${filtered_dat}"
-
-    bash ./run_genhtml.sh \
-        "${filtered_dat}" \
-        "${output_dir}"
-
-    python3 util/coverage/gen_coverage_csv.py \
-      --path="${filtered_dat}" \
-      > "${output_dir}/coverage.csv"
+    generate_report "all_views" $view_files
 fi
 
 echo "Save test target list"
