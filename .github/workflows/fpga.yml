@@ -27,7 +27,10 @@ on:
         type: string
         description: Bazel tag filters for the tests
       timeout:
-        default: 60
+        # FIXME: Restore this default timeout to 60
+        # Increase to 180 for PR presubmit since the bazel remote-cache
+        # is not available yet.
+        default: 180
         type: number
         description: Timeout for the job in minutes
       vivado_version:
