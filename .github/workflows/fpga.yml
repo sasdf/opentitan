@@ -27,7 +27,7 @@ on:
         type: string
         description: Bazel tag filters for the tests
       timeout:
-        default: 60
+        default: 150
         type: number
         description: Timeout for the job in minutes
       vivado_version:

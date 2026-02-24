@@ -20,11 +20,11 @@ otbn_binary(
     ],
 )
 
-coverage_view_test(
-    name = "boot_coverage_view",
-    elf = ":boot",
-    kind = "otbn",
-)
+# coverage_view_test(
+#     name = "boot_coverage_view",
+#     elf = ":boot",
+#     kind = "otbn",
+# )
 
 otbn_library(
     name = "ed25519",

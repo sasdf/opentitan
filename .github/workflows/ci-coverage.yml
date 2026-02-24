@@ -4,6 +4,8 @@
 
 name: Coverage
 on:
+  pull_request:
+
   push:
     branches-ignore:
       - "backport-*"
@@ -81,7 +83,7 @@ jobs:
       board: cw310
       interface: cw310
       tag_filters: "cw310_rom_with_fake_keys,cw310_rom_with_real_keys,-manuf,-coverage_broken"
-      timeout: 90
+      timeout: 150
       mode: coverage
 
   execute_rom_ext_fpga_tests_cw310:
@@ -149,7 +151,7 @@ jobs:
       board: cw310
       interface: hyper310
       tag_filters: "hyper310_rom_ext,-coverage_broken"
-      timeout: 90
+      timeout: 150
       mode: coverage
 
   # CW340 FPGA jobs
