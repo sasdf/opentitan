@@ -192,3 +192,12 @@ otp_image(
         ":otp_json_rom_ext_rollback_fi",
     ],
 )
+
+exports_files(["bl0_owner_upgrade.c"])
+
+exports_files(["bl0_self_signed_owner_upgrade.c"])
+
+cc_library(
+    name = "self_signed_owner_config_bin_h",
+    hdrs = ["self_signed_owner_config_bin.h"],
+)

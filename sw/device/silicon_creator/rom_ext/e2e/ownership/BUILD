@@ -28,17 +28,6 @@ package(default_visibility = ["//visibility:public"])
 # To reliably run the Xmodem rescue flow for ownership transfer, it is
 # recommended to sequence test runs serially.
 
-# When running the ownership tests in QEMU, be careful not to run with a high
-# degree of parallelism or on a slower host. This is because the XModem-CRC
-# rescue implementation defines a timeout to receive the Xmodem frame data (300
-# ms) based upon a UART transferring at ~115200bps, with ~3x lenience (see
-# `sw/device/silicon_creator/lib/rescue/xmodem.c`). When running in QEMU, the
-# baud rate is not used and data will transfer via a PTY-backed CharDev at a
-# speed that depends on host performance and load.
-#
-# To reliably run the Xmodem rescue flow for ownership transfer, it is
-# recommended to sequence test runs serially.
-
 opentitan_binary(
     name = "boot_test",
     testonly = True,

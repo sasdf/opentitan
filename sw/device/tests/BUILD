@@ -4513,6 +4513,7 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
         },
     ),
+    fpga = fpga_params(tags = ["coverage"]),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",

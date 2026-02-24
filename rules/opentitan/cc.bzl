@@ -13,30 +13,9 @@ load("@lowrisc_opentitan//rules/opentitan:exec_env.bzl", "ExecEnvInfo")
 load("@lowrisc_opentitan//rules/opentitan:util.bzl", "get_fallback", "get_override")
 load("@lowrisc_opentitan//rules:rv.bzl", "rv_rule")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
+load("//rules/coverage:info.bzl", "create_cc_instrumented_files_info")
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
 load("//rules/opentitan:util.bzl", "assemble_for_test", "recursive_format")
-
-def create_cc_instrumented_files_info(ctx, metadata_files):
-    """Creates an InstrumentedFilesInfo provider to be added to the target.
-
-    This is a simplified version of the same function in `cc_helper.bzl`.
-
-    Args:
-      ctx: The rule context.
-      metadata_files: A list of metadata files to be added to the provider.
-
-    Returns:
-      An InstrumentedFilesInfo provider.
-    """
-    cc_config = ctx.fragments.cpp
-    info = coverage_common.instrumented_files_info(
-        ctx = ctx,
-        source_attributes = ["srcs", "hdrs"],
-        dependency_attributes = ["implementation_deps", "deps", "data"],
-        extensions = [".c", ".h", ".inc", ".s", ".S"],
-        metadata_files = metadata_files,
-    )
-    return info
 
 def _expand(ctx, name, items):
     """Perform location and make_variable expansion on a list of items.

@@ -15,6 +15,7 @@ load(
     "opentitan_manual_test",
     "opentitan_test",
 )
+load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:cc.bzl", "opentitan_binary_assemble")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules/coverage:view.bzl", "coverage_view_test")

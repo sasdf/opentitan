@@ -29,7 +29,7 @@ static rom_error_t rom_irq_error(void) {
 
 void rom_interrupt_handler(void) {
 #ifdef OT_COVERAGE_INSTRUMENTED
-  // Fix gp first in case it's modified by ROM_EXT imm_section.
+  // Fix gp first in case it's modified by later boot stages.
   asm volatile(
       ".option push\n"
       ".option norelax\n"

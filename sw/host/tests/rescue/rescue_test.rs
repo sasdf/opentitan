@@ -25,6 +25,9 @@ use opentitanlib::transport::Capability;
 use opentitanlib::uart::console::UartConsole;
 use opentitanlib::util::file::FromReader;
 
+#[cfg(feature = "ot_coverage_enabled")]
+use opentitanlib::transport::Capability;
+
 #[derive(Debug, Parser)]
 struct Opts {
     #[command(flatten)]

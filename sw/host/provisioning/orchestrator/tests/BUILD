@@ -162,14 +162,16 @@ sh_test(
             ":orchestrator_{}_zip".format(fpga),
             "@python3",
             cfg["orchestrator_cfg"],
-            cfg["rom_ext"],
             cfg["owner_fw"],
+            cfg["rom_ext"],
+            "//sw/host/provisioning/orchestrator/src:data_dependencies",
             "//util/coverage/collect_cc_coverage",
         ],
         env = {
             "PYTHON": "$(location @python3//:python3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+            "CC_CODE_COVERAGE_SCRIPT": "",  # Disable built-in cc coverage
             "FPGA": "{}".format(fpga),
         } | CW340_OVERRIDE,
         tags = [

@@ -51,7 +51,7 @@ opentitan_binary(
     name = "sram_cp_provision",
     testonly = True,
     srcs = ["sram_cp_provision.c"],
-    collect_code_coverage = 0,  # No space for sram binaries
+    collect_code_coverage = 0,
     exec_env = {
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
@@ -92,7 +92,7 @@ opentitan_binary(
     name = "sram_cp_provision_functest",
     testonly = True,
     srcs = ["sram_cp_provision_functest.c"],
-    collect_code_coverage = 0,  # No space for sram binaries
+    collect_code_coverage = 0,
     exec_env = {
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
@@ -191,7 +191,7 @@ opentitan_test(
         name = "sram_ft_individualize_{}{}".format(sku, variant),
         testonly = True,
         srcs = ["sram_ft_individualize.c"],
-        collect_code_coverage = 0,  # No space for sram binaries
+        collect_code_coverage = 0,
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
@@ -324,8 +324,8 @@ manifest(d = {
     "manuf_state_creator": hex(CONST.MANUF_STATE.PERSO_INITIAL),
     "visibility": ["//visibility:private"],
     "version_major": "0",
-    # Release: 2026-01-05-RC00
-    "version_minor": "2026010500",
+    # Release: 2026-02-10-RC00
+    "version_minor": "2026021000",
     "security_version": "0xFFFFFFFF",
 })
 
