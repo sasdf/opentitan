@@ -201,7 +201,7 @@ def _get_test_commands(ctx, param, exec_env):
         # Cleanup flash ROM magic bytes.
         test_cleanup_cmd.extend([
             '--exec="transport init"',
-            '--exec="clear-flash-rom --clear-uart=true --magic-bytes-offset={flash_rom_magic}"',
+            '--exec="fpga clear-flash-rom --clear-uart=true --magic-bytes-offset={flash_rom_magic}"',
         ])
 
     test_cleanup_cmd = "\n".join(test_cleanup_cmd)
