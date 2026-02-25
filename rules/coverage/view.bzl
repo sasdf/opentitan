@@ -9,6 +9,8 @@ load(
 )
 
 _TEST_SCRIPT = """\
+set -eu
+
 {generate_coverage_view} \
   --elf="{elf_file}" \
   --kind="{kind}" \

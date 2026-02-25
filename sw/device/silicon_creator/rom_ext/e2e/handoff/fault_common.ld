@@ -50,8 +50,6 @@ _manifest_address_translation = (_text_start >= ORIGIN(eflash) &&
                                  _text_start < (ORIGIN(eflash)
                                               + LENGTH(eflash))) ? 0x1d4 : 0x739;
 
-REGION_ALIAS("coverage_flash", owner_flash);
-
 /**
  * NOTE: We have to align each section to word boundaries as our current
  * s19->slm conversion scripts are not able to handle non-word aligned sections.
@@ -104,8 +102,6 @@ SECTIONS {
     *(.rodata)
     *(.rodata.*)
   } > owner_flash
-
-  INCLUDE sw/device/lib/coverage/rodata.ld
 
   /**
    * Critical static data that is accessible by both the ROM and the ROM
@@ -174,8 +170,6 @@ SECTIONS {
     . = ALIGN(4);
     _bss_end = .;
   } > ram_main
-
-  INCLUDE sw/device/lib/coverage/bss.ld
 
   INCLUDE sw/device/info_sections.ld
 }

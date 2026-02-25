@@ -332,6 +332,8 @@ CRYPTO_TESTS=(
 //sw/device/tests/crypto/cryptotest:sphincsplus_kat_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw310_sival_rom_ext
+# //sw/device/tests/crypto/cryptotest:acvp_fpga_cw310_sival_rom_ext
+# //sw/device/tests/crypto/cryptotest:hmac_sha256_acvp_fpga_cw310_sival_rom_ext
 )
 
 CW310_SIVAL_ROMEXT_TESTS=(
@@ -902,6 +904,11 @@ HYPER310_ROMEXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_fault_to_fallback_owner_fpga_hyper310_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_spidfu_custom_fallback_owner_fpga_hyper310_rom_ext
 
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_a_both_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_a_only_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_b_both_fpga_hyper310_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_b_only_fpga_hyper310_rom_ext
+
 # FAILED
 # //sw/device/silicon_creator/rom_ext/e2e/rescue/std_utils:usbdfu_protocol_fpga_hyper310_rom_ext
 
@@ -1014,6 +1021,7 @@ UNRELATED_HARDENED_COMPARISON_TESTS=(
 # //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout_hardened_comparison_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_custom_fallback_owner_hardened_comparison_test
 # //sw/device/silicon_creator/rom_ext:rom_ext_fault_to_fallback_owner_hardened_comparison_test
+# //sw/device/silicon_creator/rom_ext:rom_ext_xmodem_erase_both_hardened_comparison_test
 )
 
 # ./bazelisk.sh query 'tests(//sw/otbn/...) except attr("tags", "skip_in_ci|manual|broken", //sw/otbn/...)'

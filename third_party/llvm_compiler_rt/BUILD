@@ -9,7 +9,6 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "llvm_compiler_rt",
     srcs = ["@llvm_compiler_rt//:srcs"],
-    features = ["-coverage"],
     deps = [
         "//sw/device/lib/base:memory",
         "@llvm_compiler_rt//:hdrs",

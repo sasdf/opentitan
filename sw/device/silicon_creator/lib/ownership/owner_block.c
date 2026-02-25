@@ -39,10 +39,6 @@ enum {
   kFlashSlotBStart = kFlashBankSize,
   kFlashSlotBEnd = kFlashSlotBStart + kFlashBankSize,
 
-#ifdef OT_COVERAGE_ENABLED
-#undef CHIP_ROM_EXT_SIZE_MAX
-#define CHIP_ROM_EXT_SIZE_MAX 0x10000
-#endif  // OT_COVERAGE_ENABLED
   kRomExtSizeInPages = CHIP_ROM_EXT_SIZE_MAX / kFlashPageSize,
   kRomExtAStart = 0 / kFlashPageSize,
   kRomExtAEnd = kRomExtAStart + kRomExtSizeInPages,

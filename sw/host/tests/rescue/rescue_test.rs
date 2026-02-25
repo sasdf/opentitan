@@ -21,7 +21,6 @@ use opentitanlib::ownership::{
 };
 use opentitanlib::rescue::{EntryMode, RescueMode, RescueParams, RescueProtocol};
 use opentitanlib::test_utils::init::InitializeTest;
-use opentitanlib::transport::Capability;
 use opentitanlib::uart::console::UartConsole;
 use opentitanlib::util::file::FromReader;
 

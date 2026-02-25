@@ -14,10 +14,10 @@ exec_env_filegroup(
     testonly = True,
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": "cw310",
-        # "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": "cw340",
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": "cw340",
     },
     files = {
         "rom_ext_dice_x509_slot_virtual_fpga_cw310.signed.bin": "cw310",
-        # "rom_ext_dice_x509_slot_virtual_fpga_cw340.signed.bin": "cw340",
+        "rom_ext_dice_x509_slot_virtual_fpga_cw340.signed.bin": "cw340",
     },
 )

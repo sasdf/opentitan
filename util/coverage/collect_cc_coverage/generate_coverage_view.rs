@@ -218,7 +218,7 @@ fn find_executable_regions(
 /// across translation units may have a filename prefix separated by a colon.
 /// This function returns the base function name.
 fn dedup_inline_copies(name: &str) -> Result<&str> {
-    Ok(name.split(':').last().context("Invalid function name")?)
+    name.split(':').last().context("Invalid function name")
 }
 
 /// Filters raw LCOV output to only include regions that exist in the binary.
@@ -282,7 +282,7 @@ fn filter_lcov_view(
                 writeln!(filtered_lcov, "FN:{lineno},{name}")?;
             }
         }
-        for (name, _count) in &filtered.fnda {
+        for name in filtered.fnda.keys() {
             writeln!(filtered_lcov, "FNDA:0,{name}")?;
         }
         for lineno in &filtered.da {

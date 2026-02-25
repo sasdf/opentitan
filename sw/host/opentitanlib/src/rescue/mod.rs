@@ -216,7 +216,6 @@ pub trait Rescue {
 
     // Not supported by all backends
     fn set_speed(&self, speed: u32) -> Result<u32>;
-
     fn reboot(&self) -> Result<()>;
 
     fn get_raw(&self, mode: RescueMode) -> Result<Vec<u8>> {

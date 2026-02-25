@@ -396,6 +396,12 @@ EX_CW340_CRYPTO_TESTS=(
 //sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw340_sival_rom_ext
 
 # //sw/device/tests/crypto/cryptotest:kmac_kat_fpga_cw340_sival_rom_ext
+# //sw/device/tests/crypto/cryptotest:acvp_fpga_cw310_test_rom
+# //sw/device/tests/crypto/cryptotest:acvp_fpga_cw340_sival_rom_ext
+# //sw/device/tests/crypto/cryptotest:acvp_fpga_cw340_test_rom
+# //sw/device/tests/crypto/cryptotest:hmac_sha256_acvp_fpga_cw310_test_rom
+# //sw/device/tests/crypto/cryptotest:hmac_sha256_acvp_fpga_cw340_sival_rom_ext
+# //sw/device/tests/crypto/cryptotest:hmac_sha256_acvp_fpga_cw340_test_rom
 )
 
 EX_CW310_SIVAL_TESTS=(
@@ -772,6 +778,11 @@ EX_CW340_ROM_EXT_TESTS=(
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_device_id_spidfu_fault_to_fallback_owner_fpga_cw340_rom_ext
 //sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_get_owner_page_spidfu_custom_fallback_owner_fpga_cw340_rom_ext
+
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_a_both_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_a_only_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_b_both_fpga_cw340_rom_ext
+//sw/device/silicon_creator/rom_ext/e2e/rescue:rescue_erase_slot_b_only_fpga_cw340_rom_ext
 
 # //sw/device/silicon_creator/rom_ext/e2e/handoff:epmp_test_fpga_cw340_rom_ext
 )

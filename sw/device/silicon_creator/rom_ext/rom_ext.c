@@ -682,6 +682,5 @@ void rom_ext_main(void) {
     HARDENED_CHECK_EQ(error, kErrorWriteBootdataThenReboot);
     error = boot_data_write(&boot_data);
   }
-  coverage_report();
   shutdown_finalize(error);
 }

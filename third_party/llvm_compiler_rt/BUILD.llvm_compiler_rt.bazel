@@ -29,7 +29,6 @@ cc_library(
     ],
     hdrs = [
         "lib/profile/InstrProfiling.h",
-        "lib/profile/InstrProfilingInternal.h",
     ],
     include_prefix = "external/llvm_compiler_rt",
     includes = ["include"],

@@ -157,7 +157,6 @@ rom_error_t sku_creator_owner_init(boot_data_t *bootdata) {
   owner_keydata_t owner = OWNER_KEYDATA;
   ownership_state_t state = bootdata->ownership_state;
 
-#ifndef TEST_OWNER_FORCE_UPDATE
   if (state == kOwnershipStateUnlockedSelf ||
       state == kOwnershipStateUnlockedAny ||
       state == kOwnershipStateUnlockedEndorsed) {
@@ -175,7 +174,6 @@ rom_error_t sku_creator_owner_init(boot_data_t *bootdata) {
     // We'll not return, thus allowing the owner config below to be programmed
     // into flash.
   }
-#endif
 
   owner_page[0].header.tag = kTlvTagOwner;
   owner_page[0].header.length = 2048;

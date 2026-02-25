@@ -63,7 +63,6 @@ configure_make(
         "--enable-remote-bitbang",
     ],
     copts = [
-        "-Wno-error",
         "-Wno-error=unused-variable",
         "-Wno-unused-but-set-variable",
         "-Wno-strict-prototypes",

@@ -81,7 +81,6 @@ void fault_test_main(void) {
 #else
   dbg_printf("Fault not defined. FAIL!\r\n");
 #endif
-
   while (true) {
   }
 }

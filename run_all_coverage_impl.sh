@@ -125,7 +125,9 @@ echo "Save testlogs"
 python3 util/coverage/bundle_logs.py "${COVERAGE_OUTPUT_DIR}/testlogs"
 
 echo "Save ToE source diff"
-python3 util/coverage/show_diff.py > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
+python3 util/coverage/show_diff.py \
+  --view="${COVERAGE_OUTPUT_DIR}/all_views/coverage.dat" \
+  > "${COVERAGE_OUTPUT_DIR}/toe_source.diff"
 
 base_commit="$(git merge-base earlgrey_1.0.0 HEAD)"
 git log -n 5 "${base_commit}" > "${COVERAGE_OUTPUT_DIR}/commit_base.log"

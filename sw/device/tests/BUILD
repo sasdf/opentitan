@@ -4510,7 +4510,6 @@ opentitan_test(
         EARLGREY_CW340_TEST_ENVS,
         {
             "//hw/top_earlgrey:silicon_creator": None,
-            "//hw/top_earlgrey:fpga_cw310_test_rom": None,
         },
     ),
     fpga = fpga_params(tags = ["coverage"]),

@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@lowrisc_opentitan//rules/opentitan:transform.bzl", "obj_transform")
-load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/coverage:view.bzl", "coverage_view_test")
+load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_binary")
 load("//rules:linker.bzl", "ld_library")
 load(
@@ -52,7 +52,6 @@ cc_library(
         "//sw/device/lib/base:hardened",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/coverage:api",
-        "//sw/device/lib/coverage:api_asm",
         "//sw/device/lib/coverage:uart_runtime",
         "//sw/device/silicon_creator/lib:epmp_state",
         "//sw/device/silicon_creator/lib:error",
