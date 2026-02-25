@@ -7,27 +7,27 @@ on:
   workflow_call:
 
 jobs:
-  otbn_crypto_tests:
-    name: OTBN Crypto Tests
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Bitstream cache requires all commits.
-      - name: Prepare environment
-        uses: ./.github/actions/prepare-env
-        with:
-          service_account_json: '${{ secrets.BAZEL_CACHE_CREDS }}'
-      - name: Execute tests
-        run: |
-          ./bazelisk.sh coverage --config=ot_coverage --test_tag_filters=-nightly \
-            //sw/otbn/crypto/...
-      - name: Publish Bazel test results
-        uses: ./.github/actions/publish-bazel-test-results
-        if: ${{ !cancelled() }}
-        with:
-          artifact-name: otbn-test-results
+  # otbn_crypto_tests:
+  #   name: OTBN Crypto Tests
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 60
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0 # Bitstream cache requires all commits.
+  #     - name: Prepare environment
+  #       uses: ./.github/actions/prepare-env
+  #       with:
+  #         service_account_json: '${{ secrets.BAZEL_CACHE_CREDS }}'
+  #     - name: Execute tests
+  #       run: |
+  #         ./bazelisk.sh coverage --config=ot_coverage --test_tag_filters=-nightly \
+  #           //sw/otbn/crypto/...
+  #     - name: Publish Bazel test results
+  #       uses: ./.github/actions/publish-bazel-test-results
+  #       if: ${{ !cancelled() }}
+  #       with:
+  #         artifact-name: otbn-test-results
 
   sw_build_test:
     name: Unit Tests

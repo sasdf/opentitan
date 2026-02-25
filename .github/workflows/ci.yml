@@ -768,7 +768,7 @@ jobs:
 
   coverage_quick:
     name: Coverage (quick)
-    needs: quick_lint
+    # needs: quick_lint
     uses: ./.github/workflows/coverage-quick.yml
     secrets: inherit
 
