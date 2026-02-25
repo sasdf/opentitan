@@ -330,6 +330,7 @@
         background-color: var(--cv-bg-input);
         border-bottom: 1px solid var(--cv-border-strong);
         display: flex;
+        align-items: center;
         font-family: monospace;
         font-size: 0.9em;
         font-weight: bold;
@@ -341,6 +342,28 @@
         text-align: left;
         cursor: pointer;
         white-space: nowrap;
+      }
+      #cv-export-csv {
+        margin-left: auto;
+        background: transparent;
+        border: none;
+        color: var(--cv-text-muted);
+        cursor: pointer;
+        padding: 4px 10px;
+        height: 100%;
+        transition: color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #cv-export-csv:hover {
+        color: var(--cv-text-bright);
+        background-color: var(--cv-bg-hover);
+      }
+      #cv-export-csv svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
       }
       #cv-file-header .sort-asc::after {
         content: " ▲";
@@ -781,6 +804,11 @@
         <span id="cv-file-header-ratio" data-sort-key="ratio" class="sortable">Ratio</span>
         <span id="cv-file-header-missed" data-sort-key="missed" class="sortable">Miss</span>
         <span id="cv-file-header-name" data-sort-key="filename" class="sortable">Filename</span>
+        <button id="cv-export-csv" title="Export current list to CSV">
+          <svg viewBox="0 0 24 24">
+            <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" />
+          </svg>
+        </button>
       </div>
 
       <div id="cv-file-container">
@@ -896,6 +924,7 @@
           syntaxHighlightToggle: document.getElementById("cv-syntax-checkbox"),
           loadingOverlay: document.getElementById("cv-loading-overlay"),
           headerTimestamp: document.getElementById("cv-gen-timestamp"),
+          exportCsvBtn: document.getElementById("cv-export-csv"),
           lineHit: document.querySelector("#cv-summary-row-line .cv-summary-val-hit"),
           lineMiss: document.querySelector("#cv-summary-row-line .cv-summary-val-miss"),
           lineTotal: document.querySelector("#cv-summary-row-line .cv-summary-val-total"),
@@ -1308,6 +1337,45 @@
                   h.classList.add(`sort-${state.ui.sort.order}`);
               });
             },
+
+            /** Exports the currently displayed file list to a CSV file. */
+            exportCsv() {
+              const rows = [
+                [
+                  "Name",
+                  "Line Miss",
+                  "Line Coverage (%)",
+                  "Fn Coverage (%)",
+                  "Line Hit",
+                  "Line Total",
+                  "Fn Hit",
+                  "Fn Total",
+                ],
+              ];
+              state.meta.displayedFiles.forEach((f) => {
+                rows.push([
+                  f.path,
+                  f.line.missed,
+                  f.line.ratio.toFixed(2),
+                  f.func.ratio.toFixed(2),
+                  f.line.hit,
+                  f.line.total,
+                  f.func.hit,
+                  f.func.total,
+                ]);
+              });
+
+              const csvContent = rows.map((e) => e.join(",")).join("\n");
+              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", `coverage_export_${new Date().toISOString()}.csv`);
+              link.style.visibility = "hidden";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            },
           },
 
           Source: {
@@ -1606,6 +1674,8 @@
             UI.FileList.updateSortHeaders();
             UI.update("pushUrl");
           };
+
+          dom.exportCsvBtn.onclick = () => UI.FileList.exportCsv();
 
           // Keyboard Navigation: Shortcuts for search and list traversal
           document.onkeydown = (e) => {
