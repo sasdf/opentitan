@@ -50,7 +50,6 @@ EX_CW310_TEST_ROM_TESTS=(
 //sw/device/tests/crypto/cryptotest:aes_gcm_kat_fpga_cw310_test_rom
 //sw/device/tests/crypto/cryptotest:rsa_kat_fpga_cw310_test_rom
 //sw/device/tests:otp_ctrl_descrambling_test_fpga_cw310_test_rom
-//sw/device/tests:uart_smoketest_fpga_cw310_test_rom
 
 # //sw/device/tests:usbdev_suspend_resume_test_fpga_cw310_test_rom
 
