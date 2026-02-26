@@ -1,3 +1,8 @@
+if [[ -z "${COVERAGE_OUTPUT_DIR}" ]]; then
+  echo "ERROR: COVERAGE_OUTPUT_DIR is not set"
+  exit 1
+fi
+
 COVERAGE_DAT="bazel-out/_coverage/_coverage_report.dat"
 LCOV_FILES="bazel-out/_coverage/lcov_files.tmp"
 VIEW_CACHE_DIR="bazel-out/_coverage/view/"
@@ -34,9 +39,6 @@ fi
 
 ./bazelisk.sh coverage "${COVERAGE_VIEWS[@]}" "${BAZEL_ARGS[@]}" "$@"
 
-python3 ./util/coverage/collect_view_json.py \
-    --output="${VIEWER_DIR}/view.json.gz"
-
 if [[ "${#TARGETS[@]}" == "0" ]]; then
     for test_group_name in "${TEST_GROUPS[@]}"; do
         test_group_expr="${test_group_name}[@]"
@@ -56,13 +58,15 @@ echo "Collect overall coverage"
 rm -f "${COVERAGE_DAT}"
 ./bazelisk.sh coverage "${TARGETS[@]}" "${COVERAGE_VIEWS[@]}" "${BAZEL_ARGS[@]}" "$@" || true
 
-python3 ./util/coverage/collect_coverage_json.py \
-    --output="${VIEWER_DIR}/coverage.json.gz"
+ci/scripts/collect-coverage-report.sh \
+  "${COVERAGE_OUTPUT_DIR}/ci-cov-collect/"
 
-python3 ./util/coverage/viewer_bundler.py bundle \
-    --coverage_json="${VIEWER_DIR}/coverage.json.gz" \
-    --view_json="${VIEWER_DIR}/view.json.gz" \
-    --output_html="${VIEWER_DIR}/index.html"
+ci/scripts/merge-coverage-report.sh \
+  "${COVERAGE_OUTPUT_DIR}/ci-cov-collect/" \
+  "${COVERAGE_OUTPUT_DIR}/ci-cov-merge/"
+
+rm -rf "${VIEWER_DIR}"
+cp -R "${COVERAGE_OUTPUT_DIR}/ci-cov-merge/viewer" "${VIEWER_DIR}"
 
 if [[ "${#COVERAGE_VIEWS[@]}" == "0" ]]; then
     bash ./run_genhtml.sh \
