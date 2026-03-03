@@ -58,31 +58,36 @@ class TestCoverageData(unittest.TestCase):
         data = coll.as_dict()
 
         self.assertEqual(data["tests"], ["test1", "test2"])
+        self.assertEqual(data["views"], [])
         lines = data["files"][path]["l"]
         self.assertEqual(lines[0]["t"], [0])  # Line 1 hit by test 0
+        self.assertEqual(lines[0]["v"], [])
         self.assertEqual(lines[1]["t"], [1])  # Line 2 hit by test 1
+        self.assertEqual(lines[1]["v"], [])
         self.assertEqual(lines[2]["t"], [])  # Line 3 not hit
 
-    def test_coverage_collection_add_uncovered(self) -> None:
+    def test_coverage_collection_add_uncovered_view(self) -> None:
         source_file = self.test_dir / "file1.c"
         source_file.write_text("line1\nline2\n")
 
         coll = CoverageCollection()
 
-        # With add_uncovered=True, even 0 counts get the test index
+        # Views include all lines even if count is 0
         test_profiles = {
             str(source_file): FileProfile(sf=str(source_file), da={
                 1: 0,
                 2: 0
             })
         }
-        coll.add_test("test_view", test_profiles, add_uncovered=True)
+        coll.add_test("test_view", test_profiles, is_view=True)
 
         path = simplify_path(str(source_file))
         data = coll.as_dict()
         lines = data["files"][path]["l"]
-        self.assertEqual(lines[0]["t"], [0])
-        self.assertEqual(lines[1]["t"], [0])
+        self.assertEqual(lines[0]["v"], [0])
+        self.assertEqual(lines[1]["v"], [0])
+        self.assertEqual(lines[0]["t"], [])
+        self.assertEqual(data["views"], ["test_view"])
 
     def test_missing_source_file_graceful_skip(self) -> None:
         coll = CoverageCollection()
@@ -108,6 +113,30 @@ class TestCoverageData(unittest.TestCase):
         path = simplify_path(rel_sf_path)
         self.assertIn(path, coll.files)
         self.assertEqual(coll.files[path]["l"][0]["c"], "content")
+
+    def test_function_coverage_aggregation(self) -> None:
+        source_file = self.test_dir / "file1.c"
+        source_file.write_text("func1\nfunc2\nfunc1_overload\n")
+
+        coll = CoverageCollection()
+
+        # Two functions named 'myfunc' at line 1 and 3
+        # One function named 'otherfunc' at line 2
+        fn = {"myfunc": {1, 3}, "otherfunc": {2}}
+        fnda = {"myfunc": 1, "otherfunc": 0}
+        da = {1: 1, 2: 1, 3: 0}
+        profile = FileProfile(sf=str(source_file), fn=fn, fnda=fnda, da=da)
+        coll.add_test("test1", {str(source_file): profile})
+
+        path = simplify_path(str(source_file))
+        data = coll.as_dict()
+        funcs = data["files"][path]["f"]
+
+        self.assertEqual(len(funcs), 3)
+        # Check entries exist and have t, v fields
+        self.assertIn({"n": "myfunc", "l": 0, "t": [0], "v": []}, funcs)
+        self.assertIn({"n": "myfunc", "l": 2, "t": [0], "v": []}, funcs)
+        self.assertIn({"n": "otherfunc", "l": 1, "t": [0], "v": []}, funcs)
 
 
 if __name__ == "__main__":

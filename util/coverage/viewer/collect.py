@@ -53,25 +53,22 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help='Path to the output gzipped JSON file.')
     args = parser.parse_args(argv)
 
-    test = CoverageCollection(source_dir=args.source_dir)
-    view = CoverageCollection(source_dir=args.source_dir)
+    coll = CoverageCollection(source_dir=args.source_dir)
 
     for test_lcov in iter_lcov_files(args.lcov_files, args.coverage_dir):
         if test_lcov.name.endswith('_coverage_view'):
             print(f'Processing view {test_lcov.name}...')
-            view.add_test(test_lcov.name, test_lcov.files, add_uncovered=True)
-            test.add_test(test_lcov.name, test_lcov.files, add_uncovered=False)
+            coll.add_test(test_lcov.name, test_lcov.files, is_view=True)
         else:
             print(f'Processing test {test_lcov.name}...')
-            test.add_test(test_lcov.name, test_lcov.files, add_uncovered=False)
+            coll.add_test(test_lcov.name, test_lcov.files, is_view=False)
 
     result = {
         'metadata': {
             'timestamp': datetime.now().replace(microsecond=0).isoformat(),
             'commit': get_git_commit(),
         },
-        'test': test.as_dict(),
-        'view': view.as_dict(),
+        **coll.as_dict()
     }
 
     print(f'Saving json to {args.output}')

@@ -69,5 +69,6 @@ py_binary(
 py_test(
     name = "bundler_test",
     srcs = ["bundler_test.py"],
+    data = ["viewer.html"],
     deps = [":bundler"],
 )

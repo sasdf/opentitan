@@ -23,9 +23,7 @@ class TestBundler(unittest.TestCase):
         shutil.rmtree(self.test_dir)
 
     def test_bundler_end_to_end(self) -> None:
-        html_template = self.test_dir / "template.html"
-        html_template.write_text(
-            "<html><script>// -- Bundled data --</script></html>")
+        viewer_html = Path(__file__).parent / "viewer.html"
 
         json_data = {"test": "data"}
         coverage_json = self.test_dir / "coverage.json.gz"
@@ -36,7 +34,7 @@ class TestBundler(unittest.TestCase):
 
         result = main([
             "--viewer_html",
-            str(html_template), "--coverage_json",
+            str(viewer_html), "--coverage_json",
             str(coverage_json), "--output",
             str(output_html)
         ])
@@ -45,7 +43,7 @@ class TestBundler(unittest.TestCase):
         self.assertTrue(output_html.exists())
 
         output_content = output_html.read_text()
-        self.assertIn("bundledData.set('coverage.json.gz'", output_content)
+        self.assertIn("bundledData = `", output_content)
 
         # Verify base64 data
         coverage_bytes = coverage_json.read_bytes()

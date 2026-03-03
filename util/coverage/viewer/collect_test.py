@@ -55,25 +55,22 @@ class TestCollectCoverageJson(unittest.TestCase):
             self.assertIn("timestamp", data["metadata"])
 
             # Check labels
-            self.assertEqual(data["test"]["tests"],
-                             ["//pkg:mytest", "//pkg:mytest_coverage_view"])
-            self.assertEqual(data["view"]["tests"],
-                             ["//pkg:mytest_coverage_view"])
+            self.assertEqual(data["tests"], ["//pkg:mytest"])
+            self.assertEqual(data["views"], ["//pkg:mytest_coverage_view"])
 
             path = simplify_path(str(source_file))
 
             # Check coverage
-            self.assertIn(path, data["test"]["files"])
-            self.assertEqual(data["test"]["files"][path]["l"][0]["t"],
-                             [0])  # Line 1 hit
-            self.assertEqual(data["test"]["files"][path]["l"][1]["t"],
+            self.assertIn(path, data["files"])
+            self.assertEqual(data["files"][path]["l"][0]["t"],
+                             [0])  # Line 1 hit only by first test
+            self.assertEqual(data["files"][path]["l"][1]["t"],
                              [])  # Line 2 missed
 
             # Check view
-            self.assertIn(path, data["view"]["files"])
-            self.assertEqual(data["view"]["files"][path]["l"][0]["t"], [0])
-            self.assertEqual(data["view"]["files"][path]["l"][1]["t"], [0])
-            self.assertEqual(data["view"]["files"][path]["l"][2]["t"], [0])
+            self.assertEqual(data["files"][path]["l"][0]["v"], [0])
+            self.assertEqual(data["files"][path]["l"][1]["v"], [0])
+            self.assertEqual(data["files"][path]["l"][2]["v"], [0])
 
     def test_main_with_dir_resolution(self) -> None:
         coverage_dir = self.test_dir / "cov_root"
@@ -108,10 +105,10 @@ class TestCollectCoverageJson(unittest.TestCase):
         self.assertTrue(output_file.exists())
         with gzip.open(output_file, 'rt') as f:
             data = json.load(f)
-            self.assertEqual(data["test"]["tests"], ["//pkg:mytest"])
+            self.assertEqual(data["tests"], ["//pkg:mytest"])
             path = simplify_path(rel_src_path)
-            self.assertIn(path, data["test"]["files"])
-            self.assertEqual(data["test"]["files"][path]["l"][0]["c"], "line1")
+            self.assertIn(path, data["files"])
+            self.assertEqual(data["files"][path]["l"][0]["c"], "line1")
 
 
 if __name__ == "__main__":

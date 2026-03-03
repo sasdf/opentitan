@@ -46,12 +46,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     coverage_data_b64 = base64.b64encode(coverage_data_gz).decode('utf-8')
 
     # Prepare the bundled data JavaScript
-    bundled_data_js = f"""
-      bundledData.set('coverage.json.gz', `{coverage_data_b64}`);
-    """
+    bundled_data_js = f"bundledData = `{coverage_data_b64}`;"
 
     # Insert bundled data into the HTML
-    placeholder = '// -- Bundled data --'
+    placeholder = '/* == Bundled data placeholder == */'
     if placeholder not in template:
         print(f"Error: Could not find placeholder in {args.viewer_html}")
         return 1

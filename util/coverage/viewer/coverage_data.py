@@ -22,6 +22,7 @@ class CoverageCollection:
     def __init__(self, source_dir: Optional[Path] = None) -> None:
         """Initializes the collection with an optional source root directory."""
         self.tests: List[str] = []
+        self.views: List[str] = []
         self.files: Dict[str, Any] = {}
         self.loaded_sources: Dict[str, str] = {}
         self.source_dir = source_dir
@@ -29,10 +30,16 @@ class CoverageCollection:
     def add_test(self,
                  test_label: str,
                  file_profiles: Dict[str, FileProfile],
-                 add_uncovered: bool = False) -> None:
-        """Adds coverage data from a specific test to the collection."""
-        test_idx = len(self.tests)
-        self.tests.append(test_label)
+                 is_view: bool = False) -> None:
+        """Adds coverage data from a specific test or view to the collection."""
+        if is_view:
+            test_idx = len(self.views)
+            self.views.append(test_label)
+            key = 'v'
+        else:
+            test_idx = len(self.tests)
+            self.tests.append(test_label)
+            key = 't'
 
         for sf_path, profile in file_profiles.items():
             path = simplify_path(sf_path)
@@ -56,50 +63,62 @@ class CoverageCollection:
                     "l": [{
                         "c": line,
                         "s": True,
-                        "t": []
+                        "t": [],
+                        "v": []
                     } for line in contents],
-                    "f": {},
+                    "f": [],
                 }
 
             lines = self.files[path]["l"]
 
             # Update line coverage data
             for lineno, count in profile.da.items():
-                idx = lineno - 1
-                if 0 <= idx < len(lines):
-                    lines[idx]['s'] = False
-                    if add_uncovered or count > 0:
-                        if test_idx not in lines[idx]['t']:
-                            lines[idx]['t'].append(test_idx)
+                lineid = lineno - 1
+                if 0 <= lineid < len(lines):
+                    lines[lineid]['s'] = False
+                    # Views include all lines defined in the LCOV (even with 0 hits)
+                    # Tests only include lines with actual hits (count > 0)
+                    if is_view or count > 0:
+                        if test_idx not in lines[lineid][key]:
+                            lines[lineid][key].append(test_idx)
 
             # Update function coverage data
             funcs = self.files[path]["f"]
             for func_name, fn_lines in profile.fn.items():
-                if func_name not in funcs:
-                    funcs[func_name] = {"l": [], "t": []}
-
                 for lineno in fn_lines:
-                    idx = lineno - 1
-                    if idx not in funcs[func_name]["l"]:
-                        funcs[func_name]["l"].append(idx)
+                    lineid = lineno - 1
+                    for f in funcs:
+                        if f["n"] == func_name and f["l"] == lineid:
+                            func_entry = f
+                            break
+                    else:
+                        func_entry = {
+                            "n": func_name,
+                            "l": lineid,
+                            "t": [],
+                            "v": []
+                        }
+                        funcs.append(func_entry)
 
-                fnda_count = profile.fnda.get(func_name, 0)
-                if add_uncovered or fnda_count > 0:
-                    if test_idx not in funcs[func_name]["t"]:
-                        funcs[func_name]["t"].append(test_idx)
+                    fnda_count = profile.fnda.get(func_name, 0)
+                    if is_view or fnda_count > 0:
+                        if test_idx not in func_entry[key]:
+                            func_entry[key].append(test_idx)
 
-    def _fix_fn_hit(self) -> None:
-        """Marks a function as covered if any of its lines are covered."""
+    def _fix_test_fn_hit(self) -> None:
+        """Marks a function as covered if its definition line is covered."""
         for path, data in self.files.items():
             lines = data["l"]
-            for func_name, func_data in data["f"].items():
-                for idx in func_data["l"]:
-                    if 0 <= idx < len(lines):
-                        for test_idx in lines[idx]["t"]:
-                            if test_idx not in func_data["t"]:
-                                func_data["t"].append(test_idx)
+            for func_entry in data["f"]:
+                lineid = func_entry["l"]
+                if 0 <= lineid < len(lines):
+                    # Sync test hits.
+                    # NOTE: DO NOT sync view hits to keep the list accurate.
+                    for test_idx in lines[lineid]["t"]:
+                        if test_idx not in func_entry["t"]:
+                            func_entry["t"].append(test_idx)
 
     def as_dict(self) -> Dict[str, Any]:
         """Returns the aggregated coverage data as a dictionary."""
-        self._fix_fn_hit()
-        return {"tests": self.tests, "files": self.files}
+        self._fix_test_fn_hit()
+        return {"tests": self.tests, "views": self.views, "files": self.files}
