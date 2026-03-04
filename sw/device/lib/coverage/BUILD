@@ -3,8 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("//rules:linker.bzl", "ld_library")
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
+load(
+    "//rules/opentitan:defs.bzl",
+    "EARLGREY_CW340_TEST_ENVS",
+    "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
+    "EARLGREY_TEST_ENVS",
+    "opentitan_test",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -147,5 +155,37 @@ ld_library(
         "bss.ld",
         "info.ld",
         "rodata.ld",
+    ],
+)
+
+cc_library(
+    name = "smoke_target",
+    srcs = ["smoke_target.c"],
+    hdrs = ["smoke_target.h"],
+)
+
+opentitan_test(
+    name = "smoke_functest",
+    srcs = ["smoke_functest.c"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        EARLGREY_CW340_TEST_ENVS,
+        {
+            "//hw/top_earlgrey:silicon_creator": None,
+        },
+    ),
+    deps = [
+        ":smoke_target",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+cc_test(
+    name = "smoke_unittest",
+    srcs = ["smoke_unittest.cc"],
+    deps = [
+        ":smoke_target",
+        "@googletest//:gtest_main",
     ],
 )
