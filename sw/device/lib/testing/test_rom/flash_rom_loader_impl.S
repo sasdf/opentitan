@@ -23,15 +23,12 @@
   .type _try_flash_rom, @function
 
 _try_flash_rom:
-  /**
-   * Unlock ePMP for Flash access
-   */
+  // Unlock ePMP for Flash access.
   // Remove address space protections by configuring entry 15 as
   // read-write-execute for the entire address space and then clearing
   // all other entries.
   // NOTE: This should happen before attemting to access any address outside
-  // the initial ePMP RX region at reset, e.g. `kDeviceType` which is in
-  // .rodata.
+  // the initial ePMP RX region at reset, e.g. flash ROM magic bytes.
   li   t0, (0x9f << 24) // Locked NAPOT read-write-execute.
   csrw pmpcfg3, t0
   li   t0, 0x7fffffff   // NAPOT encoded region covering entire 34-bit address space.
@@ -50,9 +47,7 @@ _try_flash_rom:
   csrw pmpcfg1, zero
   csrw pmpcfg2, zero
 
-  /**
-   * Reset flash protection on the flash ROM region
-   */
+  // Reset flash protection on the flash ROM region
   li    t1, TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR
 
   // t0 = ( ((size / 2048) << 9) | (offset / 2048) )
@@ -70,15 +65,10 @@ _try_flash_rom:
   li t0, 0x9996666
   sw    t0, FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET(t1)
 
-  /**
-   * Check if flash ROM is presented
-   */
-  li t0, (TOP_EARLGREY_EFLASH_BASE_ADDR + TOP_EARLGREY_EFLASH_SIZE_BYTES)
-  la t1, _chip_info_size
-  sub t0, t0, t1
-
+  // Check if flash ROM is presented
   // Continue if the build version is `kBuildInfoVersion1`.
-  lw t0, 0x8(t0)
+  la t0, (_flash_rom_magic + TOP_EARLGREY_EFLASH_BASE_ADDR)
+  lw t0, 0(t0)
   li t1, 0x4efecea6
   beq t0, t1, .L_boot_flash_rom
   ret
@@ -86,9 +76,6 @@ _try_flash_rom:
 .L_boot_flash_rom:
   la a0, (_flash_rom_slot + TOP_EARLGREY_EFLASH_BASE_ADDR)
 
-  /**
-   * Initialize the hardware for running flash ROM
-   */
   // Initialize main memory (main SRAM).
   li    t1, TOP_EARLGREY_SRAM_CTRL_MAIN_REGS_BASE_ADDR
   li    t0, (1 << SRAM_CTRL_CTRL_INIT_BIT)
@@ -106,9 +93,7 @@ _try_flash_rom:
   li   t1, 0xa26a38f7
   sw   t1, FLASH_CTRL_EXEC_REG_OFFSET(a3)
 
-  /**
-   * Jump to flash ROM
-   */
+  // Jump to flash ROM
   jr 0x80(a0)
   unimp
 
