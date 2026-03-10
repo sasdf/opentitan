@@ -516,6 +516,7 @@ CW310_SIVAL_ROMEXT_TESTS=(
 //sw/device/tests/crypto:sha384_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:sha512_functest_fpga_cw310_sival_rom_ext
 //sw/device/tests/crypto:symmetric_keygen_functest_fpga_cw310_sival_rom_ext
+//sw/device/tests/crypto:ed25519_functest_fpga_cw310_sival_rom_ext
 
 //sw/device/silicon_creator/lib/sigverify/sphincsplus/test:fors_test_fpga_cw310_sival_rom_ext
 //sw/device/silicon_creator/lib/sigverify/sphincsplus/test:mgf1_test_fpga_cw310_sival_rom_ext
@@ -1155,6 +1156,9 @@ OTBN_TESTS=(
 # //sw/otbn/crypto/tests:x25519_consttime
 # //sw/otbn/crypto/tests:x25519_test1
 # //sw/otbn/crypto/tests:x25519_test2
+# //sw/otbn/crypto/tests:ed25519_encode_decode_test
+# //sw/otbn/crypto/tests:ed25519_sign_test
+# //sw/otbn/crypto/tests:ed25519_verify_test
 )
 
 TEST_GROUPS=(

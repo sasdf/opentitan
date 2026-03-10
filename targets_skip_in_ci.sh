@@ -313,6 +313,7 @@ EX_CW310_FAKE_KEYS_TESTS=(
 //sw/device/tests/crypto:sha384_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:sha512_functest_fpga_cw310_rom_with_fake_keys
 //sw/device/tests/crypto:symmetric_keygen_functest_fpga_cw310_rom_with_fake_keys
+//sw/device/tests/crypto:ed25519_functest_fpga_cw310_rom_with_fake_keys
 
 # //sw/device/tests:crt_test_fpga_cw310_rom_with_fake_keys
 
@@ -828,6 +829,7 @@ EX_CW340_SIVAL_ROM_EXT_TESTS=(
 //sw/device/tests:uart_smoketest_fpga_cw340_sival_rom_ext
 //sw/device/tests/crypto:otcrypto_export_test_fpga_cw340_sival_rom_ext
 //sw/device/tests/crypto:otcrypto_hash_test_fpga_cw340_sival_rom_ext
+//sw/device/tests/crypto:ed25519_functest_fpga_cw340_sival_rom_ext
 
 //sw/device/tests:aes_masking_off_test_fpga_cw340_sival_rom_ext
 //sw/device/tests:edn_boot_mode_fpga_cw340_sival_rom_ext
@@ -1230,7 +1232,6 @@ EX_OTHER_FAILED_TESTS=(
 # //sw/device/tests:ottf_dual_console_test_fpga_cw340_sival_rom_ext
 # //sw/device/tests:ottf_dual_console_test_fpga_cw340_test_rom
 )
-
 
 EX_TEST_GROUPS=(
     "EX_CW310_TEST_ROM_TESTS"
