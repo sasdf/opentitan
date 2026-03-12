@@ -165,6 +165,7 @@ sh_test(
             "changes_otp",
             "exclusive",
             "manuf",
+            "provisioning",
         ] + [fpga] + ([
             "manual",
         ] if cfg.get("offline", False) else []),
