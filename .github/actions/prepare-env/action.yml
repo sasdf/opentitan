@@ -113,7 +113,6 @@ runs:
       shell: bash
 
     - uses: google-github-actions/setup-gcloud@v2
-      if: github.event_name != 'pull_request' && inputs.service_account_json != ''
 
     - name: Configure ~/.bazelrc
       if: inputs.configure-bazel == 'true'
