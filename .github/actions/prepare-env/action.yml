@@ -101,18 +101,38 @@ runs:
     # The above action creates a credential file in workspace and it doesn't provide a way to configure
     # it. This influences with a few scripts that assume clean workspace, and introduce security risk
     # that it may be exposed when uploading to buckets.
-    - name: Move Google credentials out from workspace
-      if: github.event_name != 'pull_request' && inputs.service_account_json != ''
-      run: |
-        SOURCE=${{ steps.google_auth.outputs.credentials_file_path }}
-        TARGET=${{ runner.temp }}/$(basename "$SOURCE")
-        mv $SOURCE $TARGET
-        echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$TARGET" >> $GITHUB_ENV
-        echo "GOOGLE_APPLICATION_CREDENTIALS=$TARGET" >> $GITHUB_ENV
-        echo "GOOGLE_GHA_CREDS_PATH=$TARGET" >> $GITHUB_ENV
-      shell: bash
+    # - name: Move Google credentials out from workspace
+    #   run: |
+    #     SOURCE=${{ steps.google_auth.outputs.credentials_file_path }}
+    #     TARGET=${{ runner.temp }}/$(basename "$SOURCE")
+    #     mv $SOURCE $TARGET
+    #     echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$TARGET" >> $GITHUB_ENV
+    #     echo "GOOGLE_APPLICATION_CREDENTIALS=$TARGET" >> $GITHUB_ENV
+    #     echo "GOOGLE_GHA_CREDS_PATH=$TARGET" >> $GITHUB_ENV
+    #   shell: bash
 
     - uses: google-github-actions/setup-gcloud@v2
+
+    - name: Move Google credentials out from workspace
+      run: |
+        (which gcloud || true ) >&2
+        echo "HOME: $HOME" >&2
+        echo "PATH: $PATH" >&2
+        echo "PYTHONPATH: $PYTHONPATH" >&2
+
+        echo "UV_CACHE_DIR=/home/runner/_work/_temp/setup-uv-cache" >> $GITHUB_ENV
+        echo "VIRTUAL_ENV=/home/runner/.local/share/venv" >> $GITHUB_ENV
+        echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=/home/runner/_work/_temp/gha-creds-2e642f106864998d.json" >> $GITHUB_ENV
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/home/runner/_work/_temp/gha-creds-2e642f106864998d.json" >> $GITHUB_ENV
+        echo "GOOGLE_GHA_CREDS_PATH=/home/runner/_work/_temp/gha-creds-2e642f106864998d.json" >> $GITHUB_ENV
+        echo "CLOUDSDK_CORE_PROJECT=active-premise-257318" >> $GITHUB_ENV
+        echo "CLOUDSDK_PROJECT=active-premise-257318" >> $GITHUB_ENV
+        echo "GCLOUD_PROJECT=active-premise-257318" >> $GITHUB_ENV
+        echo "GCP_PROJECT=active-premise-257318" >> $GITHUB_ENV
+        echo "GOOGLE_CLOUD_PROJECT=active-premise-257318" >> $GITHUB_ENV
+        echo "CLOUDSDK_METRICS_ENVIRONMENT=github-actions-setup-gcloud" >> $GITHUB_ENV
+        echo "CLOUDSDK_METRICS_ENVIRONMENT_VERSION=2.2.1" >> $GITHUB_ENV
+      shell: bash
 
     - name: Configure ~/.bazelrc
       if: inputs.configure-bazel == 'true'
