@@ -5,6 +5,7 @@
 #include "sw/device/silicon_creator/rom_ext/rom_ext.h"
 
 #include "sw/device/lib/arch/device.h"
+#include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/memory.h"
@@ -60,9 +61,11 @@
 #include "sw/device/silicon_creator/rom_ext/rom_ext_manifest.h"
 #include "sw/device/silicon_creator/rom_ext/rom_ext_verify.h"
 
+#include "alert_handler_regs.h"                       // Generated.
 #include "flash_ctrl_regs.h"                          // Generated.
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"  // Generated.
 #include "otp_ctrl_regs.h"                            // Generated.
+#include "rv_core_ibex_regs.h"                        // Generated.
 #include "sram_ctrl_regs.h"                           // Generated.
 
 // Useful constants for flash sizes and ROM_EXT locations.
@@ -109,6 +112,28 @@ hmac_digest_t owner_history_hash;
 // Verifying key index
 size_t verify_key;
 
+static void print_alert_64(uint32_t id) {
+  uint32_t alert_cause =
+      abs_mmio_read32(TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR +
+                      ALERT_HANDLER_ALERT_CAUSE_64_REG_OFFSET);
+  abs_mmio_write32(TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR +
+                       ALERT_HANDLER_ALERT_CAUSE_64_REG_OFFSET,
+                   alert_cause);
+  dbg_printf("alert_64(%C): 0x%x\r\n", id, alert_cause);
+}
+
+static void enable_alert_64(void) {
+  abs_mmio_write32_shadowed(TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR +
+                                ALERT_HANDLER_ALERT_EN_SHADOWED_64_REG_OFFSET,
+                            1);
+}
+
+static void trigger_alert_64(void) {
+  abs_mmio_write32(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR +
+                       RV_CORE_IBEX_ALERT_TEST_REG_OFFSET,
+                   (1u << RV_CORE_IBEX_ALERT_TEST_RECOV_HW_ERR_BIT));
+}
+
 OT_WARN_UNUSED_RESULT
 static uint32_t rom_ext_current_slot(void) {
   uint32_t pc = ibex_addr_remap_get(0);
@@ -148,6 +173,7 @@ void rom_ext_check_rom_expectations(void) {
 
 OT_WARN_UNUSED_RESULT
 static rom_error_t rom_ext_init(boot_data_t *boot_data) {
+  print_alert_64(0x74696e69);  // init
   sec_mmio_next_stage_init();
   lc_state = lifecycle_state_get();
   flash_ecc_exc_handler_en = otp_read32(
@@ -174,6 +200,7 @@ static rom_error_t rom_ext_init(boot_data_t *boot_data) {
 }
 
 void rom_ext_sram_exec(owner_sram_exec_mode_t mode) {
+  print_alert_64(0x78657273);  // srex
   switch (launder32(mode)) {
     case kOwnerSramExecModeEnabled:
       // In enabled mode, we do not lock the register so owner code can disable
@@ -230,6 +257,7 @@ OT_WARN_UNUSED_RESULT
 static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
                                 const manifest_t *manifest,
                                 uint32_t *flash_exec) {
+  print_alert_64(0x746f6f62);  // boot
   // Determine which owner block the key came from and measure that block.
   hmac_digest_t owner_measurement;
   const owner_application_key_t *key = keyring.key[verify_key];
@@ -279,6 +307,8 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
 
   HARDENED_RETURN_IF_ERROR(epmp_state_check());
 
+  print_alert_64(0x30746461);  // adt0
+
   // Configure address translation, compute the epmp regions and the entry
   // point for the virtual address in case the address translation is enabled.
   // Otherwise, compute the epmp regions and the entry point for the load
@@ -318,6 +348,8 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
     default:
       HARDENED_TRAP();
   }
+
+  print_alert_64(0x31746461);  // adt1
 
   // Allow execution of owner stage executable code (text) sections.
   epmp_set_tor(2, text_region, kEpmpPermReadExecute);
@@ -374,6 +406,7 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   HARDENED_CHECK_EQ(*flash_exec, kSigverifyFlashExec);
 
   // Jump to OWNER entry point.
+  print_alert_64(0x77736e6f);  // onsw
   dbg_printf("entry: 0x%x\r\n", (unsigned int)entry_point);
   coverage_report();
   coverage_invalidate();
@@ -386,6 +419,7 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
 OT_WARN_UNUSED_RESULT
 static rom_error_t rom_ext_try_next_stage(boot_data_t *boot_data,
                                           boot_log_t *boot_log) {
+  print_alert_64(0x7478656e);  // next
   rom_ext_boot_policy_manifests_t manifests =
       rom_ext_boot_policy_manifests_get(boot_data);
   rom_error_t error = kErrorRomExtBootFailed;
@@ -435,6 +469,7 @@ static rom_error_t rom_ext_try_next_stage(boot_data_t *boot_data,
 }
 
 static void rom_ext_flash_protect_self(uint32_t rom_ext_slot) {
+  print_alert_64(0x6f727066);  // fpro
   flash_ctrl_cfg_t cfg = flash_ctrl_data_default_cfg_get();
   flash_ctrl_perms_t read = {
       .read = kMultiBitBool4True,
@@ -478,6 +513,7 @@ static void rom_ext_rescue_lockdown(boot_data_t *boot_data) {
 
 static rom_error_t rom_ext_advance_secver(boot_data_t *boot_data,
                                           const manifest_t *manifest) {
+  print_alert_64(0x63657361);  // asec
   const manifest_ext_secver_write_t *secver;
   rom_error_t error;
   error = manifest_ext_get_secver_write(manifest, &secver);
@@ -673,6 +709,8 @@ static rom_error_t rom_ext_start(boot_data_t *boot_data, boot_log_t *boot_log) {
 }
 
 void rom_ext_main(void) {
+  print_alert_64(0x6e69616d);  // main
+
   rom_ext_check_rom_expectations();
   boot_data_t boot_data;
   boot_log_t *boot_log = &retention_sram_get()->creator.boot_log;
