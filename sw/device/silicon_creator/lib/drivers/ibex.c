@@ -5,6 +5,7 @@
 #include "sw/device/silicon_creator/lib/drivers/ibex.h"
 
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/hardened.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/silicon_creator/lib/base/sec_mmio.h"
@@ -41,8 +42,8 @@ void ibex_addr_remap_0_set(uint32_t matching_addr, uint32_t remap_addr,
   icache_invalidate();
 }
 
-void ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
-                           size_t size) {
+uint32_t ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
+                               size_t size) {
   // Work-around for opentitan#22884: Mask off bits below the alignment size
   // prior to programming the REMAP_ADDR register.
   size = size - 1;
@@ -59,7 +60,21 @@ void ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
 
   sec_mmio_write32(kBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET, 1);
   sec_mmio_write32(kBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET, 1);
+
+  uint32_t iters = 0;
+#ifdef OT_PLATFORM_RV32
+  uint32_t cpuctrl;
   icache_invalidate();
+  do {
+    CSR_READ(CSR_REG_CPUCTRL, &cpuctrl);
+    iters++;
+  } while ((cpuctrl & (1u << 8)) == 0);
+
+  for (uint32_t i = 0; i < 256; ++i) {
+    asm volatile("nop");
+  }
+#endif
+  return iters;
 }
 
 uint32_t ibex_addr_remap_get(uint32_t index) {
