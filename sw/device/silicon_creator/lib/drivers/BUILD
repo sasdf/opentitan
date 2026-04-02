@@ -277,6 +277,7 @@ dual_cc_library(
     deps = dual_inputs(
         shared = [
             "//hw/ip/rv_core_ibex/data:rv_core_ibex_c_regs",
+            "//hw/ip/rv_timer/data:rv_timer_c_regs",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
             "//sw/device/lib/arch:device",
             "//sw/device/lib/base:abs_mmio",

@@ -5,12 +5,15 @@
 #include "sw/device/silicon_creator/lib/drivers/ibex.h"
 
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/hardened.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/silicon_creator/lib/base/sec_mmio.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "rv_core_ibex_regs.h"
+#include "rv_timer_regs.h"
 
 enum {
   kBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
@@ -41,8 +44,8 @@ void ibex_addr_remap_0_set(uint32_t matching_addr, uint32_t remap_addr,
   icache_invalidate();
 }
 
-void ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
-                           size_t size) {
+uint32_t ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
+                               size_t size) {
   // Work-around for opentitan#22884: Mask off bits below the alignment size
   // prior to programming the REMAP_ADDR register.
   size = size - 1;
@@ -59,7 +62,60 @@ void ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
 
   sec_mmio_write32(kBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET, 1);
   sec_mmio_write32(kBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET, 1);
+
+  uint32_t wfi_iters = 0;
+#ifdef OT_PLATFORM_RV32
+  uint32_t timer_base = TOP_EARLGREY_RV_TIMER_BASE_ADDR;
+  // Ensure timer is stopped.
+  abs_mmio_write32(timer_base + RV_TIMER_CTRL_REG_OFFSET, 0);
+
+  // Enable timer interrupt in MIE CSR (bit 7 is MTIE).
+  uint32_t old_mie;
+  CSR_READ(CSR_REG_MIE, &old_mie);
+  CSR_WRITE(CSR_REG_MIE, old_mie | (1u << 7));
+
+  // Initialize timer for 1:1 clock ratio (prescale=0, step=1).
+  abs_mmio_write32(timer_base + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 0);
+  abs_mmio_write32(timer_base + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET, 0);
+  abs_mmio_write32(timer_base + RV_TIMER_COMPARE_UPPER0_0_REG_OFFSET, 0);
+  abs_mmio_write32(timer_base + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 1024);
+  abs_mmio_write32(timer_base + RV_TIMER_INTR_STATE0_REG_OFFSET, 1);
+  abs_mmio_write32(timer_base + RV_TIMER_INTR_ENABLE0_REG_OFFSET, 1);
+  uint32_t cfg = 0;
+  cfg = bitfield_field32_write(cfg, RV_TIMER_CFG0_PRESCALE_FIELD, 0);
+  cfg = bitfield_field32_write(cfg, RV_TIMER_CFG0_STEP_FIELD, 1);
+  abs_mmio_write32(timer_base + RV_TIMER_CFG0_REG_OFFSET, cfg);
+
+  abs_mmio_write32(timer_base + RV_TIMER_CTRL_REG_OFFSET, 1);
+
+  // Trigger flush.
   icache_invalidate();
+
+  while (true) {
+    wait_for_interrupt();
+    wfi_iters++;
+
+    uint32_t cpuctrl;
+    CSR_READ(CSR_REG_CPUCTRL, &cpuctrl);
+    if ((cpuctrl & (1u << 8)) != 0) {
+      break;
+    }
+
+    // Key not received yet. Clear timer interrupt and set for another 1024
+    // cycles.
+    abs_mmio_write32(timer_base + RV_TIMER_INTR_STATE0_REG_OFFSET, 1);
+    uint32_t now =
+        abs_mmio_read32(timer_base + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET);
+    abs_mmio_write32(timer_base + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET,
+                     now + 1024);
+  }
+
+  // Disable timer and restore MIE CSR.
+  abs_mmio_write32(timer_base + RV_TIMER_CTRL_REG_OFFSET, 0);
+  CSR_WRITE(CSR_REG_MIE, old_mie);
+#endif
+  return (wfi_iters << 16) +
+         abs_mmio_read32(timer_base + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET);
 }
 
 uint32_t ibex_addr_remap_get(uint32_t index) {

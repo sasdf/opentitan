@@ -321,8 +321,13 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   switch (launder32(manifest->address_translation)) {
     case kHardenedBoolTrue:
       HARDENED_CHECK_EQ(manifest->address_translation, kHardenedBoolTrue);
-      ibex_addr_remap_1_set((uintptr_t)_owner_virtual_start_address,
-                            (uintptr_t)manifest, (size_t)_owner_virtual_size);
+      uint32_t wfi_iters = ibex_addr_remap_1_set(
+          (uintptr_t)_owner_virtual_start_address, (uintptr_t)manifest,
+          (size_t)_owner_virtual_size);
+      uint32_t timer_ticks = wfi_iters & 0xFFFF;
+      wfi_iters >>= 16;
+      dbg_printf("ibex_addr_remap_1_set: wfi loops = %u, ticks = %u\n",
+                 wfi_iters, timer_ticks);
       SEC_MMIO_WRITE_INCREMENT(kAddressTranslationSecMmioConfigure);
 
       // Unlock read-only for the whole rom_ext virtual memory.

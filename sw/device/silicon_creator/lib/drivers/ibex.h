@@ -118,9 +118,10 @@ void ibex_addr_remap_0_set(uint32_t matching_addr, uint32_t remap_addr,
  * @param remap_addr  The region where the matched transtaction will be
  * redirected to.
  * @param size The size of the regions mapped.
+ * @return The number of wfi loops executed while waiting for icache flush.
  */
-void ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
-                           size_t size);
+uint32_t ibex_addr_remap_1_set(uint32_t matching_addr, uint32_t remap_addr,
+                               size_t size);
 
 /**
  * Get the remap target address.
