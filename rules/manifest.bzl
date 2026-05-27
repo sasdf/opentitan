@@ -103,6 +103,9 @@ def _manifest_impl(ctx):
     if ctx.attr.address_translation:
         mf["address_translation"] = ctx.attr.address_translation
 
+    if ctx.attr.base_addr != "none":
+        mf["base_addr"] = ctx.attr.base_addr
+
     # The binding_value, if provided, must be exactly 8 words.
     if ctx.attr.binding_value:
         if len(ctx.attr.binding_value) != 8:
@@ -246,6 +249,7 @@ _manifest = rule(
         "integrator_specific_firmware_binding": attr.string(doc = "Create an Integrator Specific Firmware Block (ISFB) JSON object"),
         "isfb_erase_allowed_policy": attr.string(doc = "Create an ISFB Erase Allowed Policy JSON object"),
         "secver_write": attr.string(default = "none", values = ["none", "false", "true"], doc = "Add the secver_write extension with the specified value"),
+        "base_addr": attr.string(default = "none", doc = "Override the image base_addr with the specified value"),
     },
 )
 
