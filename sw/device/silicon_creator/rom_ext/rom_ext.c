@@ -216,14 +216,13 @@ extern char _owner_virtual_size[];
 /**
  * Compute the virtual address corresponding to the physical address `lma_addr`.
  *
- * @param manifest Pointer to the current manifest.
+ * @param bank_base Base address of the flash bank containing the physical address.
  * @param lma_addr Load address or physical address.
  * @return the computed virtual address.
  */
 OT_WARN_UNUSED_RESULT
-static uintptr_t owner_vma_get(const manifest_t *manifest, uintptr_t lma_addr) {
-  return (lma_addr - (uintptr_t)manifest +
-          (uintptr_t)_owner_virtual_start_address + CHIP_ROM_EXT_SIZE_MAX);
+static uintptr_t owner_vma_get(uintptr_t bank_base, uintptr_t lma_addr) {
+  return lma_addr - bank_base + (uintptr_t)_owner_virtual_start_address;
 }
 
 OT_WARN_UNUSED_RESULT
@@ -291,8 +290,9 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   switch (launder32(manifest->address_translation)) {
     case kHardenedBoolTrue:
       HARDENED_CHECK_EQ(manifest->address_translation, kHardenedBoolTrue);
-      ibex_addr_remap_1_set((uintptr_t)_owner_virtual_start_address,
-                            (uintptr_t)manifest, (size_t)_owner_virtual_size);
+      uintptr_t bank_base = flash_ctrl_data_bank_base((uint32_t)(uintptr_t)manifest);
+      ibex_addr_remap_1_set((uintptr_t)_owner_virtual_start_address, bank_base,
+                            (size_t)_owner_virtual_size);
       SEC_MMIO_WRITE_INCREMENT(kAddressTranslationSecMmioConfigure);
 
       // Unlock read-only for the whole rom_ext virtual memory.
@@ -308,9 +308,9 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
       // Move the ROM_EXT execution section from the load address to the virtual
       // address.
       // TODO(#13513): Harden these calculations.
-      text_region.start = owner_vma_get(manifest, text_region.start);
-      text_region.end = owner_vma_get(manifest, text_region.end);
-      entry_point = owner_vma_get(manifest, entry_point);
+      text_region.start = owner_vma_get(bank_base, text_region.start);
+      text_region.end = owner_vma_get(bank_base, text_region.end);
+      entry_point = owner_vma_get(bank_base, entry_point);
       break;
     case kHardenedBoolFalse:
       HARDENED_CHECK_EQ(manifest->address_translation, kHardenedBoolFalse);
