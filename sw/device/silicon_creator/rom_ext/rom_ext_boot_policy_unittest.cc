@@ -7,8 +7,13 @@
 #include "gtest/gtest.h"
 #include "sw/device/silicon_creator/lib/mock_boot_data.h"
 #include "sw/device/silicon_creator/lib/mock_manifest.h"
+#include "sw/device/silicon_creator/lib/drivers/mock_flash_ctrl.h"
 #include "sw/device/silicon_creator/rom_ext/mock_rom_ext_boot_policy_ptrs.h"
 #include "sw/device/silicon_creator/testing/rom_test.h"
+
+extern "C" {
+char _owner_virtual_start_address[1] = {0};
+}
 
 namespace manifest_unittest {
 namespace {
@@ -19,6 +24,7 @@ class RomExtBootPolicyTest : public rom_test::RomTest {
   rom_test::MockRomExtBootPolicyPtrs rom_ext_boot_policy_ptrs_;
   rom_test::MockManifest mock_manifest_;
   rom_test::MockBootData mock_boot_data_;
+  rom_test::MockFlashCtrl mock_flash_ctrl_;
 };
 
 // TODO(#21204): Refactor to use `manifest_check` from `lib/manifest.h`.
@@ -118,6 +124,91 @@ TEST_F(RomExtBootPolicyTest, ManifestCheckBadEntryPoint) {
             kErrorManifestBadEntryPoint);
 }
 
+TEST_F(RomExtBootPolicyTest, ManifestCheckBaseAddrFallbackPass) {
+  boot_data_t boot_data{};
+  boot_data.identifier = kBootDataIdentifier;
+
+  void *raw_ptr = nullptr;
+  ASSERT_EQ(posix_memalign(&raw_ptr, 0x80000, 0x10000 + sizeof(manifest_t)), 0);
+
+  manifest_t *manifest = reinterpret_cast<manifest_t *>(
+      reinterpret_cast<uintptr_t>(raw_ptr) + 0x10000);
+
+  memset(manifest, 0, sizeof(manifest_t));
+  manifest->identifier = CHIP_BL0_IDENTIFIER;
+  manifest->length = sizeof(manifest_t) + 0x1000;
+  manifest->security_version = 0;
+  manifest->manifest_version.major = kManifestVersionMajor2;
+  manifest->manifest_version.minor = kManifestVersionMinor1;
+  manifest->signed_region_end = sizeof(manifest_t) + 0x900;
+  manifest->code_start = sizeof(manifest_t);
+  manifest->code_end = sizeof(manifest_t) + 0x800;
+  manifest->entry_point = manifest->code_start;
+
+  manifest->base_addr = 0xa5a5a5a5;
+
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(manifest)))
+      .WillOnce(Return(reinterpret_cast<uintptr_t>(raw_ptr)));
+  EXPECT_EQ(rom_ext_boot_policy_manifest_check(manifest, &boot_data), kErrorOk);
+
+  free(raw_ptr);
+}
+
+TEST_F(RomExtBootPolicyTest, ManifestCheckBaseAddrAbsolutePass) {
+  boot_data_t boot_data{};
+  boot_data.identifier = kBootDataIdentifier;
+
+  manifest_t manifest{};
+  manifest.identifier = CHIP_BL0_IDENTIFIER;
+  manifest.length = sizeof(manifest_t) + 0x1000;
+  manifest.security_version = 0;
+  manifest.manifest_version.major = kManifestVersionMajor2;
+  manifest.manifest_version.minor = kManifestVersionMinor2;
+  manifest.signed_region_end = sizeof(manifest_t) + 0x900;
+  manifest.code_start = sizeof(manifest_t);
+  manifest.code_end = sizeof(manifest_t) + 0x800;
+  manifest.entry_point = manifest.code_start;
+
+  manifest.base_addr = reinterpret_cast<uintptr_t>(&manifest);
+
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(&manifest)))
+      .WillOnce(Return(0));
+  EXPECT_EQ(rom_ext_boot_policy_manifest_check(&manifest, &boot_data),
+            kErrorOk);
+}
+
+TEST_F(RomExtBootPolicyTest, ManifestCheckBaseAddrVirtualPass) {
+  boot_data_t boot_data{};
+  boot_data.identifier = kBootDataIdentifier;
+
+  void *raw_ptr = nullptr;
+  ASSERT_EQ(posix_memalign(&raw_ptr, 0x80000, 0x10000 + sizeof(manifest_t)), 0);
+
+  manifest_t *manifest = reinterpret_cast<manifest_t *>(
+      reinterpret_cast<uintptr_t>(raw_ptr) + 0x10000);
+
+  memset(manifest, 0, sizeof(manifest_t));
+  manifest->identifier = CHIP_BL0_IDENTIFIER;
+  manifest->length = sizeof(manifest_t) + 0x1000;
+  manifest->security_version = 0;
+  manifest->manifest_version.major = kManifestVersionMajor2;
+  manifest->manifest_version.minor = kManifestVersionMinor2;
+  manifest->signed_region_end = sizeof(manifest_t) + 0x900;
+  manifest->code_start = sizeof(manifest_t);
+  manifest->code_end = sizeof(manifest_t) + 0x800;
+  manifest->entry_point = manifest->code_start;
+
+  manifest->address_translation = kHardenedBoolTrue;
+  manifest->base_addr =
+      reinterpret_cast<uintptr_t>(_owner_virtual_start_address) + 0x10000;
+
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(manifest)))
+      .WillOnce(Return(reinterpret_cast<uintptr_t>(raw_ptr)));
+  EXPECT_EQ(rom_ext_boot_policy_manifest_check(manifest, &boot_data), kErrorOk);
+
+  free(raw_ptr);
+}
+
 struct ManifestOrderTestCase {
   uint32_t primary;
 };
@@ -148,11 +239,15 @@ TEST_P(ManifestOrderTest, ManifestsGet) {
   rom_ext_boot_policy_manifests_t res =
       rom_ext_boot_policy_manifests_get(&boot_data);
   if (GetParam().primary == kBootSlotA) {
-    EXPECT_EQ(res.ordered[0], &manifest_a);
-    EXPECT_EQ(res.ordered[1], &manifest_b);
+    EXPECT_EQ(res.ordered[0].manifest, &manifest_a);
+    EXPECT_EQ(res.ordered[0].slot, kBootSlotA);
+    EXPECT_EQ(res.ordered[1].manifest, &manifest_b);
+    EXPECT_EQ(res.ordered[1].slot, kBootSlotB);
   } else {
-    EXPECT_EQ(res.ordered[0], &manifest_b);
-    EXPECT_EQ(res.ordered[1], &manifest_a);
+    EXPECT_EQ(res.ordered[0].manifest, &manifest_b);
+    EXPECT_EQ(res.ordered[0].slot, kBootSlotB);
+    EXPECT_EQ(res.ordered[1].manifest, &manifest_a);
+    EXPECT_EQ(res.ordered[1].slot, kBootSlotA);
   }
 }
 

@@ -9,6 +9,8 @@
 #include "sw/device/silicon_creator/lib/manifest.h"
 #include "sw/device/silicon_creator/rom_ext/rom_ext_boot_policy_ptrs.h"
 
+extern char _owner_virtual_start_address[];
+
 rom_ext_boot_policy_manifests_t rom_ext_boot_policy_manifests_get(
     const boot_data_t *boot_data) {
   const manifest_t *slot_a = rom_ext_boot_policy_manifest_a_get();
@@ -87,6 +89,23 @@ rom_error_t rom_ext_boot_policy_manifest_check(const manifest_t *manifest,
                     boot_data->min_security_version_bl0);
 
   RETURN_IF_ERROR(manifest_check_rom_ext(manifest));
+
+  // Check image placement.
+  uint32_t expected_base_addr = manifest->base_addr;
+  uint32_t bank_base = flash_ctrl_data_bank_base((uint32_t)(uintptr_t)manifest);
+
+  if (manifest->manifest_version.minor == kManifestVersionMinor1) {
+    // v2.1 OwnerSW manifest should be placed at 64K offset.
+    expected_base_addr = bank_base + 0x10000;
+  } else if (manifest->address_translation == kHardenedBoolTrue) {
+    expected_base_addr = expected_base_addr -
+                         (uint32_t)(uintptr_t)_owner_virtual_start_address +
+                         bank_base;
+  }
+  if ((uint32_t)(uintptr_t)manifest != expected_base_addr) {
+    return kErrorBootPolicyBadBaseAddr;
+  }
+
   return kErrorOk;
 }
 

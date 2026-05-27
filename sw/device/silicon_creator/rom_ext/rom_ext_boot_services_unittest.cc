@@ -22,6 +22,10 @@
 #include "sw/device/silicon_creator/rom_ext/mock_rom_ext_boot_policy_ptrs.h"
 #include "sw/device/silicon_creator/testing/rom_test.h"
 
+extern "C" {
+char _owner_virtual_start_address[1] = {0};
+}
+
 namespace boot_services_unittest {
 namespace {
 using ::testing::_;
@@ -223,29 +227,35 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVerValid) {
   manifest_a.length = CHIP_BL0_SIZE_MIN;
   manifest_a.security_version = 2;
   manifest_a.manifest_version.major = kManifestVersionMajor2;
+  manifest_a.manifest_version.minor = kManifestVersionMinor2;
   manifest_a.length = sizeof(manifest_t) + 0x1000;
   manifest_a.signed_region_end = sizeof(manifest_t) + 0x900;
   manifest_a.code_start = sizeof(manifest_t);
   manifest_a.code_end = sizeof(manifest_t) + 0x800;
   manifest_a.entry_point = 0x500;
   manifest_a.ecdsa_public_key.x[0] = 0;
+  manifest_a.base_addr = (uint32_t)(uintptr_t)&manifest_a;
 
   manifest_b.identifier = CHIP_BL0_IDENTIFIER;
   manifest_b.length = CHIP_BL0_SIZE_MIN;
   manifest_b.security_version = 3;
   manifest_b.manifest_version.major = kManifestVersionMajor2;
+  manifest_b.manifest_version.minor = kManifestVersionMinor2;
   manifest_b.length = sizeof(manifest_t) + 0x1000;
   manifest_b.signed_region_end = sizeof(manifest_t) + 0x900;
   manifest_b.code_start = sizeof(manifest_t);
   manifest_b.code_end = sizeof(manifest_t) + 0x800;
   manifest_b.entry_point = 0x500;
   manifest_b.ecdsa_public_key.x[0] = 0;
+  manifest_b.base_addr = (uint32_t)(uintptr_t)&manifest_b;
 
   EXPECT_CALL(mock_hmac_, sha256)
       .WillOnce(SetArgPointee<2>(hmac_digest_t{0x1234}));
 
   EXPECT_CALL(rom_ext_boot_policy_ptrs_, ManifestA)
       .WillOnce(Return(&manifest_a));
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(&manifest_a)))
+      .WillOnce(Return(0));
   EXPECT_CALL(mock_manifest_, SpxKey)
       .WillOnce(Return(kErrorManifestBadExtension));
   EXPECT_CALL(mock_manifest_, SpxSignature)
@@ -267,6 +277,8 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVerValid) {
 
   EXPECT_CALL(rom_ext_boot_policy_ptrs_, ManifestB)
       .WillOnce(Return(&manifest_b));
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(&manifest_b)))
+      .WillOnce(Return(0));
   EXPECT_CALL(mock_manifest_, SpxKey)
       .WillOnce(Return(kErrorManifestBadExtension));
   EXPECT_CALL(mock_manifest_, SpxSignature)
@@ -379,29 +391,35 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVerInvalidHigh) {
   manifest_a.length = CHIP_BL0_SIZE_MIN;
   manifest_a.security_version = 2;
   manifest_a.manifest_version.major = kManifestVersionMajor2;
+  manifest_a.manifest_version.minor = kManifestVersionMinor2;
   manifest_a.length = sizeof(manifest_t) + 0x1000;
   manifest_a.signed_region_end = sizeof(manifest_t) + 0x900;
   manifest_a.code_start = sizeof(manifest_t);
   manifest_a.code_end = sizeof(manifest_t) + 0x800;
   manifest_a.entry_point = 0x500;
   manifest_a.ecdsa_public_key.x[0] = 0;
+  manifest_a.base_addr = (uint32_t)(uintptr_t)&manifest_a;
 
   manifest_b.identifier = CHIP_BL0_IDENTIFIER;
   manifest_b.length = CHIP_BL0_SIZE_MIN;
   manifest_b.security_version = 3;
   manifest_b.manifest_version.major = kManifestVersionMajor2;
+  manifest_b.manifest_version.minor = kManifestVersionMinor2;
   manifest_b.length = sizeof(manifest_t) + 0x1000;
   manifest_b.signed_region_end = sizeof(manifest_t) + 0x900;
   manifest_b.code_start = sizeof(manifest_t);
   manifest_b.code_end = sizeof(manifest_t) + 0x800;
   manifest_b.entry_point = 0x500;
   manifest_b.ecdsa_public_key.x[0] = 0;
+  manifest_b.base_addr = (uint32_t)(uintptr_t)&manifest_b;
 
   EXPECT_CALL(mock_hmac_, sha256)
       .WillOnce(SetArgPointee<2>(hmac_digest_t{0x1234}));
 
   EXPECT_CALL(rom_ext_boot_policy_ptrs_, ManifestA)
       .WillOnce(Return(&manifest_a));
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(&manifest_a)))
+      .WillOnce(Return(0));
   EXPECT_CALL(mock_manifest_, SpxKey)
       .WillOnce(Return(kErrorManifestBadExtension));
   EXPECT_CALL(mock_manifest_, SpxSignature)
@@ -423,6 +441,8 @@ TEST_F(RomExtBootServicesTest, BootSvcMinBl0SecVerInvalidHigh) {
 
   EXPECT_CALL(rom_ext_boot_policy_ptrs_, ManifestB)
       .WillOnce(Return(&manifest_b));
+  EXPECT_CALL(mock_flash_ctrl_, DataBankBase(reinterpret_cast<uintptr_t>(&manifest_b)))
+      .WillOnce(Return(0));
   EXPECT_CALL(mock_manifest_, SpxKey)
       .WillOnce(Return(kErrorManifestBadExtension));
   EXPECT_CALL(mock_manifest_, SpxSignature)
