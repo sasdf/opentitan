@@ -49,6 +49,7 @@ class MockFlashCtrl : public global_mock::GlobalMock<MockFlashCtrl> {
   MOCK_METHOD(void, CreatorInfoPagesLockdown, ());
   MOCK_METHOD(rom_error_t, InfoType0ParamsBuild,
               (uint32_t, uint32_t, flash_ctrl_info_page_t *));
+  MOCK_METHOD(uint32_t, DataBankBase, (uint32_t));
 };
 
 }  // namespace internal

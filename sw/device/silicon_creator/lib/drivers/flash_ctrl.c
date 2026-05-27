@@ -725,6 +725,15 @@ rom_error_t flash_ctrl_info_type0_params_build(
       .cfg_addr = cfg_addr + page * sizeof(uint32_t),
       .cfg_wen_addr = cfg_wen_addr + page * sizeof(uint32_t),
   };
-
   return kErrorOk;
+}
+
+uint32_t flash_ctrl_data_bank_base(uint32_t addr) {
+  uint32_t bank_size = TOP_EARLGREY_EFLASH_SIZE_BYTES / 2;
+  uint32_t bank_base = addr & ~(bank_size - 1);
+
+  uint32_t diff = launder32(bank_base) ^ TOP_EARLGREY_EFLASH_BASE_ADDR;
+  HARDENED_CHECK_EQ(diff & ~bank_size, 0);
+
+  return bank_base;
 }

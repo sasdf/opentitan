@@ -10,6 +10,7 @@
 #include "sw/device/lib/base/hardened.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/silicon_creator/lib/error.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -689,6 +690,19 @@ void flash_ctrl_cert_info_page_owner_restrict(
  */
 rom_error_t flash_ctrl_info_type0_params_build(
     uint8_t bank, uint8_t page, flash_ctrl_info_page_t *info_page);
+
+/**
+ * Returns the base address of the flash bank containing the given address.
+ *
+ * This function asserts that the calculated base address is indeed either Bank
+ * A or Bank B base address, and triggers a hardened trap on target if the
+ * assertion fails (e.g., if the input address is outside the valid flash
+ * boundaries).
+ *
+ * @param addr A physical address in flash.
+ * @return The base address of the flash bank (either Bank A or Bank B).
+ */
+uint32_t flash_ctrl_data_bank_base(uint32_t addr);
 
 #ifdef __cplusplus
 }

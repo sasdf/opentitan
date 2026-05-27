@@ -108,5 +108,9 @@ rom_error_t flash_ctrl_info_type0_params_build(
   return MockFlashCtrl::Instance().InfoType0ParamsBuild(bank, page, info_page);
 }
 
+uint32_t flash_ctrl_data_bank_base(uint32_t addr) {
+  return MockFlashCtrl::Instance().DataBankBase(addr);
+}
+
 }  // extern "C"
 }  // namespace rom_test
