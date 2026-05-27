@@ -24,6 +24,8 @@ CONST = struct(
     BL0_SIZE_MIN = 1024,
     BL0_SIZE_MAX = 0x70000,
     DEFAULT_USAGE_CONSTRAINTS = 0xa5a5a5a5,
+    MANIFEST_VERSION_MINOR_1 = 0x6c47,
+    MANIFEST_VERSION_MINOR_2 = 0x6685,
     # Must match the definition in spx_verify.h
     SPX_DISABLED = 0x8d6c8c17,
     SPX_SUCCESS = 0x8d6c8c17,

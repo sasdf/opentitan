@@ -26,6 +26,10 @@ load(
     "qemu_params",
 )
 load(
+    "//sw/device/silicon_creator/rom_ext:defs.bzl",
+    "ROM_EXT_VARIATIONS",
+)
+load(
     "//sw/device/silicon_creator/rom_ext/imm_section:defs.bzl",
     "IMMUTABLE_HASH_UNENFORCED_MSG",
     "IMM_SECTION_MAJOR_VERSION",
@@ -82,6 +86,15 @@ _POSITIONS = {
         "success": "bl0_slot = __BB\r\n",
         "otp_img": None,
     },
+    "owner_slot_b_shifted": {
+        "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_mldsa_slot_a",
+        "romext_offset": "{rom_ext_slot_a}",
+        "linker_script": "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_b",
+        "owner_offset": "{owner_slot_b}",
+        "success": "bl0_slot = __BB\r\n",
+        "otp_img": None,
+        "slot_spec": ROM_EXT_VARIATIONS["dice_mldsa"].slot_spec,
+    },
     "owner_virtual_a": {
         "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
         "romext_offset": "{rom_ext_slot_a}",
@@ -97,6 +110,24 @@ _POSITIONS = {
         "owner_offset": "{owner_slot_b}",
         "success": "bl0_slot = __BB\r\n",
         "otp_img": None,
+    },
+    "owner_virtual_b_shifted": {
+        "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_mldsa_slot_a",
+        "romext_offset": "{rom_ext_slot_a}",
+        "linker_script": "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+        "owner_offset": "{owner_slot_b}",
+        "success": "bl0_slot = __BB\r\n",
+        "otp_img": None,
+        "slot_spec": ROM_EXT_VARIATIONS["dice_mldsa"].slot_spec,
+    },
+    "owner_virtual_b_fallback_base": {
+        "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
+        "romext_offset": "{rom_ext_slot_a}",
+        "linker_script": "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+        "owner_offset": "{owner_slot_b}",
+        "success": "bl0_slot = __BB\r\n",
+        "otp_img": None,
+        "manifest": ":owner_virtual_fallback_base_manifest",
     },
     "romext_slot_a": {
         "romext": "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
@@ -170,6 +201,7 @@ _POSITIONS = {
             romext_offset = position["romext_offset"],
         ),
         linker_script = position["linker_script"],
+        manifest = position.get("manifest"),
         qemu = qemu_params(
             assemble = "{romext}@{romext_offset} {firmware}@{owner_offset}",
             binaries = {
@@ -181,6 +213,7 @@ _POSITIONS = {
             owner_offset = position["owner_offset"],
             romext_offset = position["romext_offset"],
         ),
+        slot_spec = position.get("slot_spec", {}),
         deps = [
             "//sw/device/lib/base:status",
             "//sw/device/lib/testing/test_framework:ottf_main",
@@ -195,6 +228,14 @@ test_suite(
     name = "positions",
     tests = ["position_{}".format(name) for name in _POSITIONS],
 )
+
+manifest(d = {
+    "name": "owner_virtual_fallback_base_manifest",
+    "address_translation": hex(CONST.HARDENED_TRUE),
+    "identifier": hex(CONST.OWNER),
+    "manifest_version_minor": hex(CONST.MANIFEST_VERSION_MINOR_1),
+    "visibility": ["//visibility:public"],
+})
 
 manifest(d = {
     "name": "bad_manifest",
@@ -223,6 +264,42 @@ opentitan_test(
     qemu = qemu_params(
         exit_failure = "PASS|FAIL|FAULT|BFV:.{8}",
         exit_success = "BFV:054d410d",
+    ),
+    deps = [
+        "//sw/device/lib/base:status",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib:boot_log",
+        "//sw/device/silicon_creator/lib/drivers:retention_sram",
+    ],
+)
+
+manifest(d = {
+    "name": "bad_base_addr_manifest",
+    "address_translation": hex(CONST.HARDENED_FALSE),
+    "identifier": hex(CONST.OWNER),
+    "base_addr": "0x20012000",
+    "visibility": ["//visibility:public"],
+})
+
+opentitan_test(
+    name = "bad_base_addr_manifest_test",
+    srcs = [":boot_test"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
+        "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
+    },
+    fpga = fpga_params(
+        exit_failure = "PASS|FAIL|FAULT|BFV:.{8}",
+        # The manifest indicates the image should be placed at base_addr 0x20012000,
+        # but is placed at 0x20010000 (Slot A).
+        # We expect kErrorBootPolicyBadBaseAddr (0442500d) from the ROM_EXT.
+        exit_success = "BFV:0442500d",
+    ),
+    manifest = ":bad_base_addr_manifest",
+    qemu = qemu_params(
+        exit_failure = "PASS|FAIL|FAULT|BFV:.{8}",
+        exit_success = "BFV:0442500d",
     ),
     deps = [
         "//sw/device/lib/base:status",
