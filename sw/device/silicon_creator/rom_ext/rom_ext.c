@@ -392,31 +392,24 @@ static rom_error_t rom_ext_try_next_stage(boot_data_t *boot_data,
   rom_error_t slot[2] = {0, 0};
   for (size_t i = 0; i < ARRAYSIZE(manifests.ordered); ++i) {
     uint32_t flash_exec = 0;
-    char slot_id =
-        (manifests.ordered[i] == rom_ext_boot_policy_manifest_a_get()) ? 'A'
-                                                                       : 'B';
+    boot_slot_t current_slot = manifests.ordered[i].slot;
+    const manifest_t *manifest = manifests.ordered[i].manifest;
+
     error =
-        rom_ext_verify(manifests.ordered[i], slot_id, boot_data, &flash_exec,
-                       &keyring, &verify_key, &owner_config, &isfb_check_count);
+        rom_ext_verify(manifest, current_slot, boot_data, &flash_exec, &keyring,
+                       &verify_key, &owner_config, &isfb_check_count);
     slot[i] = error;
     if (error != kErrorOk) {
-      dbg_printf("verifyfail: Slot%c;%x\r\n", slot_id, error);
+      dbg_printf("verifyfail: Slot:%C;%x\r\n", current_slot, error);
       continue;
     }
     HARDENED_CHECK_EQ(flash_exec, kSigverifyFlashExec);
 
-    if (manifests.ordered[i] == rom_ext_boot_policy_manifest_a_get()) {
-      boot_log->bl0_slot = kBootSlotA;
-    } else if (manifests.ordered[i] == rom_ext_boot_policy_manifest_b_get()) {
-      boot_log->bl0_slot = kBootSlotB;
-    } else {
-      return kErrorRomExtBootFailed;
-    }
+    boot_log->bl0_slot = current_slot;
     boot_log_digest_update(boot_log);
 
     // Boot fails if a verified ROM_EXT cannot be booted.
-    RETURN_IF_ERROR(
-        rom_ext_boot(boot_data, boot_log, manifests.ordered[i], &flash_exec));
+    RETURN_IF_ERROR(rom_ext_boot(boot_data, boot_log, manifest, &flash_exec));
     // `rom_ext_boot()` should never return `kErrorOk`, but if it does
     // we must shut down the chip instead of trying the next ROM_EXT.
     return kErrorRomExtBootFailed;

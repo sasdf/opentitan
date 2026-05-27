@@ -13,18 +13,23 @@ rom_ext_boot_policy_manifests_t rom_ext_boot_policy_manifests_get(
     const boot_data_t *boot_data) {
   const manifest_t *slot_a = rom_ext_boot_policy_manifest_a_get();
   const manifest_t *slot_b = rom_ext_boot_policy_manifest_b_get();
+
+  rom_ext_boot_policy_manifest_t manifest_a = {.manifest = slot_a,
+                                               .slot = kBootSlotA};
+  rom_ext_boot_policy_manifest_t manifest_b = {.manifest = slot_b,
+                                               .slot = kBootSlotB};
+
   uint32_t slot = boot_data->primary_bl0_slot;
   switch (launder32(slot)) {
     case kBootSlotB:
       HARDENED_CHECK_EQ(slot, kBootSlotB);
       return (rom_ext_boot_policy_manifests_t){
-          .ordered = {slot_b, slot_a},
+          .ordered = {manifest_b, manifest_a},
       };
     case kBootSlotA:
-      OT_FALLTHROUGH_INTENDED;
     default:
       return (rom_ext_boot_policy_manifests_t){
-          .ordered = {slot_a, slot_b},
+          .ordered = {manifest_a, manifest_b},
       };
   }
 }
