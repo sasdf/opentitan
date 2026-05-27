@@ -146,9 +146,9 @@ ld_library(
         deps = [
             ":main_lib",
             "//sw/device/lib/crt",
-        ] + variation_deps,
+        ] + variation.deps,
     )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ]
 
@@ -165,7 +165,7 @@ ld_library(
         name = "main_binaries_{}_slot_{}_hardened_comparison_test".format(variation_name, slot),
         srcs = [":main_binaries_{}_slot_{}".format(variation_name, slot)],
     )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ]
 
@@ -174,7 +174,7 @@ ld_library(
         name = "main_section_{}_slot_{}".format(variation_name, slot),
         src = ":main_binaries_{}_slot_{}".format(variation_name, slot),
     )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ]
 

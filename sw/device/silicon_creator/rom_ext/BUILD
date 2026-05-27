@@ -88,6 +88,7 @@ dual_cc_library(
             "//sw/device/lib/base:macros",
             "//sw/device/silicon_creator/lib:manifest",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+            "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         ],
     ),
 )
@@ -307,9 +308,9 @@ asm_library_with_coverage(
             "//sw/device/silicon_creator/lib/sigverify",
             "//sw/device/silicon_creator/rom_ext/imm_section:imm_section_version",
             "//sw/otbn/crypto:boot",
-        ] + variation_deps,
+        ] + variation.deps,
     )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
 ]
 
 manifest(d = {
@@ -341,6 +342,7 @@ manifest(d = {
         ],
         linker_script = ":ld_slot_{}".format(slot),
         manifest = ":manifest",
+        slot_spec = variation.slot_spec,
         spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:spx_keyset": "prod_key_0"},
         deps = [
             ":rom_ext_{}".format(variation_name),
@@ -352,13 +354,13 @@ manifest(d = {
             "//sw/device/silicon_creator/rom_ext/imm_section:main_section_{}_slot_{}".format(variation_name, slot),
         ],
     )
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ]
 
 ROM_EXT_LABELS.extend([
     "rom_ext_{}_slot_{}".format(variation_name, slot)
-    for variation_name, variation_deps in ROM_EXT_VARIATIONS.items()
+    for variation_name, variation in ROM_EXT_VARIATIONS.items()
     for slot in SLOTS
 ])
 
