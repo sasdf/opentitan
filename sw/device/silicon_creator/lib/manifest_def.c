@@ -27,13 +27,14 @@ extern char _manifest_address_translation[];
 OT_USED OT_SECTION(".manifest") static manifest_t kManifest_ = {
     .manifest_version =
         (manifest_version_t){
-            .minor = kManifestVersionMinor1,
+            .minor = kManifestVersionMinor2,
             .major = kManifestVersionMajor2,
         },
     .code_start = (uint32_t)_manifest_code_start,
     .code_end = (uint32_t)_manifest_code_end,
     .entry_point = (uint32_t)_manifest_entry_point,
     .address_translation = (uint32_t)_manifest_address_translation,
+    .base_addr = (uint32_t)&kManifest_,
 };
 
 const manifest_t *manifest_def_get(void) { return &kManifest_; }

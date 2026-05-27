@@ -174,6 +174,7 @@ enum {
   kManifestVersionMajor1 = CHIP_MANIFEST_VERSION_MAJOR_1,
   kManifestVersionMajor2 = CHIP_MANIFEST_VERSION_MAJOR_2,
   kManifestVersionMinor1 = CHIP_MANIFEST_VERSION_MINOR_1,
+  kManifestVersionMinor2 = CHIP_MANIFEST_VERSION_MINOR_2,
 };
 
 /**
@@ -234,7 +235,13 @@ typedef struct manifest {
   /**
    * Reserved bytes.
    */
-  uint32_t reserved[80];
+  uint32_t reserved[79];
+  /**
+   * Base address the image is designed to be placed.
+   *
+   * Available starting from manifest v2.2.
+   */
+  uint32_t base_addr;
   /**
    * Address translation (hardened boolean).
    */
@@ -320,6 +327,7 @@ OT_ASSERT_MEMBER_OFFSET(manifest_t, reserved_unsigned, 64);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, usage_constraints, 384);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, ecdsa_public_key, 432);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, reserved, 496);
+OT_ASSERT_MEMBER_OFFSET(manifest_t, base_addr, 812);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, address_translation, 816);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, identifier, 820);
 OT_ASSERT_MEMBER_OFFSET(manifest_t, manifest_version, 824);

@@ -17,8 +17,13 @@
 
 /**
  * Manifest format major and minor versions.
+ *
+ * v1.1: Initial version with RSA signing
+ * v2.1: Replaced RSA with ECDSA-P256 signing
+ * v2.2: Add base_addr field
  */
 #define CHIP_MANIFEST_VERSION_MINOR_1 0x6c47
+#define CHIP_MANIFEST_VERSION_MINOR_2 0x6685
 #define CHIP_MANIFEST_VERSION_MAJOR_1 0x71c3
 
 // TODO(moidx): Update to a valid number once we figure out a manifest

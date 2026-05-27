@@ -37,6 +37,7 @@ pub const CHIP_MANIFEST_SIZE: u32 = 1024;
 // versioning scheme.
 pub const CHIP_MANIFEST_VERSION_MAJOR2: u16 = 0x0002;
 pub const CHIP_MANIFEST_VERSION_MINOR1: u16 = 0x6c47;
+pub const CHIP_MANIFEST_VERSION_MINOR2: u16 = 0x6685;
 pub const CHIP_MANIFEST_VERSION_MAJOR1: u16 = 0x71c3;
 pub const CHIP_MANIFEST_EXT_TABLE_COUNT: usize = 15;
 pub const MANIFEST_USAGE_CONSTRAINT_UNSELECTED_WORD_VAL: u32 = 0xa5a5a5a5;
@@ -92,7 +93,8 @@ pub struct Manifest {
     pub reserved_unsigned: ReservedBuffer<320>,
     pub usage_constraints: ManifestUsageConstraints,
     pub pub_key: SigverifyBuffer,
-    pub reserved: ReservedBuffer<320>,
+    pub reserved: ReservedBuffer<316>,
+    pub base_addr: u32,
     pub address_translation: u32,
     pub identifier: u32,
     pub manifest_version: ManifestVersion,
@@ -311,6 +313,7 @@ mod tests {
         assert_eq!(offset_of!(Manifest, usage_constraints), 384);
         assert_eq!(offset_of!(Manifest, pub_key), 432);
         assert_eq!(offset_of!(Manifest, reserved), 496);
+        assert_eq!(offset_of!(Manifest, base_addr), 812);
         assert_eq!(offset_of!(Manifest, address_translation), 816);
         assert_eq!(offset_of!(Manifest, identifier), 820);
         assert_eq!(offset_of!(Manifest, manifest_version), 824);
