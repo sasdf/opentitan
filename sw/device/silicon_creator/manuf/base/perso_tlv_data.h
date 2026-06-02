@@ -146,6 +146,16 @@ typedef enum perso_tlv_cert_header_fields {
     *(field_value) = (__builtin_bswap16(full_value) >> shift) & mask;       \
   }
 
+// Helper macros for compile-time Big Endian conversion
+#define TO_BE16(val) \
+  (uint16_t)((((uint16_t)(val)&0xFF00) >> 8) | (((uint16_t)(val)&0x00FF) << 8))
+
+#define TLV_OBJ_HEADER(type, size) \
+  TO_BE16(((((uint16_t)(type)&0xF) << 12) | ((uint16_t)(size)&0xFFF)))
+
+#define TLV_CERT_HEADER(name_len, size) \
+  TO_BE16(((((uint16_t)(name_len)&0xF) << 12) | ((uint16_t)(size)&0xFFF)))
+
 /**
  * A helper structure for quick access to a certificate stored as a perso LTV
  * object.

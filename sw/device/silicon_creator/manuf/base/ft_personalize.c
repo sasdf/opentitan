@@ -893,7 +893,8 @@ static status_t write_digest_to_dice_page(
     const cert_flash_info_layout_t *layout, uint32_t page_offset) {
   base_printf("Digesting %s page ...\n", layout->group_name);
 
-  hmac_sha256(dice_page.data, sizeof(dice_page.data), &dice_page.digest);
+  hmac_sha256(&dice_page, sizeof(dice_page) - sizeof(dice_page.meta.digest),
+              &dice_page.meta.digest);
 
   return OK_STATUS();
 }

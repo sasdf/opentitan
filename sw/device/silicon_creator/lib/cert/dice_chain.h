@@ -18,16 +18,18 @@
 extern "C" {
 #endif
 
-enum {
-  kDicePageDataSize = FLASH_CTRL_PARAM_BYTES_PER_PAGE - sizeof(hmac_digest_t),
-};
+typedef struct dice_page_meta {
+  uint64_t cdi_0_key_id;
+  uint64_t cdi_1_key_id;
+  hmac_digest_t digest;
+} dice_page_meta_t;
 
 /**
  * The flash page schema for holding DICE certificates.
  */
 typedef struct dice_page {
-  uint8_t data[kDicePageDataSize];
-  hmac_digest_t digest;
+  uint8_t data[FLASH_CTRL_PARAM_BYTES_PER_PAGE - sizeof(dice_page_meta_t)];
+  dice_page_meta_t meta;
 } dice_page_t;
 
 static_assert(sizeof(dice_page_t) == FLASH_CTRL_PARAM_BYTES_PER_PAGE,
@@ -77,14 +79,6 @@ rom_error_t dice_chain_attestation_owner(
     const manifest_t *owner_manifest, keymgr_binding_value_t *bl0_measurement,
     hmac_digest_t *owner_measurement, hmac_digest_t *owner_history_hash,
     keymgr_binding_value_t *sealing_binding, owner_app_domain_t key_domain);
-
-/**
- * Write back the certificate chain to flash if changed.
- *
- * @return errors encountered during the operation.
- */
-OT_WARN_UNUSED_RESULT
-rom_error_t dice_chain_flush_flash(void);
 
 /**
  * Checks that the factory-provisioned certificates in flash are valid and
