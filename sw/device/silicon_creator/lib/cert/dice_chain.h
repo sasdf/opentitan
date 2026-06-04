@@ -18,18 +18,15 @@
 extern "C" {
 #endif
 
-typedef struct dice_page_meta {
-  uint64_t cdi_0_key_id;
-  uint64_t cdi_1_key_id;
-  hmac_digest_t digest;
-} dice_page_meta_t;
-
 /**
  * The flash page schema for holding DICE certificates.
  */
 typedef struct dice_page {
-  uint8_t data[FLASH_CTRL_PARAM_BYTES_PER_PAGE - sizeof(dice_page_meta_t)];
-  dice_page_meta_t meta;
+  uint8_t data[FLASH_CTRL_PARAM_BYTES_PER_PAGE -
+               (2 * sizeof(uint64_t) + sizeof(hmac_digest_t))];
+  uint64_t cdi_0_key_id;
+  uint64_t cdi_1_key_id;
+  hmac_digest_t digest;
 } dice_page_t;
 
 static_assert(sizeof(dice_page_t) == FLASH_CTRL_PARAM_BYTES_PER_PAGE,

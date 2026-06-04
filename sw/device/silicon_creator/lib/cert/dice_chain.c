@@ -46,6 +46,7 @@ typedef struct dice_cert_layout {
   const flash_ctrl_info_page_t *info_page;
   uint32_t offset;
   dice_cert_header_t header;  // Template
+  size_t max_size;
 } dice_cert_layout_t;
 
 static const dice_cert_layout_t kLayoutCdi0 = {
@@ -58,6 +59,7 @@ static const dice_cert_layout_t kLayoutCdi0 = {
                 TLV_CERT_HEADER(12, 0),  // NameSize=12, Size filled at runtime
             .name = "CDI_0",  // C auto-pads the rest of 12 bytes with 0
         },
+    .max_size = kDiceSlotSize - sizeof(dice_cert_header_t),
 };
 
 static const dice_cert_layout_t kLayoutCdi1 = {
@@ -70,115 +72,68 @@ static const dice_cert_layout_t kLayoutCdi1 = {
                 TLV_CERT_HEADER(12, 0),  // NameSize=12, Size filled at runtime
             .name = "CDI_1",
         },
+    .max_size = kDiceSlotSize - sizeof(dice_cert_header_t),
 };
 
-static uint32_t scratch_buffer[kFlashPageSize / sizeof(uint32_t)];
+static dice_page_t dice_page;
 
 cert_key_id_pair_t dice_chain_cdi_0_key_ids = (cert_key_id_pair_t){
     .endorsement = &static_dice_cdi_0.uds_pubkey_id,
     .cert = &static_dice_cdi_0.cdi_0_pubkey_id,
 };
 
-static rom_error_t dice_chain_page_digest(hmac_digest_t *digest_out) {
-  size_t bytes_to_hash = kFlashPageSize - sizeof(hmac_digest_t);  // 2016 bytes
-  size_t word_count = bytes_to_hash / sizeof(uint32_t);           // 504 words
+static dice_cert_header_t *dice_chain_slot_header(
+    const dice_cert_layout_t *layout, dice_page_t *page) {
+  return (dice_cert_header_t *)((uint8_t *)page + layout->offset);
+}
 
-  RETURN_IF_ERROR(flash_ctrl_info_read_zeros_on_read_error(
-      &kFlashCtrlInfoPageDiceCerts, 0, word_count, scratch_buffer));
+static uint8_t *dice_chain_slot_data(const dice_cert_layout_t *layout,
+                                     dice_page_t *page) {
+  return (uint8_t *)page + layout->offset + sizeof(dice_cert_header_t);
+}
 
+static rom_error_t dice_chain_load_page(dice_page_t *page) {
+  return flash_ctrl_info_read_zeros_on_read_error(
+      &kFlashCtrlInfoPageDiceCerts, 0,
+      sizeof(dice_page_t) / sizeof(uint32_t), page);
+}
+
+static rom_error_t dice_chain_flush_page(const dice_page_t *page) {
+  RETURN_IF_ERROR(flash_ctrl_info_erase(&kFlashCtrlInfoPageDiceCerts,
+                                        kFlashCtrlEraseTypePage));
+  return flash_ctrl_info_write(
+      &kFlashCtrlInfoPageDiceCerts, 0,
+      sizeof(dice_page_t) / sizeof(uint32_t), page);
+}
+
+static rom_error_t dice_chain_get_cdi_0_id(uint64_t *cdi_0_id) {
+  return flash_ctrl_info_read_zeros_on_read_error(
+      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_page_t, cdi_0_key_id),
+      sizeof(uint64_t) / sizeof(uint32_t), cdi_0_id);
+}
+
+static void dice_chain_init_slot(const dice_cert_layout_t *layout,
+                                 dice_page_t *page) {
+  dice_cert_header_t *header = dice_chain_slot_header(layout, page);
+  memset(header, 0, kDiceSlotSize);
+  memcpy(header, &layout->header, sizeof(dice_cert_header_t));
+}
+
+static void dice_chain_set_cert_size(const dice_cert_layout_t *layout,
+                                     size_t cert_size, dice_page_t *page) {
+  dice_cert_header_t *header = dice_chain_slot_header(layout, page);
+  size_t wrapped_size = sizeof(perso_tlv_cert_header_t) + 12 + cert_size;
+  PERSO_TLV_SET_FIELD(Crth, Size, header->cert_header, wrapped_size);
+}
+
+static void dice_chain_digest_page(const dice_page_t *page,
+                                   hmac_digest_t *digest_out) {
   hmac_sha256_init();
-  hmac_sha256_update(scratch_buffer, bytes_to_hash);
+  hmac_sha256_update(page, sizeof(dice_page_t) - sizeof(hmac_digest_t));
   hmac_sha256_process();
   hmac_sha256_final(digest_out);
-  return kErrorOk;
 }
 
-static rom_error_t dice_chain_read_meta(dice_page_meta_t *meta) {
-  return flash_ctrl_info_read_zeros_on_read_error(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_page_t, meta),
-      sizeof(dice_page_meta_t) / sizeof(uint32_t), meta);
-}
-
-static rom_error_t dice_chain_load_cdi0_from_flash(void) {
-  dice_cert_header_t header;
-  RETURN_IF_ERROR(flash_ctrl_info_read(
-      &kFlashCtrlInfoPageDiceCerts, kLayoutCdi0.offset,
-      sizeof(dice_cert_header_t) / sizeof(uint32_t), &header));
-
-  uint16_t wrapped_cert_size;
-  PERSO_TLV_GET_FIELD(Crth, Size, header.cert_header, &wrapped_cert_size);
-
-  if (wrapped_cert_size <= 14) {
-    return kErrorDicePageCorrupted;
-  }
-  uint32_t cert_size = wrapped_cert_size - 14;
-  if (cert_size > sizeof(static_dice_cdi_0.cert_data)) {
-    return kErrorDicePageCorrupted;
-  }
-
-  // Simply read the maximum certificate size.
-  RETURN_IF_ERROR(flash_ctrl_info_read(
-      &kFlashCtrlInfoPageDiceCerts,
-      kLayoutCdi0.offset + sizeof(dice_cert_header_t),
-      util_size_to_words(cert_size), static_dice_cdi_0.cert_data));
-
-  static_dice_cdi_0.cert_size = cert_size;
-  return kErrorOk;
-}
-
-static rom_error_t dice_chain_write_cert_slot(const dice_cert_layout_t *layout,
-                                              uint8_t *cert_data,
-                                              size_t cert_size) {
-  dice_cert_header_t header = layout->header;
-  size_t wrapped_size = sizeof(perso_tlv_cert_header_t) + 12 + cert_size;
-  PERSO_TLV_SET_FIELD(Crth, Size, header.cert_header, wrapped_size);
-
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      layout->info_page, layout->offset,
-      sizeof(dice_cert_header_t) / sizeof(uint32_t), &header));
-
-  uint32_t word_count = util_size_to_words(cert_size);
-
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      layout->info_page, layout->offset + sizeof(dice_cert_header_t),
-      word_count, cert_data));
-
-  return kErrorOk;
-}
-
-static rom_error_t dice_chain_write_key_ids(
-    const hmac_digest_t *cdi1_pubkey_id) {
-  uint64_t key_ids[2];
-  key_ids[0] = *(uint64_t *)static_dice_cdi_0.cdi_0_pubkey_id.digest;
-  key_ids[1] = *(uint64_t *)cdi1_pubkey_id->digest;
-
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_page_t, meta.cdi_0_key_id),
-      util_size_to_words(sizeof(key_ids)), key_ids));
-  return kErrorOk;
-}
-
-static rom_error_t dice_chain_seal(void) {
-  hmac_digest_t digest;
-  RETURN_IF_ERROR(dice_chain_page_digest(&digest));
-
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_page_t, meta.digest),
-      sizeof(digest) / sizeof(uint32_t), &digest));
-
-  return kErrorOk;
-}
-
-static rom_error_t dice_chain_write_page(size_t cdi1_cert_size,
-                                         const hmac_digest_t *cdi1_pubkey_id) {
-  RETURN_IF_ERROR(dice_chain_write_cert_slot(
-      &kLayoutCdi0, static_dice_cdi_0.cert_data, static_dice_cdi_0.cert_size));
-  RETURN_IF_ERROR(dice_chain_write_cert_slot(
-      &kLayoutCdi1, (uint8_t *)scratch_buffer, cdi1_cert_size));
-  RETURN_IF_ERROR(dice_chain_write_key_ids(cdi1_pubkey_id));
-  RETURN_IF_ERROR(dice_chain_seal());
-  return kErrorOk;
-}
 
 rom_error_t dice_chain_attestation_silicon(void) {
   // Initialize the entropy complex and KMAC for key manager operations.
@@ -233,12 +188,13 @@ rom_error_t dice_chain_attestation_creator(
       &static_dice_cdi_0.cdi_0_pubkey));
 
   // Check if the current CDI_0 cert is valid.
-  dice_page_meta_t meta;
-  RETURN_IF_ERROR(dice_chain_read_meta(&meta));
   uint64_t expected_cdi0_id =
       *(uint64_t *)static_dice_cdi_0.cdi_0_pubkey_id.digest;
 
-  bool cache_valid = meta.cdi_0_key_id == expected_cdi0_id;
+  uint64_t cached_cdi0_id;
+  RETURN_IF_ERROR(dice_chain_get_cdi_0_id(&cached_cdi0_id));
+
+  bool cache_valid = cached_cdi0_id == expected_cdi0_id;
 
   if (!cache_valid) {
     // Update the cert page buffer.
@@ -261,15 +217,14 @@ rom_error_t dice_chain_attestation_creator(
 }
 
 static rom_error_t dice_chain_check_digest(void) {
-  dice_page_meta_t meta;
-  RETURN_IF_ERROR(dice_chain_read_meta(&meta));
-
   hmac_digest_t calculated_digest;
-  RETURN_IF_ERROR(dice_chain_page_digest(&calculated_digest));
+  dice_chain_digest_page(&dice_page, &calculated_digest);
 
-  if (memcmp(&calculated_digest, &meta.digest, sizeof(hmac_digest_t)) != 0) {
+  if (memcmp(&calculated_digest, &dice_page.digest,
+             sizeof(hmac_digest_t)) != 0) {
     return kErrorDicePageCorrupted;
   }
+
   return kErrorOk;
 }
 
@@ -277,6 +232,8 @@ rom_error_t dice_chain_rom_ext_check(void) {
   if (static_dice_cdi_0.cert_size != 0) {
     return kErrorOk;
   }
+
+  RETURN_IF_ERROR(dice_chain_load_page(&dice_page));
 
   rom_error_t status = dice_chain_check_digest();
   if (status != kErrorOk) {
@@ -318,38 +275,46 @@ rom_error_t dice_chain_attestation_owner(
   HARDENED_RETURN_IF_ERROR(otbn_boot_cert_ecc_p256_keygen(
       kDiceKeyCdi1, &subject_pubkey_id, &subject_pubkey));
 
-  // Read metadata for validation.
-  dice_page_meta_t meta;
-  RETURN_IF_ERROR(dice_chain_read_meta(&meta));
+  // Load page to dice_page.
+  RETURN_IF_ERROR(dice_chain_load_page(&dice_page));
 
   uint64_t expected_cdi1_id = *(uint64_t *)subject_pubkey_id.digest;
 
   bool cache_valid = (static_dice_cdi_0.cert_size == 0 &&
-                      meta.cdi_1_key_id == expected_cdi1_id);
+                      dice_page.cdi_1_key_id == expected_cdi1_id);
 
   if (!cache_valid) {
     dbg_puts("warning: DICE cache not valid; updating\r\n");
 
-    // Check if cdi0 in static region is empty, if empty fill from flash.
-    if (static_dice_cdi_0.cert_size == 0) {
-      RETURN_IF_ERROR(dice_chain_load_cdi0_from_flash());
+    // If CDI_0 in RAM is valid, copy it to dice_page.
+    if (static_dice_cdi_0.cert_size != 0) {
+      dice_chain_init_slot(&kLayoutCdi0, &dice_page);
+      memcpy(dice_chain_slot_data(&kLayoutCdi0, &dice_page),
+             static_dice_cdi_0.cert_data, static_dice_cdi_0.cert_size);
+      dice_chain_set_cert_size(&kLayoutCdi0, static_dice_cdi_0.cert_size,
+                               &dice_page);
+      dice_page.cdi_0_key_id =
+          *(uint64_t *)static_dice_cdi_0.cdi_0_pubkey_id.digest;
     }
 
-    // Erase the page.
-    RETURN_IF_ERROR(flash_ctrl_info_erase(&kFlashCtrlInfoPageDiceCerts,
-                                          kFlashCtrlEraseTypePage));
-
-    // Sign cdi1.
-    size_t updated_cert_size = sizeof(scratch_buffer);
+    // Generate CDI_1 directly into dice_page.
+    dice_chain_init_slot(&kLayoutCdi1, &dice_page);
+    uint8_t *cdi1_cert_data_ptr =
+        dice_chain_slot_data(&kLayoutCdi1, &dice_page);
+    size_t generated_cdi1_size = kLayoutCdi1.max_size;
     HARDENED_RETURN_IF_ERROR(dice_cdi_1_cert_build(
         (hmac_digest_t *)bl0_measurement, owner_measurement, owner_history_hash,
         owner_manifest->security_version, key_domain, &key_ids,
-        &static_dice_cdi_0.cdi_0_pubkey, &subject_pubkey,
-        (uint8_t *)scratch_buffer, &updated_cert_size));
+        &static_dice_cdi_0.cdi_0_pubkey, &subject_pubkey, cdi1_cert_data_ptr,
+        &generated_cdi1_size));
+    dice_chain_set_cert_size(&kLayoutCdi1, generated_cdi1_size, &dice_page);
+    dice_page.cdi_1_key_id = expected_cdi1_id;
 
-    // Write both certs and metadata.
-    RETURN_IF_ERROR(
-        dice_chain_write_page(updated_cert_size, &subject_pubkey_id));
+    // Calculate and update digest.
+    dice_chain_digest_page(&dice_page, &dice_page.digest);
+
+    // Flush page to flash.
+    RETURN_IF_ERROR(dice_chain_flush_page(&dice_page));
   } else {
     // Replace CDI_0 with CDI_1 key for endorsing next stage cert.
     HARDENED_RETURN_IF_ERROR(otbn_boot_attestation_key_save(
@@ -364,6 +329,7 @@ rom_error_t dice_chain_attestation_owner(
 rom_error_t dice_chain_init(void) {
   // Configure DICE certificate flash info page and buffer it into RAM.
   flash_ctrl_cert_info_page_creator_cfg(&kFlashCtrlInfoPageDiceCerts);
+  // Configure factory certs page.
   flash_ctrl_info_cfg_set(&kFlashCtrlInfoPageFactoryCerts,
                           kCertificateInfoPageCfg);
   flash_ctrl_cert_info_page_owner_restrict(&kFlashCtrlInfoPageFactoryCerts);
