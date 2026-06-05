@@ -36,60 +36,59 @@ enum {
 typedef struct __attribute__((packed)) dice_cert_header {
   uint16_t object_header;  // Big Endian
   uint16_t cert_header;    // Big Endian
-  char name[12];           // "CDI_0" or "CDI_1", padded with 0
+  char name[5];           // "CDI_0" or "CDI_1", padded with 0
 } dice_cert_header_t;
-
-static_assert(sizeof(dice_cert_header_t) % 8 == 0,
-              "dice_cert_header_t must be a multiple of 8 bytes");
 
 typedef struct dice_cert_layout {
   const flash_ctrl_info_page_t *info_page;
-  uint32_t offset;
-  dice_cert_header_t header;  // Template
-  size_t max_size;
+  uint32_t page_offset;
+  dice_cert_header_t header;
+  uint8_t header_size;
+  uint16_t data_size;
 } dice_cert_layout_t;
 
-static const dice_cert_layout_t kLayoutCdi0 = {
-    .info_page = &kFlashCtrlInfoPageDiceCerts,
-    .offset = 0,
-    .header =
-        {
-            .object_header = TLV_OBJ_HEADER(kPersoObjectTypeX509Cert, 1000),
-            .cert_header =
-                TLV_CERT_HEADER(12, 0),  // NameSize=12, Size filled at runtime
-            .name = "CDI_0",  // C auto-pads the rest of 12 bytes with 0
-        },
-    .max_size = kDiceSlotSize - sizeof(dice_cert_header_t),
-};
+#define DICE_CERT_LAYOUT(_name, _info_page, _page_offset, _slot_size) \
+  {                                                                   \
+    .info_page = _info_page,                                          \
+    .page_offset = _page_offset,                                      \
+    .header =                                                         \
+        {                                                             \
+            .object_header =                                          \
+                TLV_OBJ_HEADER(kPersoObjectTypeX509Cert, _slot_size), \
+            .cert_header = TLV_CERT_HEADER(sizeof(_name) - 1, 0),     \
+            .name = _name,                                            \
+        },                                                            \
+    .header_size = 4 + sizeof(_name) - 1,                             \
+    .data_size = _slot_size - (4 + sizeof(_name) - 1),                \
+  }
 
-static const dice_cert_layout_t kLayoutCdi1 = {
-    .info_page = &kFlashCtrlInfoPageDiceCerts,
-    .offset = kDiceSlotSize,
-    .header =
-        {
-            .object_header = TLV_OBJ_HEADER(kPersoObjectTypeX509Cert, 1000),
-            .cert_header =
-                TLV_CERT_HEADER(12, 0),  // NameSize=12, Size filled at runtime
-            .name = "CDI_1",
-        },
-    .max_size = kDiceSlotSize - sizeof(dice_cert_header_t),
-};
+static const dice_cert_layout_t kLayoutCdi0 = DICE_CERT_LAYOUT(
+    "CDI_0",
+    &kFlashCtrlInfoPageDiceCerts,
+    /*page_offset=*/0,
+    /*slot_size=*/kDiceSlotSize);
+
+static const dice_cert_layout_t kLayoutCdi1 = DICE_CERT_LAYOUT(
+    "CDI_1",
+    &kFlashCtrlInfoPageDiceCerts,
+    /*page_offset=*/kDiceSlotSize,
+    /*slot_size=*/kDiceSlotSize);
 
 static dice_page_t dice_page;
 
-cert_key_id_pair_t dice_chain_cdi_0_key_ids = (cert_key_id_pair_t){
+static cert_key_id_pair_t dice_chain_cdi_0_key_ids = (cert_key_id_pair_t){
     .endorsement = &static_dice_cdi_0.uds_pubkey_id,
     .cert = &static_dice_cdi_0.cdi_0_pubkey_id,
 };
 
 static dice_cert_header_t *dice_chain_slot_header(
     const dice_cert_layout_t *layout, dice_page_t *page) {
-  return (dice_cert_header_t *)((uint8_t *)page + layout->offset);
+  return (dice_cert_header_t *)((uint8_t *)page + layout->page_offset);
 }
 
 static uint8_t *dice_chain_slot_data(const dice_cert_layout_t *layout,
                                      dice_page_t *page) {
-  return (uint8_t *)page + layout->offset + sizeof(dice_cert_header_t);
+  return (uint8_t *)page + layout->page_offset + layout->header_size;
 }
 
 static rom_error_t dice_chain_load_page(dice_page_t *page) {
@@ -114,15 +113,15 @@ static rom_error_t dice_chain_get_cdi_0_id(uint64_t *cdi_0_id) {
 
 static void dice_chain_init_slot(const dice_cert_layout_t *layout,
                                  dice_page_t *page) {
-  dice_cert_header_t *header = dice_chain_slot_header(layout, page);
-  memset(header, 0, kDiceSlotSize);
-  memcpy(header, &layout->header, sizeof(dice_cert_header_t));
+  uint8_t *header_ptr = (uint8_t *)dice_chain_slot_header(layout, page);
+  memset(header_ptr, 0, layout->header_size + layout->data_size);
+  memcpy(header_ptr, &layout->header, sizeof(layout->header));
 }
 
 static void dice_chain_set_cert_size(const dice_cert_layout_t *layout,
                                      size_t cert_size, dice_page_t *page) {
   dice_cert_header_t *header = dice_chain_slot_header(layout, page);
-  size_t wrapped_size = sizeof(perso_tlv_cert_header_t) + 12 + cert_size;
+  size_t wrapped_size = layout->header_size - sizeof(layout->header.object_header) + cert_size;
   PERSO_TLV_SET_FIELD(Crth, Size, header->cert_header, wrapped_size);
 }
 
@@ -301,7 +300,7 @@ rom_error_t dice_chain_attestation_owner(
     dice_chain_init_slot(&kLayoutCdi1, &dice_page);
     uint8_t *cdi1_cert_data_ptr =
         dice_chain_slot_data(&kLayoutCdi1, &dice_page);
-    size_t generated_cdi1_size = kLayoutCdi1.max_size;
+    size_t generated_cdi1_size = kLayoutCdi1.data_size;
     HARDENED_RETURN_IF_ERROR(dice_cdi_1_cert_build(
         (hmac_digest_t *)bl0_measurement, owner_measurement, owner_history_hash,
         owner_manifest->security_version, key_domain, &key_ids,
