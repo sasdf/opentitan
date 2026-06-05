@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sw/device/silicon_creator/lib/cert/dice_chain.h"
+#include "sw/device/silicon_creator/lib/cert/dice_storage.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -27,52 +28,7 @@
 
 #include "flash_ctrl_regs.h"  // Generated.
 
-enum {
-  kFlashPageSize = FLASH_CTRL_PARAM_BYTES_PER_PAGE,
-  kDiceSlotSize = 1000,
-  kDiceCertHeaderSize = 16,
-};
 
-typedef struct __attribute__((packed)) dice_cert_header {
-  uint16_t object_header;  // Big Endian
-  uint16_t cert_header;    // Big Endian
-  char name[5];           // "CDI_0" or "CDI_1", padded with 0
-} dice_cert_header_t;
-
-typedef struct dice_cert_layout {
-  const flash_ctrl_info_page_t *info_page;
-  uint32_t page_offset;
-  dice_cert_header_t header;
-  uint8_t header_size;
-  uint16_t data_size;
-} dice_cert_layout_t;
-
-#define DICE_CERT_LAYOUT(_name, _info_page, _page_offset, _slot_size) \
-  {                                                                   \
-    .info_page = _info_page,                                          \
-    .page_offset = _page_offset,                                      \
-    .header =                                                         \
-        {                                                             \
-            .object_header =                                          \
-                TLV_OBJ_HEADER(kPersoObjectTypeX509Cert, _slot_size), \
-            .cert_header = TLV_CERT_HEADER(sizeof(_name) - 1, 0),     \
-            .name = _name,                                            \
-        },                                                            \
-    .header_size = 4 + sizeof(_name) - 1,                             \
-    .data_size = _slot_size - (4 + sizeof(_name) - 1),                \
-  }
-
-static const dice_cert_layout_t kLayoutCdi0 = DICE_CERT_LAYOUT(
-    "CDI_0",
-    &kFlashCtrlInfoPageDiceCerts,
-    /*page_offset=*/0,
-    /*slot_size=*/kDiceSlotSize);
-
-static const dice_cert_layout_t kLayoutCdi1 = DICE_CERT_LAYOUT(
-    "CDI_1",
-    &kFlashCtrlInfoPageDiceCerts,
-    /*page_offset=*/kDiceSlotSize,
-    /*slot_size=*/kDiceSlotSize);
 
 static dice_page_t dice_page;
 
@@ -287,26 +243,26 @@ rom_error_t dice_chain_attestation_owner(
 
     // If CDI_0 in RAM is valid, copy it to dice_page.
     if (static_dice_cdi_0.cert_size != 0) {
-      dice_chain_init_slot(&kLayoutCdi0, &dice_page);
-      memcpy(dice_chain_slot_data(&kLayoutCdi0, &dice_page),
+      dice_chain_init_slot(&kCdi0EcdsaStorage, &dice_page);
+      memcpy(dice_chain_slot_data(&kCdi0EcdsaStorage, &dice_page),
              static_dice_cdi_0.cert_data, static_dice_cdi_0.cert_size);
-      dice_chain_set_cert_size(&kLayoutCdi0, static_dice_cdi_0.cert_size,
+      dice_chain_set_cert_size(&kCdi0EcdsaStorage, static_dice_cdi_0.cert_size,
                                &dice_page);
       dice_page.cdi_0_key_id =
           *(uint64_t *)static_dice_cdi_0.cdi_0_pubkey_id.digest;
     }
 
     // Generate CDI_1 directly into dice_page.
-    dice_chain_init_slot(&kLayoutCdi1, &dice_page);
+    dice_chain_init_slot(&kCdi1EcdsaStorage, &dice_page);
     uint8_t *cdi1_cert_data_ptr =
-        dice_chain_slot_data(&kLayoutCdi1, &dice_page);
-    size_t generated_cdi1_size = kLayoutCdi1.data_size;
+        dice_chain_slot_data(&kCdi1EcdsaStorage, &dice_page);
+    size_t generated_cdi1_size = kCdi1EcdsaStorage.data_size;
     HARDENED_RETURN_IF_ERROR(dice_cdi_1_cert_build(
         (hmac_digest_t *)bl0_measurement, owner_measurement, owner_history_hash,
         owner_manifest->security_version, key_domain, &key_ids,
         &static_dice_cdi_0.cdi_0_pubkey, &subject_pubkey, cdi1_cert_data_ptr,
         &generated_cdi1_size));
-    dice_chain_set_cert_size(&kLayoutCdi1, generated_cdi1_size, &dice_page);
+    dice_chain_set_cert_size(&kCdi1EcdsaStorage, generated_cdi1_size, &dice_page);
     dice_page.cdi_1_key_id = expected_cdi1_id;
 
     // Calculate and update digest.

@@ -126,6 +126,15 @@ cc_test(
 )
 
 cc_library(
+    name = "dice_storage",
+    hdrs = ["dice_storage.h"],
+    deps = [
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+        "//sw/device/silicon_creator/manuf/base:perso_tlv_data",
+    ],
+)
+
+cc_library(
     name = "dice_api",
     hdrs = ["dice.h"],
     deps = [
@@ -146,6 +155,7 @@ cc_library(
     deps = [
         ":cert",
         ":dice_api",
+        ":dice_storage",
         ":template",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:status",
@@ -195,6 +205,7 @@ cc_library(
         ":cert",
         ":cwt_template",
         ":dice_api",
+        ":dice_storage",
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:status",
@@ -260,6 +271,7 @@ cc_library(
     srcs = ["dice_chain.c"],
     hdrs = ["dice_chain.h"],
     deps = [
+        ":dice_storage",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:memory",

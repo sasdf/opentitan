@@ -24,6 +24,19 @@
 #include "sw/device/silicon_creator/manuf/base/perso_tlv_data.h"
 #include "sw/device/silicon_creator/manuf/lib/flash_info_fields.h"
 
+#include "sw/device/silicon_creator/lib/cert/dice_storage.h"
+enum {
+  kDiceSlotSize = 1000,
+};
+
+const dice_cert_layout_t kCdi0EcdsaStorage = DICE_CERT_LAYOUT(
+    "CDI_0", &kFlashCtrlInfoPageDiceCerts, 0, kDiceSlotSize,
+    kPersoObjectTypeX509Cert);
+
+const dice_cert_layout_t kCdi1EcdsaStorage = DICE_CERT_LAYOUT(
+    "CDI_1", &kFlashCtrlInfoPageDiceCerts, kDiceSlotSize, kDiceSlotSize,
+    kPersoObjectTypeX509Cert);
+
 static ecdsa_p256_signature_t curr_tbs_signature = {.r = {0}, .s = {0}};
 
 static uint8_t cdi_0_tbs_buffer[kCdi0MaxTbsSizeBytes];

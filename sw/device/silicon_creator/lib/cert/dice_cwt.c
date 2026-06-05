@@ -25,7 +25,18 @@
 #include "sw/device/silicon_creator/manuf/base/perso_tlv_data.h"
 
 #include "otp_ctrl_regs.h"  // Generated.
+#include "sw/device/silicon_creator/lib/cert/dice_storage.h"
+enum {
+  kDiceSlotSize = 1000,
+};
 
+const dice_cert_layout_t kCdi0EcdsaStorage = DICE_CERT_LAYOUT(
+    "CDI_0", &kFlashCtrlInfoPageDiceCerts, 0, kDiceSlotSize,
+    kPersoObjectTypeCwtCert);
+
+const dice_cert_layout_t kCdi1EcdsaStorage = DICE_CERT_LAYOUT(
+    "CDI_1", &kFlashCtrlInfoPageDiceCerts, kDiceSlotSize, kDiceSlotSize,
+    kPersoObjectTypeCwtCert);
 const dice_cert_format_t kDiceCertFormat = kDiceCertFormatCWTAndroid;
 
 enum config_desc_labels {
