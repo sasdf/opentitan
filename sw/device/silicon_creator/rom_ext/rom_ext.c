@@ -229,9 +229,12 @@ static rom_error_t rom_ext_boot(boot_data_t *boot_data, boot_log_t *boot_log,
   }
 
   // Generate CDI_1 attestation keys and certificate.
+  uint32_t dice_start_cycles = ibex_mcycle32();
   HARDENED_RETURN_IF_ERROR(dice_attest_cdi_1(
       manifest, &boot_measurements.bl0, &owner_measurement, &owner_history_hash,
       &sealing_binding, key->key_domain));
+  uint32_t dice_cycles = ibex_mcycle32() - dice_start_cycles;
+  dbg_printf("dice_cdi_1 cycles: %u\r\n", dice_cycles);
 
   // Remove write and erase access to the certificate pages before handing over
   // execution to the owner firmware (owner firmware can still read).
