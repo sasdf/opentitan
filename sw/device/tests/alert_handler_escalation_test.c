@@ -104,7 +104,7 @@ static void config_alert_handler(void) {
   // premature cancellation of the NMI interrupt handler (see
   // `ottf_external_nmi_handler`).
   uint32_t phase0DurationCycles = 1000000;
-  if (kDeviceType == kDeviceSimVerilator) {
+  if (kDeviceType == kDeviceSimVerilator || kDeviceType == kDeviceSimQemu) {
     phase0DurationCycles /= 10;
   } else if (kDeviceType == kDeviceSimDV) {
     phase0DurationCycles /= 100;
