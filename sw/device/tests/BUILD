@@ -830,6 +830,7 @@ opentitan_test(
     name = "clkmgr_external_clk_src_for_sw_slow_test",
     srcs = ["clkmgr_external_clk_src_for_sw_slow_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
@@ -2022,6 +2023,7 @@ opentitan_test(
     name = "flash_ctrl_rma_test",
     srcs = ["flash_ctrl_rma_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
@@ -2574,6 +2576,7 @@ _KMAC_APP_ROM_LIST = [
             hashfile,
         ],
         exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:{}".format(exec_env): None,
         },
         deps = [
@@ -3020,6 +3023,7 @@ opentitan_test(
     name = "otp_ctrl_mem_access_test",
     srcs = ["otp_ctrl_mem_access_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs to program OTP which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:sim_dv": None,
@@ -3049,6 +3053,7 @@ opentitan_test(
     name = "otp_ctrl_smoketest",
     srcs = ["otp_ctrl_smoketest.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs to program OTP which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
@@ -5082,6 +5087,7 @@ opentitan_test(
     name = "usbdev_logging_test",
     srcs = ["usbdev_logging_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
@@ -5566,6 +5572,7 @@ opentitan_test(
         "rv_core_ibex_address_translation_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs access address translation unit which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
@@ -5835,6 +5842,7 @@ opentitan_test(
         otp = ":flash_scrambling_smoketest_otp_img_rma",
     ),
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_dv": None,
     },
     deps = [
@@ -6441,6 +6449,7 @@ opentitan_test(
     name = "openocd_test",
     srcs = ["example_test_from_flash.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
@@ -6463,6 +6472,7 @@ opentitan_test(
         "i2c_target_smbus_arp_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
@@ -6575,6 +6585,7 @@ opentitan_test(
     name = "status_report_test",
     srcs = ["status_report_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
     fpga = fpga_params(
@@ -6600,6 +6611,7 @@ opentitan_test(
     name = "status_report_overflow_test",
     srcs = ["status_report_overflow_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
     fpga = fpga_params(
@@ -6619,6 +6631,7 @@ opentitan_test(
     # platform (as well as the RTL sim platforms) as these are the only
     # compatible with both pre- and post-silicon test environments.
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
@@ -6943,6 +6956,7 @@ opentitan_binary(
         "rv_core_ibex_isa_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
@@ -7440,6 +7454,7 @@ opentitan_test(
     name = "sram_ctrl_lc_escalation_test",
     srcs = ["sram_ctrl_lc_escalation_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
