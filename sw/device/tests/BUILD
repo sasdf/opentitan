@@ -2907,12 +2907,11 @@ opentitan_test(
     name = "otbn_mem_scramble_test",
     srcs = ["otbn_mem_scramble_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:silicon_creator": None,
-            "//hw/top_earlgrey:sim_dv": None,
-            "//hw/top_earlgrey:sim_verilator": None,
         },
     ),
     verilator = verilator_params(timeout = "long"),
