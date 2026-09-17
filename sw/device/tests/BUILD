@@ -1837,6 +1837,7 @@ _FLASH_CTRL_INFO_ACCESS_LC_STATES = get_lc_items(
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
@@ -1877,8 +1878,12 @@ test_suite(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_{}_manuf_personalized".format(lc_state),
+        ),
+        qemu = qemu_params(
             otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_{}_manuf_personalized".format(lc_state),
         ),
         deps = [
