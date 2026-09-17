@@ -48,3 +48,19 @@ rust_binary(
     ],
 )
 
+rust_binary(
+    name = "lc_ctrl_transition",
+    srcs = [
+        "src/lc_ctrl_transition.rs",
+    ],
+    edition = "2024",
+    deps = [
+        "//sw/host/opentitanlib",
+        "@crate_index//:anyhow",
+        "@crate_index//:clap",
+        "@crate_index//:humantime",
+        "@crate_index//:log",
+    ],
+)
+
+

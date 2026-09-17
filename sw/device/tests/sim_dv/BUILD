@@ -4,6 +4,14 @@
 
 load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_test", "qemu_params")
 load("//rules/opentitan:qemu.bzl", "qemu_otp")
+load(
+    "//rules:otp.bzl",
+    "STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS",
+    "otp_image",
+    "otp_json",
+    "otp_partition",
+)
+
 
 opentitan_test(
     name = "i2c_host_tx_rx_test",
@@ -251,10 +259,48 @@ cc_library(
     ],
 )
 
+otp_json(
+    name = "lc_ctrl_transition_test_otp_json",
+    partitions = [
+        otp_partition(
+            name = "LIFE_CYCLE",
+            count = 8,
+            state = "TEST_LOCKED1",
+        ),
+        otp_partition(
+            name = "SECRET0",
+            items = {
+                "TEST_UNLOCK_TOKEN": "0xde0a1f1e0d6a649fd35fadb75ec82674",
+                "TEST_EXIT_TOKEN": "0x547070d7503264af5b9a971b894ef3be",
+            },
+            lock = True,
+        ),
+    ],
+    seed = "52408960416235844780753299194502148156786072650816676092165912261205302331741",
+)
+
+otp_image(
+    name = "lc_ctrl_transition_test_otp_img",
+    src = ":lc_ctrl_transition_test_otp_json",
+    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
+        "//hw/ip/otp_ctrl/data:otp_json_secret1",
+        "//hw/ip/otp_ctrl/data:otp_json_secret2_unlocked",
+    ],
+)
+
 opentitan_test(
     name = "lc_ctrl_transition_test",
     srcs = ["lc_ctrl_transition_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":lc_ctrl_transition_test_otp_img",
+        test_harness = "//sw/host/tests/qemu:lc_ctrl_transition",
+    ),
     deps = [
         ":lc_ctrl_transition_impl",
         "//sw/device/lib/testing/test_framework:ottf_main",
