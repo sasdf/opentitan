@@ -158,7 +158,9 @@ static status_t configure_led_i2c_controller(void) {
 
 static status_t configure_screen_spi_controller(void) {
   dif_spi_host_config_t config = {
-      .spi_clock = 10000000,
+      .spi_clock = (kClockFreqPeripheralHz / 2 < 10000000)
+                       ? (uint32_t)(kClockFreqPeripheralHz / 2)
+                       : 10000000,
       .peripheral_clock_freq_hz = (uint32_t)kClockFreqPeripheralHz,
       .chip_select =
           {
@@ -215,7 +217,10 @@ bool test_main(void) {
   };
 
   // Cycle through brightness levels and colors.
-  for (size_t i = 0; i < kDemoNumCycles; ++i) {
+  size_t num_cycles = (kDeviceType == kDeviceSimQemu) ? 1 : kDemoNumCycles;
+  uint32_t pause_ms =
+      (kDeviceType == kDeviceSimQemu) ? 1 : kLedCyclePauseMilliseconds;
+  for (size_t i = 0; i < num_cycles; ++i) {
     for (size_t j = 0; j < kLedNumColorsInCycle; ++j) {
       CHECK_STATUS_OK(
           leds_set_color(&i2c, (i + j) % kNumTeacupLeds, kColorCycle[j]));
@@ -228,7 +233,7 @@ bool test_main(void) {
         curr_brightness <= brightness_start) {
       brightness_step *= -1;
     }
-    busy_spin_micros(kLedCyclePauseMilliseconds * 1000);
+    busy_spin_micros(pause_ms * 1000);
   }
 
   // Turn screen and LEDs off.
