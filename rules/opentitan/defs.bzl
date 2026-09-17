@@ -271,6 +271,25 @@ def opentitan_test(
 
         extra_tags = _hacky_tags(env)
         tparam = test_parameters[pname]
+        if pname == "qemu" and "testopt_bootstrap" not in tparam.param and "testopt_bootstrap" in fpga.param:
+            tparam = struct(
+                tags = tparam.tags,
+                timeout = tparam.timeout,
+                local = getattr(tparam, "local", True),
+                test_harness = tparam.test_harness,
+                binaries = tparam.binaries,
+                rom = tparam.rom,
+                rom_ext = tparam.rom_ext,
+                otp = tparam.otp,
+                bitstream = tparam.bitstream,
+                post_test_cmd = getattr(tparam, "post_test_cmd", ""),
+                post_test_harness = getattr(tparam, "post_test_harness", None),
+                test_cmd = tparam.test_cmd,
+                param = tparam.param | {"testopt_bootstrap": fpga.param["testopt_bootstrap"]},
+                data = tparam.data,
+                defines = getattr(tparam, "defines", []),
+                needs_jtag = getattr(tparam, "needs_jtag", False),
+            )
         if pname in kwargs_unused:
             kwargs_unused.remove(pname)
         all_test_params.append((env, pname, tparam, extra_tags))
