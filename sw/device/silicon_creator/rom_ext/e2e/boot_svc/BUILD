@@ -122,7 +122,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        # Not supported in QEMU whilst low power is not modelled
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -130,6 +130,9 @@ opentitan_test(
         #exit_success = "FinalBootLog: 2:AA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -153,7 +156,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        # Not supported in QEMU whilst low power is not modelled
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -162,6 +165,10 @@ opentitan_test(
         testopt_clear_before_test = "True",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_boot_svc_after_wakeup",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
