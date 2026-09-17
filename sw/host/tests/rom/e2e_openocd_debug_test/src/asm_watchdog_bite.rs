@@ -79,6 +79,7 @@ fn asm_watchdog_bite(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     // Set a breakpoint to ensure the NMI handler is not being hit.
     // If the NMI handler is hit then the PC check below will fail.
     dbg.set_breakpoint("_asm_exception_handler")?;
+    dbg.resume()?;
 
     // This should trigger the watchdog and cause a reset.
     // Disconnect JTAG, wait for a sufficiently long period to allow reset to complete and reconnect.
