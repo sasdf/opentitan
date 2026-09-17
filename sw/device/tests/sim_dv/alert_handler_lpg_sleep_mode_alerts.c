@@ -13,6 +13,7 @@
 #include "sw/device/lib/dif/dif_rstmgr.h"
 #include "sw/device/lib/dif/dif_rv_core_ibex.h"
 #include "sw/device/lib/dif/dif_rv_plic.h"
+#include "sw/device/lib/dif/dif_sensor_ctrl.h"
 #include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/alert_handler_testutils.h"
@@ -40,8 +41,10 @@ static dif_pwrmgr_t pwrmgr;
 static dif_rstmgr_t rstmgr;
 static dif_rv_core_ibex_t ibex;
 
-// This location will be update from SV to contain the expected alert.
-static volatile const uint8_t kExpectedAlertNumber = 0;
+// This location will be updated from SV (or use default on non-DV platforms)
+// to contain the expected alert.
+static volatile const uint8_t kExpectedAlertNumber =
+    kTopEarlgreyAlertIdSensorCtrlAonFatalAlert;
 
 /**
  * Initialize the peripherals used in this test.
@@ -326,6 +329,19 @@ static void execute_test_phases(uint8_t test_phase, uint32_t ping_timeout_cyc) {
     // Trigger the SV side to inject fault.
     // DO NOT CHANGE THIS: it is used to notify the SV side.
     LOG_INFO("Ready for fault injection");
+
+    if (kDeviceType != kDeviceSimDV) {
+      dif_sensor_ctrl_t sensor_ctrl;
+      CHECK_DIF_OK(dif_sensor_ctrl_init(
+          mmio_region_from_addr(TOP_EARLGREY_SENSOR_CTRL_AON_BASE_ADDR),
+          &sensor_ctrl));
+      CHECK_DIF_OK(
+          dif_sensor_ctrl_set_alert_en(&sensor_ctrl, 0, kDifToggleEnabled));
+      CHECK_DIF_OK(
+          dif_sensor_ctrl_set_alert_fatal(&sensor_ctrl, 0, kDifToggleEnabled));
+      CHECK_DIF_OK(dif_sensor_ctrl_set_ast_event_trigger(
+          &sensor_ctrl, 0, kDifToggleEnabled));
+    }
 
     // Enter normal sleep mode.
     enter_low_power(/*deep_sleep=*/false);
