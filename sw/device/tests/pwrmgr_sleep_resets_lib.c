@@ -263,7 +263,12 @@ void prepare_for_sysrst(pwrmgr_sleep_resets_lib_modes_t mode) {
   if (mode == kPwrmgrSleepResetsLibModesActive) {
     LOG_INFO("Sysrst reset in active mode");
     // Just wait for a reset.
-    busy_spin_micros(kWaitWhileActiveMicros);
+    for (uint32_t i = 0; i < kWaitWhileActiveMicros / 10; ++i) {
+      bool pin_val;
+      CHECK_DIF_OK(dif_sysrst_ctrl_input_pin_read(
+          sysrst_ctrl_aon, kDifSysrstCtrlPinKey0In, &pin_val));
+      busy_spin_micros(10);
+    }
   } else {
     bool deep_sleep = mode == kPwrmgrSleepResetsLibModesDeepSleep;
     // Place device into low power.
