@@ -4464,7 +4464,6 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
             "{firmware:elf}"
-            --console-tx-indicator-pin=0
         """,
         test_harness = "//sw/host/tests/chip/ottf_console_with_gpio_tx_indicator",
     ),
