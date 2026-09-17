@@ -2703,6 +2703,7 @@ opentitan_test(
     name = "kmac_entropy_stress_test",
     srcs = ["kmac_entropy_stress_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_dv": None,
@@ -7779,6 +7780,7 @@ opentitan_test(
     name = "hmac_error_conditions_test",
     srcs = ["hmac_error_conditions_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_verilator": None,
@@ -7803,6 +7805,7 @@ opentitan_test(
     name = "hmac_endianness_test",
     srcs = ["hmac_endianness_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_verilator": None,
