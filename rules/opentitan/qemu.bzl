@@ -418,6 +418,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         bootstrap_cmd = "bootstrap --clear-uart=true {firmware}".format(**param)
         param["bootstrap_cmd"] = '--exec="{}"'.format(bootstrap_cmd)
     else:
+        testopt_bootstrap = param.get("testopt_bootstrap", "True").lower() != "false"
         # Generate the flash backend image for QEMU emulation
         flash_bin = image
         if flash_bin and flash_bin.extension == "elf":
@@ -425,7 +426,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         flash_image = gen_flash(
             ctx,
             flashgen = exec_env.flashgen,
-            firmware_bin = flash_bin,
+            firmware_bin = flash_bin if testopt_bootstrap else None,
             # TODO: no support for convenience debug symbols from ELFs for now
             firmware_elf = None,
             # Do not sanity check ELFs, because we do not expect the binary to

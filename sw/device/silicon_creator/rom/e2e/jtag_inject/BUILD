@@ -298,10 +298,20 @@ LC_STATES_DEBUG_DISALLOWED = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             timeout = "moderate",
             logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:debug_test",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            timeout = "moderate",
             needs_jtag = True,
             otp = ":img_{}_exec_disabled".format(lc_state),
             test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
