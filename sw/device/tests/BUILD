@@ -1677,6 +1677,10 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/mem",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/mem",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["manual"],
