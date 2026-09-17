@@ -90,3 +90,19 @@ rust_binary(
         "@crate_index//:rand",
     ],
 )
+
+rust_binary(
+    name = "gpio_sim_dv",
+    srcs = [
+        "src/gpio_sim_dv.rs",
+    ],
+    edition = "2024",
+    deps = [
+        "//sw/host/opentitanlib",
+        "@crate_index//:anyhow",
+        "@crate_index//:clap",
+        "@crate_index//:humantime",
+        "@crate_index//:log",
+    ],
+)
+

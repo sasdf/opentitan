@@ -128,7 +128,14 @@ opentitan_test(
 opentitan_test(
     name = "gpio_test",
     srcs = ["gpio_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/gpio:gpio_sim_dv",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
