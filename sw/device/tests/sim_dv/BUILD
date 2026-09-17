@@ -345,10 +345,26 @@ opentitan_test(
     ],
 )
 
+otp_image(
+    name = "lc_walkthrough_test_otp_img",
+    src = "//hw/ip/otp_ctrl/data:otp_json_raw",
+    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS,
+)
+
 opentitan_test(
     name = "lc_walkthrough_test",
     srcs = ["lc_walkthrough_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":lc_walkthrough_test_otp_img",
+        test_cmd = "--firmware={firmware}",
+        test_harness = "//sw/host/tests/qemu:lc_walkthrough",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:memory",
