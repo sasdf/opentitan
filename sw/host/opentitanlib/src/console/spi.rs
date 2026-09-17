@@ -101,6 +101,7 @@ impl<'a> SpiConsoleDevice<'a> {
         let data_len_bytes: usize = u32::from_le_bytes(header[8..12].try_into().unwrap()) as usize;
         if magic_number != SpiConsoleDevice::SPI_FRAME_MAGIC_NUMBER
             || (!self.ignore_frame_num && frame_number != self.console_next_frame_number.get())
+            || data_len_bytes == 0
             || data_len_bytes > SpiConsoleDevice::SPI_MAX_DATA_LENGTH
         {
             if self.get_tx_ready_pin()?.is_none() {
