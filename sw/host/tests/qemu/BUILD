@@ -32,3 +32,19 @@ rust_binary(
         "@crate_index//:humantime",
     ],
 )
+
+rust_binary(
+    name = "rom_ctrl_integrity_check",
+    srcs = [
+        "src/rom_ctrl_integrity_check.rs",
+    ],
+    edition = "2024",
+    deps = [
+        "//sw/host/opentitanlib",
+        "@crate_index//:anyhow",
+        "@crate_index//:clap",
+        "@crate_index//:humantime",
+        "@crate_index//:log",
+    ],
+)
+

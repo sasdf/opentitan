@@ -129,7 +129,7 @@ def gen_otp(ctx, **kwargs):
     out = ctx.actions.declare_file(name + ".raw")
 
     vmem = get_override(ctx, "file.vmem", kwargs)
-    otptool = get_override(ctx, "executable.otptool", kwargs)
+    otptool = get_override(ctx, "attr.otptool", kwargs)
 
     ctx.actions.run(
         inputs = [vmem],

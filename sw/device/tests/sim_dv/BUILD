@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
-load("//rules/opentitan:defs.bzl", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_test", "qemu_params")
+load("//rules/opentitan:qemu.bzl", "qemu_otp")
 
 opentitan_test(
     name = "i2c_host_tx_rx_test",
@@ -472,10 +472,26 @@ opentitan_test(
     ],
 )
 
+qemu_otp(
+    name = "rom_ctrl_integrity_check_otp_prod",
+    vmem = "//hw/ip/otp_ctrl/data:img_prod",
+)
+
 opentitan_test(
     name = "rom_ctrl_integrity_check_test",
     srcs = ["rom_ctrl_integrity_check_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        data = [":rom_ctrl_integrity_check_otp_prod"],
+        globals = {
+            "ot-rom_ctrl.corrupt-digest": "true",
+        },
+        test_cmd = "--prod-otp=$(rootpath :rom_ctrl_integrity_check_otp_prod)",
+        test_harness = "//sw/host/tests/qemu:rom_ctrl_integrity_check",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
