@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+#include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/memory.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_lc_ctrl.h"
@@ -42,5 +43,23 @@ bool test_main(void) {
   init_peripherals();
   // This is an anker for sv wait
   LOG_INFO("init peripheral is done");
+
+  if (kDeviceType != kDeviceSimDV) {
+    uint32_t ctrl_val = 0;
+    CHECK(dif_lc_ctrl_set_otp_vendor_test_reg(&lc, 0xa5a5a5a5) ==
+          kDifUnavailable);
+    CHECK(dif_lc_ctrl_get_otp_vendor_test_reg(&lc, &ctrl_val) ==
+          kDifUnavailable);
+
+    CHECK_DIF_OK(dif_lc_ctrl_mutex_try_acquire(&lc));
+    CHECK_DIF_OK(dif_lc_ctrl_set_otp_vendor_test_reg(&lc, 0xa5a5a5a5));
+    CHECK_DIF_OK(dif_lc_ctrl_get_otp_vendor_test_reg(&lc, &ctrl_val));
+    CHECK(ctrl_val == 0xa5a5a5a5);
+    CHECK_DIF_OK(dif_lc_ctrl_mutex_release(&lc));
+
+    CHECK(dif_lc_ctrl_get_otp_vendor_test_reg(&lc, &ctrl_val) ==
+          kDifUnavailable);
+  }
+
   return true;
 }
