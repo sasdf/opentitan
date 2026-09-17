@@ -5902,6 +5902,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_dv": None,
     },
+    qemu = qemu_params(
+        otp = ":flash_scrambling_smoketest_otp_img_rma",
+    ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
