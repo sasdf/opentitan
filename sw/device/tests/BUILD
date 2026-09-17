@@ -6278,9 +6278,20 @@ test_suite(
             {
                 "//hw/top_earlgrey:fpga_cw310_sival": None,
                 "//hw/top_earlgrey:fpga_cw340_sival": None,
+                "//hw/top_earlgrey:sim_qemu_sival": None,
             },
         ),
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = " --expect-fail" if lc_state_val in _LC_STATES_DEBUG_DISALLOWED else "",
+            test_harness = "//sw/host/tests/chip/rv_dm:lc_disabled",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
