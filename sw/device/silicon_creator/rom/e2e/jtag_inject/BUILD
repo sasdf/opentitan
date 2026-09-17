@@ -43,6 +43,7 @@ package(default_visibility = ["//visibility:public"])
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             binaries = {
@@ -55,6 +56,18 @@ package(default_visibility = ["//visibility:public"])
                 "coverage_broken",  # FIXME: broken in coverage mode.
                 "cw310_rom_with_fake_keys",
             ],
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/chip/jtag:sram_load",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            binaries = {
+                "//sw/device/examples/sram_program:sram_program": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
             test_cmd = """
                 --elf={sram_program}
             """,
