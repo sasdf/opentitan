@@ -1009,10 +1009,26 @@ opentitan_test(
     ],
 )
 
+otp_image(
+    name = "inject_scramble_seed_otp_img",
+    src = "//hw/ip/otp_ctrl/data:otp_json_prod",
+    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
+        "//hw/ip/otp_ctrl/data:otp_json_secret0",
+        "//hw/ip/otp_ctrl/data:otp_json_secret2_unlocked",
+    ],
+)
+
 opentitan_test(
     name = "inject_scramble_seed",
     srcs = ["inject_scramble_seed.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        otp = ":inject_scramble_seed_otp_img",
+    ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
