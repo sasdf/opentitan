@@ -6241,9 +6241,16 @@ _LC_STATES_DEBUG_DISALLOWED = [
             {
                 "//hw/top_earlgrey:fpga_cw310_sival": None,
                 "//hw/top_earlgrey:fpga_cw340_sival": None,
+                "//hw/top_earlgrey:sim_qemu_sival": None,
             },
         ),
         fpga = fpga_params(
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+        ),
+        qemu = qemu_params(
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
                 "lc_{}".format(lc_state),
