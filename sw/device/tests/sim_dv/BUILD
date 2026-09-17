@@ -256,7 +256,13 @@ opentitan_test(
 opentitan_test(
     name = "lc_ctrl_volatile_raw_unlock_test",
     srcs = ["lc_ctrl_volatile_raw_unlock_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
