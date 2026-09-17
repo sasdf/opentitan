@@ -8,6 +8,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 load(
@@ -30,9 +31,14 @@ package(default_visibility = ["//visibility:public"])
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_verilator": None,
         },
         fpga = fpga_params(
+            otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
+            tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
             otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
             tags = maybe_skip_in_ci(lc_state_val),
         ),
