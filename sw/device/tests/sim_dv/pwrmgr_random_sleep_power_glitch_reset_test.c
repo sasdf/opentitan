@@ -271,7 +271,7 @@ static void normal_sleep_glitch_reset(const dif_pwrmgr_t *pwrmgr) {
 }
 
 static void timer_on(uint32_t usec) {
-  busy_spin_micros(usec);
+  busy_spin_micros(usec * alert_handler_testutils_cycle_rescaling_factor());
   // If we arrive here the test must fail.
   CHECK(false, "Timeout waiting for reset!");
 }
