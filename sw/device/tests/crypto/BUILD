@@ -1405,6 +1405,9 @@ opentitan_test(
     name = "rsa_3072_signature_functest",
     srcs = ["rsa_3072_signature_functest.c"],
     exec_env = CRYPTOTEST_EXEC_ENVS,
+    qemu = qemu_params(
+        timeout = "moderate",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["manual"],
