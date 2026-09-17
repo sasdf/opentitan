@@ -7002,6 +7002,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_isa_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         tags = ["manual"],
@@ -7093,6 +7103,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_epmp_test": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         test_cmd = "--elf={firmware}",
@@ -7117,6 +7137,7 @@ opentitan_binary(
         "rv_core_ibex_epmp_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
@@ -7217,6 +7238,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_mem_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         binaries = {
             ":rv_core_ibex_mem_test_sram": "sram_program",
@@ -7241,6 +7272,7 @@ opentitan_binary(
     testonly = True,
     srcs = ["rv_core_ibex_mem_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
