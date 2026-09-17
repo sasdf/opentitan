@@ -7,6 +7,7 @@ load(
     "OPENTITAN_CPU",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules:files.bzl", "output_groups")
@@ -228,8 +229,12 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
         "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_base": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
+    qemu = qemu_params(
+        rom = ":test_rom",
+    ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
