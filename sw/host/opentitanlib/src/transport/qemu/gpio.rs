@@ -231,12 +231,17 @@ impl GpioPin for QemuGpioPin {
 
         let value = match qemu_outputting {
             true => gpio.qemu_to_host >> self.idx & 1,
-            // For now we just give the pullup value regardless of whether it's floating.
             false => {
-                // Do not warn on reading floating GPIO, since it is common pattern
-                // to read a SPI console TX ready pin at the start of a test when
-                // QEMU has not yet had time to pull-up the pin, unlike HW.
-                gpio.qemu_pull >> self.idx & 1
+                let qemu_floating = (gpio.qemu_floating >> self.idx & 1) == 1;
+                if qemu_floating {
+                    match self.pull_mode.get() {
+                        PullMode::PullUp => 1,
+                        PullMode::PullDown => 0,
+                        PullMode::None => gpio.qemu_pull >> self.idx & 1,
+                    }
+                } else {
+                    gpio.qemu_pull >> self.idx & 1
+                }
             }
         };
 

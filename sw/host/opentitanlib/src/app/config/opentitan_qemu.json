@@ -59,6 +59,76 @@
       "pull_mode": "None",
       "alias_of": "22"
     },
+    {
+      "name": "IOB0",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "0"
+    },
+    {
+      "name": "IOB1",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "1"
+    },
+    {
+      "name": "IOB2",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "2"
+    },
+    {
+      "name": "IOB3",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "3"
+    },
+    {
+      "name": "IOR6",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "6"
+    },
+    {
+      "name": "IOR7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "7"
+    },
+    {
+      "name": "IOR10",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "10"
+    },
+    {
+      "name": "IOR11",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
+      "name": "IOR12",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "12"
+    },
+    {
+      "name": "IOR13",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "13"
+    },
   ],
   "strappings": [
     {

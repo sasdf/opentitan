@@ -7580,6 +7580,9 @@ opentitan_test(
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7619,6 +7622,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
     ),
     silicon = silicon_params(
