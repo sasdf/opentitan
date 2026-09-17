@@ -11,12 +11,14 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/flash_ctrl_testutils.h"
 #include "sw/device/lib/testing/rstmgr_testutils.h"
+#include "sw/device/lib/testing/sysrst_ctrl_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+#include "sw/device/lib/testing/test_framework/ottf_utils.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
-OTTF_DEFINE_TEST_CONFIG();
+OTTF_DEFINE_TEST_CONFIG(.enable_uart_flow_control = true);
 
 static dif_pinmux_t pinmux;
 static dif_sysrst_ctrl_t sysrst_ctrl;
@@ -26,6 +28,7 @@ static dif_flash_ctrl_state_t flash;
 static dif_rstmgr_reset_info_bitfield_t rstmgr_reset_info;
 
 const uint32_t kTestPhaseTimeoutUsec = 10000;
+const uint32_t kTestPhaseTimeoutUsecReal = 1000000;
 
 typedef enum {
   kTestPhaseSetup = 0,
@@ -59,6 +62,13 @@ static const dif_pinmux_index_t kInputPads[] = {
     kTopEarlgreyPinmuxInselIor13,
 };
 
+static const dif_pinmux_index_t kInputPadsReal[] = {
+    kTopEarlgreyPinmuxInselIor10,
+    kTopEarlgreyPinmuxInselIor11,
+    kTopEarlgreyPinmuxInselIor12,
+    kTopEarlgreyPinmuxInselIor5,
+};
+
 static const dif_pinmux_index_t kPeripheralOutputs[] = {
     kTopEarlgreyPinmuxOutselSysrstCtrlAonKey0Out,
     kTopEarlgreyPinmuxOutselSysrstCtrlAonKey1Out,
@@ -72,6 +82,12 @@ static const dif_pinmux_index_t kOutputPads[] = {
     kTopEarlgreyPinmuxMioOutIob9, kTopEarlgreyPinmuxMioOutIor5,
     kTopEarlgreyPinmuxMioOutIor6, kTopEarlgreyPinmuxMioOutIoc7,
     kTopEarlgreyPinmuxMioOutIoc9, kTopEarlgreyPinmuxMioOutIob7,
+};
+
+static const dif_pinmux_index_t kOutputPadsReal[] = {
+    kTopEarlgreyPinmuxMioOutIor6, kTopEarlgreyPinmuxMioOutIor7,
+    kTopEarlgreyPinmuxMioOutIob0, kTopEarlgreyPinmuxMioOutIob1,
+    kTopEarlgreyPinmuxMioOutIob2, kTopEarlgreyPinmuxMioOutIob3,
 };
 
 static const dif_sysrst_ctrl_pin_t kSysrstCtrlOutputs[] = {
@@ -92,16 +108,26 @@ enum {
 
 // Test phase written by testbench.
 static volatile const uint8_t kTestPhase[1] = {0};
+OT_SECTION(".data")
+static volatile const uint8_t kTestPhaseReal = kTestPhaseSetup;
 
 // Sets up the pinmux to assign input and output pads
 // to the sysrst_ctrl peripheral as required.
 static void pinmux_setup(void) {
+  if (kDeviceType != kDeviceSimDV) {
+    sysrst_ctrl_testutils_setup_dio(&pinmux);
+    sysrst_ctrl_testutils_release_dio(&sysrst_ctrl, true, true);
+  }
+  const dif_pinmux_index_t *input_pads =
+      kDeviceType == kDeviceSimDV ? kInputPads : kInputPadsReal;
   for (int i = 0; i < kNumMioInputs; ++i) {
     CHECK_DIF_OK(
-        dif_pinmux_input_select(&pinmux, kPeripheralInputs[i], kInputPads[i]));
+        dif_pinmux_input_select(&pinmux, kPeripheralInputs[i], input_pads[i]));
   }
+  const dif_pinmux_index_t *output_pads =
+      kDeviceType == kDeviceSimDV ? kOutputPads : kOutputPadsReal;
   for (int i = 0; i < kNumMioOutputs; ++i) {
-    CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kOutputPads[i],
+    CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, output_pads[i],
                                           kPeripheralOutputs[i]));
   }
 }
@@ -149,8 +175,12 @@ static void sync_with_testbench(uint8_t prior_phase) {
   // no actual WFI instruction is issued.
   test_status_set(kTestStatusInWfi);
   test_status_set(kTestStatusInTest);
-  CHECK_STATUS_OK(flash_ctrl_testutils_backdoor_wait_update(
-      &kTestPhase[0], prior_phase, kTestPhaseTimeoutUsec));
+  if (kDeviceType == kDeviceSimDV) {
+    CHECK_STATUS_OK(flash_ctrl_testutils_backdoor_wait_update(
+        &kTestPhase[0], prior_phase, kTestPhaseTimeoutUsec));
+  } else {
+    OTTF_WAIT_FOR(prior_phase != kTestPhaseReal, kTestPhaseTimeoutUsecReal);
+  }
 }
 
 // Enables the sysrst_ctrl overrides for the output pins. Allows
@@ -185,16 +215,23 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_rstmgr_init(
       mmio_region_from_addr(TOP_EARLGREY_RSTMGR_AON_BASE_ADDR), &rstmgr));
 
-  CHECK_STATUS_OK(flash_ctrl_testutils_backdoor_init(&flash));
+  if (kDeviceType == kDeviceSimDV) {
+    CHECK_STATUS_OK(flash_ctrl_testutils_backdoor_init(&flash));
+  }
 
   pinmux_setup();
   rstmgr_reset_info = rstmgr_testutils_reason_get();
+  if (kDeviceType != kDeviceSimDV &&
+      rstmgr_reset_info == kDifRstmgrResetInfoSysRstCtrl) {
+    *(volatile uint8_t *)&kTestPhaseReal = kTestPhaseCheckComboReset;
+  }
 
   // Disable EC rst override.
   CHECK_DIF_OK(dif_sysrst_ctrl_output_pin_override_set_enabled(
       &sysrst_ctrl, kDifSysrstCtrlPinEcResetInOut, kDifToggleDisabled));
 
-  uint8_t current_test_phase = kTestPhase[0];
+  uint8_t current_test_phase =
+      kDeviceType == kDeviceSimDV ? kTestPhase[0] : kTestPhaseReal;
   while (current_test_phase < kTestPhaseDone) {
     LOG_INFO("Test phase %d", current_test_phase);
     switch (current_test_phase) {
@@ -220,7 +257,8 @@ bool test_main(void) {
         break;
     }
     sync_with_testbench(current_test_phase);
-    current_test_phase = kTestPhase[0];
+    current_test_phase =
+        kDeviceType == kDeviceSimDV ? kTestPhase[0] : kTestPhaseReal;
   }
   return true;
 }
