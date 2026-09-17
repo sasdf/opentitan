@@ -15,6 +15,7 @@ load(
     "EARLGREY_TEST_ENVS",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 
@@ -520,8 +521,10 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             # See #21706, expects keymgr state 0 so not working after ROM_EXT.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
     verilator = verilator_params(tags = ["manual"]),
