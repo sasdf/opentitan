@@ -7808,10 +7808,18 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+            "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/pattgen:pattgen_ios",
+    ),
+    qemu = qemu_params(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/pattgen:pattgen_ios",
     ),
