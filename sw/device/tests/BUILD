@@ -3706,7 +3706,11 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_sensor_ctrl_deep_sleep_wake_up",
     srcs = ["pwrmgr_sensor_ctrl_deep_sleep_wake_up.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
     deps = [
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
