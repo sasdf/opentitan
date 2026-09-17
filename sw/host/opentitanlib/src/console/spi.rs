@@ -93,7 +93,9 @@ impl<'a> SpiConsoleDevice<'a> {
         if let Some(ready_pin) = self.get_tx_ready_pin()?
             && self.wait_tx_ready_deassert
         {
-            while ready_pin.read()? {}
+            while ready_pin.read()? {
+                std::thread::sleep(Duration::from_micros(100));
+            }
         }
 
         let magic_number: u32 = u32::from_le_bytes(header[0..4].try_into().unwrap());
@@ -159,19 +161,28 @@ impl<'a> SpiConsoleDevice<'a> {
 }
 
 impl<'a> ConsoleDevice for SpiConsoleDevice<'a> {
-    fn console_read(&self, buf: &mut [u8], _timeout: Duration) -> Result<usize> {
+    fn console_read(&self, buf: &mut [u8], timeout: Duration) -> Result<usize> {
         if self.rx_buf.borrow().is_empty() {
             if let Some(ready_pin) = self.get_tx_ready_pin()? {
                 if ready_pin.read()? {
                     if self.read_from_spi()? == 0 {
                         // If we are gated by the TX-ready pin, only perform the SPI console read if
                         // the ready pin is high.
+                        if !timeout.is_zero() {
+                            std::thread::sleep(Duration::from_millis(1).min(timeout));
+                        }
                         return Ok(0);
                     }
                 } else {
+                    if !timeout.is_zero() {
+                        std::thread::sleep(Duration::from_millis(1).min(timeout));
+                    }
                     return Ok(0);
                 }
             } else if self.read_from_spi()? == 0 {
+                if !timeout.is_zero() {
+                    std::thread::sleep(Duration::from_millis(1).min(timeout));
+                }
                 return Ok(0);
             }
         }
