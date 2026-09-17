@@ -9,6 +9,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "verilator_params",
 )
@@ -66,6 +67,11 @@ opentitan_test(
             "pmod",
         ],  # Requires the PMOD::BoB.
     ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mx66l1g45g",
+        },
+    ),
     silicon = silicon_params(
         tags = [
             "pmod",
@@ -109,6 +115,11 @@ opentitan_test(
             "pmod",
         ],  # Requires the PMOD::BoB.
     ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mx25l12835f",
+        },
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -139,6 +150,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "gd25q256",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -172,6 +188,11 @@ opentitan_test(
             "pmod",
         ],  # Requires the PMOD::BoB.
     ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "gd25b01g",
+        },
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -203,6 +224,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "is25wp256",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -236,6 +262,11 @@ opentitan_test(
             "pmod",
         ],  # Requires the PMOD::BoB.
     ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mt25ql512ab",
+        },
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -267,6 +298,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "w25q01jvq",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
