@@ -668,20 +668,12 @@ cc_test(
 opentitan_test(
     name = "rnd_functest",
     srcs = ["rnd_functest.c"],
-    broken = fpga_params(tags = ["broken"]),
-    exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        {
-            # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
-        },
-    ),
-    qemu_broken = qemu_params(tags = ["broken"]),
+    exec_env = EARLGREY_TEST_ENVS,
     deps = [
         ":otp",
         ":rnd",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:crc32",
         "//sw/device/lib/dif:entropy_src",
         "//sw/device/lib/testing:entropy_testutils",

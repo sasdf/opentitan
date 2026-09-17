@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/crc32.h"
 #include "sw/device/lib/dif/dif_entropy_src.h"
 #include "sw/device/lib/runtime/log.h"
@@ -233,7 +234,17 @@ bool test_main(void) {
 
   status_t result = OK_STATUS();
   EXECUTE_TEST(result, test_rnd);
-  EXECUTE_TEST(result, test_otp_crc_check);
-  EXECUTE_TEST(result, test_rnd_health_config_check);
+  if (abs_mmio_read32(TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR +
+                      OTP_CTRL_CREATOR_SW_CFG_READ_LOCK_REG_OFFSET) != 0) {
+    EXECUTE_TEST(result, test_otp_crc_check);
+    EXECUTE_TEST(result, test_rnd_health_config_check);
+  } else {
+    LOG_INFO(
+        "OTP CREATOR_SW_CFG locked by ROM_EXT; testing health check config and "
+        "RND.");
+    configure_random_health_checks();
+    CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
+    EXECUTE_TEST(result, test_rnd);
+  }
   return status_ok(result);
 }
