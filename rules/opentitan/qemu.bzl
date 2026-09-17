@@ -76,7 +76,7 @@ def qemu_params(
 def gen_cfg(ctx, **kwargs):
     """Generate a QEMU `readconfig` INI file containing OpenTitan RTL secrets"""
     name = get_override(ctx, "label.name", kwargs)
-    cfggen = get_override(ctx, "executable.cfggen", kwargs)
+    cfggen = get_override(ctx, "attr.cfggen", kwargs)
 
     otp_sv = get_override(ctx, "file.otp_sv", kwargs)
     lc_sv = get_override(ctx, "file.lc_sv", kwargs)
@@ -173,9 +173,9 @@ def gen_flash(ctx, **kwargs):
     firmware_bin = get_override(ctx, "file.firmware_bin", kwargs)
     firmware_elf = get_override(ctx, "file.firmware_elf", kwargs)
 
-    check_elfs = get_override(ctx, "file.check_elfs", kwargs)
+    check_elfs = get_override(ctx, "attr.check_elfs", kwargs)
 
-    flashgen = get_override(ctx, "executable.flashgen", kwargs)
+    flashgen = get_override(ctx, "attr.flashgen", kwargs)
 
     flashgen_inputs = []
     flashgen_args = []

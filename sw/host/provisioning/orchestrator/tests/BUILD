@@ -4,6 +4,7 @@
 
 load("@ot_python_deps//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_test")
+load("//rules/opentitan:qemu.bzl", "qemu_cfg", "qemu_flash", "qemu_otp")
 load(
     "//sw/device/silicon_creator/manuf/base:provisioning_inputs.bzl",
     "EARLGREY_SKUS",
@@ -69,6 +70,36 @@ orchestrator_cw340_test_settings_transition(
     target = "//sw/host/provisioning/orchestrator/src:orchestrator.zip",
 )
 
+filegroup(
+    name = "orchestrator_sim_qemu_zip",
+    testonly = True,
+    srcs = ["//sw/host/provisioning/orchestrator/src:orchestrator.zip"],
+)
+
+qemu_cfg(
+    name = "qemu_earlgrey_cfg",
+    lc_sv = "//hw/ip/lc_ctrl:rtl/lc_ctrl_state_pkg.sv",
+    otp_sv = "//hw/ip/otp_ctrl:rtl/otp_ctrl_part_pkg.sv",
+    top_hjson = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
+    top_name = "earlgrey",
+)
+
+qemu_otp(
+    name = "qemu_otp_empty",
+    vmem = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_test_unlocked0_manuf_empty",
+)
+
+qemu_flash(
+    name = "qemu_flash_empty",
+    check_elfs = False,
+)
+
+filegroup(
+    name = "qemu_rom",
+    srcs = ["//sw/device/silicon_creator/rom:mask_rom"],
+    output_group = "sim_qemu_base_elf",
+)
+
 sh_test(
     name = "e2e_option_flags_test",
     timeout = "moderate",
@@ -93,18 +124,35 @@ sh_test(
 [
     sh_test(
         name = "e2e_multistage_{}_{}_test".format(sku, fpga),
+        timeout = "long" if fpga == "sim_qemu" else "moderate",
         srcs = ["e2e_multistage.sh"],
         data = [
             ":orchestrator_{}_zip".format(fpga),
             "@python3",
             cfg["orchestrator_cfg"],
             "//sw/device/silicon_creator/manuf/base:ft_flash_scramble_{}".format(sku),
-        ],
+        ] + ([
+            ":qemu_earlgrey_cfg",
+            ":qemu_flash_empty",
+            ":qemu_otp_empty",
+            ":qemu_rom",
+            "qemu_setup.sh",
+            "//hw/top_earlgrey/sw/util:qemu_start",
+            "//third_party/qemu:qemu-system-riscv32",
+        ] if fpga == "sim_qemu" else []),
         env = {
             "PYTHON": "$(location @python3//:python3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "FPGA": "{}".format(fpga),
-        },
+        } | ({
+            "QEMU_BIN": "$(location //third_party/qemu:qemu-system-riscv32)",
+            "QEMU_START": "$(location //hw/top_earlgrey/sw/util:qemu_start)",
+            "QEMU_CONFIG": "$(location :qemu_earlgrey_cfg)",
+            "QEMU_ROM": "$(location :qemu_rom)",
+            "QEMU_OTP": "$(location :qemu_otp_empty)",
+            "QEMU_FLASH": "$(location :qemu_flash_empty)",
+            "QEMU_ICOUNT": "6",
+        } if fpga == "sim_qemu" else {}),
         tags = [
             "changes_otp",
             "exclusive",
@@ -117,6 +165,7 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
+        "sim_qemu",
     ]
 ]
 
@@ -144,7 +193,7 @@ sh_test(
 [
     sh_test(
         name = "e2e_{}_{}_test".format(sku, fpga),
-        timeout = "moderate",
+        timeout = "long" if fpga == "sim_qemu" else "moderate",
         srcs = ["e2e.sh"],
         data = [
             ":orchestrator_{}_zip".format(fpga),
@@ -152,14 +201,30 @@ sh_test(
             cfg["orchestrator_cfg"],
             "//sw/host/provisioning/orchestrator/src:fw_dependencies",
             "//util/coverage/collect_cc_coverage",
-        ],
+        ] + ([
+            ":qemu_earlgrey_cfg",
+            ":qemu_flash_empty",
+            ":qemu_otp_empty",
+            ":qemu_rom",
+            "qemu_setup.sh",
+            "//hw/top_earlgrey/sw/util:qemu_start",
+            "//third_party/qemu:qemu-system-riscv32",
+        ] if fpga == "sim_qemu" else []),
         env = {
             "PYTHON": "$(location @python3//:python3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
             "CC_CODE_COVERAGE_SCRIPT": "",  # Disable built-in cc coverage
             "FPGA": "{}".format(fpga),
-        },
+        } | ({
+            "QEMU_BIN": "$(location //third_party/qemu:qemu-system-riscv32)",
+            "QEMU_START": "$(location //hw/top_earlgrey/sw/util:qemu_start)",
+            "QEMU_CONFIG": "$(location :qemu_earlgrey_cfg)",
+            "QEMU_ROM": "$(location :qemu_rom)",
+            "QEMU_OTP": "$(location :qemu_otp_empty)",
+            "QEMU_FLASH": "$(location :qemu_flash_empty)",
+            "QEMU_ICOUNT": "6",
+        } if fpga == "sim_qemu" else {}),
         tags = [
             "changes_otp",
             "exclusive",
@@ -173,6 +238,7 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
+        "sim_qemu",
     ]
 ]
 
@@ -189,6 +255,7 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
+        "sim_qemu",
     ]
 ]
 
@@ -204,5 +271,6 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
+        "sim_qemu",
     ]
 ]
