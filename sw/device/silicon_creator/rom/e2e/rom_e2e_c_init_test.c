@@ -78,17 +78,36 @@ static void fault(void) {
  * write-any-read-legal behavior.
  */
 static uint32_t pad_attr_mask_get(void) {
-  CHECK_EQ(kDeviceType, kDeviceFpgaCw310,
-           "This test is only supported for CW310");
-
-  // The only legal attributes on CW310 are `invert`, `virtual_od_en`, and
-  // `input_disable`.
   uint32_t mask = 0;
-  mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INVERT_0_BIT, true);
-  mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_VIRTUAL_OD_EN_0_BIT,
-                              true);
-  mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
-                              true);
+  if (kDeviceType == kDeviceFpgaCw310 || kDeviceType == kDeviceFpgaCw340) {
+    // The only legal attributes on CW310/CW340 are `invert`, `virtual_od_en`,
+    // and `input_disable`.
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INVERT_0_BIT, true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_VIRTUAL_OD_EN_0_BIT,
+                                true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
+                                true);
+  } else if (kDeviceType == kDeviceSimQemu) {
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INVERT_0_BIT, true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_VIRTUAL_OD_EN_0_BIT,
+                                true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT, true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_SELECT_0_BIT,
+                                true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_KEEPER_EN_0_BIT,
+                                true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_SCHMITT_EN_0_BIT,
+                                true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_OD_EN_0_BIT, true);
+    mask = bitfield_field32_write(mask, PINMUX_MIO_PAD_ATTR_0_SLEW_RATE_0_FIELD,
+                                  PINMUX_MIO_PAD_ATTR_0_SLEW_RATE_0_MASK);
+    mask = bitfield_field32_write(
+        mask, PINMUX_MIO_PAD_ATTR_0_DRIVE_STRENGTH_0_FIELD,
+        PINMUX_MIO_PAD_ATTR_0_DRIVE_STRENGTH_0_MASK);
+  } else {
+    CHECK_EQ(kDeviceType, kDeviceFpgaCw310,
+             "This test is only supported for CW310/CW340/QEMU");
+  }
 
   // Save the original attributes for pad 0.
   uint32_t attr0_orig =
