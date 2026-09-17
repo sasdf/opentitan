@@ -7827,6 +7827,10 @@ opentitan_test(
         exit_failure = "FAIL!",
         exit_success = "Alert 3 is asserted",
     ),
+    qemu = qemu_params(
+        exit_failure = "FAIL!",
+        exit_success = "Alert 3 is asserted",
+    ),
     silicon = silicon_params(
         exit_failure = "FAIL!",
         exit_success = "Alert 3 is asserted",
