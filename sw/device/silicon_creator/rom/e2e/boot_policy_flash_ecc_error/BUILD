@@ -25,6 +25,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/rom/e2e:defs.bzl",
@@ -112,6 +113,7 @@ otp_image(
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         # This image always get the lower security version as we want the image that self-corrupts the ECC
@@ -140,6 +142,7 @@ otp_image(
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         local_defines = [
@@ -182,8 +185,20 @@ otp_image(
         name = t["name"].format(c["cause"]),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
+            binaries = {
+                t["a"].format(c["cause"]): "fw_a",
+                t["b"].format(c["cause"]): "fw_b",
+            },
+            exit_success = t["exit_success"].format(c["cause"]),
+            otp = ":otp_img_boot_policy_flash_ecc_error",
+            slot_a = SLOTS["a"],
+            slot_b = SLOTS["b"],
+        ),
+        qemu = qemu_params(
             assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
             binaries = {
                 t["a"].format(c["cause"]): "fw_a",
@@ -203,8 +218,23 @@ opentitan_test(
     name = "flash_exc_handler_disabled_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
+        binaries = {
+            ":flash_ecc_self_corruption_slot_a_manifest_identifier": "fw_a",
+            ":uncorrupted_test_slot_b": "fw_b",
+        },
+        # Since the flash ecc exception handler is disabled in this test,
+        # we expect to see a load access fault when the ROM accesses the
+        # corrupted flash word.
+        exit_success = "BFV:{}".format(hex_digits(CONST.BFV.INTERRUPT.LOAD_ACCESS)),
+        otp = ":otp_img_flash_exc_handler_disabled",
+        slot_a = SLOTS["a"],
+        slot_b = SLOTS["b"],
+    ),
+    qemu = qemu_params(
         assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
         binaries = {
             ":flash_ecc_self_corruption_slot_a_manifest_identifier": "fw_a",
