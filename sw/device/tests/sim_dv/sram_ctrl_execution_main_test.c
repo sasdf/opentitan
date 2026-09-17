@@ -5,7 +5,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/dif/dif_sram_ctrl.h"
@@ -19,6 +21,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_macros.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/lib/testing/test_framework/status.h"
+#include "sw/device/silicon_creator/lib/epmp_state.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "otp_ctrl_regs.h"  // Generated
@@ -104,6 +107,7 @@ static bool otp_ifetch_enabled(void) {
  * return address can be loaded from there. See comments below for more details.
  */
 void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
   // The frame address is the address of the stack location that holds the
   // `mepc`, since the OTTF exception handler entry code saves the `mepc` to
   // the top of the stack before transferring control flow to the exception
@@ -204,6 +208,18 @@ bool test_main(void) {
       dif_sram_ctrl_is_locked(&sram_ctrl, kDifSramCtrlLockExec, &locked));
   CHECK(!locked, "Execution is disabled and locked, cannot perform the test");
 
+  if (kDeviceType != kDeviceSimDV) {
+    // Unlock the entire address space for RWX so that we can run this test with
+    // mask_rom (which configures PMP entry 15 for SRAM as RW-only).
+    CSR_WRITE(CSR_REG_PMPADDR7, 0x7fffffff);
+    uint32_t pmpcfg1 = 0;
+    CSR_READ(CSR_REG_PMPCFG1, &pmpcfg1);
+    CHECK((pmpcfg1 & 0xff000000) == 0,
+          "expected PMPCFG1 to be unconfigured before changing it");
+    CSR_SET_BITS(CSR_REG_PMPCFG1,
+                 (kEpmpModeNapot | kEpmpPermLockedReadWriteExecute) << 24);
+  }
+
   dif_lc_ctrl_t lc;
   CHECK_DIF_OK(dif_lc_ctrl_init(
       mmio_region_from_addr(TOP_EARLGREY_LC_CTRL_BASE_ADDR), &lc));
@@ -217,8 +233,10 @@ bool test_main(void) {
   // When the test is complete flag WFI status so
   // the testbench can reset and progress to the next
   // combination of LC_STATE and OTP IFETCH.
-  test_status_set(kTestStatusInWfi);
-  wait_for_interrupt();
+  if (kDeviceType == kDeviceSimDV) {
+    test_status_set(kTestStatusInWfi);
+    wait_for_interrupt();
+  }
 
   return true;
 }
