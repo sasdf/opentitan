@@ -844,7 +844,15 @@ opentitan_test(
 opentitan_test(
     name = "lc_ctrl_program_error",
     srcs = ["lc_ctrl_program_error.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        globals = {
+            "ot-lc_ctrl.inject-otp-prog-error": "true",
+        },
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
