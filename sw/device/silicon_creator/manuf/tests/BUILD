@@ -510,6 +510,18 @@ opentitan_binary(
             test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
             testopt_bootstrap = "False",
         ),
+        qemu = qemu_params(
+            binaries = {
+                ":sram_exec_test": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
+        ),
         deps = [
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing:otp_ctrl_testutils",
