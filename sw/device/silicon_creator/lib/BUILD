@@ -77,9 +77,11 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
     fpga = fpga_params(tags = ["coverage"]),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["flaky"],
