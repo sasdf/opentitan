@@ -296,6 +296,7 @@ opentitan_test(
     name = "ecc_p256_dice_functest",
     srcs = ["ecc_p256_dice_functest.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
@@ -307,6 +308,7 @@ opentitan_test(
         timeout = "eternal",
     ),
     deps = [
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/crypto/drivers:keymgr",
         "//sw/device/lib/crypto/impl:config",
@@ -319,6 +321,7 @@ opentitan_test(
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing:hexstr",
         "//sw/device/lib/testing:keymgr_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/base:util",
         "//sw/device/silicon_creator/lib/cert:dice_keys",
