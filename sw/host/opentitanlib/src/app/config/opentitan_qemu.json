@@ -60,6 +60,42 @@
       "alias_of": "22"
     },
     {
+      "name": "IOC1",
+      "alias_of": "23"
+    },
+    {
+      "name": "IOC2",
+      "alias_of": "24"
+    },
+    {
+      "name": "IOC3",
+      "alias_of": "25"
+    },
+    {
+      "name": "IOC4",
+      "alias_of": "26"
+    },
+    {
+      "name": "IOC5",
+      "alias_of": "27"
+    },
+    {
+      "name": "IOC6",
+      "alias_of": "28"
+    },
+    {
+      "name": "IOC7",
+      "alias_of": "29"
+    },
+    {
+      "name": "IOC8",
+      "alias_of": "30"
+    },
+    {
+      "name": "IOC9",
+      "alias_of": "31"
+    },
+    {
       "name": "IOA0",
       "alias_of": "0"
     },
@@ -256,5 +292,26 @@
   ],
   "provides": {
     "chip": "opentitan",
-  }
+  },
+  "gpios": [
+    "Ioa0",
+    "Ioa1",
+    "Ioa2",
+    "Ioa3",
+    "Ioa4",
+    "Ioa5",
+    "Ioa6",
+    "Ioa7",
+    "Ioa8",
+    "Ioc0",
+    "Ioc1",
+    "Ioc2",
+    "Ioc3",
+    "Ioc4",
+    "Ioc5",
+    "Ioc6",
+    "Ioc7",
+    "Ioc8",
+    "Ioc9"
+  ]
 }

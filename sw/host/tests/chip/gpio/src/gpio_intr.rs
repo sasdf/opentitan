@@ -114,6 +114,36 @@ static CONFIG: Lazy<HashMap<&'static str, Config>> = Lazy::new(|| {
                 PinmuxMioOut::Ior13 => PinmuxOutsel::GpioGpio28,
             },
         },
+        "qemu" => Config {
+            input: collection! {
+                PinmuxPeripheralIn::GpioGpio17 => PinmuxInsel::Ioa0,
+                PinmuxPeripheralIn::GpioGpio18 => PinmuxInsel::Ioa1,
+                PinmuxPeripheralIn::GpioGpio19 => PinmuxInsel::Ioa2,
+
+                PinmuxPeripheralIn::GpioGpio20 => PinmuxInsel::Ioa3,
+                PinmuxPeripheralIn::GpioGpio21 => PinmuxInsel::Ioa4,
+                PinmuxPeripheralIn::GpioGpio22 => PinmuxInsel::Ioa5,
+
+                PinmuxPeripheralIn::GpioGpio25 => PinmuxInsel::Ioa6,
+                PinmuxPeripheralIn::GpioGpio26 => PinmuxInsel::Ioa7,
+                PinmuxPeripheralIn::GpioGpio27 => PinmuxInsel::Ioa8,
+                PinmuxPeripheralIn::GpioGpio28 => PinmuxInsel::Ioc3,
+            },
+            output: collection! {
+                PinmuxMioOut::Ioa0 => PinmuxOutsel::GpioGpio17,
+                PinmuxMioOut::Ioa1 => PinmuxOutsel::GpioGpio18,
+                PinmuxMioOut::Ioa2 => PinmuxOutsel::GpioGpio19,
+
+                PinmuxMioOut::Ioa3 => PinmuxOutsel::GpioGpio20,
+                PinmuxMioOut::Ioa4 => PinmuxOutsel::GpioGpio21,
+                PinmuxMioOut::Ioa5 => PinmuxOutsel::GpioGpio22,
+
+                PinmuxMioOut::Ioa6 => PinmuxOutsel::GpioGpio25,
+                PinmuxMioOut::Ioa7 => PinmuxOutsel::GpioGpio26,
+                PinmuxMioOut::Ioa8 => PinmuxOutsel::GpioGpio27,
+                PinmuxMioOut::Ioc3 => PinmuxOutsel::GpioGpio28,
+            },
+        },
     }
 });
 
