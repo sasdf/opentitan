@@ -94,8 +94,12 @@ static status_t print_certs(void) {
   // If this test is being run just after running a provisioning test which
   // wrote the UDS certificate to FACTORY INFO page, read and print the UDS
   // cert. Note that for FPGAs the bitstream must not be cleared after running
-  // the provisioning test
-  TRY(print_cert(buf, &kFlashCtrlInfoPageFactoryCerts));
+  // the provisioning test. On QEMU, each test runs with a fresh unprovisioned
+  // flash image, where reading an unprovisioned scrambled/ECC info page
+  // triggers a flash ECC error and Alert 35.
+  if (kDeviceType != kDeviceSimQemu) {
+    TRY(print_cert(buf, &kFlashCtrlInfoPageFactoryCerts));
+  }
 #endif  // POST_PROVISIONING_TESTS
 
   TRY(print_cert(buf, &kFlashCtrlInfoPageDiceCerts));
@@ -110,6 +114,7 @@ static status_t print_certs(void) {
   return OK_STATUS();
 }
 
+#ifdef POST_PROVISIONING_TESTS
 const flash_ctrl_info_page_t *const mldsa_endorsed_cert_pages[4] = {
     &kFlashCtrlInfoPageOwnerReserved0,
     &kFlashCtrlInfoPageOwnerReserved1,
@@ -120,6 +125,7 @@ static uint8_t
     endorsed_uds_mldsa_cert[FLASH_CTRL_PARAM_BYTES_PER_PAGE *
                             ARRAYSIZE(
                                 mldsa_endorsed_cert_pages)] OT_WORD_ALIGNED;
+#endif  // POST_PROVISIONING_TESTS
 
 static status_t verify_handover(void) {
   retention_sram_t *retram = retention_sram_get();
@@ -283,40 +289,42 @@ static status_t verify_handover(void) {
   LOG_INFO("CDI_1_MLDSA: %s", buf);
 
 #ifdef POST_PROVISIONING_TESTS
-  for (size_t i = 0; i < ARRAYSIZE(mldsa_endorsed_cert_pages); i++) {
-    flash_ctrl_cfg_t cfg = {
-        .scrambling = kMultiBitBool4True,
-        .ecc = kMultiBitBool4True,
-        .he = kMultiBitBool4False,
-    };
-    flash_ctrl_info_cfg_set(mldsa_endorsed_cert_pages[i], cfg);
-    const flash_ctrl_perms_t perms = {
-        .read = kMultiBitBool4True,
-        .write = kMultiBitBool4True,
-        .erase = kMultiBitBool4True,
-    };
-    flash_ctrl_info_perms_set(mldsa_endorsed_cert_pages[i], perms);
-    TRY(flash_ctrl_info_read(
-        mldsa_endorsed_cert_pages[i], /*offset=*/0,
-        util_size_to_words(FLASH_CTRL_PARAM_BYTES_PER_PAGE),
-        (uint8_t *)endorsed_uds_mldsa_cert +
-            i * FLASH_CTRL_PARAM_BYTES_PER_PAGE));
-  }
+  if (kDeviceType != kDeviceSimQemu) {
+    for (size_t i = 0; i < ARRAYSIZE(mldsa_endorsed_cert_pages); i++) {
+      flash_ctrl_cfg_t cfg = {
+          .scrambling = kMultiBitBool4True,
+          .ecc = kMultiBitBool4True,
+          .he = kMultiBitBool4False,
+      };
+      flash_ctrl_info_cfg_set(mldsa_endorsed_cert_pages[i], cfg);
+      const flash_ctrl_perms_t perms = {
+          .read = kMultiBitBool4True,
+          .write = kMultiBitBool4True,
+          .erase = kMultiBitBool4True,
+      };
+      flash_ctrl_info_perms_set(mldsa_endorsed_cert_pages[i], perms);
+      TRY(flash_ctrl_info_read(
+          mldsa_endorsed_cert_pages[i], /*offset=*/0,
+          util_size_to_words(FLASH_CTRL_PARAM_BYTES_PER_PAGE),
+          (uint8_t *)endorsed_uds_mldsa_cert +
+              i * FLASH_CTRL_PARAM_BYTES_PER_PAGE));
+    }
 
-  perso_tlv_cert_obj_view_t uds_mldsa_obj = {0};
-  rom_error_t err = perso_tlv_get_cert_obj_view(
-      endorsed_uds_mldsa_cert, sizeof(endorsed_uds_mldsa_cert), &uds_mldsa_obj);
-  if (err != kErrorOk) {
-    LOG_ERROR(
-        "Failed to parse UDS ML-DSA 44 TLV from flash: 0x%08x. Maybe it is not "
-        "present?",
-        err);
-  } else {
-    LOG_INFO("UDS MLDSA cert size: %u", uds_mldsa_obj.cert_body_size);
-    TRY_CHECK(uds_mldsa_obj.cert_body_size <= INT32_MAX);
-    base64_encode(buf, uds_mldsa_obj.cert_body_p,
-                  (int32_t)uds_mldsa_obj.cert_body_size);
-    LOG_INFO("UDS_MLDSA_CERT: %s", buf);
+    perso_tlv_cert_obj_view_t uds_mldsa_obj = {0};
+    rom_error_t err = perso_tlv_get_cert_obj_view(
+        endorsed_uds_mldsa_cert, sizeof(endorsed_uds_mldsa_cert), &uds_mldsa_obj);
+    if (err != kErrorOk) {
+      LOG_ERROR(
+          "Failed to parse UDS ML-DSA 44 TLV from flash: 0x%08x. Maybe it is not "
+          "present?",
+          err);
+    } else {
+      LOG_INFO("UDS MLDSA cert size: %u", uds_mldsa_obj.cert_body_size);
+      TRY_CHECK(uds_mldsa_obj.cert_body_size <= INT32_MAX);
+      base64_encode(buf, uds_mldsa_obj.cert_body_p,
+                    (int32_t)uds_mldsa_obj.cert_body_size);
+      LOG_INFO("UDS_MLDSA_CERT: %s", buf);
+    }
   }
 #endif  // POST_PROVISIONING_TESTS
 
