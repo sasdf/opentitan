@@ -15,6 +15,7 @@ load(
     "opentitan_binary",
     "opentitan_binary_blob",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "verilator_params",
 )
@@ -683,6 +684,9 @@ opentitan_test(
         timeout = "long",
         tags = ["manual"],
     ),
+    qemu = qemu_params(
+        timeout = "long",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -1285,6 +1289,9 @@ opentitan_test(
         timeout = "long",
         tags = ["manual"],
     ),
+    qemu = qemu_params(
+        timeout = "long",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -1335,6 +1342,9 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "long",
         tags = ["manual"],
+    ),
+    qemu = qemu_params(
+        timeout = "long",
     ),
     silicon = silicon_params(
         timeout = "long",
@@ -1408,6 +1418,9 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "long",
         tags = ["manual"],
+    ),
+    qemu = qemu_params(
+        timeout = "long",
     ),
     silicon = silicon_params(
         timeout = "long",
