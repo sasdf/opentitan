@@ -180,6 +180,13 @@
       "alias_of": "3"
     },
     {
+      "name": "IOR5",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "5"
+    },
+    {
       "name": "IOR6",
       "mode": "Input",
       "level": false,
@@ -220,6 +227,34 @@
       "level": false,
       "pull_mode": "None",
       "alias_of": "13"
+    },
+    {
+      "name": "IOR8",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "14"
+    },
+    {
+      "name": "IOR9",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "15"
+    },
+    {
+      "name": "SYSRST_CTRL_EC_RST_L",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "14"
+    },
+    {
+      "name": "SYSRST_CTRL_FLASH_WP_L",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "15"
     }
   ],
   "strappings": [

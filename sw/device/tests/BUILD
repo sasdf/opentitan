@@ -6786,9 +6786,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
     ),
@@ -6820,9 +6826,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
     ),
@@ -6855,9 +6867,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
     ),
@@ -6891,9 +6909,14 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
     ),
     silicon = silicon_params(
@@ -6926,9 +6949,14 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
     ),
     silicon = silicon_params(
@@ -6965,9 +6993,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
     ),

@@ -22,14 +22,16 @@ use std::time::Duration;
 use anyhow::{Context, bail};
 
 use crate::backend::qemu::QemuOpts;
-use crate::io::gpio::{GpioBitbanging, GpioError, GpioPin};
+use crate::io::gpio::{GpioBitbanging, GpioError, GpioMonitoring, GpioPin};
 use crate::io::jtag::{JtagChain, JtagParams};
 use crate::io::uart::Uart;
 use crate::io::usb::UsbContext;
 use crate::transport::Bus;
 use crate::transport::Target;
 use crate::transport::common::uart::SerialPortUart;
-use crate::transport::qemu::gpio::{QemuGpio, QemuGpioBitbanging, QemuGpioPin};
+use crate::transport::qemu::gpio::{
+    QemuGpio, QemuGpioBitbanging, QemuGpioMonitoring, QemuGpioPin,
+};
 use crate::transport::qemu::i2c::QemuI2c;
 use crate::transport::qemu::jtag::QemuJtag;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
@@ -305,7 +307,7 @@ impl Transport for Qemu {
         // We have to unconditionally claim to support GPIO because of the reset
         // pin which actually goes via the monitor. Attempting to use a non-reset
         // GPIO pin in `.gpio_pin` will cause an error if GPIO isn't connected.
-        let mut cap = Capability::GPIO | Capability::GPIO_BITBANGING;
+        let mut cap = Capability::GPIO | Capability::GPIO_BITBANGING | Capability::GPIO_MONITORING;
 
         if !self.uarts.is_empty() || self.log.is_some() {
             cap |= Capability::UART;
@@ -383,6 +385,13 @@ impl Transport for Qemu {
             bail!("GPIO interface not connected");
         };
         Ok(Rc::new(QemuGpioBitbanging::new(Rc::clone(gpio))))
+    }
+
+    fn gpio_monitoring(&self) -> anyhow::Result<Rc<dyn GpioMonitoring>> {
+        let Some(ref gpio) = self.gpio else {
+            bail!("GPIO interface not connected");
+        };
+        Ok(Rc::new(QemuGpioMonitoring::new(Rc::clone(gpio))))
     }
 
     fn spi(&self, _instance: &str) -> anyhow::Result<Rc<dyn Target>> {
