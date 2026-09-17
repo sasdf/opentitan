@@ -6601,6 +6601,10 @@ opentitan_test(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_TEST_MSG,
     ),
+    qemu = qemu_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_TEST_MSG,
+    ),
     deps = [
         "//sw/device/lib/base:status_report_unittest_c",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -6624,6 +6628,10 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
     fpga = fpga_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
+    ),
+    qemu = qemu_params(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
     ),
