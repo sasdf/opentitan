@@ -248,7 +248,15 @@ opentitan_test(
 opentitan_test(
     name = "otp_ctrl_vendor_test_ecc_error_test",
     srcs = ["otp_ctrl_vendor_test_ecc_error_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        globals = {
+            "ot-otp-eg.inject-vendor-test-ecc-error": "true",
+        },
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
