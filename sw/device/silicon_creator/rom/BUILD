@@ -14,6 +14,7 @@ load(
     "opentitan_binary",
     "opentitan_manual_test",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
@@ -294,7 +295,8 @@ opentitan_test(
     srcs = [
         "rom_epmp_test.c",
     ],
-    # This test doesn't use the OTTF and can only run in verilator right now.
+    # This test doesn't use the OTTF and can only run in verilator and qemu
+    # right now.
     #
     # This test is designed to run and complete entirely in the ROM boot stage.
     # Setting `kind = "rom"` makes the `opentitan_test` rule aware
@@ -303,6 +305,7 @@ opentitan_test(
     # Verilator or CW310 params).
     exec_env = {
         "//hw/top_earlgrey:sim_verilator": None,
+        "//hw/top_earlgrey:sim_qemu_base": None,
     },
     kind = "rom",
     linker_script = ":linker_script",
@@ -565,18 +568,7 @@ genrule(
     """,
 )
 
-opentitan_test(
-    name = "stack_utilization_test",
-    cw310 = fpga_params(
-        binaries = {
-            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_fpga_cw310_rom_with_fake_keys_signed_bin": "good_a",
-            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0_fpga_cw310_rom_with_fake_keys_signed_bin": "good_b",
-            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_fpga_cw310_rom_with_fake_keys_signed_bin": "bad_a",
-            ":empty_flash": "empty",
-        },
-        stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
-        tags = ["manual"],
-        test_cmd = """
+_STACK_UTILIZATION_TEST_CMD = """
             --exec="no-op --info '
             ###########################################################################
             # This is a manual test.  Run it with:
@@ -622,10 +614,35 @@ opentitan_test(
             --exec="no-op --info '### Measuring stack utilization for empty flash'"
             --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='PASS|FAIL'"
             no-op
-        """,
+        """
+
+opentitan_test(
+    name = "stack_utilization_test",
+    cw310 = fpga_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_fpga_cw310_rom_with_fake_keys_signed_bin": "good_a",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0_fpga_cw310_rom_with_fake_keys_signed_bin": "good_b",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_fpga_cw310_rom_with_fake_keys_signed_bin": "bad_a",
+            ":empty_flash": "empty",
+        },
+        stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
+        tags = ["manual"],
+        test_cmd = _STACK_UTILIZATION_TEST_CMD,
         testopt_bootstrap = "False",
     ),
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
+    qemu = qemu_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_sim_qemu_rom_with_fake_keys_signed_bin": "good_a",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0_sim_qemu_rom_with_fake_keys_signed_bin": "good_b",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_sim_qemu_rom_with_fake_keys_signed_bin": "bad_a",
+            ":empty_flash": "empty",
+        },
+        stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
+        tags = ["manual"],
+        test_cmd = _STACK_UTILIZATION_TEST_CMD,
+    ),
 )
