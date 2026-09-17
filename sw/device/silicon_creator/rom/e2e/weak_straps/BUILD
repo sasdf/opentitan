@@ -6,6 +6,7 @@ load(
     "CLEAR_TEST_CMD",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "verilator_params",
 )
@@ -64,7 +65,13 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:sim_verilator": None,
         "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
+    qemu = qemu_params(
+        test_cmd = CLEAR_TEST_CMD,
+        test_harness = "//sw/host/tests/rom/sw_strap_value",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"

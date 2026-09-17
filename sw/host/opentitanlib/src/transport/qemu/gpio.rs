@@ -41,6 +41,12 @@ pub struct QemuGpio {
     /// - 1 indicates QEMU should treat this pin as a host -> device input.
     pub host_output_enable: u32,
 
+    /// Current host weak pull up/down configuration:
+    ///
+    /// - 0 indicates host pull down / none.
+    /// - 1 indicates host pull up.
+    pub host_pull_up: u32,
+
     /// Current outputs being driven from QEMU to host (if pin in output mode).
     pub qemu_to_host: u32,
 
@@ -84,6 +90,7 @@ impl QemuGpio {
             pins: HashMap::default(),
             host_to_qemu: 0x0,
             host_output_enable: 0x0,
+            host_pull_up: 0x0,
             qemu_to_host: 0x0,
             qemu_outputting: 0x0,
             qemu_pull: 0x0,
@@ -92,6 +99,51 @@ impl QemuGpio {
         };
 
         Ok(qemu_gpio)
+    }
+
+    fn process_single_frame(&mut self, line: &str) -> anyhow::Result<bool> {
+        let (cmd, value) = line
+            .split_once(":")
+            .context("bad QEMU GPIO frame: missing ':'")?;
+        let (cmd, value) = (cmd.trim(), value.trim());
+
+        let &[cmd] = cmd.as_bytes() else {
+            bail!("bad QEMU GPIO frame: expected single ascii char command, got {cmd}");
+        };
+
+        let value = u32::from_str_radix(value, 16).with_context(|| {
+            format!("bad QEMU GPIO frame: expected four-hex value, got {value}")
+        })?;
+
+        let cmd_char = cmd as char;
+        match cmd_char {
+            // QEMU wants us to clear / reset what we know about its pins.
+            QEMU_GPIO_CLEAR => {
+                self.qemu_to_host = 0;
+                self.qemu_outputting = 0;
+                self.qemu_pull = 0;
+                self.qemu_floating = 0;
+            }
+            // The direction of one or more pins has changed between input/output.
+            QEMU_GPIO_DIRECTION => self.qemu_outputting = value,
+            // The output of one or more pins has changed.
+            QEMU_GPIO_OUTPUT => self.qemu_to_host = value,
+            // The pull up/down of one or more pins has changed.
+            QEMU_GPIO_PULL => self.qemu_pull = value,
+            // QEMU is querying our inputs to its pins.
+            QEMU_GPIO_QUERY => {
+                self.send_frame(QEMU_GPIO_MASK, !self.host_output_enable)?;
+                self.send_frame(QEMU_GPIO_INPUT, self.host_to_qemu)?;
+                self.send_frame(QEMU_GPIO_PULL, self.host_pull_up)?;
+            }
+            // The hi-Z value of one or more pins has changed.
+            QEMU_GPIO_FLOATING => self.qemu_floating = value,
+            // QEMU is telling us what its last GPIO input values were
+            QEMU_GPIO_INPUT_FORWARD => self.qemu_input_fwd = value,
+            _ => bail!("unknown command from QEMU: {cmd_char}"),
+        }
+
+        Ok(cmd_char == QEMU_GPIO_INPUT_FORWARD)
     }
 
     /// Process all GPIO command frames received from QEMU over the TTY.
@@ -113,45 +165,7 @@ impl QemuGpio {
                 break; // EOF reached
             }
 
-            let (cmd, value) = line
-                .split_once(":")
-                .context("bad QEMU GPIO frame: missing ':'")?;
-            let (cmd, value) = (cmd.trim(), value.trim());
-
-            let &[cmd] = cmd.as_bytes() else {
-                bail!("bad QEMU GPIO frame: expected single ascii char command, got {cmd}");
-            };
-
-            let value = u32::from_str_radix(value, 16).with_context(|| {
-                format!("bad QEMU GPIO frame: expected four-hex value, got {value}")
-            })?;
-
-            match cmd as char {
-                // QEMU wants us to clear / reset what we know about its pins.
-                QEMU_GPIO_CLEAR => {
-                    self.qemu_to_host = 0;
-                    self.qemu_outputting = 0;
-                    self.qemu_pull = 0;
-                    self.qemu_floating = 0;
-                }
-                // The direction of one or more pins has changed between input/output.
-                QEMU_GPIO_DIRECTION => self.qemu_outputting = value,
-                // The output of one or more pins has changed.
-                QEMU_GPIO_OUTPUT => self.qemu_to_host = value,
-                // The pull up/down of one or more pins has changed.
-                QEMU_GPIO_PULL => self.qemu_pull = value,
-                // QEMU is querying our inputs to its pins.
-                QEMU_GPIO_QUERY => {
-                    self.send_frame(QEMU_GPIO_MASK, !self.host_output_enable)?;
-                    self.send_frame(QEMU_GPIO_INPUT, self.host_to_qemu)?;
-                }
-                // The hi-Z value of one or more pins has changed.
-                QEMU_GPIO_FLOATING => self.qemu_floating = value,
-                // QEMU is telling us what its last GPIO input values were
-                QEMU_GPIO_INPUT_FORWARD => self.qemu_input_fwd = value,
-                _ => bail!("unknown command from QEMU: {cmd}"),
-            }
-
+            self.process_single_frame(&line)?;
             line.clear();
         }
 
@@ -159,17 +173,42 @@ impl QemuGpio {
     }
 
     /// Send a GPIO command frame to QEMU telling it about how we're driving the pins.
-    ///
-    /// See [`QemuGpio::process_frames`] for a description of the frame format.
-    ///
-    /// Frame commands currently supported by QEMU are:
-    ///
-    /// * `I:<value>`:  the inputs to the device's pads are now `<value>`, if driven.
-    /// * `M:<value>`:  the inputs are masked with `<value>`, meaning driven/connected.
-    /// * `R:00000000`: ask QEMU to repeat the last `D` and `O` frames (see [`QemuGpio::process_frames`]).
     pub fn send_frame(&mut self, cmd: char, value: u32) -> anyhow::Result<()> {
         writeln!(self.stream.get_mut(), "{cmd}:{value:08x}")
             .context("failed to send GPIO frame")?;
+        self.stream.get_mut().flush()?;
+
+        Ok(())
+    }
+
+    /// Send a GPIO command frame to QEMU and wait synchronously for QEMU's input forward ACK (`Y:`).
+    pub fn send_frame_wait(&mut self, cmd: char, value: u32) -> anyhow::Result<()> {
+        self.stream.get_ref().set_nonblocking(true)?;
+        let _ = self.process_frames();
+        self.stream.get_ref().set_nonblocking(false)?;
+        self.stream
+            .get_ref()
+            .set_read_timeout(Some(Duration::from_millis(200)))?;
+
+        writeln!(self.stream.get_mut(), "{cmd}:{value:08x}")
+            .context("failed to send GPIO frame")?;
+        self.stream.get_mut().flush()?;
+
+        let mut line = String::new();
+        while let Ok(bytes_read) = self.stream.read_line(&mut line) {
+            if bytes_read == 0 {
+                break;
+            }
+            let is_ack = self.process_single_frame(&line)?;
+            line.clear();
+            if is_ack {
+                break;
+            }
+        }
+
+        self.stream
+            .get_ref()
+            .set_read_timeout(Some(Duration::from_millis(1)))?;
 
         Ok(())
     }
@@ -345,7 +384,7 @@ impl GpioPin for QemuGpioPin {
         }
 
         if new_value != gpio.host_to_qemu {
-            gpio.send_frame(QEMU_GPIO_INPUT, new_value)?;
+            gpio.send_frame_wait(QEMU_GPIO_INPUT, new_value)?;
             gpio.host_to_qemu = new_value;
         }
 
@@ -360,7 +399,7 @@ impl GpioPin for QemuGpioPin {
         if mode == PinMode::OpenDrain && (gpio.host_output_enable & mask) == 0 {
             if (gpio.host_to_qemu & mask) == 0 {
                 let val = gpio.host_to_qemu | mask;
-                gpio.send_frame(QEMU_GPIO_INPUT, val)?;
+                gpio.send_frame_wait(QEMU_GPIO_INPUT, val)?;
                 gpio.host_to_qemu = val;
             }
         }
@@ -374,7 +413,7 @@ impl GpioPin for QemuGpioPin {
         if new_value != gpio.host_output_enable {
             // Note: the protocol inverts this mask so that `1` means ignored
             // and `0` means connected.
-            gpio.send_frame(QEMU_GPIO_MASK, !new_value)?;
+            gpio.send_frame_wait(QEMU_GPIO_MASK, !new_value)?;
             gpio.host_output_enable = new_value;
         }
 
@@ -384,7 +423,21 @@ impl GpioPin for QemuGpioPin {
     }
 
     fn set_pull_mode(&self, mode: PullMode) -> anyhow::Result<()> {
-        // Currently ignored, see [`QemuGpioPin::pull_mode`].
+        let mut gpio = self.qemu_gpio.borrow_mut();
+        let mut new_value = gpio.host_pull_up;
+
+        let mask = 1 << self.idx;
+        if mode == PullMode::PullUp {
+            new_value |= mask;
+        } else {
+            new_value &= !mask;
+        }
+
+        if new_value != gpio.host_pull_up {
+            gpio.send_frame_wait(QEMU_GPIO_PULL, new_value)?;
+            gpio.host_pull_up = new_value;
+        }
+
         self.pull_mode.set(mode);
 
         Ok(())
