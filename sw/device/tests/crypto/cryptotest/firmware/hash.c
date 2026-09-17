@@ -17,7 +17,7 @@ status_t handle_hash(ujson_t *uj) {
   // Declare test arguments
   cryptotest_hash_algorithm_t uj_algorithm;
   cryptotest_hash_shake_digest_length_t uj_shake_digest_length;
-  cryptotest_hash_message_t uj_message;
+  static cryptotest_hash_message_t uj_message;
   // Deserialize test arguments from UART
   TRY(ujson_deserialize_cryptotest_hash_algorithm_t(uj, &uj_algorithm));
   TRY(ujson_deserialize_cryptotest_hash_shake_digest_length_t(
@@ -25,16 +25,11 @@ status_t handle_hash(ujson_t *uj) {
   TRY(ujson_deserialize_cryptotest_hash_message_t(uj, &uj_message));
 
   // Create input message
-  uint8_t msg_buf[uj_message.message_len];
-  memcpy(msg_buf, uj_message.message, uj_message.message_len);
   otcrypto_const_byte_buf_t input_message = OTCRYPTO_MAKE_BUF(
-      otcrypto_const_byte_buf_t, msg_buf, uj_message.message_len);
-  uint8_t customization_string_buf[uj_message.customization_string_len];
-  memcpy(customization_string_buf, uj_message.customization_string,
-         uj_message.customization_string_len);
-  otcrypto_const_byte_buf_t customization_string =
-      OTCRYPTO_MAKE_BUF(otcrypto_const_byte_buf_t, customization_string_buf,
-                        uj_message.customization_string_len);
+      otcrypto_const_byte_buf_t, uj_message.message, uj_message.message_len);
+  otcrypto_const_byte_buf_t customization_string = OTCRYPTO_MAKE_BUF(
+      otcrypto_const_byte_buf_t, uj_message.customization_string,
+      uj_message.customization_string_len);
   // If we are using cSHAKE, the empty function name tells cryptolib not to
   // apply any function on top of cSHAKE.
   otcrypto_const_byte_buf_t cshake_function_name =
@@ -135,7 +130,7 @@ status_t handle_hash(ujson_t *uj) {
     LOG_ERROR("Bad status value: 0x%x", status.value);
     return INTERNAL(status.value);
   }
-  cryptotest_hash_output_t uj_output;
+  static cryptotest_hash_output_t uj_output;
   uj_output.digest_len = digest_len * sizeof(uint32_t);
   // Copy oneshot digest to uJSON type
   memcpy(uj_output.oneshot_digest, digest_buf, digest_len * sizeof(uint32_t));
@@ -152,9 +147,11 @@ status_t handle_hash(ujson_t *uj) {
     // Split up input mesasge into 2 shares for better coverage of stepwise
     // hashing
     otcrypto_const_byte_buf_t input_message_share1 = OTCRYPTO_MAKE_BUF(
-        otcrypto_const_byte_buf_t, msg_buf, uj_message.message_len / 2);
+        otcrypto_const_byte_buf_t, uj_message.message,
+        uj_message.message_len / 2);
     otcrypto_const_byte_buf_t input_message_share2 = OTCRYPTO_MAKE_BUF(
-        otcrypto_const_byte_buf_t, &msg_buf[uj_message.message_len / 2],
+        otcrypto_const_byte_buf_t,
+        &uj_message.message[uj_message.message_len / 2],
         ceil_div(uj_message.message_len, 2));
     status = otcrypto_sha2_update(&ctx, &input_message_share1);
     if (status.value != kOtcryptoStatusValueOk) {
