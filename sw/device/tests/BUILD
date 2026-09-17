@@ -7489,6 +7489,12 @@ opentitan_test(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
     ),
+    qemu = qemu_params(
+        timeout = "moderate",
+        needs_jtag = True,
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
