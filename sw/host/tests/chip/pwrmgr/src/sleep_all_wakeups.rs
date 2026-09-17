@@ -49,7 +49,16 @@ fn sleep_all_wakeups_test(opts: &Opts, transport: &TransportWrapper) -> Result<(
             }
             _ => (),
         }
-        let vec = UartConsole::wait_for(&*uart, r"Woke up by source ([0-9]+)", opts.timeout)?;
+        let vec = UartConsole::wait_for(
+            &*uart,
+            r"PASS|FAIL|Woke up by source ([0-9]+)",
+            opts.timeout,
+        )?;
+        match vec[0].as_str() {
+            "PASS" => return Ok(()),
+            "FAIL" => return Err(anyhow!("Failure result: {:?}", vec)),
+            _ => {}
+        };
         assert_eq!(vec.len(), 2, "Expected unit number");
         let sleep_case: i32 = vec[1].parse().expect("expected a number");
         match sleep_case {

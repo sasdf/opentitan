@@ -39,15 +39,6 @@ static const uint32_t kNumDio = 16;  // top_earlgrey has 16 DIOs
 #define NUM_DIRECT_DIO 5
 static const uint32_t kDirectDio[NUM_DIRECT_DIO] = {6, 12, 13, 14, 15};
 
-static plic_isr_ctx_t plic_ctx = {.rv_plic = &plic,
-                                  .hart_id = kTopEarlgreyPlicTargetIbex0};
-
-static pwrmgr_isr_ctx_t pwrmgr_isr_ctx = {
-    .pwrmgr = &pwrmgr,
-    .plic_pwrmgr_start_irq_id = kTopEarlgreyPlicIrqIdPwrmgrAonWakeup,
-    .expected_irq = kDifPwrmgrIrqWakeup,
-    .is_only_irq = true};
-
 // Preserve wakeup_detector_selected over multiple resets
 OT_SET_BSS_SECTION(".non_volatile_scratch", uint32_t wakeup_detector_idx;)
 
@@ -59,16 +50,18 @@ OT_SECTION(".data") bool sival_ready_to_sleep = 0;
 /**
  * External interrupt handler.
  */
-void ottf_external_isr(uint32_t *exc_info) {
-  dif_pwrmgr_irq_t irq_id;
-  top_earlgrey_plic_peripheral_t peripheral;
-
-  isr_testutils_pwrmgr_isr(plic_ctx, pwrmgr_isr_ctx, &peripheral, &irq_id);
-
-  // Check that both the peripheral and the irq id is correct
-  CHECK(peripheral == kTopEarlgreyPlicPeripheralPwrmgrAon,
-        "IRQ peripheral: %d is incorrect", peripheral);
+bool ottf_handle_irq(uint32_t *exc_info,
+                     top_earlgrey_plic_peripheral_t peripheral,
+                     dif_rv_plic_irq_id_t plic_id) {
+  (void)exc_info;
+  if (peripheral != kTopEarlgreyPlicPeripheralPwrmgrAon) {
+    return false;
+  }
+  dif_pwrmgr_irq_t irq_id =
+      (dif_pwrmgr_irq_t)(plic_id - kTopEarlgreyPlicIrqIdPwrmgrAonWakeup);
   CHECK(irq_id == kDifPwrmgrIrqWakeup, "IRQ ID: %d is incorrect", irq_id);
+  CHECK_DIF_OK(dif_pwrmgr_irq_acknowledge(&pwrmgr, irq_id));
+  return true;
 }
 
 bool test_main(void) {

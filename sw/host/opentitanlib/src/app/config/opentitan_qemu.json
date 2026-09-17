@@ -45,6 +45,20 @@
       "pull_mode": "None",
       "alias_of": "24"
     },
+    {
+      "name": "Ioc0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "22"
+    },
+    {
+      "name": "IOC0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "22"
+    },
   ],
   "strappings": [
     {
