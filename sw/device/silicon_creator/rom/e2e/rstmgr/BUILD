@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_test", "qemu_params")
 load(
     "//rules:const.bzl",
     "CONST",
@@ -40,6 +40,7 @@ CPU_INFO_TESTCASES = [
     {
         "name": "disabled",
         "fpga": fpga_params(),
+        "qemu": qemu_params(),
         "defines": ["TEST_CPU_INFO_DISABLED"],
     },
     {
@@ -49,6 +50,11 @@ CPU_INFO_TESTCASES = [
 
             # These expectations only applies to earlgrey. See #27498.
             # After the ROM is fixed, the test should report PASS.
+            exit_success = "BFV:0152530d",
+            otp = ":otp_img_cpu_info_enabled",
+        ),
+        "qemu": qemu_params(
+            exit_failure = "PASS!",
             exit_success = "BFV:0152530d",
             otp = ":otp_img_cpu_info_enabled",
         ),
@@ -63,9 +69,11 @@ CPU_INFO_TESTCASES = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = testcase["fpga"],
         local_defines = testcase["defines"],
+        qemu = testcase["qemu"],
         deps = [
             "//sw/device/lib/base:macros",
             "//sw/device/lib/base:mmio",
@@ -110,11 +118,17 @@ ALERT_INFO_TESTCASES = [
         "fpga": fpga_params(
             otp = "//sw/device/silicon_creator/rom/e2e/shutdown_alert:otp_img_shutdown_alert_rma",
         ),
+        "qemu": qemu_params(
+            otp = "//sw/device/silicon_creator/rom/e2e/shutdown_alert:otp_img_shutdown_alert_rma",
+        ),
         "defines": ["TEST_ALERT_INFO_DISABLED"],
     },
     {
         "name": "enabled",
         "fpga": fpga_params(
+            otp = ":otp_img_alert_info_enabled",
+        ),
+        "qemu": qemu_params(
             otp = ":otp_img_alert_info_enabled",
         ),
         "defines": ["TEST_ALERT_INFO_ENABLED"],
@@ -128,9 +142,11 @@ ALERT_INFO_TESTCASES = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = testcase["fpga"],
         local_defines = testcase["defines"],
+        qemu = testcase["qemu"],
         deps = [
             "//hw/ip/uart/data:uart_c_regs",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
