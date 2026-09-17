@@ -433,7 +433,17 @@ opentitan_test(
 opentitan_test(
     name = "clkmgr_external_clk_src_for_lc_test",
     srcs = ["clkmgr_external_clk_src_for_lc_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":lc_ctrl_transition_test_otp_img",
+        test_cmd = "--expect-ext-clk",
+        test_harness = "//sw/host/tests/qemu:lc_ctrl_transition",
+    ),
     deps = [
         ":lc_ctrl_transition_impl",
         "//sw/device/lib/testing/test_framework:ottf_main",
