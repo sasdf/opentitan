@@ -300,8 +300,20 @@ bool test_main(void) {
     sec_mmio_init();
     kmac_keymgr_configure();
 
-    EXECUTE_TEST(result, keymgr_rom_test);
-    EXECUTE_TEST(result, keymgr_rom_ext_test);
+    if (sc_keymgr_state_check(kScKeymgrStateReset) == kErrorOk) {
+      EXECUTE_TEST(result, keymgr_rom_test);
+      EXECUTE_TEST(result, keymgr_rom_ext_test);
+    } else {
+      // When booted via sival_rom_ext, ROM and ROM_EXT have already advanced
+      // keymgr through Reset -> Init -> CreatorRootKey -> OwnerIntermediateKey
+      // -> OwnerKey. Verify OwnerKey state and SW binding unlock before
+      // disabling.
+      CHECK(sc_keymgr_state_check(kScKeymgrStateOwnerKey) == kErrorOk,
+            "Expected keymgr in OwnerKey state after ROM_EXT");
+      CHECK(abs_mmio_read32(TOP_EARLGREY_KEYMGR_BASE_ADDR +
+                            KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 1,
+            "Keymgr SW binding should be unlocked in OwnerKey state.");
+    }
     EXECUTE_TEST(result, keymgr_disable_test);
     return status_ok(result);
   } else {
