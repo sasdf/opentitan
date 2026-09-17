@@ -3163,6 +3163,10 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/pwm_smoketest",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/pwm_smoketest",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"

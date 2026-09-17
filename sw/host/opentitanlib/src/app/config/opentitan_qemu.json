@@ -60,6 +60,34 @@
       "alias_of": "22"
     },
     {
+      "name": "IOA0",
+      "alias_of": "0"
+    },
+    {
+      "name": "IOA1",
+      "alias_of": "1"
+    },
+    {
+      "name": "IOA2",
+      "alias_of": "2"
+    },
+    {
+      "name": "IOA3",
+      "alias_of": "3"
+    },
+    {
+      "name": "IOA4",
+      "alias_of": "4"
+    },
+    {
+      "name": "IOA5",
+      "alias_of": "5"
+    },
+    {
+      "name": "IOA6",
+      "alias_of": "6"
+    },
+    {
       "name": "Ioa7",
       "mode": "Input",
       "level": false,
@@ -156,7 +184,7 @@
       "level": false,
       "pull_mode": "None",
       "alias_of": "13"
-    },
+    }
   ],
   "strappings": [
     {
