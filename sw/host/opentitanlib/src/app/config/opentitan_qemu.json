@@ -60,6 +60,34 @@
       "alias_of": "22"
     },
     {
+      "name": "Ioa7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "7"
+    },
+    {
+      "name": "IOA7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "7"
+    },
+    {
+      "name": "Ioa8",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
+      "name": "IOA8",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
       "name": "IOB0",
       "mode": "Input",
       "level": false,

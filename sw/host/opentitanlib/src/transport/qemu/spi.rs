@@ -36,6 +36,7 @@ pub struct QemuSpi {
     tty: RefCell<TTYPort>,
 
     mode: Cell<TransferMode>,
+    max_speed: Cell<u32>,
 }
 
 impl QemuSpi {
@@ -48,8 +49,9 @@ impl QemuSpi {
         let tty = RefCell::new(tty);
 
         let mode = Cell::new(TransferMode::Mode0);
+        let max_speed = Cell::new(10_000_000);
 
-        Ok(QemuSpi { tty, mode })
+        Ok(QemuSpi { tty, mode, max_speed })
     }
 
     /// Send a SPI transfer header to QEMU.
@@ -182,11 +184,12 @@ impl Target for QemuSpi {
     }
 
     fn get_max_speed(&self) -> anyhow::Result<u32> {
-        Err(TransportError::UnsupportedOperation.into())
+        Ok(self.max_speed.get())
     }
 
-    fn set_max_speed(&self, _max_speed: u32) -> anyhow::Result<()> {
-        Err(TransportError::UnsupportedOperation.into())
+    fn set_max_speed(&self, max_speed: u32) -> anyhow::Result<()> {
+        self.max_speed.set(max_speed);
+        Ok(())
     }
 
     fn set_bits_per_word(&self, _bits_per_word: u32) -> anyhow::Result<()> {

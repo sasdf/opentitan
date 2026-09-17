@@ -4072,6 +4072,7 @@ opentitan_test(
     name = "spi_device_sleep_test",
     srcs = ["spi_device_sleep_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         EARLGREY_CW340_TEST_ENVS,
         {
@@ -4080,6 +4081,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
     ),
     silicon = silicon_params(
