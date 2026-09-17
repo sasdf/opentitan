@@ -5798,12 +5798,16 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:silicon_creator": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
         otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
         tags = ["coverage_broken"],  # FIXME: Coverage mode heap is too small.
         test_harness = "//sw/host/tests/chip/power_virus",
+    ),
+    qemu = qemu_params(
+        otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
     ),
     silicon = silicon_params(
         timeout = "long",
