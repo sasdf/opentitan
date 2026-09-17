@@ -7,6 +7,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -93,6 +94,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -101,6 +103,12 @@ test_suite(
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
