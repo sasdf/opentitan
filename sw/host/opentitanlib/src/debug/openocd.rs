@@ -128,7 +128,7 @@ impl OpenOcd {
         )
         .context("OpenOCD was not ready in time to accept a connection")?;
         let openocd_port: u16 = regex_captures.get(1).unwrap().as_str().parse()?;
-        // Print stdout and stderr with log
+        // Print stdout and stderr with log, or drain to sink to prevent SIGPIPE
         if log_stdio {
             std::thread::spawn(move || {
                 printer::accumulate(
@@ -143,6 +143,14 @@ impl OpenOcd {
                     concat!(module_path!(), "::stderr"),
                     Default::default(),
                 )
+            });
+        } else {
+            std::thread::spawn(move || {
+                let mut stdout = stdout;
+                let _ = std::io::copy(&mut stdout, &mut std::io::sink());
+            });
+            std::thread::spawn(move || {
+                let _ = std::io::copy(&mut stderr, &mut std::io::sink());
             });
         }
 
