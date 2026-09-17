@@ -346,7 +346,12 @@ impl Transport for Qemu {
     }
 
     fn i2c(&self, instance: &str) -> anyhow::Result<Rc<dyn Bus>> {
-        match self.i2cs.get(instance) {
+        let lookup = if instance == "TPM" || instance == "default" {
+            "0"
+        } else {
+            instance
+        };
+        match self.i2cs.get(lookup) {
             Some(i2c) => Ok(Rc::clone(i2c)),
             None => Err(TransportError::InvalidInstance(
                 TransportInterfaceType::I2c,
