@@ -2657,6 +2657,7 @@ opentitan_test(
     name = "kmac_entropy_test",
     srcs = ["kmac_entropy_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
@@ -2681,6 +2682,7 @@ opentitan_test(
     name = "kmac_error_conditions_test",
     srcs = ["kmac_error_conditions_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
