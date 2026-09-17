@@ -41,13 +41,19 @@ struct Opts {
     #[command(flatten)]
     init: InitializeTest,
 
-    /// Firmware image to reload via bootstrap after RMA flash wipe.
+    /// Run `lc_walkthrough_testunlocks_test` (walkthrough TestUnlocked0..7 via TestLocked0..6).
+    #[arg(long, default_value_t = false)]
+    pub testunlocks: bool,
+
+    /// Firmware image to reload via bootstrap after RMA flash wipe (`lc_walkthrough_test`).
     #[arg(long)]
-    pub firmware: PathBuf,
+    pub firmware: Option<PathBuf>,
 
     #[arg(long, value_parser = humantime::parse_duration, default_value = "60s")]
     pub timeout: Duration,
 }
+
+const TEST_UNLOCK_TOKEN_PREIMAGE: [u32; 4] = [0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c];
 
 fn main() -> Result<()> {
     let opts = Opts::parse();
@@ -88,9 +94,105 @@ fn main() -> Result<()> {
         DifLcCtrlState::TestUnlocked0,
         Some(token_words),
         /*use_external_clk=*/ true,
-        /*reset_tap_straps=*/ None,
+        /*reset_tap_straps=*/ Some(JtagTap::LcTap),
     )
     .context("Failed JTAG transition to TEST_UNLOCKED0")?;
+
+    if opts.testunlocks {
+        let locked_states = [
+            DifLcCtrlState::TestLocked0,
+            DifLcCtrlState::TestLocked1,
+            DifLcCtrlState::TestLocked2,
+            DifLcCtrlState::TestLocked3,
+            DifLcCtrlState::TestLocked4,
+            DifLcCtrlState::TestLocked5,
+            DifLcCtrlState::TestLocked6,
+        ];
+        let unlocked_states = [
+            DifLcCtrlState::TestUnlocked1,
+            DifLcCtrlState::TestUnlocked2,
+            DifLcCtrlState::TestUnlocked3,
+            DifLcCtrlState::TestUnlocked4,
+            DifLcCtrlState::TestUnlocked5,
+            DifLcCtrlState::TestUnlocked6,
+            DifLcCtrlState::TestUnlocked7,
+        ];
+
+        for i in 0..7 {
+            log::info!(
+                "Waiting for SW to request transition to {:?}...",
+                locked_states[i]
+            );
+            _ = UartConsole::wait_for(
+                &*uart,
+                r"Waiting for LC transtition \d+ done and reboot\.",
+                opts.timeout,
+            )
+            .with_context(|| {
+                format!(
+                    "Failed waiting for SW to initiate transition to {:?}",
+                    locked_states[i]
+                )
+            })?;
+
+            log::info!("Resetting into {:?}...", locked_states[i]);
+            uart.clear_rx_buffer()?;
+            transport.reset(UartRx::Clear)?;
+
+            let mut jtag = opts
+                .init
+                .jtag_params
+                .create(&transport)?
+                .connect(JtagTap::LcTap)
+                .with_context(|| format!("Failed to connect to LC TAP in {:?}", locked_states[i]))?;
+
+            let state = jtag.read_lc_ctrl_reg(&LcCtrlReg::LcState)?;
+            ensure!(
+                state == locked_states[i].redundant_encoding(),
+                "Expected LC state {:?}, got 0x{:x}",
+                locked_states[i],
+                state
+            );
+            let exp_cnt = (2 * i + 2) as u32;
+            let cnt = jtag.read_lc_ctrl_reg(&LcCtrlReg::LcTransitionCnt)?;
+            ensure!(
+                cnt == exp_cnt,
+                "Expected LC transition count {}, got {}",
+                exp_cnt,
+                cnt
+            );
+
+            log::info!(
+                "Triggering JTAG transition from {:?} to {:?}...",
+                locked_states[i],
+                unlocked_states[i]
+            );
+            uart.clear_rx_buffer()?;
+            lc_transition::trigger_lc_transition(
+                &transport,
+                jtag,
+                unlocked_states[i],
+                Some(TEST_UNLOCK_TOKEN_PREIMAGE),
+                /*use_external_clk=*/ true,
+                /*reset_tap_straps=*/ Some(JtagTap::LcTap),
+            )
+            .with_context(|| {
+                format!(
+                    "Failed JTAG transition from {:?} to {:?}",
+                    locked_states[i], unlocked_states[i]
+                )
+            })?;
+        }
+
+        transport.pin_strapping("PINMUX_TAP_LC")?.remove()?;
+
+        log::info!("Waiting for test PASS in TEST_UNLOCKED7...");
+        _ = UartConsole::wait_for(&*uart, r"PASS!.*", opts.timeout)
+            .context("Failed waiting for test PASS in TEST_UNLOCKED7")?;
+
+        log::info!("LC walkthrough testunlocks test completed successfully.");
+        return Ok(());
+    }
 
     transport.pin_strapping("PINMUX_TAP_LC")?.remove()?;
 
@@ -122,9 +224,13 @@ fn main() -> Result<()> {
     // re-bootstrap the firmware image over SPI and wait for SW test PASS.
     log::info!("Phase 5: Bootstrapping firmware into RMA state after flash wipe...");
     uart.clear_rx_buffer()?;
+    let firmware = opts
+        .firmware
+        .as_ref()
+        .context("--firmware is required for lc_walkthrough_test")?;
     opts.init
         .bootstrap
-        .load(&transport, &opts.firmware)
+        .load(&transport, firmware)
         .context("Failed to bootstrap firmware after RMA transition")?;
 
     _ = UartConsole::wait_for(&*uart, r"PASS!.*", opts.timeout)
