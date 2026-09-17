@@ -6005,8 +6005,6 @@ _RV_DM_TEST_CONFIGURATIONS = [
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
             tags = [
                 "lc_{}".format(test_cfg["lc_state"]),
-                # Delayed enable currently not working in QEMU.
-                "broken" if test_cfg["rv_dm_delayed_en"] != "" else "",
             ],
             test_cmd = """
                 --bootstrap="{firmware}"
@@ -6544,6 +6542,11 @@ opentitan_test(
         otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
         # TODO(#22823): Remove "broken" tag once the test is fixed.
         tags = ["broken"],
+        test_harness = "//sw/host/tests/chip/jtag:openocd_test",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
         test_harness = "//sw/host/tests/chip/jtag:openocd_test",
     ),
     deps = [
