@@ -365,6 +365,15 @@ def _test_dispatch(ctx, exec_env, firmware):
         image = firmware.signed_bin or firmware.default
     else:
         image = None
+        for attr, name in ctx.attr.binaries.items():
+            if name == "firmware":
+                if exec_env.provider and exec_env.provider in attr:
+                    image = getattr(attr[exec_env.provider], "signed_bin", None) or attr[exec_env.provider].default
+                elif DefaultInfo in attr:
+                    for f in attr[DefaultInfo].files.to_list():
+                        if f.extension != "dis":
+                            image = f
+                            break
 
     # Replace the firmware param with the newly assembled image.
     if image:
