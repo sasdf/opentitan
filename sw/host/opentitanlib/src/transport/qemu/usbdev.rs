@@ -533,21 +533,45 @@ impl UsbDevice for QemuUsbDevice {
     /// Read bulk data bytes to given USB endpoint.
     fn read_bulk_timeout(
         &self,
-        _endpoint: u8,
-        _data: &mut [u8],
-        _timeout: Duration,
+        endpoint: u8,
+        data: &mut [u8],
+        timeout: Duration,
     ) -> anyhow::Result<usize> {
-        anyhow::bail!("unimplemented");
+        let ep = endpoint & !USBDEV_TRANSFER_EP_IN;
+        let (send, recv) = mpsc::channel();
+        self.host_channel
+            .send(HostChannelEvent::SubmitInTransfer {
+                generation: self.dev_info.generation,
+                ep,
+                length: data.len(),
+                answer: send,
+            })
+            .context("failed to submit IN transfer for bulk read")?;
+        let recv_data = recv.recv_timeout(timeout)??;
+        let copy_len = std::cmp::min(data.len(), recv_data.len());
+        data[..copy_len].copy_from_slice(&recv_data[..copy_len]);
+        Ok(copy_len)
     }
 
     /// Write bulk data bytes to given USB endpoint.
     fn write_bulk_timeout(
         &self,
-        _endpoint: u8,
-        _data: &[u8],
-        _timeout: Duration,
+        endpoint: u8,
+        data: &[u8],
+        timeout: Duration,
     ) -> anyhow::Result<usize> {
-        anyhow::bail!("unimplemented");
+        let ep = endpoint & !USBDEV_TRANSFER_EP_IN;
+        let (send, recv) = mpsc::channel();
+        self.host_channel
+            .send(HostChannelEvent::SubmitOutTransfer {
+                generation: self.dev_info.generation,
+                ep,
+                data: data.to_vec(),
+                answer: send,
+            })
+            .context("failed to submit OUT transfer for bulk write")?;
+        let sent_size = recv.recv_timeout(timeout)??;
+        Ok(sent_size)
     }
 }
 
@@ -1348,15 +1372,27 @@ impl QemuHostThread {
         &self,
         dev_info: &DeviceInfo,
         ep: u8,
-        _dir_in: bool,
+        dir_in: bool,
     ) -> UsbResult<u16> {
-        // TODO
-        if ep != 0 {
-            Err(anyhow!("unimplemented endpoint_max_pkt_size for EP{ep}"))?;
+        if ep == 0 {
+            return Ok(desc::DeviceDescriptor::ref_from_bytes(&dev_info.dev_desc)
+                .unwrap()
+                .max_pkt_size as u16);
         }
-        Ok(desc::DeviceDescriptor::ref_from_bytes(&dev_info.dev_desc)
-            .unwrap()
-            .max_pkt_size as u16)
+        let target_addr = (ep & 0x7f) | if dir_in { 0x80 } else { 0x00 };
+        for cfg_bytes in &dev_info.configurations {
+            let config = desc::Configuration::new(cfg_bytes);
+            for intf in config.interface_alt_settings() {
+                for endpoint in intf.endpoints() {
+                    if let Ok(desc) = endpoint.descriptor()
+                        && desc.addr == target_addr
+                    {
+                        return Ok(desc.max_pkt_size.get());
+                    }
+                }
+            }
+        }
+        Ok(64)
     }
 
     fn submit_in_transfer(
@@ -1416,10 +1452,11 @@ impl QemuHostThread {
             };
             // Ignore send error if receiver has disconnected.
             let _ = answer.send(res);
+        } else {
+            log::debug!(
+                "USB Host: ignore complete event (ID {id:?}), does not match any known pending transfer"
+            );
         }
-        log::debug!(
-            "USB Host: ignore complete event (ID {id:?}), does not match any known pending transfer"
-        );
         Ok(())
     }
 
