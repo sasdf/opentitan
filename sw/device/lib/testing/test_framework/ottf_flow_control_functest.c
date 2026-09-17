@@ -24,7 +24,7 @@ status_t ottf_flow_control_test(ujson_t *uj) {
   // event while in the wait loop.
   uint32_t delay = kDeviceType == kDeviceSimVerilator ? 1 : 500000;
   if (kDeviceType == kDeviceSimQemu) {
-    delay = 20000;
+    delay = 150000;
   }
   for (size_t i = 0; i < 10; ++i) {
     // Print a bunch of stuff so that ibex will be busy
