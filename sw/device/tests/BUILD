@@ -6419,8 +6419,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:dtm",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6457,8 +6466,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:control_status",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6495,8 +6513,20 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_wakeup",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6552,8 +6582,20 @@ test_suite(
         srcs = ["rv_dm_access_after_hw_reset.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_hw_reset",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
