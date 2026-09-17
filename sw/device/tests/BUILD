@@ -6544,6 +6544,10 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
+    ),
     deps = [
         "//sw/device/lib/arch:device",
         "//sw/device/lib/dif:i2c",
