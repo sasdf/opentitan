@@ -458,6 +458,11 @@ def _test_dispatch(ctx, exec_env, firmware):
     # default `test_cmd`.
     if ctx.attr.test_harness:
         test_cmd = ctx.attr.test_cmd
+    elif ctx.attr.test_cmd:
+        test_cmd = """
+            --exec="transport init"
+            {bootstrap_cmd}
+        """ + ctx.attr.test_cmd
     else:
         test_cmd = exec_env.test_cmd
     test_cmd = test_cmd.format(**param)
