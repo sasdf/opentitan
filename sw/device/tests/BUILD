@@ -2573,12 +2573,12 @@ opentitan_test(
 )
 
 _KMAC_APP_ROM_LIST = [
-    ("//sw/device/lib/testing/test_rom:test_rom_sim_verilator_hashfile", "sim_verilator"),
-    ("//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_hashfile", "fpga_cw310_test_rom"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "fpga_cw310_rom_with_fake_keys"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "fpga_cw310_sival"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_hashfile", "fpga_cw340_sival"),
-    ("//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile", "sim_dv"),
+    ("//sw/device/lib/testing/test_rom:test_rom_sim_verilator_hashfile", "//sw/device/lib/testing/test_rom:test_rom_sim_verilator_scr_vmem", "sim_verilator"),
+    ("//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_hashfile", "//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_scr_vmem", "fpga_cw310_test_rom"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", None, "fpga_cw310_rom_with_fake_keys"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_scr_vmem", "fpga_cw310_sival"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_hashfile", "//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_scr_vmem", "fpga_cw340_sival"),
+    ("//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile", "//sw/device/lib/testing/test_rom:test_rom_sim_dv_scr_vmem", "sim_dv"),
 ]
 
 [
@@ -2589,9 +2589,12 @@ _KMAC_APP_ROM_LIST = [
             hashfile,
         ],
         exec_env = {
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:{}".format(exec_env): None,
         },
+        qemu = qemu_params(
+            rom = rom_vmem,
+        ),
         deps = [
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
             "//sw/device/lib/base:mmio",
@@ -2600,14 +2603,14 @@ _KMAC_APP_ROM_LIST = [
             "//sw/device/lib/testing/test_framework:ottf_main",
         ],
     )
-    for (hashfile, exec_env) in _KMAC_APP_ROM_LIST
+    for (hashfile, rom_vmem, exec_env) in _KMAC_APP_ROM_LIST
 ]
 
 test_suite(
     name = "kmac_app_rom_test",
     tests = [
         "kmac_app_rom_test_{}".format(exec_env)
-        for (_, exec_env) in _KMAC_APP_ROM_LIST
+        for (_, _, exec_env) in _KMAC_APP_ROM_LIST
     ],
 )
 

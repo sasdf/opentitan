@@ -82,6 +82,18 @@ legacy_rom_targets(
     ]
 ]
 
+[
+    filegroup(
+        name = "test_rom_{}_scr_vmem".format(dev),
+        srcs = [":test_rom"],
+        output_group = "{}_rom".format(dev),
+    )
+    for dev in [
+        "sim_dv",
+        "sim_verilator",
+    ]
+]
+
 # TODO(#12905): Use a slightly hollowed out version of the silicon_creator bootstrap
 # and other functions necessary to build the test_rom for the english breakfast top level.
 cc_library(
