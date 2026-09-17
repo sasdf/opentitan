@@ -29,6 +29,16 @@ def _qemu_bazel_build_or_forward_impl(rctx):
         if not configure_script.exists:
             fail("There is no configure script in the source directory, did you override the QEMU source correctly?")
 
+        # Watch everything in the source directory before building so changes
+        # always invalidate the repo rule even if a build fails.
+        for child in qemu_root.readdir():
+            # Skip the build directory because it can cause weird bazel behaviour:
+            # this directory has symlinks and cycles.
+            if not child.is_dir:
+                rctx.watch(child)
+            elif child.is_dir and child.basename != "build":
+                rctx.watch_tree(child)
+
         # Run the build script which will produce a release archive
         release_archive = "build_archive.tar.gz"
         rctx.watch(rctx.attr._build_qemu)
@@ -45,15 +55,6 @@ def _qemu_bazel_build_or_forward_impl(rctx):
 
         # Extract archive here.
         rctx.extract(rctx.path(release_archive))
-
-        # Watch everything in the source directory.
-        for child in qemu_root.readdir():
-            # Skip the build directory because it can cause weird bazel behaviour:
-            # this directory has symlinks and cycles.
-            if not child.is_dir:
-                rctx.watch(child)
-            elif child.is_dir and child.basename != "build":
-                rctx.watch_tree(child)
 
         # Create a single BUILD file that exports everything.
         rctx.file("BUILD", rctx.read(rctx.path(rctx.attr._build_file)))
