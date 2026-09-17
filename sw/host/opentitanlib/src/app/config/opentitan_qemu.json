@@ -127,14 +127,14 @@
       "name": "Ioa7",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
+      "pull_mode": "PullUp",
       "alias_of": "7"
     },
     {
       "name": "IOA7",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
+      "pull_mode": "PullUp",
       "alias_of": "7"
     },
     {
@@ -197,7 +197,7 @@
       "name": "IOR7",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
+      "pull_mode": "PullUp",
       "alias_of": "7"
     },
     {

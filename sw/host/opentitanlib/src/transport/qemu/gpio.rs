@@ -101,7 +101,7 @@ impl QemuGpio {
             pins: HashMap::default(),
             host_to_qemu: 0x0,
             host_output_enable: 0x0,
-            host_pull_up: 0x0,
+            host_pull_up: 1 << 7,
             qemu_to_host: 0x0,
             qemu_outputting: 0x0,
             qemu_pull: 0x0,
