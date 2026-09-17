@@ -6692,11 +6692,16 @@ opentitan_test(
     # compatible with both pre- and post-silicon test environments.
     exec_env = {
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/example_sival",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/example_sival",
     ),
