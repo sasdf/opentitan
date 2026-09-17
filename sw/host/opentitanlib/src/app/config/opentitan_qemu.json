@@ -46,6 +46,20 @@
       "alias_of": "24"
     },
     {
+      "name": "TAP_STRAP0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "30"
+    },
+    {
+      "name": "TAP_STRAP1",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "27"
+    },
+    {
       "name": "Ioc0",
       "mode": "PushPull",
       "level": false,
@@ -301,15 +315,51 @@
         }
       ]
     },
-    // QEMU does not currently model TAP straps, the JTAG interfaces are always available.
-    // For now we model both straps as no-ops without any pins.
-    {
-      "name": "PINMUX_TAP_RISCV",
-      "pins": [],
-    },
+    // TAP_STRAP0 (IOC8 / pin 30) and TAP_STRAP1 (IOC5 / pin 27) select JTAG TAP.
     {
       "name": "PINMUX_TAP_LC",
-      "pins": [],
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": true
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": false
+        }
+      ]
+    },
+    {
+      "name": "PINMUX_TAP_RISCV",
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": false
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": true
+        }
+      ]
+    },
+    {
+      "name": "PINMUX_TAP_DFT",
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": true
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": true
+        }
+      ]
     },
     {
       "name": "SPI_TPM"
