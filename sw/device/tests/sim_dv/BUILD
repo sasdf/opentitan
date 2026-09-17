@@ -1065,10 +1065,26 @@ opentitan_test(
     ],
 )
 
+otp_image(
+    name = "otp_ctrl_lc_signals_test_otp_img",
+    src = "//hw/ip/otp_ctrl/data:otp_json_dev",
+    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
+        "//hw/ip/otp_ctrl/data:otp_json_secret0",
+        "//hw/ip/otp_ctrl/data:otp_json_secret1",
+    ],
+)
+
 opentitan_test(
     name = "otp_ctrl_lc_signals_test",
     srcs = ["otp_ctrl_lc_signals_test.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    qemu = qemu_params(
+        otp = ":otp_ctrl_lc_signals_test_otp_img",
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:memory",

@@ -246,8 +246,14 @@ static void keymgr_check_can_generate_key(void) {
   CHECK_STATUS_OK(keymgr_testutils_wait_for_operation_done(&keymgr));
   CHECK_STATUS_OK(
       keymgr_testutils_check_state(&keymgr, kDifKeymgrStateCreatorRootKey));
+  uint32_t max_key_version;
   CHECK_STATUS_OK(
-      keymgr_testutils_generate_versioned_key(&keymgr, kKeyVersionedParams));
+      keymgr_testutils_max_key_version_get(&keymgr, &max_key_version));
+  dif_keymgr_versioned_key_params_t params = kKeyVersionedParams;
+  if (params.version > max_key_version) {
+    params.version = max_key_version;
+  }
+  CHECK_STATUS_OK(keymgr_testutils_generate_versioned_key(&keymgr, params));
 }
 
 /**

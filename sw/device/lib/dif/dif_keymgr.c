@@ -348,6 +348,17 @@ dif_result_t dif_keymgr_advance_state_raw(const dif_keymgr_t *keymgr) {
     return kDifLocked;
   }
 
+  max_key_version_reg_info_t max_key_ver_reg_info;
+  uint32_t reg_working_state =
+      mmio_region_read32(keymgr->base_addr, KEYMGR_WORKING_STATE_REG_OFFSET);
+  if (!get_max_key_version_reg_info_for_next_state(
+          (bitfield_field32_read(reg_working_state,
+                                 KEYMGR_WORKING_STATE_STATE_FIELD)),
+          &max_key_ver_reg_info) ||
+      !max_key_ver_reg_info.is_required) {
+    return kDifError;
+  }
+
   // Advance state.
   start_operation(keymgr,
                   (start_operation_params_t){
