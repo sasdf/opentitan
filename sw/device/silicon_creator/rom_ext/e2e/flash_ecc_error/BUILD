@@ -231,6 +231,7 @@ opentitan_binary(
                 --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
                 no-op
             """,
+            testopt_bootstrap = "False",
         ),
     )
     for t in BOOT_POLICY_FLASH_ECC_ERROR_TESTS
@@ -303,6 +304,7 @@ opentitan_test(
             --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
             no-op
         """,
+        testopt_bootstrap = "False",
     ),
 )
 
