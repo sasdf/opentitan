@@ -385,8 +385,10 @@ static status_t ed25519_pct_verify(const otcrypto_blinded_key_t *private_key,
                                    const otcrypto_unblinded_key_t *public_key) {
   // Use a zero-initialized dummy message for sign and verify.
   uint8_t dummy_msg_data[32] = {0};
-  otcrypto_const_byte_buf_t dummy_msg =
-      otcrypto_make_const_byte_buf(dummy_msg_data, sizeof(dummy_msg_data));
+  otcrypto_const_byte_buf_t dummy_msg = {
+      .data = dummy_msg_data,
+      .len = sizeof(dummy_msg_data),
+  };
 
   enum {
     kEd25519SigWords = sizeof(curve25519_signature_t) / sizeof(uint32_t),

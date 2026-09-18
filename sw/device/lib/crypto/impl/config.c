@@ -9,7 +9,6 @@
 #include "sw/device/lib/crypto/drivers/alert.h"
 #include "sw/device/lib/crypto/drivers/entropy.h"
 #include "sw/device/lib/crypto/drivers/keymgr.h"
-#include "sw/device/lib/crypto/drivers/kmac.h"
 #include "sw/device/lib/crypto/drivers/otbn.h"
 #include "sw/device/lib/crypto/drivers/rv_core_ibex.h"
 #include "sw/device/lib/crypto/impl/cmvp.h"
@@ -93,9 +92,6 @@ otcrypto_status_t otcrypto_init(otcrypto_key_security_level_t security_level,
 
   // Instantiate the entropy source in FIPS mode.
   HARDENED_TRY(entropy_complex_start(kHardenedBoolTrue));
-
-  // Configure KMAC hardware to use EDN entropy for DOM masking.
-  HARDENED_TRY(kmac_hwip_default_configure());
 
   // The OTBN is still left with DMEM from the boot.
   HARDENED_TRY(otbn_dmem_sec_wipe());

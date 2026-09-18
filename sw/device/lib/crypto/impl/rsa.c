@@ -550,8 +550,10 @@ static otcrypto_status_t rsa_pct_verify(
     otcrypto_rsa_size_t size, const otcrypto_unblinded_key_t *public_key,
     const otcrypto_blinded_key_t *private_key) {
   uint8_t dummy_msg_data[32] = {0};
-  otcrypto_const_byte_buf_t msg =
-      otcrypto_make_const_byte_buf(dummy_msg_data, sizeof(dummy_msg_data));
+  otcrypto_const_byte_buf_t msg = {
+      .data = dummy_msg_data,
+      .len = sizeof(dummy_msg_data),
+  };
 
   uint32_t sig_data[128];
   size_t sig_words = 0;
