@@ -131,6 +131,7 @@ pub fn run_sram_ft_individualize(
             "FT_INDIVIDUALIZE_DATA_IN".to_string(),
             ft_individualize_data_in.send(spi_console)?,
         );
+        spi_console.flush_tx_buf()?;
     }
 
     // Wait for provisioning operations to complete.
@@ -140,7 +141,10 @@ pub fn run_sram_ft_individualize(
     log::info!("after timeout, sp = {:x}", sp);
     match sp {
         SRAM_MAGIC_SP_EXECUTION_DONE => {}
-        _ => panic!("SRAM program load/execution failed: sp = {:?}.", sp),
+        _ => {
+            let _ = jtag.disconnect();
+            panic!("SRAM program load/execution failed: sp = {:?}.", sp);
+        }
     }
 
     // Switch TAP straps to LC TAP (without resetting) to aid debugging if there are OTP issues.

@@ -160,7 +160,7 @@ impl<'a> SpiConsoleDevice<'a> {
         }
         Ok(self)
     }
-    fn flush_tx_buf(&self) -> Result<()> {
+    pub fn flush_tx_buf(&self) -> Result<()> {
         let mut tx_buf = self.tx_buf.borrow_mut();
         if tx_buf.is_empty() {
             return Ok(());
@@ -248,7 +248,10 @@ impl<'a> ConsoleDevice for SpiConsoleDevice<'a> {
 
     fn console_write(&self, buf: &[u8]) -> Result<()> {
         self.tx_buf.borrow_mut().extend_from_slice(buf);
-        if self.tx_buf.borrow().len() >= SpiConsoleDevice::SPI_FLASH_PAYLOAD_BUFFER_SIZE {
+        if buf.ends_with(b"}")
+            || buf.contains(&b'\n')
+            || self.tx_buf.borrow().len() >= SpiConsoleDevice::SPI_FLASH_PAYLOAD_BUFFER_SIZE
+        {
             self.flush_tx_buf()?;
         }
         Ok(())
