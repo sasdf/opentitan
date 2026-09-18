@@ -616,6 +616,21 @@ _STACK_UTILIZATION_TEST_CMD = """
             no-op
         """
 
+opentitan_binary(
+    name = "mask_rom_stack_utilization",
+    collect_code_coverage = 0,
+    exec_env = [
+        "//hw/top_earlgrey:sim_qemu_base",
+    ],
+    extra_bazel_copts = ["-DSTACK_UTILIZATION_CHECK"],
+    kind = "rom",
+    linker_script = ":linker_script",
+    deps = [
+        ":mask_rom_lib",
+        ":rom_isrs",
+    ],
+)
+
 opentitan_test(
     name = "stack_utilization_test",
     cw310 = fpga_params(
@@ -641,8 +656,8 @@ opentitan_test(
             "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_sim_qemu_rom_with_fake_keys_signed_bin": "bad_a",
             ":empty_flash": "empty",
         },
+        rom = ":mask_rom_stack_utilization",
         stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
-        tags = ["manual"],
         test_cmd = _STACK_UTILIZATION_TEST_CMD,
     ),
 )
