@@ -514,19 +514,42 @@ cc_library(
 opentitan_test(
     name = "otbn_boot_services_functest",
     srcs = ["otbn_boot_services_functest.c"],
-    broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
+        dicts.omit(
+            EARLGREY_TEST_ENVS,
+            [
+                # See #21706, expects keymgr state 0 so not working after ROM_EXT.
+                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
+                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+            ],
+        ),
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
-            # See #21706, expects keymgr state 0 so not working after ROM_EXT.
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
         },
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
     verilator = verilator_params(tags = ["manual"]),
+    # This target uses OTBN pointers internally, so it cannot work host-side.
+    deps = [
+        ":otbn_boot_services",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/crypto/drivers:entropy",
+        "//sw/device/lib/testing:keymgr_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/manuf/lib:flash_info_fields",
+    ],
+)
+
+opentitan_test(
+    name = "otbn_boot_services_rom_ext_functest",
+    srcs = ["otbn_boot_services_rom_ext_functest.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
     # This target uses OTBN pointers internally, so it cannot work host-side.
     deps = [
         ":otbn_boot_services",

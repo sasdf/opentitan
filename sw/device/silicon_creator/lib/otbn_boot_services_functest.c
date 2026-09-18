@@ -88,17 +88,6 @@ rom_error_t sigverify_with_bad_signature_test(void) {
 }
 
 rom_error_t attestation_keygen_test(void) {
-  dif_keymgr_state_t keymgr_state;
-  CHECK_DIF_OK(dif_keymgr_get_state(&keymgr, &keymgr_state));
-  sc_keymgr_diversification_t div_cdi0 = kDiversification;
-  sc_keymgr_diversification_t div_cdi1 = kDiversification;
-  if (keymgr_state == kDifKeymgrStateOwnerRootKey) {
-    // When booted via sival_rom_ext, flash info page 4 is locked unprovisioned
-    // (all zero seeds), so differentiate CDI0/CDI1 keys via diversification.
-    div_cdi0.salt[0] ^= 1;
-    div_cdi1.salt[0] ^= 2;
-  }
-
   // Check that key generations with different seeds result in different keys.
   ecdsa_p256_public_key_t pk_uds;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldUdsKeySeedIdx,
@@ -107,11 +96,11 @@ rom_error_t attestation_keygen_test(void) {
   ecdsa_p256_public_key_t pk_cdi0;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi0KeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
-                                               div_cdi0, &pk_cdi0));
+                                               kDiversification, &pk_cdi0));
   ecdsa_p256_public_key_t pk_cdi1;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi1KeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
-                                               div_cdi1, &pk_cdi1));
+                                               kDiversification, &pk_cdi1));
   ecdsa_p256_public_key_t pk_tpm_ek;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldTpmEkKeySeedIdx,
                                                kScKeymgrKeyTypeSealing,
@@ -158,23 +147,19 @@ rom_error_t attestation_advance_and_endorse_test(void) {
                                                  kScKeymgrKeyTypeAttestation,
                                                  kDiversification));
 
-  // Advance keymgr to the next stage if not already at OwnerRootKey (e.g. when
-  // booted via sival_rom_ext).
-  dif_keymgr_state_t keymgr_state;
-  CHECK_DIF_OK(dif_keymgr_get_state(&keymgr, &keymgr_state));
-  sc_keymgr_diversification_t next_div = kDiversification;
-  if (keymgr_state == kDifKeymgrStateCreatorRootKey) {
-    CHECK(num_keymgr_advances == 0);
+  // Advance keymgr to the next stage.
+  if (num_keymgr_advances == 0) {
+    CHECK_STATUS_OK(
+        keymgr_testutils_check_state(&keymgr, kDifKeymgrStateCreatorRootKey));
     CHECK_STATUS_OK(keymgr_testutils_advance_state(&keymgr, &kOwnerIntParams));
     num_keymgr_advances++;
-  } else if (keymgr_state == kDifKeymgrStateOwnerIntermediateKey) {
+  } else {
     CHECK(num_keymgr_advances == 1);
+    CHECK_STATUS_OK(keymgr_testutils_check_state(
+        &keymgr, kDifKeymgrStateOwnerIntermediateKey));
     CHECK_STATUS_OK(
         keymgr_testutils_advance_state(&keymgr, &kOwnerRootKeyParams));
     num_keymgr_advances++;
-  } else {
-    CHECK(keymgr_state == kDifKeymgrStateOwnerRootKey);
-    next_div.salt[0] ^= (uint32_t)(++num_keymgr_advances);
   }
 
   // Run endorsement (should overwrite the key with randomness when done).
@@ -183,12 +168,12 @@ rom_error_t attestation_advance_and_endorse_test(void) {
   ecdsa_p256_signature_t sig;
   RETURN_IF_ERROR(otbn_boot_attestation_endorse(&digest, &sig, &pk));
 
-  // Check that generating a new key gets a different public key because keymgr
-  // has advanced (or diversification changed if already at OwnerRootKey).
+  // Check that generating a new key with the same diversification as before
+  // now gets a different public key because keymgr has advanced.
   ecdsa_p256_public_key_t pk_adv;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldUdsKeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
-                                               next_div, &pk_adv));
+                                               kDiversification, &pk_adv));
   CHECK_ARRAYS_NE((unsigned char *)&pk, (unsigned char *)&pk_adv, sizeof(pk));
 
   return kErrorOk;
@@ -233,10 +218,9 @@ bool test_main(void) {
   // Initialize the entropy complex, KMAC, and the key manager.
   CHECK_STATUS_OK(entropy_complex_init(kHardenedBoolFalse));
   dif_kmac_t kmac;
-  dif_keymgr_state_t keymgr_state;
-  CHECK_STATUS_OK(keymgr_testutils_try_startup(&keymgr, &kmac, &keymgr_state));
-  CHECK(keymgr_state == kDifKeymgrStateCreatorRootKey ||
-        keymgr_state == kDifKeymgrStateOwnerRootKey);
+  CHECK_STATUS_OK(keymgr_testutils_startup(&keymgr, &kmac));
+  CHECK_STATUS_OK(
+      keymgr_testutils_check_state(&keymgr, kDifKeymgrStateCreatorRootKey));
 
   // Initialize flash.
   dif_flash_ctrl_state_t flash_ctrl;
@@ -245,41 +229,29 @@ bool test_main(void) {
       mmio_region_from_addr(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR)));
   CHECK_STATUS_OK(flash_ctrl_testutils_wait_for_init(&flash_ctrl));
 
-  // Program the attestation key seeds in flash if not already locked by ROM_EXT.
+  // Program the attestation key seeds in flash. The setup step only needs to
+  // be done once, since the seeds are on the same page.
   flash_info_field_t seed_fields[] = {
       kFlashInfoFieldUdsAttestationKeySeed,
       kFlashInfoFieldCdi0AttestationKeySeed,
       kFlashInfoFieldCdi1AttestationKeySeed,
   };
-  dif_flash_ctrl_info_region_t info_region = {
-      .bank = seed_fields[0].bank,
-      .page = seed_fields[0].page,
-      .partition_id = seed_fields[0].partition,
-  };
-  bool is_locked = false;
-  CHECK_DIF_OK(dif_flash_ctrl_info_region_is_locked(&flash_ctrl, info_region,
-                                                    &is_locked));
-  if (!is_locked) {
-    uint32_t page_address = 0;
-    CHECK_STATUS_OK(flash_ctrl_testutils_info_region_scrambled_setup(
-        &flash_ctrl, seed_fields[0].page, seed_fields[0].bank,
-        seed_fields[0].partition, &page_address));
-    CHECK_STATUS_OK(flash_ctrl_testutils_erase_and_write_page(
-        &flash_ctrl, page_address, seed_fields[0].partition, kSeedValues[0],
+  uint32_t page_address = 0;
+  CHECK_STATUS_OK(flash_ctrl_testutils_info_region_scrambled_setup(
+      &flash_ctrl, seed_fields[0].page, seed_fields[0].bank,
+      seed_fields[0].partition, &page_address));
+  CHECK_STATUS_OK(flash_ctrl_testutils_erase_and_write_page(
+      &flash_ctrl, page_address, seed_fields[0].partition, kSeedValues[0],
+      kDifFlashCtrlPartitionTypeInfo, kAttestationSeedWords));
+  CHECK(ARRAYSIZE(seed_fields) == ARRAYSIZE(kSeedValues));
+  for (size_t i = 1; i < ARRAYSIZE(seed_fields); i++) {
+    CHECK(seed_fields[i].page == seed_fields[i - 1].page);
+    CHECK(seed_fields[i].bank == seed_fields[i - 1].bank);
+    CHECK(seed_fields[i].partition == seed_fields[i - 1].partition);
+    CHECK_STATUS_OK(flash_ctrl_testutils_write(
+        &flash_ctrl, page_address + seed_fields[i].byte_offset,
+        seed_fields[i].partition, kSeedValues[i],
         kDifFlashCtrlPartitionTypeInfo, kAttestationSeedWords));
-    CHECK(ARRAYSIZE(seed_fields) == ARRAYSIZE(kSeedValues));
-    for (size_t i = 1; i < ARRAYSIZE(seed_fields); i++) {
-      CHECK(seed_fields[i].page == seed_fields[i - 1].page);
-      CHECK(seed_fields[i].bank == seed_fields[i - 1].bank);
-      CHECK(seed_fields[i].partition == seed_fields[i - 1].partition);
-      CHECK_STATUS_OK(flash_ctrl_testutils_write(
-          &flash_ctrl, page_address + seed_fields[i].byte_offset,
-          seed_fields[i].partition, kSeedValues[i],
-          kDifFlashCtrlPartitionTypeInfo, kAttestationSeedWords));
-    }
-  } else {
-    CHECK_STATUS_OK(
-        ottf_alerts_ignore_alert(kTopEarlgreyAlertIdFlashCtrlRecovErr));
   }
 
   // Load the boot services OTBN app.
