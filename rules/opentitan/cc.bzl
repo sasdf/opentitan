@@ -899,18 +899,17 @@ opentitan_binary_assemble = rule(
 
 def _exec_env_filegroup(ctx):
     files = {v: k for k, v in ctx.attr.files.items()}
-    exec_env = {v: k for k, v in ctx.attr.exec_env.items()}
 
     fset = {k: 1 for k in files.keys()}
-    eset = {k: 1 for k in exec_env.keys()}
+    eset = {k: 1 for k in ctx.attr.exec_env.values()}
 
     if fset != eset:
         fail("The set of files and exec_envs must be matched: files =", fset.keys(), ", exec_env =", eset.keys())
 
     result = []
     default_files = []
-    for k in files.keys():
-        provider = exec_env[k][ExecEnvInfo].provider
+    for env_target, k in ctx.attr.exec_env.items():
+        provider = env_target[ExecEnvInfo].provider
         f = files[k].files.to_list()
         if len(f) != 1:
             fail("files[{}] must supply exactly one file".format(k))
