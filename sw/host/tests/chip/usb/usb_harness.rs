@@ -294,6 +294,70 @@ fn main() -> Result<()> {
             && let Some(ref dev) = qemu_dev
         {
             run_qemu_usb_streams(&**dev, opts.timeout)?;
+        } else if let Some(ref dev) = qemu_dev {
+            let mut in_only_eps = Vec::new();
+            if let Ok(config) = dev.active_configuration() {
+                for intf in config.interface_alt_settings() {
+                    let mut ep_in = None;
+                    let mut ep_out = None;
+                    for ep in intf.endpoints() {
+                        if let Ok(ep_desc) = ep.descriptor() {
+                            if (ep_desc.addr & 0x80) != 0 {
+                                ep_in = Some(ep_desc.addr);
+                            } else {
+                                ep_out = Some(ep_desc.addr);
+                            }
+                        }
+                    }
+                    if let (Some(addr), None) = (ep_in, ep_out) {
+                        in_only_eps.push(addr);
+                    }
+                }
+            }
+            if !in_only_eps.is_empty() {
+                log::info!(
+                    "Draining {} QEMU USB IN-only logging stream(s) while waiting for pass...",
+                    in_only_eps.len()
+                );
+                let deadline = std::time::Instant::now() + opts.timeout;
+                let mut buf = [0u8; 512];
+                let mut uart_buf = [0u8; 256];
+                let mut uart_acc = String::new();
+                let mut total_usb_bytes = 0usize;
+                loop {
+                    ensure!(
+                        std::time::Instant::now() < deadline,
+                        "Timed out draining QEMU USB IN-only logging streams (read {total_usb_bytes} USB bytes, uart={uart_acc:?})"
+                    );
+                    for &ep in &in_only_eps {
+                        while let Ok(n) =
+                            dev.read_bulk_timeout(ep, &mut buf, Duration::from_micros(200))
+                        {
+                            if n == 0 {
+                                break;
+                            }
+                            total_usb_bytes += n;
+                        }
+                    }
+                    while let Ok(n) = uart.read_timeout(&mut uart_buf, Duration::ZERO) {
+                        if n == 0 {
+                            break;
+                        }
+                        let s = String::from_utf8_lossy(&uart_buf[..n]);
+                        print!("{s}");
+                        uart_acc.push_str(&s);
+                        if uart_acc.contains("PASS!") {
+                            log::info!(
+                                "Detected PASS! on UART after draining {total_usb_bytes} USB bytes"
+                            );
+                            return Ok(());
+                        }
+                        if uart_acc.contains("FAIL!") || uart_acc.contains("FAULT") {
+                            bail!("device code reported a failure: {uart_acc}");
+                        }
+                    }
+                }
+            }
         }
 
         log::info!("wait for pass...");
