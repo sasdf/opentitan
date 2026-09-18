@@ -82,10 +82,10 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False):
             test_harness = test_harness,
         ),
         qemu = qemu_params(
-            timeout = "long",
+            timeout = "eternal",
             data = test_vectors,
             tags = tags,
-            test_cmd = test_args,
+            test_cmd = (("--timeout=60s " + test_args) if "--timeout=" not in test_args else test_args) if test_args else "",
             test_harness = test_harness,
         ),
         exec_env = CRYPTOTEST_EXEC_ENVS,
