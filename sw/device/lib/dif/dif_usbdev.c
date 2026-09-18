@@ -217,13 +217,6 @@ dif_result_t dif_usbdev_configure(const dif_usbdev_t *usbdev,
     return kDifBadArg;
   }
 
-  // Reset hardware FIFOs before re-initializing the free buffer pool so any
-  // buffers previously queued in AVOUT/AVSETUP/RX are discarded cleanly.
-  mmio_region_write32(usbdev->base_addr, USBDEV_FIFO_CTRL_REG_OFFSET,
-                      (1u << USBDEV_FIFO_CTRL_AVOUT_RST_BIT) |
-                          (1u << USBDEV_FIFO_CTRL_AVSETUP_RST_BIT) |
-                          (1u << USBDEV_FIFO_CTRL_RX_RST_BIT));
-
   // Configure the free buffer pool.
   if (!buffer_pool_init(buffer_pool)) {
     return kDifError;
