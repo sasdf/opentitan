@@ -691,10 +691,19 @@ cc_test(
 opentitan_test(
     name = "rnd_functest",
     srcs = ["rnd_functest.c"],
-    exec_env = EARLGREY_TEST_ENVS,
+    exec_env = dicts.omit(
+        EARLGREY_TEST_ENVS,
+        [
+            # See #21706, reads CREATOR_SW_CFG OTP which is locked by ROM_EXT.
+            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+        ],
+    ),
     deps = [
+        ":otp",
         ":rnd",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:crc32",
         "//sw/device/lib/dif:entropy_src",
         "//sw/device/lib/testing:entropy_testutils",
         "//sw/device/lib/testing:rand_testutils",
@@ -706,18 +715,13 @@ opentitan_test(
 opentitan_test(
     name = "rnd_rom_ext_functest",
     srcs = ["rnd_rom_ext_functest.c"],
-    exec_env = dicts.omit(
-        EARLGREY_TEST_ENVS,
-        [
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-        ],
-    ),
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
     deps = [
-        ":otp",
         ":rnd",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:crc32",
         "//sw/device/lib/dif:entropy_src",
         "//sw/device/lib/testing:entropy_testutils",
         "//sw/device/lib/testing:rand_testutils",
