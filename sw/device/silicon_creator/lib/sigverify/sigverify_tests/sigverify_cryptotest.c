@@ -22,7 +22,8 @@
 
 OTTF_DEFINE_TEST_CONFIG(.console.type = kOttfConsoleSpiDevice,
                         .console.base_addr = TOP_EARLGREY_SPI_DEVICE_BASE_ADDR,
-                        .console.test_may_clobber = false, );
+                        .console.test_may_clobber = false,
+                        .console.putbuf_buffered = true, );
 
 bool ecdsa_p256_params_set(cryptotest_ecdsa_coordinate_t uj_qx,
                            cryptotest_ecdsa_coordinate_t uj_qy,
