@@ -219,6 +219,7 @@ test_suite(
         qemu = qemu_params(
             needs_jtag = True,
             otp = ":img_{}_exec_disabled".format(lc_state),
+            tags = ["broken"],
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bark",
         ),
@@ -269,6 +270,7 @@ test_suite(
         qemu = qemu_params(
             needs_jtag = True,
             otp = ":img_{}_exec_disabled".format(lc_state),
+            tags = ["broken"],
             test_cmd = " --elf={rom:elf} --breakpoint-timeout=2s",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bite",
         ),

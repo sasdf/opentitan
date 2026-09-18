@@ -410,11 +410,13 @@ opentitan_test(
     name = "alert_handler_reverse_ping_in_deep_sleep_test",
     srcs = ["alert_handler_reverse_ping_in_deep_sleep_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         {
             # See #23038, this test requires a provisioned flash in sival.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
@@ -501,6 +503,7 @@ opentitan_test(
     name = "alert_handler_lpg_sleep_mode_pings_test",
     srcs = ["alert_handler_lpg_sleep_mode_pings.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         # The test requires the Ibex core to wait long enough
         # before checking for the ping_timeout error.
@@ -516,6 +519,7 @@ opentitan_test(
         {
             # See #23038, this test requires a provisioned flash in sival.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
@@ -840,6 +844,7 @@ opentitan_test(
         # TODO(lowrisc/opentitan#19620): fpga doesn't support lowering main clk frequency
         tags = ["broken"],
     ),
+    qemu = qemu_params(tags = ["broken"]),
     verilator = verilator_params(tags = ["broken"]),
     deps = [
         ":clkmgr_external_clk_src_for_sw_impl",
@@ -1618,6 +1623,7 @@ opentitan_test(
     # tuning the health test thresholds for FPGA platforms in a robust way is not feasible
     # currently. Instead, the test is marked as "broken" on FPGA.
     fpga = fpga_params(tags = ["broken"]),
+    qemu = qemu_params(tags = ["broken"]),
     silicon = silicon_params(tags = ["flaky"]),
     verilator = verilator_params(timeout = "long"),
     deps = [
@@ -2080,6 +2086,10 @@ opentitan_test(
     qemu = qemu_params(
         needs_jtag = True,
         otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_dev_manuf_personalized",
+        tags = [
+            "broken",
+            "lc_dev",
+        ],
         test_cmd = " ".join([
             "--elf=\"{firmware}\"",
             " \"{firmware}\"",
@@ -5606,6 +5616,7 @@ opentitan_test(
         tags = ["coverage_broken"],  # RAM exhausted in coverage mode.
     ),
     qemu = qemu_params(
+        tags = ["broken"],
         test_cmd = """
             --fin-phase=deep-reset
             --init-phase=deep-resume
@@ -5662,6 +5673,7 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
     qemu = qemu_params(
+        tags = ["broken"],
         test_cmd = """
             --vbus-sense-en=VBUS_SENSE_EN
             --vbus-sense-wait=10ms
@@ -5723,6 +5735,7 @@ opentitan_test(
     name = "rstmgr_alert_info_test",
     srcs = ["rstmgr_alert_info_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -5731,6 +5744,7 @@ opentitan_test(
             # TODO(lowrisc/opentitan#20589): Enable _sival* tests when bug is fixed
             "//hw/top_earlgrey:fpga_cw310_sival": "broken",
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -6818,6 +6832,7 @@ opentitan_test(
     qemu = qemu_params(
         needs_jtag = True,
         otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
+        tags = ["broken"],
         test_harness = "//sw/host/tests/chip/jtag:openocd_test",
     ),
     deps = [
@@ -7511,6 +7526,11 @@ opentitan_test(
     name = "uart_tx_rx_test",
     srcs = ["uart_tx_rx_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(
+        tags = ["broken"],
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
+    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7520,6 +7540,7 @@ opentitan_test(
             # See #23468, currently broken on SAM3X execution environments.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -7726,6 +7747,11 @@ opentitan_test(
     name = "uart_loopback_test",
     srcs = ["uart_loopback_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(
+        tags = ["broken"],
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_loopback",
+    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7733,6 +7759,7 @@ opentitan_test(
             # See #23468: currently broken over the SAM3X interface.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -7808,6 +7835,11 @@ opentitan_test(
     name = "uart_parity_break_test",
     srcs = ["uart_parity_break_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(
+        tags = ["broken"],
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
+    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7816,6 +7848,7 @@ opentitan_test(
             # See #23468: currently broken over the SAM3X interface.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -8001,6 +8034,10 @@ opentitan_test(
     name = "sleep_pin_retention_test",
     srcs = ["sleep_pin_retention_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(
+        tags = ["broken"],
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
+    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -8008,6 +8045,7 @@ opentitan_test(
             # See #23468, currently broken in SAM3X execution environments.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(

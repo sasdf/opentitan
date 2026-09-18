@@ -85,7 +85,7 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False):
             timeout = "long",
             data = test_vectors,
             tags = tags,
-            test_cmd = ("--timeout=60s " + test_args) if test_args else "",
+            test_cmd = test_args,
             test_harness = test_harness,
         ),
         exec_env = CRYPTOTEST_EXEC_ENVS,
