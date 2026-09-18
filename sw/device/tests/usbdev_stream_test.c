@@ -193,6 +193,7 @@ bool test_main(void) {
       transfer_bytes = TRANSFER_BYTES_VERILATOR;
       break;
     case kDeviceSimDV:
+    case kDeviceSimQemu:
       transfer_bytes = TRANSFER_BYTES_DVSIM;
       break;
     case kDeviceSilicon:

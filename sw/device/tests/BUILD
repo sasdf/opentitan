@@ -5074,6 +5074,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5114,6 +5120,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5149,6 +5161,12 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     fpga = fpga_params(
+        test_cmd = """
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
         test_cmd = """
             --exec=$(rootpath :usbdev_stream_host_harness)
         """,

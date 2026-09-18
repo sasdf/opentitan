@@ -825,7 +825,11 @@ struct QemuHostThread {
     /// device change.
     pending_dev_changes: Vec<mpsc::Sender<()>>,
     /// Pending IN transfers.
-    pending_in_transfers: HashMap<PacketId, mpsc::Sender<UsbResult<Vec<u8>>>>,
+    pending_in_transfers: HashMap<PacketId, (u8, mpsc::Sender<UsbResult<Vec<u8>>>)>,
+    /// Active IN transfer ID per endpoint index.
+    active_ep_in: HashMap<u8, PacketId>,
+    /// Completed IN transfer buffered when caller timed out before completion arrived.
+    completed_ep_in: HashMap<u8, UsbResult<Vec<u8>>>,
     /// Pending Out transfers.
     pending_out_transfers: HashMap<PacketId, mpsc::Sender<UsbResult<usize>>>,
 }
@@ -854,6 +858,8 @@ impl QemuHostThread {
             next_id: 0,
             pending_dev_changes: Vec::new(),
             pending_in_transfers: HashMap::new(),
+            active_ep_in: HashMap::new(),
+            completed_ep_in: HashMap::new(),
             pending_out_transfers: HashMap::new(),
         }
     }
@@ -1438,13 +1444,16 @@ impl QemuHostThread {
         data: Vec<u8>,
     ) -> UsbResult<()> {
         // Check if this matches a pending IN transfer.
-        if let Some(answer) = self.pending_in_transfers.remove(&id) {
+        if let Some((ep_idx, answer)) = self.pending_in_transfers.remove(&id) {
+            self.active_ep_in.remove(&ep_idx);
             let res = match status {
                 QemuUsbdevTransferStatus::Success => Ok(data),
                 _ => Err(anyhow!("Transfer failed: {status:?}").into()),
             };
-            // Ignore send error if receiver has disconnected.
-            let _ = answer.send(res);
+            // If receiver timed out and dropped, buffer the result for the next read on this endpoint.
+            if let Err(mpsc::SendError(unsent_res)) = answer.send(res) {
+                self.completed_ep_in.insert(ep_idx, unsent_res);
+            }
         } else if let Some(answer) = self.pending_out_transfers.remove(&id) {
             let res = match status {
                 QemuUsbdevTransferStatus::Success => Ok(xfer_size),
@@ -1462,6 +1471,10 @@ impl QemuHostThread {
 
     /// Serve requests for the device until it disconnects .
     fn serve_device_requests(&mut self, dev_info: &DeviceInfo) -> UsbResult<()> {
+        self.pending_in_transfers.clear();
+        self.active_ep_in.clear();
+        self.completed_ep_in.clear();
+        self.pending_out_transfers.clear();
         loop {
             let Ok(event) = self.channel_recv.recv() else {
                 return Err(UsbError::Shutdown);
@@ -1542,15 +1555,21 @@ impl QemuHostThread {
                     length,
                     answer,
                 } => {
-                    match self.submit_in_transfer(dev_info, generation, ep, length) {
-                        Ok(pkt_id) => {
-                            if self.pending_in_transfers.insert(pkt_id, answer).is_some() {
-                                log::error!("USB Host: internal error: packet ID reused?!");
+                    let ep_idx = ep & 0x7f;
+                    if let Some(res) = self.completed_ep_in.remove(&ep_idx) {
+                        let _ = answer.send(res);
+                    } else if let Some(&pkt_id) = self.active_ep_in.get(&ep_idx) {
+                        self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
+                    } else {
+                        match self.submit_in_transfer(dev_info, generation, ep_idx, length) {
+                            Ok(pkt_id) => {
+                                self.active_ep_in.insert(ep_idx, pkt_id);
+                                self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
                             }
-                        }
-                        Err(err) => {
-                            // Ignore error if we know the sender has already disconnected.
-                            let _ = answer.send(Err(err));
+                            Err(err) => {
+                                // Ignore error if we know the sender has already disconnected.
+                                let _ = answer.send(Err(err));
+                            }
                         }
                     }
                 }
