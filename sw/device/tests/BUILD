@@ -5293,6 +5293,7 @@ opentitan_test(
         tags = ["manual"],
     ),
     qemu = qemu_params(
+        rom = "//sw/device/lib/testing/test_rom:test_rom",
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     verilator = verilator_params(

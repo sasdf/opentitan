@@ -142,9 +142,6 @@ void ottf_external_isr(uint32_t *exc_info) {
   // Handle interrupts for the console UART separately.
   if (peripheral != uart_cfg.peripheral_id) {
     ottf_console_flow_control_isr(exc_info);
-    CHECK_DIF_OK(dif_rv_plic_irq_complete(&rv_plic, kTopEarlgreyPlicTargetIbex0,
-                                          plic_irq_id));
-    return;
   }
 
   // Check it was the parity error that fired and that we expected it.

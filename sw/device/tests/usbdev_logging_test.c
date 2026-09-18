@@ -83,11 +83,9 @@ bool test_main(void) {
     LOG_INFO("Now logging %u over USB", iter);
   }
 
-  // Just a quantity of data as ASCII hex (stop before the ePMP stack guard at
-  // _stack_start configured by ROM/ROM_EXT).
-  extern char _stack_start[];
+  // Just a quantity of data as ASCII hex...
   const uint32_t kSramStart = TOP_EARLGREY_SRAM_CTRL_MAIN_RAM_BASE_ADDR;
-  const uint32_t kSramSize = (uint32_t)((uintptr_t)_stack_start - kSramStart);
+  const uint32_t kSramSize = TOP_EARLGREY_SRAM_CTRL_MAIN_RAM_SIZE_BYTES;
   base_hexdump((char *)kSramStart, kSramSize);
 
   CHECK_STATUS_OK(usb_logging_fin(true, true));

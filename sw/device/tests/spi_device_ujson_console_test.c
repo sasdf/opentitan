@@ -26,8 +26,7 @@
 
 OTTF_DEFINE_TEST_CONFIG(.console.type = kOttfConsoleSpiDevice,
                         .console.base_addr = TOP_EARLGREY_SPI_DEVICE_BASE_ADDR,
-                        .console.test_may_clobber = false,
-                        .console.putbuf_buffered = true, );
+                        .console.test_may_clobber = false, );
 
 volatile uint8_t kTestBytes[256];
 volatile uint32_t kTestWord;
