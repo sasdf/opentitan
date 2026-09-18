@@ -298,7 +298,6 @@ opentitan_test(
     name = "ecc_p256_dice_functest",
     srcs = ["ecc_p256_dice_functest.c"],
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
@@ -310,7 +309,6 @@ opentitan_test(
         timeout = "eternal",
     ),
     deps = [
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/crypto/drivers:entropy",
         "//sw/device/lib/crypto/drivers:keymgr",
         "//sw/device/lib/crypto/impl:config",
@@ -323,13 +321,38 @@ opentitan_test(
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing:hexstr",
         "//sw/device/lib/testing:keymgr_testutils",
-        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/base:util",
         "//sw/device/silicon_creator/lib/cert:dice_keys",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
         "//sw/device/silicon_creator/manuf/base:perso_tlv_data",
         "//sw/device/silicon_creator/manuf/lib:flash_info_fields",
+    ],
+)
+
+opentitan_test(
+    name = "ecc_p256_dice_no_rom_ext_functest",
+    srcs = ["ecc_p256_dice_no_rom_ext_functest.c"],
+    exec_env = EARLGREY_TEST_ENVS,
+    verilator = verilator_params(
+        timeout = "eternal",
+    ),
+    deps = [
+        "//sw/device/lib/crypto/drivers:entropy",
+        "//sw/device/lib/crypto/drivers:keymgr",
+        "//sw/device/lib/crypto/impl:config",
+        "//sw/device/lib/crypto/impl:ecc_p256",
+        "//sw/device/lib/crypto/impl:integrity",
+        "//sw/device/lib/crypto/impl:key_transport",
+        "//sw/device/lib/crypto/impl:keyblob",
+        "//sw/device/lib/crypto/impl:status",
+        "//sw/device/lib/crypto/impl/ecc:p256",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:hexstr",
+        "//sw/device/lib/testing:keymgr_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib/base:util",
+        "//sw/device/silicon_creator/lib/cert:dice_keys",
     ],
 )
 

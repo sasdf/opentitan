@@ -18,9 +18,7 @@
 #include "sw/device/lib/testing/entropy_testutils.h"
 #include "sw/device/lib/testing/hexstr.h"
 #include "sw/device/lib/testing/keymgr_testutils.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/testing/test_framework/check.h"
-#include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/base/util.h"
 #include "sw/device/silicon_creator/lib/cert/dice_keys.h"
@@ -111,24 +109,19 @@ static status_t read_attestation_seed_configured(uint32_t *attestation_data) {
 }
 
 status_t dice_test(void) {
-  TRY(ottf_alerts_ignore_alert(kTopEarlgreyAlertIdFlashCtrlRecovErr));
   perso_tlv_cert_obj_view_t target_cert = {0};
-  uint32_t cert_pk[512 / 32] = {0};
-  bool has_cert = false;
 
-  status_t cert_status = get_stored_certificate(
-      "CDI_1", 5, &kFlashCtrlInfoPageDiceCerts, &target_cert);
-  if (status_ok(cert_status)) {
-    LOG_INFO("Found CDI_1 cert. Size: %d bytes", target_cert.cert_body_size);
-    TRY(extract_public_key_from_der(target_cert.cert_body_p,
-                                    target_cert.cert_body_size, cert_pk));
-    char cert_pk_hex[256];
-    hexstr_encode(cert_pk_hex, sizeof(cert_pk_hex), cert_pk, sizeof(cert_pk));
-    LOG_INFO("Cert public key: %s\r", cert_pk_hex);
-    has_cert = true;
-  } else {
-    LOG_INFO("No CDI_1 cert found in kFlashCtrlInfoPageDiceCerts (non-ROM_EXT env); skipping X.509 pubkey comparison.");
-  }
+  TRY(get_stored_certificate("CDI_1", 5, &kFlashCtrlInfoPageDiceCerts,
+                             &target_cert));
+  LOG_INFO("Found CDI_1 cert. Size: %d bytes", target_cert.cert_body_size);
+
+  uint32_t cert_pk[512 / 32] = {0};
+  TRY(extract_public_key_from_der(target_cert.cert_body_p,
+                                  target_cert.cert_body_size, cert_pk));
+
+  char cert_pk_hex[256];
+  hexstr_encode(cert_pk_hex, sizeof(cert_pk_hex), cert_pk, sizeof(cert_pk));
+  LOG_INFO("Cert public key: %s\r", cert_pk_hex);
 
   char buf[256];
 
@@ -178,17 +171,15 @@ status_t dice_test(void) {
   LOG_INFO("OTBN keygen instruction count: 0x%08x",
            otbn_instruction_count_get());
 
-  if (has_cert) {
-    // Compare the public key from what is given in the cert.
-    // Needs endianness transformations.
-    uint32_t pk_be[512 / 32];
-    memcpy(pk_be, pk, sizeof(pk_be));
-    uint8_t *pk_be_bytes = (uint8_t *)pk_be;
-    util_reverse_bytes(pk_be_bytes, 32);
-    util_reverse_bytes(pk_be_bytes + 32, 32);
+  // Compare the public key from what is given in the cert.
+  // Needs endianness transformations.
+  uint32_t pk_be[512 / 32];
+  memcpy(pk_be, pk, sizeof(pk_be));
+  uint8_t *pk_be_bytes = (uint8_t *)pk_be;
+  util_reverse_bytes(pk_be_bytes, 32);
+  util_reverse_bytes(pk_be_bytes + 32, 32);
 
-    CHECK_ARRAYS_EQ(cert_pk, pk_be, 512 / 32);
-  }
+  CHECK_ARRAYS_EQ(cert_pk, pk_be, 512 / 32);
 
   // Checking the synchronous call and whether the same public key is generated
   // the second time.
