@@ -5,20 +5,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "sw/device/lib/base/abs_mmio.h"
-#include "sw/device/lib/base/crc32.h"
 #include "sw/device/lib/dif/dif_entropy_src.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/entropy_testutils.h"
 #include "sw/device/lib/testing/rand_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
-#include "sw/device/silicon_creator/lib/drivers/otp.h"
 #include "sw/device/silicon_creator/lib/drivers/rnd.h"
 #include "sw/device/silicon_creator/lib/error.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "otp_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -56,7 +52,7 @@ static void configure_random_health_checks(void) {
   dif_entropy_src_health_test_config_t configs[kDifEntropySrcTestNumVariants];
   for (uint32_t test_id = kDifEntropySrcTestRepetitionCount;
        test_id < kDifEntropySrcTestNumVariants; ++test_id) {
-    // Randomize threshold values without aiming to disrrupt the default
+    // Randomize threshold values without aiming to disrupt the default
     // entropy_src health test behavior.
     uint32_t meaningless_threshold =
         rand_testutils_gen32_range(/*min=*/0, /*max=*/16);
@@ -74,139 +70,6 @@ static void configure_random_health_checks(void) {
         dif_entropy_src_health_test_configure(&entropy_src, configs[i]));
   }
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
-}
-
-// Configures the entropy source health check and alert thresholds with the
-// configuration stored in OTP.
-static void configure_health_checks_from_otp(void) {
-  CHECK_STATUS_OK(entropy_testutils_stop_all());
-  dif_entropy_src_health_test_config_t configs[] = {
-      [kDifEntropySrcTestRepetitionCount] =
-          {
-              .test_type = kDifEntropySrcTestRepetitionCount,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_REPCNT_THRESHOLDS_OFFSET),
-              .low_threshold = 0,
-          },
-      [kDifEntropySrcTestRepetitionCountSymbol] =
-          {
-              .test_type = kDifEntropySrcTestRepetitionCountSymbol,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_REPCNTS_THRESHOLDS_OFFSET),
-              .low_threshold = 0,
-          },
-      [kDifEntropySrcTestAdaptiveProportion] =
-          {
-              .test_type = kDifEntropySrcTestAdaptiveProportion,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ADAPTP_HI_THRESHOLDS_OFFSET),
-              .low_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ADAPTP_LO_THRESHOLDS_OFFSET),
-          },
-      [kDifEntropySrcTestBucket] =
-          {
-              .test_type = kDifEntropySrcTestBucket,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_BUCKET_THRESHOLDS_OFFSET),
-              .low_threshold = 0,
-          },
-      [kDifEntropySrcTestMarkov] =
-          {
-              .test_type = kDifEntropySrcTestMarkov,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_MARKOV_HI_THRESHOLDS_OFFSET),
-              .low_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_MARKOV_LO_THRESHOLDS_OFFSET),
-          },
-      [kDifEntropySrcTestMailbox] =
-          {
-              .test_type = kDifEntropySrcTestMailbox,
-              .high_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_EXTHT_HI_THRESHOLDS_OFFSET),
-              .low_threshold = otp_read32(
-                  OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_EXTHT_LO_THRESHOLDS_OFFSET),
-          },
-  };
-  for (size_t i = 0; i < ARRAYSIZE(configs); ++i) {
-    CHECK_DIF_OK(
-        dif_entropy_src_health_test_configure(&entropy_src, configs[i]));
-  }
-
-  // The entropy_src DIF expects the alert threshold to be set at configuration
-  // time. We skip enabling csrng and edn0/1 in this case.
-  dif_entropy_src_config_t entropy_src_config =
-      entropy_testutils_config_default();
-  entropy_src_config.alert_threshold = (uint16_t)otp_read32(
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ALERT_THRESHOLD_OFFSET);
-  CHECK_DIF_OK(dif_entropy_src_configure(&entropy_src, entropy_src_config,
-                                         kDifToggleEnabled));
-}
-
-// Checks that the CRC value stored in OTP is consistent with what ROM is
-// expecting.
-rom_error_t test_otp_crc_check(void) {
-  uint32_t ctx;
-  crc32_init(&ctx);
-  uint32_t otp_in_order_offsets[] = {
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_REPCNT_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_REPCNTS_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ADAPTP_HI_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ADAPTP_LO_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_BUCKET_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_MARKOV_HI_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_MARKOV_LO_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_EXTHT_HI_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_EXTHT_LO_THRESHOLDS_OFFSET,
-      OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_ALERT_THRESHOLD_OFFSET,
-  };
-  for (size_t i = 0; i < ARRAYSIZE(otp_in_order_offsets); ++i) {
-    crc32_add32(&ctx, otp_read32(otp_in_order_offsets[i]));
-  }
-  uint32_t crc = crc32_finish(&ctx);
-  uint32_t expected = crc ^ kErrorOk;
-  uint32_t got =
-      otp_read32(OTP_CTRL_PARAM_CREATOR_SW_CFG_RNG_HEALTH_CONFIG_DIGEST_OFFSET);
-  CHECK(expected == got, "Unexpected OTP CRC value. expected: 0x%x, got: 0x%x",
-        expected, got);
-
-  // If calculated properly, this will return kErrorOk.
-  return crc ^ got;
-}
-
-rom_error_t test_rnd_health_config_check(void) {
-  // The default OTP image uses the default reset configuration. We test that
-  // first here because the health tests configuration cannot be reset by
-  // toggling the entropy_src enable field. The
-  // `configure_random_health_checks()` function called later reduces the health
-  // test window sizes.
-
-  // Other lc states must match the expected CRC stored in OTP.
-  lifecycle_state_t lc_expect_check[] = {
-      kLcStateDev,
-      kLcStateProd,
-      kLcStateProdEnd,
-      kLcStateRma,
-  };
-  configure_health_checks_from_otp();
-  for (size_t i = 0; i < ARRAYSIZE(lc_expect_check); ++i) {
-    rom_error_t res = rnd_health_config_check(lc_expect_check[i]);
-    CHECK(res == kErrorOk, "Lifecycle: %d, error: %d", lc_expect_check[i], res);
-  }
-
-  // Don't care lc states should always return `kErrorOk` regardless of what
-  // values are stored in the entropy_src.
-  lifecycle_state_t lc_expect_check_skip[] = {
-      kLcStateTest,
-  };
-  configure_random_health_checks();
-  for (size_t i = 0; i < ARRAYSIZE(lc_expect_check_skip); ++i) {
-    CHECK(rnd_health_config_check(lc_expect_check_skip[i]) == kErrorOk);
-  }
-
-  // Configure entropy source one last time to leave the device in a good end
-  // state.
-  CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
-  return kErrorOk;
 }
 
 rom_error_t test_rnd(void) {
@@ -234,17 +97,7 @@ bool test_main(void) {
 
   status_t result = OK_STATUS();
   EXECUTE_TEST(result, test_rnd);
-  if (abs_mmio_read32(TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR +
-                      OTP_CTRL_CREATOR_SW_CFG_READ_LOCK_REG_OFFSET) != 0) {
-    EXECUTE_TEST(result, test_otp_crc_check);
-    EXECUTE_TEST(result, test_rnd_health_config_check);
-  } else {
-    LOG_INFO(
-        "OTP CREATOR_SW_CFG locked by ROM_EXT; testing health check config and "
-        "RND.");
-    configure_random_health_checks();
-    CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
-    EXECUTE_TEST(result, test_rnd);
-  }
+  configure_random_health_checks();
+  EXECUTE_TEST(result, test_rnd);
   return status_ok(result);
 }

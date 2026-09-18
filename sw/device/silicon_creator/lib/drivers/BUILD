@@ -670,10 +670,30 @@ opentitan_test(
     srcs = ["rnd_functest.c"],
     exec_env = EARLGREY_TEST_ENVS,
     deps = [
+        ":rnd",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/dif:entropy_src",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing:rand_testutils",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib:error",
+    ],
+)
+
+opentitan_test(
+    name = "rnd_rom_ext_functest",
+    srcs = ["rnd_rom_ext_functest.c"],
+    exec_env = dicts.omit(
+        EARLGREY_TEST_ENVS,
+        [
+            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+        ],
+    ),
+    deps = [
         ":otp",
         ":rnd",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:crc32",
         "//sw/device/lib/dif:entropy_src",
         "//sw/device/lib/testing:entropy_testutils",
