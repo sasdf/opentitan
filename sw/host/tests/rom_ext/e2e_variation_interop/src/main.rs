@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
     let mut console = UartConsole {
         timeout: Some(opts.timeout),
         exit_success: Some(Regex::new(r"PASS.*\n")?),
-        exit_failure: Some(Regex::new(r"BFV.*\n")?),
+        exit_failure: Some(Regex::new(r"BFV:.*\n")?),
         newline: true,
         ..Default::default()
     };
