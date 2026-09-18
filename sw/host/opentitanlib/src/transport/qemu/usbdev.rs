@@ -131,6 +131,12 @@ enum HostChannelEvent {
         length: usize,
         answer: mpsc::Sender<UsbResult<Vec<u8>>>,
     },
+    /// Send a bus reset to the device.
+    Reset,
+    /// Suspend the device.
+    Suspend,
+    /// Resume the device.
+    Resume,
 }
 
 /// Minimal virtual USB host to drive the QEMU usbdev.
@@ -401,7 +407,21 @@ impl UsbDevice for QemuUsbDevice {
     /// Note that this UsbDevice handle will most likely become invalid
     /// after resetting the device and a new one has to be obtained.
     fn reset(&self) -> anyhow::Result<()> {
-        anyhow::bail!("unimplemented reset");
+        self.host_channel
+            .send(HostChannelEvent::Reset)
+            .context("failed to send RESET")
+    }
+
+    fn suspend(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Suspend)
+            .context("failed to send SUSPEND")
+    }
+
+    fn resume(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Resume)
+            .context("failed to send RESUME")
     }
 
     /// Get the default timeout for operations.
@@ -1248,6 +1268,7 @@ impl QemuHostThread {
     /// device and config descriptors, as well as assigning
     /// an address to the device.
     fn enumerate_device(&mut self, generation: u32) -> UsbResult<DeviceInfo> {
+        std::thread::sleep(Duration::from_millis(5));
         // Send a reset to the device.
         let _ = self
             .send_packet(QemuUsbdevCmd::Reset, &[])
@@ -1374,12 +1395,7 @@ impl QemuHostThread {
         })
     }
 
-    fn endpoint_max_pkt_size(
-        &self,
-        dev_info: &DeviceInfo,
-        ep: u8,
-        dir_in: bool,
-    ) -> UsbResult<u16> {
+    fn endpoint_max_pkt_size(&self, dev_info: &DeviceInfo, ep: u8, dir_in: bool) -> UsbResult<u16> {
         if ep == 0 {
             return Ok(desc::DeviceDescriptor::ref_from_bytes(&dev_info.dev_desc)
                 .unwrap()
@@ -1572,6 +1588,21 @@ impl QemuHostThread {
                             }
                         }
                     }
+                }
+                HostChannelEvent::Reset => {
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Reset, &[])
+                        .maybe_context("Failed to send RESET")?;
+                }
+                HostChannelEvent::Suspend => {
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Suspend, &[])
+                        .maybe_context("Failed to send SUSPEND")?;
+                }
+                HostChannelEvent::Resume => {
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Resume, &[])
+                        .maybe_context("Failed to send RESUME")?;
                 }
             }
         }
