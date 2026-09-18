@@ -1092,6 +1092,7 @@ opentitan_test(
     },
     qemu = qemu_params(
         otp = ":otp_ctrl_lc_signals_test_otp_img",
+        rom = "//sw/device/lib/testing/test_rom:test_rom",
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
