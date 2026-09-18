@@ -105,9 +105,9 @@ _TEST_ROM_EXTS = {
 
 _SECVER_WRITE_TEST_CMD = """
             # First, assemble the additional images we'll need for this test.
-            --exec="image assemble -s 524288 --mirror=false -o fw1.bin {rom_ext1}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
-            --exec="image assemble -s 524288 --mirror=false -o fw2.bin {rom_ext2}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
-            --exec="image assemble -s 524288 --mirror=false -o fw3.bin {rom_ext3}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+            --exec="image assemble -s 131072 --mirror=false -o fw1.bin {rom_ext1}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+            --exec="image assemble -s 131072 --mirror=false -o fw2.bin {rom_ext2}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+            --exec="image assemble -s 131072 --mirror=false -o fw3.bin {rom_ext3}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
 
             # Check the initial version 0 has been bootstrapped into SlotA
             --exec="console --non-interactive --exit-success='rom_ext_min_sec_ver = 0'"
