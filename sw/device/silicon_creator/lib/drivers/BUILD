@@ -329,14 +329,18 @@ cc_test(
 opentitan_test(
     name = "keymgr_functest",
     srcs = ["keymgr_functest.c"],
-    broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
+        dicts.omit(
+            EARLGREY_TEST_ENVS,
+            [
+                # See #21706, expects keymgr in Reset state so not working after ROM_EXT.
+                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
+                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+            ],
+        ),
         {
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:silicon_creator": None,
-            # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
         },
     ),
     verilator = verilator_params(
@@ -362,6 +366,25 @@ opentitan_test(
         "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib:keymgr_binding",
         "//sw/device/silicon_creator/lib/base:chip",
+        "//sw/device/silicon_creator/lib/base:sec_mmio",
+    ],
+)
+
+opentitan_test(
+    name = "keymgr_rom_ext_functest",
+    srcs = ["keymgr_rom_ext_functest.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
+    deps = [
+        ":keymgr",
+        ":kmac",
+        "//hw/ip/keymgr/data:keymgr_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib:error",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
     ],
 )
