@@ -352,12 +352,9 @@ static void execute_test_phases(uint8_t test_phase, uint32_t ping_timeout_cyc) {
     // Initialize the counters.
     CHECK_STATUS_OK(ret_sram_testutils_counter_clear(kCounterTestSteps));
     CHECK_STATUS_OK(ret_sram_testutils_counter_clear(kCounterTestPhase));
-    if (kDeviceType == kDeviceSimDV || kDeviceType == kDeviceSimQemu) {
-      rnd_num_iterations = 1;
-    } else {
-      rand_testutils_reseed();
-      rnd_num_iterations = rand_testutils_gen32_range(4, 8);
-    }
+    // set num_iterations to a random value between 4 and 8
+    rand_testutils_reseed();
+    rnd_num_iterations = rand_testutils_gen32_range(4, 8);
     CHECK_STATUS_OK(
         ret_sram_testutils_counter_set(kCounterTestPhase, rnd_num_iterations));
     CHECK_STATUS_OK(
@@ -496,12 +493,9 @@ bool test_main(void) {
     // Initialize the counters.
     CHECK_STATUS_OK(ret_sram_testutils_counter_clear(kCounterTestSteps));
     CHECK_STATUS_OK(ret_sram_testutils_counter_clear(kCounterTestPhase));
-    if (kDeviceType == kDeviceSimDV || kDeviceType == kDeviceSimQemu) {
-      rnd_num_iterations = 1;
-    } else {
-      rand_testutils_reseed();
-      rnd_num_iterations = rand_testutils_gen32_range(4, 8);
-    }
+    // set num_iterations to a random value between 4 and 8
+    rand_testutils_reseed();
+    rnd_num_iterations = rand_testutils_gen32_range(4, 8);
     CHECK_STATUS_OK(
         ret_sram_testutils_counter_set(kCounterTestPhase, rnd_num_iterations));
     LOG_INFO("Will run %d iterations per phase", rnd_num_iterations);
