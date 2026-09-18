@@ -7530,11 +7530,6 @@ opentitan_test(
     name = "uart_tx_rx_test",
     srcs = ["uart_tx_rx_test.c"],
     broken = fpga_params(tags = ["broken"]),
-    broken_qemu = qemu_params(
-        tags = ["broken"],
-        test_cmd = "--firmware-elf={firmware:elf}",
-        test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
-    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7544,7 +7539,6 @@ opentitan_test(
             # See #23468, currently broken on SAM3X execution environments.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -7751,11 +7745,6 @@ opentitan_test(
     name = "uart_loopback_test",
     srcs = ["uart_loopback_test.c"],
     broken = fpga_params(tags = ["broken"]),
-    broken_qemu = qemu_params(
-        tags = ["broken"],
-        test_cmd = "--firmware-elf={firmware:elf}",
-        test_harness = "//sw/host/tests/chip/uart:uart_loopback",
-    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7763,7 +7752,6 @@ opentitan_test(
             # See #23468: currently broken over the SAM3X interface.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -7839,11 +7827,6 @@ opentitan_test(
     name = "uart_parity_break_test",
     srcs = ["uart_parity_break_test.c"],
     broken = fpga_params(tags = ["broken"]),
-    broken_qemu = qemu_params(
-        tags = ["broken"],
-        test_cmd = "--firmware-elf={firmware:elf}",
-        test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
-    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -7852,7 +7835,6 @@ opentitan_test(
             # See #23468: currently broken over the SAM3X interface.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -8038,10 +8020,6 @@ opentitan_test(
     name = "sleep_pin_retention_test",
     srcs = ["sleep_pin_retention_test.c"],
     broken = fpga_params(tags = ["broken"]),
-    broken_qemu = qemu_params(
-        tags = ["broken"],
-        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
-    ),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -8049,7 +8027,6 @@ opentitan_test(
             # See #23468, currently broken in SAM3X execution environments.
             "//hw/top_earlgrey:fpga_cw310_test_rom": "broken",
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": "broken",
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "broken_qemu",
         },
     ),
     fpga = fpga_params(
