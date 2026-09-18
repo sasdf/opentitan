@@ -54,15 +54,7 @@ impl QemuSpi {
         Ok(QemuSpi { tty, mode, max_speed })
     }
 
-    /// Send a SPI transfer header to QEMU.
-    ///
-    /// Takes the length of the transfer and whether the CS should be held
-    /// asserted afterwards or released.
-    ///
-    /// The header is a custom format for our SPI device in QEMU.
-    fn write_header(&self, len: u16, hold_cs: bool) -> anyhow::Result<()> {
-        let mut tty = self.tty.borrow_mut();
-
+    fn make_header(&self, len: u16, hold_cs: bool) -> [u8; 8] {
         let spi_mode = match self.mode.get() {
             TransferMode::Mode0 => 0,
             TransferMode::Mode1 => HEADER_CPOL_BIT,
@@ -75,19 +67,30 @@ impl QemuSpi {
             true => HEADER_HOLD_CS_BIT,
         };
 
-        // Assert chip select:
-        write!(tty, "/CS")?;
-        // Protocol version (zero):
-        tty.write_all(&[0])?;
-        // Flags:
-        tty.write_all(&[spi_mode | hold_cs])?;
-        // Ignored byte:
-        tty.write_all(&[0])?;
-        // Payload length:
-        tty.write_all(&len.to_le_bytes())?;
+        let len_bytes = len.to_le_bytes();
+        [
+            b'/',
+            b'C',
+            b'S',
+            0,
+            spi_mode | hold_cs,
+            0,
+            len_bytes[0],
+            len_bytes[1],
+        ]
+    }
 
+    /// Send a SPI transfer header to QEMU.
+    ///
+    /// Takes the length of the transfer and whether the CS should be held
+    /// asserted afterwards or released.
+    ///
+    /// The header is a custom format for our SPI device in QEMU.
+    fn write_header(&self, len: u16, hold_cs: bool) -> anyhow::Result<()> {
+        let hdr = self.make_header(len, hold_cs);
+        let mut tty = self.tty.borrow_mut();
+        tty.write_all(&hdr)?;
         tty.flush()?;
-
         Ok(())
     }
 
@@ -114,6 +117,49 @@ impl QemuSpi {
 
 impl Target for QemuSpi {
     fn run_transaction(&self, transaction: &mut [Transfer]) -> anyhow::Result<()> {
+        let mut total_len: usize = 0;
+        for transfer in transaction.iter() {
+            match transfer {
+                Transfer::Read(buf) => total_len += buf.len(),
+                Transfer::Write(buf) => total_len += buf.len(),
+                Transfer::Both(wbuf, rbuf) => {
+                    ensure!(wbuf.len() == rbuf.len(), "transfers must be same size");
+                    total_len += wbuf.len();
+                }
+            }
+        }
+
+        if total_len > 0 && total_len <= MAX_TRANSMISSION_LEN && total_len <= MAX_PACKET_LEN {
+            let mut tx_buf = Vec::with_capacity(8 + total_len);
+            tx_buf.extend_from_slice(&self.make_header(total_len as u16, false));
+            for transfer in transaction.iter() {
+                match transfer {
+                    Transfer::Read(buf) => tx_buf.resize(tx_buf.len() + buf.len(), 0),
+                    Transfer::Write(buf) | Transfer::Both(buf, _) => tx_buf.extend_from_slice(buf),
+                }
+            }
+            let mut rx_buf = vec![0u8; total_len];
+            {
+                let mut tty = self.tty.borrow_mut();
+                tty.write_all(&tx_buf).context("failed to write SPI TTY")?;
+                tty.read_exact(&mut rx_buf)
+                    .context("failed to read SPI TTY")?;
+            }
+            let mut pos = 0;
+            for transfer in transaction.iter_mut() {
+                match transfer {
+                    Transfer::Read(buf) | Transfer::Both(_, buf) => {
+                        buf.copy_from_slice(&rx_buf[pos..pos + buf.len()]);
+                        pos += buf.len();
+                    }
+                    Transfer::Write(buf) => {
+                        pos += buf.len();
+                    }
+                }
+            }
+            return Ok(());
+        }
+
         // Send and receive over the TTY.
         let transfer_count = transaction.len();
 
