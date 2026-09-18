@@ -255,10 +255,19 @@ fn usbdev_suspend(
                 } else {
                     // Longer Suspended state, a cue to enter the sleep state.
                     delay_millis(time_suspended_long);
-                    // If logging is enabled, a lot more messages will be printed, for example when going to
-                    // sleep. In order to keep the host and device log roughly in-order, give a chance to the device
-                    // to print messages before moving-on.
-                    let _ = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.logging_duration);
+                    if is_qemu {
+                        let _ = UartConsole::wait_for(
+                            uart,
+                            r"(Issuing WFI to enter sleep|(PASS|FAIL)!)",
+                            Duration::from_secs(5),
+                        );
+                        delay_millis(20);
+                    } else {
+                        // If logging is enabled, a lot more messages will be printed, for example when going to
+                        // sleep. In order to keep the host and device log roughly in-order, give a chance to the device
+                        // to print messages before moving-on.
+                        let _ = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.logging_duration);
+                    }
                 }
             }
 

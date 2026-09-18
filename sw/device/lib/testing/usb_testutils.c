@@ -88,6 +88,49 @@ static bool usb_testutils_transfer_next_part(
   return true;
 }
 
+static status_t usb_testutils_process_tx_sent(usb_testutils_ctx_t *ctx) {
+  uint16_t sentep;
+  TRY(dif_usbdev_get_tx_sent(ctx->dev, &sentep));
+  if (!sentep) {
+    return OK_STATUS();
+  }
+  TRC_C('a' + sentep);
+  unsigned ep = 0u;
+  while (sentep && ep < USBDEV_NUM_ENDPOINTS) {
+    if (sentep & (1u << ep)) {
+      // Free up the buffer and optionally callback
+      TRY(dif_usbdev_clear_tx_status(ctx->dev, ctx->buffer_pool,
+                                     (uint8_t)ep));
+
+      // If we have a larger transfer in progress, continue with that
+      usb_testutils_transfer_t *transfer = &ctx->in[ep].transfer;
+      usb_testutils_xfr_result_t res = kUsbTestutilsXfrResultOk;
+      bool done = true;
+      if (transfer->buffer) {
+        if (transfer->next_valid || !transfer->last) {
+          if (usb_testutils_transfer_next_part(ctx, (uint8_t)ep, transfer)) {
+            done = false;
+          } else {
+            res = kUsbTestutilsXfrResultFailed;
+          }
+        }
+        if (done) {
+          // Larger buffer transfer now completed; forget the buffer
+          transfer->buffer = NULL;
+        }
+      }
+      // Notify that we've sent the single packet, or larger buffer transfer
+      // is now complete
+      if (done && ctx->in[ep].tx_done_callback) {
+        TRY(ctx->in[ep].tx_done_callback(ctx->in[ep].ep_ctx, res));
+      }
+      sentep &= ~(1u << ep);
+    }
+    ep++;
+  }
+  return OK_STATUS();
+}
+
 status_t usb_testutils_poll(usb_testutils_ctx_t *ctx) {
   uint32_t istate;
 
@@ -102,42 +145,7 @@ status_t usb_testutils_poll(usb_testutils_ctx_t *ctx) {
   // before processing a response to that transmission
   // This is also important for device IN performance
   if (istate & (1u << kDifUsbdevIrqPktSent)) {
-    uint16_t sentep;
-    TRY(dif_usbdev_get_tx_sent(ctx->dev, &sentep));
-    TRC_C('a' + sentep);
-    unsigned ep = 0u;
-    while (sentep && ep < USBDEV_NUM_ENDPOINTS) {
-      if (sentep & (1u << ep)) {
-        // Free up the buffer and optionally callback
-        TRY(dif_usbdev_clear_tx_status(ctx->dev, ctx->buffer_pool,
-                                       (uint8_t)ep));
-
-        // If we have a larger transfer in progress, continue with that
-        usb_testutils_transfer_t *transfer = &ctx->in[ep].transfer;
-        usb_testutils_xfr_result_t res = kUsbTestutilsXfrResultOk;
-        bool done = true;
-        if (transfer->buffer) {
-          if (transfer->next_valid || !transfer->last) {
-            if (usb_testutils_transfer_next_part(ctx, (uint8_t)ep, transfer)) {
-              done = false;
-            } else {
-              res = kUsbTestutilsXfrResultFailed;
-            }
-          }
-          if (done) {
-            // Larger buffer transfer now completed; forget the buffer
-            transfer->buffer = NULL;
-          }
-        }
-        // Notify that we've sent the single packet, or larger buffer transfer
-        // is now complete
-        if (done && ctx->in[ep].tx_done_callback) {
-          TRY(ctx->in[ep].tx_done_callback(ctx->in[ep].ep_ctx, res));
-        }
-        sentep &= ~(1u << ep);
-      }
-      ep++;
-    }
+    TRY(usb_testutils_process_tx_sent(ctx));
   }
 
   // Keep buffers available for packet reception
@@ -147,6 +155,7 @@ status_t usb_testutils_poll(usb_testutils_ctx_t *ctx) {
     // TODO: we run the risk of starving the IN side here if the rx_callback(s)
     // are time-consuming
     while (true) {
+      TRY(usb_testutils_process_tx_sent(ctx));
       bool is_empty;
       TRY(dif_usbdev_status_get_rx_fifo_empty(ctx->dev, &is_empty));
       if (is_empty) {
