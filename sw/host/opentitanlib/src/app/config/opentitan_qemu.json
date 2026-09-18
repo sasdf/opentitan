@@ -4,7 +4,7 @@
   // writes) being placed in a mis-aligned ePMP region. We must set a long
   // reset delay so that operations like bootstrapping do not try to use IOs
   // like the SPI before the ROM has set them up.
-  "reset_delay": "1000ms",
+  "reset_delay": "150ms",
   "pins": [
     // Resetting is done through the monitor on QEMU, but OpenTitanTool
     // expects a pin. We map a pin-like interface to ID 255 which can be used
