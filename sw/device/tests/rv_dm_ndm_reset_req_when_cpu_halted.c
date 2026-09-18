@@ -25,9 +25,9 @@ bool test_main(void) {
     // Sync log used by the SV sequence. Do not modify.
     LOG_INFO("Ready for CPU halt request");
 
-    // Wait for the host test sequence to issue a halt request, followed
+    // Wait for 1ms. The host test sequence will issue a halt request, followed
     // by an NDM reset request.
-    busy_spin_micros(kDeviceType == kDeviceSimDV ? 10000 : 2000000);
+    busy_spin_micros(10000);
 
     LOG_ERROR("Timed out waiting for an NDM reset request.");
     return false;

@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/boards/teacup_v1_3_0/leds.h"
 #include "sw/device/lib/dif/dif_i2c.h"
 #include "sw/device/lib/runtime/hart.h"
@@ -105,10 +104,7 @@ bool test_main(void) {
   };
 
   // Cycle through brightness levels and colors.
-  size_t num_cycles = (kDeviceType == kDeviceSimQemu) ? 2 : kLedNumCycles;
-  uint32_t pause_ms =
-      (kDeviceType == kDeviceSimQemu) ? 1 : kLedCyclePauseMilliseconds;
-  for (size_t i = 0; i < num_cycles; ++i) {
+  for (size_t i = 0; i < kLedNumCycles; ++i) {
     for (size_t j = 0; j < kLedNumColorsInCycle; ++j) {
       CHECK_STATUS_OK(
           leds_set_color(&i2c, (i + j) % kNumTeacupLeds, kColorCycle[j]));
@@ -119,7 +115,7 @@ bool test_main(void) {
         curr_brightness <= brightness_start) {
       brightness_step *= -1;
     }
-    busy_spin_micros(pause_ms * 1000);
+    busy_spin_micros(kLedCyclePauseMilliseconds * 1000);
   }
 
   CHECK_STATUS_OK(leds_turn_all_off(&i2c));

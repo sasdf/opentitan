@@ -179,7 +179,7 @@ void xmodem_cancel(void *iohandle) {
 static void xmodem_send_finish(void *iohandle) {
   xmodem_putchar(iohandle, kXModemEof);
   uint8_t ch;
-  xmodem_read(iohandle, &ch, sizeof(ch), kXModemLongTimeout * 2);
+  xmodem_read(iohandle, &ch, sizeof(ch), kXModemLongTimeout);
   if (ch != kXModemAck) {
     // Should have seen an ACK, but we don't really care since there is nothing
     // we could do about it.

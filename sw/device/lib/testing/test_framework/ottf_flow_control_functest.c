@@ -23,9 +23,6 @@ status_t ottf_flow_control_test(ujson_t *uj) {
   // we aren't reading in the wait loop, we should get flow-control
   // event while in the wait loop.
   uint32_t delay = kDeviceType == kDeviceSimVerilator ? 1 : 500000;
-  if (kDeviceType == kDeviceSimQemu) {
-    delay = 150000;
-  }
   for (size_t i = 0; i < 10; ++i) {
     // Print a bunch of stuff so that ibex will be busy
     // driving the transmitter while the host sends data
