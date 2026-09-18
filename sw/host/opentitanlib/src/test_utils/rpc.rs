@@ -107,12 +107,16 @@ where
     where
         Self: Sized,
     {
+        static EXIT_SUCCESS_REGEX: std::sync::LazyLock<Regex> =
+            std::sync::LazyLock::new(|| Regex::new(r"RESP_OK:(.*) CRC:([0-9]+)\n").unwrap());
+        static EXIT_FAILURE_REGEX: std::sync::LazyLock<Regex> =
+            std::sync::LazyLock::new(|| Regex::new(r"RESP_ERR:(.*) CRC:([0-9]+)\n").unwrap());
         let mut console = UartConsole {
             timeout: Some(timeout),
             timestamp: true,
             newline: true,
-            exit_success: Some(Regex::new(r"RESP_OK:(.*) CRC:([0-9]+)\n")?),
-            exit_failure: Some(Regex::new(r"RESP_ERR:(.*) CRC:([0-9]+)\n")?),
+            exit_success: Some(EXIT_SUCCESS_REGEX.clone()),
+            exit_failure: Some(EXIT_FAILURE_REGEX.clone()),
             ..Default::default()
         };
         let mut stdout = std::io::stdout();
