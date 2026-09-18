@@ -8,6 +8,8 @@
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/runtime/print.h"
+#include "sw/device/lib/testing/entropy_testutils.h"
+#include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/drivers/hmac.h"
 #include "sw/device/silicon_creator/lib/drivers/lifecycle.h"
@@ -262,6 +264,7 @@ rom_error_t usb_test(void) {
 }
 
 bool test_main(void) {
+  CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
   pinmux_init_usb();
   status_t result = OK_STATUS();
   EXECUTE_TEST(result, usb_test);

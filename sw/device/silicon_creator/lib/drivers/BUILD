@@ -1042,6 +1042,9 @@ opentitan_test(
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
@@ -1061,6 +1064,7 @@ opentitan_test(
         ":usb",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/runtime:print",
+        "//sw/device/lib/testing:entropy_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )

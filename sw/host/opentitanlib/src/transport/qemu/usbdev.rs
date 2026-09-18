@@ -293,7 +293,7 @@ impl QemuUsbDevice {
             // The host always set the first available configuration.
             active_cfg_idx: 0,
             // Operations should be reasonably fast with QEMU.
-            timeout: Duration::from_millis(500),
+            timeout: Duration::from_secs(5),
             host_channel: host.host_channel.clone(),
         }
     }
@@ -328,8 +328,17 @@ impl UsbDevice for QemuUsbDevice {
     }
 
     /// Set the active configuration.
-    fn set_active_configuration(&self, _config: u8) -> anyhow::Result<()> {
-        anyhow::bail!("unimplemented set_active_configuration");
+    fn set_active_configuration(&self, config: u8) -> anyhow::Result<()> {
+        let _ = self
+            .write_control(
+                USB_REQ_TYPE_OUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                USB_SET_CONFIGURATION,
+                config as u16,
+                0,
+                &[],
+            )
+            .context(format!("failed to set active configuration {config}"))?;
+        Ok(())
     }
 
     /// Claim an interface for use with the kernel.
@@ -398,8 +407,22 @@ impl UsbDevice for QemuUsbDevice {
     }
 
     /// Return a string descriptor in ASCII.
-    fn read_string_descriptor_ascii(&self, _idx: u8) -> anyhow::Result<String> {
-        anyhow::bail!("unimplemented read_string_descriptor_ascii");
+    fn read_string_descriptor_ascii(&self, idx: u8) -> anyhow::Result<String> {
+        let mut buf = [0u8; 256];
+        let len = self.read_control(
+            USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+            USB_GET_DESCRIPTOR,
+            (3u16 << 8) | (idx as u16),
+            0x0409,
+            &mut buf,
+        )?;
+        anyhow::ensure!(len >= 2 && buf[1] == 3, "invalid string descriptor");
+        let str_len = std::cmp::min(len, buf[0] as usize);
+        let u16_words: Vec<u16> = buf[2..str_len]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        Ok(String::from_utf16_lossy(&u16_words))
     }
 
     /// Reset the device.
@@ -536,17 +559,30 @@ impl UsbDevice for QemuUsbDevice {
         } else {
             0
         };
-        // Status stage.
-        let (send, recv) = mpsc::channel();
-        self.host_channel
-            .send(HostChannelEvent::SubmitOutTransfer {
-                generation: self.dev_info.generation,
-                ep: 0,
-                data: vec![],
-                answer: send,
-            })
-            .context("failed to submit OUT transfer for control status stage")?;
-        let _ = recv.recv_timeout(timeout)??;
+        // Status stage: OUT if there was an IN data stage (length > 0), IN if no-data control (length == 0).
+        if length > 0 {
+            let (send, recv) = mpsc::channel();
+            self.host_channel
+                .send(HostChannelEvent::SubmitOutTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    data: vec![],
+                    answer: send,
+                })
+                .context("failed to submit OUT transfer for control status stage")?;
+            let _ = recv.recv_timeout(timeout)??;
+        } else {
+            let (send, recv) = mpsc::channel();
+            self.host_channel
+                .send(HostChannelEvent::SubmitInTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    length: 0,
+                    answer: send,
+                })
+                .context("failed to submit IN transfer for no-data control status stage")?;
+            let _ = recv.recv_timeout(timeout)??;
+        }
         Ok(recv_size)
     }
 
@@ -886,6 +922,26 @@ impl QemuHostThread {
 
     /// Send a message to the QEMU USBDEV driver. On success, return the ID
     /// of the packet.
+    fn blocking_write_all<T: Write>(write: &mut T, buf: &[u8]) -> anyhow::Result<()> {
+        let mut pos = 0usize;
+        while pos < buf.len() {
+            match write.write(&buf[pos..]) {
+                Ok(amount) => pos += amount,
+                Err(err)
+                    if err.kind() == std::io::ErrorKind::TimedOut
+                        || err.kind() == std::io::ErrorKind::WouldBlock
+                        || err.kind() == std::io::ErrorKind::Interrupted =>
+                {
+                    continue;
+                }
+                err => {
+                    err?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn send_packet(&mut self, cmd: QemuUsbdevCmd, data: &[&[u8]]) -> UsbResult<PacketId> {
         let tot_len: usize = data.as_ref().iter().map(|data| data.len()).sum();
         let hdr = QemuUsbdevPacketHeader {
@@ -897,12 +953,10 @@ impl QemuHostThread {
         let pkt_id = self.next_id;
         self.next_id += 1;
 
-        self.usbdev
-            .write_all(hdr.as_bytes())
+        Self::blocking_write_all(&mut self.usbdev, hdr.as_bytes())
             .context("Failed to write packet header to usbdev tty")?;
         for data in data {
-            self.usbdev
-                .write_all(data)
+            Self::blocking_write_all(&mut self.usbdev, data)
                 .context("Failed to write packet data to usbdev tty")?;
         }
         self.usbdev.flush().context("Failed to flush usbdev tty")?;
@@ -1486,7 +1540,7 @@ impl QemuHostThread {
     }
 
     /// Serve requests for the device until it disconnects .
-    fn serve_device_requests(&mut self, dev_info: &DeviceInfo) -> UsbResult<()> {
+    fn serve_device_requests(&mut self, mut dev_info: DeviceInfo) -> UsbResult<()> {
         self.pending_in_transfers.clear();
         self.active_ep_in.clear();
         self.completed_ep_in.clear();
@@ -1507,7 +1561,7 @@ impl QemuHostThread {
                                     .map_err(|err| anyhow!("{err:?}"))
                                     .context("Could not parse Complete payload")?;
                             self.handle_complete(
-                                dev_info,
+                                &dev_info,
                                 PacketId(id),
                                 QemuUsbdevTransferStatus::try_from(payload.status).with_context(
                                     || {
@@ -1553,7 +1607,7 @@ impl QemuHostThread {
                     data,
                     answer,
                 } => {
-                    match self.submit_out_transfer(dev_info, generation, ep, &data) {
+                    match self.submit_out_transfer(&dev_info, generation, ep, &data) {
                         Ok(pkt_id) => {
                             if self.pending_out_transfers.insert(pkt_id, answer).is_some() {
                                 log::error!("USB Host: internal error: packet ID reused?!");
@@ -1577,7 +1631,7 @@ impl QemuHostThread {
                     } else if let Some(&pkt_id) = self.active_ep_in.get(&ep_idx) {
                         self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
                     } else {
-                        match self.submit_in_transfer(dev_info, generation, ep_idx, length) {
+                        match self.submit_in_transfer(&dev_info, generation, ep_idx, length) {
                             Ok(pkt_id) => {
                                 self.active_ep_in.insert(ep_idx, pkt_id);
                                 self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
@@ -1590,6 +1644,11 @@ impl QemuHostThread {
                     }
                 }
                 HostChannelEvent::Reset => {
+                    self.pending_in_transfers.clear();
+                    self.active_ep_in.clear();
+                    self.completed_ep_in.clear();
+                    self.pending_out_transfers.clear();
+                    dev_info.address = 0;
                     let _ = self
                         .send_packet(QemuUsbdevCmd::Reset, &[])
                         .maybe_context("Failed to send RESET")?;
@@ -1689,7 +1748,7 @@ impl QemuHostThread {
             self.notify_device_change();
 
             // Handle messages until the device disconnects.
-            match self.serve_device_requests(&dev_info) {
+            match self.serve_device_requests(dev_info) {
                 Err(UsbError::Shutdown) => return Ok(()),
                 Err(UsbError::Disconnected) | Ok(()) => {
                     log::info!("USB Host: device disconnected");

@@ -72,7 +72,10 @@ opentitan_test(
         dicts.omit(
             EARLGREY_TEST_ENVS,
             # Not intended for ROM_EXT environments.
-            ["//hw/top_earlgrey:fpga_cw310_sival_rom_ext"],
+            [
+                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
+                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+            ],
         ),
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
