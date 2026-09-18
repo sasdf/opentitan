@@ -3747,6 +3747,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
+    qemu = qemu_params(
+        otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
+    ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

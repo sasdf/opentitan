@@ -14,7 +14,6 @@
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "pwrmgr_regs.h"
-#include "sensor_ctrl_regs.h"
 #include "sw/device/lib/testing/autogen/isr_testutils.h"
 
 /*
@@ -24,10 +23,7 @@
   up by sensor_ctrl via AST inputs.
  */
 
-// Test handles its own alerts.
-// `sensor_ctrl_aon_recov_alert` fires immediately on wake-up which doesn't
-// give us enough time to disable it specifically.
-OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
+OTTF_DEFINE_TEST_CONFIG();
 
 /**
  * Clean up pwrmgr wakeup reason register for the next round.
@@ -51,11 +47,6 @@ bool test_main(void) {
   irq_external_ctrl(true);
 
   init_units();
-  // Enable all AST alerts in sensor_ctrl
-  for (uint32_t k = 0; k < SENSOR_CTRL_PARAM_NUM_ALERT_EVENTS; k++) {
-    CHECK_DIF_OK(
-        dif_sensor_ctrl_set_alert_en(&sensor_ctrl, k, kDifToggleEnabled));
-  }
 
   // Enable all the AON interrupts used in this test.
   rv_plic_testutils_irq_range_enable(&rv_plic, kTopEarlgreyPlicTargetIbex0,
