@@ -133,9 +133,8 @@ _FAULT_CONFIG = {
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "",
             binaries = {
@@ -278,9 +277,8 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
             binaries = {
@@ -341,9 +339,8 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
             binaries = {
@@ -868,9 +865,8 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if name == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "",
             exit_success = "BFV:05525304\r\n",
@@ -921,9 +917,8 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "",
             params = config["params"],
@@ -956,9 +951,8 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "",
             device_id = DEVICE_ID,
@@ -994,9 +988,8 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        } | ({} if protocol == "usbdfu" else {
             "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        }),
+        },
         fpga = fpga_params(
             assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
             binaries = {
@@ -1349,6 +1342,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -1363,6 +1357,18 @@ opentitan_test(
         test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_usbdfu": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        params = "-p usb-dfu -t strap -v 3",
+        test_cmd = """
+        rescue {params} --action=usb-dfu-out-chunk-too-big
+        """,
+        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
     ),
 )
 

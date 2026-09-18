@@ -1583,8 +1583,14 @@ impl QemuHostThread {
                     }
                 }
                 HostChannelEvent::GetDeviceInfo { answer } => {
-                    // Ignore errors (ie the other end disconnected).
-                    let _ = answer.send(Some(dev_info.clone()));
+                    // If the device was reset (address == 0), wait for re-enumeration before
+                    // reporting it as a configured device to new callers.
+                    let info = if dev_info.address != 0 {
+                        Some(dev_info.clone())
+                    } else {
+                        None
+                    };
+                    let _ = answer.send(info);
                 }
                 HostChannelEvent::NotifyDeviceChange { answer } => {
                     self.pending_dev_changes.push(answer)
