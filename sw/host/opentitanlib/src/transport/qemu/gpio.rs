@@ -251,14 +251,16 @@ impl QemuGpio {
     /// uppercase hex characters forming a value. This is a custom protocol for
     /// OpenTitan's QEMU machine.
     pub fn process_frames(&mut self) -> anyhow::Result<()> {
+        let deadline = Instant::now() + Duration::from_millis(50);
         let mut line = String::new();
-        while let Ok(bytes_read) = self.stream.read_line(&mut line) {
-            if bytes_read == 0 {
-                break; // EOF reached
+        while Instant::now() < deadline {
+            match self.stream.read_line(&mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {
+                    self.process_single_frame(&line)?;
+                    line.clear();
+                }
             }
-
-            self.process_single_frame(&line)?;
-            line.clear();
         }
 
         Ok(())
@@ -274,8 +276,12 @@ impl QemuGpio {
             .get_ref()
             .set_read_timeout(Some(Duration::from_millis(50)))?;
 
+        let deadline = Instant::now() + Duration::from_millis(50);
         let mut line = String::new();
-        while let Ok(bytes_read) = self.stream.read_line(&mut line) {
+        while Instant::now() < deadline {
+            let Ok(bytes_read) = self.stream.read_line(&mut line) else {
+                break;
+            };
             if bytes_read == 0 {
                 break;
             }
@@ -323,8 +329,12 @@ impl QemuGpio {
             .context("failed to send GPIO frame")?;
         self.stream.get_mut().flush()?;
 
+        let deadline = Instant::now() + Duration::from_millis(200);
         let mut line = String::new();
-        while let Ok(bytes_read) = self.stream.read_line(&mut line) {
+        while Instant::now() < deadline {
+            let Ok(bytes_read) = self.stream.read_line(&mut line) else {
+                break;
+            };
             if bytes_read == 0 {
                 break;
             }
