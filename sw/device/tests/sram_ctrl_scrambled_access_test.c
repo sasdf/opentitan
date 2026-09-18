@@ -135,12 +135,12 @@ static bool expect_ecc_errors(void) {
   switch (kDeviceType) {
     case kDeviceFpgaCw305:
     case kDeviceFpgaCw310:
-    case kDeviceSimQemu:
       return false;
     case kDeviceFpgaCw340:
     case kDeviceSilicon:
     case kDeviceSimDV:
     case kDeviceSimVerilator:
+    case kDeviceSimQemu:
       return true;
     default:
       CHECK(false, "Device type not handled: %d", kDeviceType);
