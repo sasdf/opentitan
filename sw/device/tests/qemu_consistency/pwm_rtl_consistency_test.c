@@ -31,6 +31,18 @@ enum {
     }                                           \
   } while (0)
 
+static volatile uint32_t kFaultCount = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mepc;
+  __asm__ volatile("csrr %0, mepc" : "=r"(mepc));
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  uint32_t step = ((insn16 & 0x3u) == 0x3u) ? 4u : 2u;
+  __asm__ volatile("csrw mepc, %0" : : "r"(mepc + step));
+  kFaultCount++;
+}
+
 bool test_main(void) {
   bool all_ok = true;
 
@@ -144,6 +156,32 @@ bool test_main(void) {
              "latched high instead of pulsing)");
   EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_ALERT_TEST_REG_OFFSET) == 0u,
              "ALERT_TEST (WO) readback must be 0");
+
+  // 4b. Verify PWM_PERMIT sub-word write checks (pwm_reg_top.sv wr_err):
+  // - Sub-word write to DUTY_CYCLE_0 (PWM_PERMIT = 4'b1111) faults and blocks write.
+  // - Sub-word write to INVERT+1 (PWM_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
+  // - Sub-word write to INVERT+0 (PWM_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET)) = 0x12u;
+  EXPECT_RTL(kFaultCount == 1u &&
+                 abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) ==
+                     0x7fff7fffu,
+             "Sub-word write to DUTY_CYCLE_0 must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPwmBase + PWM_INVERT_REG_OFFSET + 1u)) = 0x01u;
+  EXPECT_RTL(kFaultCount == 1u &&
+                 abs_mmio_read32(kPwmBase + PWM_INVERT_REG_OFFSET) == 0u,
+             "Sub-word write to INVERT+1 must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPwmBase + PWM_INVERT_REG_OFFSET)) = 0x15u;
+  busy_spin_micros(20);
+  EXPECT_RTL(kFaultCount == 0u &&
+                 abs_mmio_read32(kPwmBase + PWM_INVERT_REG_OFFSET) == 0x15u,
+             "Byte-0 sub-word write to INVERT (PWM_PERMIT=4'b0001) must succeed");
+  abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 0u);
+  busy_spin_micros(20);
 
   // 5. Verify REGWEN (rw0c) locks CFG, PWM_EN, INVERT, PWM_PARAM_0,
   // DUTY_CYCLE_0, and BLINK_PARAM_0 while leaving ALERT_TEST functional.
