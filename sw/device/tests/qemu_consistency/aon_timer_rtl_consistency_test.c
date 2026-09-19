@@ -27,6 +27,12 @@ enum {
 };
 
 static volatile uint32_t wdog_nmi_fired = 0;
+static volatile uint32_t g_fault_count = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_count++;
+}
 
 void ottf_internal_isr(uint32_t *exc_info) {
   (void)exc_info;
@@ -289,6 +295,33 @@ bool test_main(void) {
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+
+  // 7. Wave 5: Verify AON_TIMER_PERMIT sub-word write checks (aon_timer_reg_pkg.sv:191-206).
+  // WKUP_THOLD_LO (0x0c) has AON_TIMER_PERMIT = 4'b1111: an 8-bit write
+  // (reg_be = 4'b0001) must assert wr_err = 1 (mcause = 7) and preserve the register.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0x12345678u);
+  g_fault_count = 0;
+  abs_mmio_write8(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0xaau);
+  EXPECT_RTL(g_fault_count == 1u,
+             "Expected 8-bit write to WKUP_THOLD_LO (PERMIT=4'b1111) to fault (faults=%u)",
+             g_fault_count);
+  EXPECT_RTL(abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET) ==
+                 0x12345678u,
+             "Sub-word write with wr_err=1 must not modify WKUP_THOLD_LO");
+
+  // WKUP_CTRL (0x04) has AON_TIMER_PERMIT = 4'b0011: an 8-bit write (reg_be = 4'b0001)
+  // must fault with wr_err = 1, whereas a 16-bit write at byte 0 (reg_be = 4'b0011)
+  // is permitted (wr_err = 0).
+  g_fault_count = 0;
+  abs_mmio_write8(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  EXPECT_RTL(g_fault_count == 1u,
+             "Expected 8-bit write to WKUP_CTRL (PERMIT=4'b0011, reg_be=4'b0001) to fault (faults=%u)",
+             g_fault_count);
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET) = 0u;
+  EXPECT_RTL(g_fault_count == 0u,
+             "16-bit write to WKUP_CTRL (PERMIT=4'b0011, reg_be=4'b0011) must succeed (faults=%u)",
+             g_fault_count);
 
   return all_ok;
 }
