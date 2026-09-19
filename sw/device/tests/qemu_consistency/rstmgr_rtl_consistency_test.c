@@ -364,6 +364,30 @@ bool test_main(void) {
     failures++;
   }
 
+  // Wave 2 check: In rstmgr_crash_info.sv, SlotCntWidth = $clog2(CrashStoreSlot).
+  // Unlike ALERT_INFO (CrashStoreSlot=9 -> SlotCntWidth=$clog2(9)=4, so
+  // slots[15:9] are 0), CPU_INFO has CrashStoreSlot=8 -> SlotCntWidth=$clog2(8)=3!
+  // Line 44: `assign slot_o = slots[slot_sel_i[SlotCntWidth-1:0]];`
+  // Line 50: `assign unused_idx = slot_sel_i[IdxWidth-1:SlotCntWidth];`
+  // Therefore, for CPU_INFO, bit 3 of INDEX is tied off as unused, and
+  // INDEX=8..15 aliases slots[0..7] (INDEX & 7)! Slot 4 is current_pc (always
+  // non-zero in flash), so INDEX=12 (4 | 8) must equal INDEX=4.
+  abs_mmio_write32(kRstmgrBase + RSTMGR_CPU_INFO_CTRL_REG_OFFSET,
+                   4u << RSTMGR_CPU_INFO_CTRL_INDEX_OFFSET);
+  uint32_t cpu_slot4 =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_CPU_INFO_CTRL_REG_OFFSET,
+                   12u << RSTMGR_CPU_INFO_CTRL_INDEX_OFFSET);
+  uint32_t cpu_slot12 =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET);
+  if (cpu_slot4 == 0u || cpu_slot12 != cpu_slot4) {
+    LOG_ERROR(
+        "RTL_MISMATCH: CPU_INFO[12] (3-bit SlotCntWidth=$clog2(8)=3) expected "
+        "to alias CPU_INFO[4]=0x%x, got 0x%x",
+        cpu_slot4, cpu_slot12);
+    failures++;
+  }
+
   CHECK(failures == 0u, "rstmgr_rtl_consistency_test failed with %u mismatches",
         failures);
   return true;
