@@ -208,5 +208,29 @@ bool test_main(void) {
   }
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, 0u);
 
+  // 6. Verify INTR_ENABLE mask (0x3), INTR_TEST (WO) triggering INTR_STATE,
+  // INTR_STATE RW1C clearing, and WO zero readback for INTR_TEST / ALERT_TEST.
+  abs_mmio_write32(kPattgenBase + PATTGEN_INTR_ENABLE_REG_OFFSET, 0xffffffffu);
+  uint32_t intr_en =
+      abs_mmio_read32(kPattgenBase + PATTGEN_INTR_ENABLE_REG_OFFSET);
+  EXPECT_RTL(intr_en == 0x3u,
+             "[6a] INTR_ENABLE readback = 0x%08x, expected 0x3", intr_en);
+  abs_mmio_write32(kPattgenBase + PATTGEN_INTR_ENABLE_REG_OFFSET, 0u);
+
+  abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
+  abs_mmio_write32(kPattgenBase + PATTGEN_INTR_TEST_REG_OFFSET, 0x3u);
+  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_TEST_REG_OFFSET) == 0u,
+             "[6b] INTR_TEST (WO) readback must be 0");
+  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_ALERT_TEST_REG_OFFSET) ==
+                 0u,
+             "[6c] ALERT_TEST (WO) readback must be 0");
+  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) ==
+                 0x3u,
+             "[6d] INTR_STATE after INTR_TEST=0x3 must be 0x3");
+  abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
+  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) ==
+                 0u,
+             "[6e] INTR_STATE after RW1C write 0x3 must be 0");
+
   return failures == 0;
 }
