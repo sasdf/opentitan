@@ -353,6 +353,97 @@ static void test_status_read_does_not_cancel_clkdiv_active(uint32_t base) {
   abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET, 0x7fu);
 }
 
+static volatile uint32_t g_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  uint32_t mepc = 0;
+  asm volatile("csrr %0, mcause" : "=r"(mcause));
+  asm volatile("csrr %0, mepc" : "=r"(mepc));
+  g_last_mcause = mcause;
+  g_fault_count++;
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  mepc += ((insn16 & 0x3u) != 0x3u) ? 2u : 4u;
+  asm volatile("csrw mepc, %0" : : "r"(mepc));
+}
+
+static void test_subword_permit_and_window_errors(uint32_t base) {
+  // 1. 4'b1111 registers (CONTROL at 0x10, CONFIGOPTS at 0x18, CSID at 0x1c):
+  //    sb/sh must raise Store Access Fault (mcause = 7) and NOT mutate state.
+  abs_mmio_write32(base + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0x01234567u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + SPI_HOST_CONFIGOPTS_REG_OFFSET) = 0xaau;
+  EXPECT_CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+               "sb to SPI_HOST_CONFIGOPTS must fault (mcause=7)");
+  *(volatile uint16_t *)(base + SPI_HOST_CONFIGOPTS_REG_OFFSET) = 0xbbbbu;
+  EXPECT_CHECK(g_fault_count == 2u && g_last_mcause == 7u,
+               "sh to SPI_HOST_CONFIGOPTS must fault (mcause=7)");
+  EXPECT_CHECK(abs_mmio_read32(base + SPI_HOST_CONFIGOPTS_REG_OFFSET) ==
+                   0x01234567u,
+               "SPI_HOST_CONFIGOPTS must remain 0x01234567 after rejected writes");
+  abs_mmio_write32(base + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+
+  // 2. 4'b0011 register (COMMAND at 0x20):
+  //    sb at +0 must fault (mcause = 7) and NOT enqueue a command (CMDQD == 0);
+  //    sh at +0 must succeed (CMDQD == 1)!
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
+                   (1u << SPI_HOST_CONTROL_SW_RST_BIT) | 0x7fu);
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET, 0x7fu);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + SPI_HOST_COMMAND_REG_OFFSET) = 0x03u;
+  EXPECT_CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+               "sb to SPI_HOST_COMMAND must fault (mcause=7)");
+  uint32_t status = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+  EXPECT_CHECK(bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 0u,
+               "Rejected sb to SPI_HOST_COMMAND must not increment CMDQD");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(base + SPI_HOST_COMMAND_REG_OFFSET) = 0x0003u;
+  EXPECT_CHECK(g_fault_count == 0u,
+               "sh to SPI_HOST_COMMAND+0 (SPI_HOST_PERMIT=4'b0011) must succeed");
+  status = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+  EXPECT_CHECK(bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 1u,
+               "Valid sh to SPI_HOST_COMMAND+0 must increment CMDQD to 1");
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
+                   (1u << SPI_HOST_CONTROL_SW_RST_BIT) | 0x7fu);
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET, 0x7fu);
+
+  // 3. 4'b0001 register (EVENT_ENABLE at 0x34):
+  //    sb at +1 must fault (mcause = 7); sb at +0 must succeed!
+  abs_mmio_write32(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET, 0u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET + 1u) = 0x05u;
+  EXPECT_CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+               "sb to SPI_HOST_EVENT_ENABLE+1 must fault (mcause=7)");
+  EXPECT_CHECK(abs_mmio_read32(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET) == 0u,
+               "EVENT_ENABLE must remain 0 after rejected sb to +1");
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET) = 0x15u;
+  EXPECT_CHECK(g_fault_count == 0u &&
+                   abs_mmio_read32(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET) ==
+                       0x15u,
+               "sb to SPI_HOST_EVENT_ENABLE+0 must succeed and set 0x15");
+  abs_mmio_write32(base + SPI_HOST_EVENT_ENABLE_REG_OFFSET, 0u);
+
+  // 4. RXDATA (0x24) write error (mcause = 7) and TXDATA (0x28) read error
+  //    (mcause = 5), plus addrmiss at 0x38:
+  g_fault_count = 0;
+  *(volatile uint32_t *)(base + SPI_HOST_RXDATA_REG_OFFSET) = 0u;
+  EXPECT_CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+               "sw to SPI_HOST_RXDATA must raise Store Access Fault (mcause=7)");
+  (void)*(volatile uint32_t *)(base + SPI_HOST_TXDATA_REG_OFFSET);
+  EXPECT_CHECK(g_fault_count == 2u && g_last_mcause == 5u,
+               "lw from SPI_HOST_TXDATA must raise Load Access Fault (mcause=5)");
+  (void)*(volatile uint32_t *)(base + 0x38u);
+  EXPECT_CHECK(g_fault_count == 3u && g_last_mcause == 5u,
+               "lw from SPI_HOST+0x38 (addrmiss) must raise Load Access Fault");
+  *(volatile uint32_t *)(base + 0x38u) = 0u;
+  EXPECT_CHECK(g_fault_count == 4u && g_last_mcause == 7u,
+               "sw to SPI_HOST+0x38 (addrmiss) must raise Store Access Fault");
+}
+
 bool test_main(void) {
   CHECK_DIF_OK(dif_alert_handler_init(
       mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
@@ -365,6 +456,7 @@ bool test_main(void) {
   test_tx_fifo_plus_byte_select_depth_73(kSpiHost0Base);
   test_wronly_txstall_in_idle_cmdqd_and_active(kSpiHost0Base);
   test_status_read_does_not_cancel_clkdiv_active(kSpiHost0Base);
+  test_subword_permit_and_window_errors(kSpiHost0Base);
   LOG_INFO("spi_host_rtl_consistency_test finished with %u failure(s).",
            g_failures);
   return g_failures == 0;
