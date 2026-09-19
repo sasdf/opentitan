@@ -292,7 +292,8 @@ bool test_main(void) {
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
                    dis_default_region);
 
-  // 10a. Page Erase MP_ERR at unaligned intra-page address 0x81234 must latch
+  // 10a. Page Erase MP_ERR at unaligned intra-page address 0x81234 (Info
+  // Partition 2, which is disabled under both ROM and ROM_EXT) must latch
   // page-aligned ERR_ADDR 0x81000 (op_addr_i & PageAddrMask in flash_ctrl_erase.sv).
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
@@ -300,6 +301,8 @@ bool test_main(void) {
   uint32_t pg_erase_ctrl =
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
                              FLASH_CTRL_CONTROL_OP_VALUE_ERASE) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT, true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_INFO_SEL_FIELD, 2u) |
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_ERASE_SEL_BIT, false) |
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
@@ -335,13 +338,15 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
   // 10c. Read MP_ERR (with NUM=1 so u_flash_ctrl_rd enters StErr) at 0x81234
-  // must latch word-aligned ERR_ADDR 0x81234.
+  // (Info Partition 2) must latch word-aligned ERR_ADDR 0x81234.
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x81234u);
   uint32_t rd_err_ctrl =
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
                              FLASH_CTRL_CONTROL_OP_VALUE_READ) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT, true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_INFO_SEL_FIELD, 2u) |
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u) |
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, rd_err_ctrl);
