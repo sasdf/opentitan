@@ -14,8 +14,7 @@ opentitan_test(
     srcs = ["i2c_consistency_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-        # Re-enabled in fix_rtl_discrepancy_w2_i2c_status_hostidle_and_val_ovrd
-        # "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
     deps = [
