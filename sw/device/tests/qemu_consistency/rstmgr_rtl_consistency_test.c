@@ -34,6 +34,16 @@ enum {
   kRetSramMagicExpectedSwReset = 0x52535432u,
 };
 
+static volatile uint32_t g_expected_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_last_mcause = ibex_mcause_read();
+  g_expected_fault_count++;
+}
+
+
 bool test_main(void) {
   uint32_t failures = 0;
   retention_sram_t *ret_sram = retention_sram_get();
@@ -388,7 +398,77 @@ bool test_main(void) {
     failures++;
   }
 
+  // Wave 5 check: RSTMGR_PERMIT sub-word wr_err, sub-word read, and AW=7
+  // addrmiss (0x70).
+  // 1) Valid 1-byte write to byte 0 of ALERT_INFO_CTRL (PERMIT = 4'b0001) sets
+  // INDEX=6 without fault, and 1-byte read at ALERT_INFO + 2 returns byte 2 of
+  // slot 6 (0x08).
+  g_expected_fault_count = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET,
+                  6u << RSTMGR_ALERT_INFO_CTRL_INDEX_OFFSET);
+  uint8_t alert_slot6_b2 =
+      abs_mmio_read8(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET + 2u);
+  if (g_expected_fault_count != 0u ||
+      alert_slot6_b2 != (uint8_t)((alert_slot6 >> 16) & 0xffu)) {
+    LOG_ERROR(
+        "RTL_MISMATCH: valid byte-0 write / byte-2 read failed (faults=%u "
+        "b2=0x%x expected=0x%x)",
+        g_expected_fault_count, alert_slot6_b2,
+        (uint8_t)((alert_slot6 >> 16) & 0xffu));
+    failures++;
+  }
+
+  // 2) Unpermitted 1-byte write to byte 1 of ALERT_INFO_CTRL (offset 0x11,
+  // reg_be = 4'b0010, PERMIT = 4'b0001) must raise Store Access Fault
+  // (mcause = 7) and preserve ALERT_INFO_CTRL == 0x60.
+  g_expected_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET + 1u, 0x00u);
+  uint32_t ctrl_after_bad_sb =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET);
+  if (g_expected_fault_count != 1u || g_last_mcause != 7u ||
+      ctrl_after_bad_sb != (6u << RSTMGR_ALERT_INFO_CTRL_INDEX_OFFSET)) {
+    LOG_ERROR(
+        "RTL_MISMATCH: sub-word write to ALERT_INFO_CTRL+1 expected mcause=7 "
+        "and preserved 0x60 (got faults=%u mcause=%u ctrl=0x%x)",
+        g_expected_fault_count, g_last_mcause, ctrl_after_bad_sb);
+    failures++;
+  }
+
+  // 3) Unpermitted 1-byte write to ALERT_INFO (offset 0x18, reg_be = 4'b0001,
+  // PERMIT = 4'b1111) must raise Store Access Fault (mcause = 7).
+  g_expected_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET, 0x00u);
+  if (g_expected_fault_count != 1u || g_last_mcause != 7u) {
+    LOG_ERROR(
+        "RTL_MISMATCH: 1-byte write to ALERT_INFO (PERMIT=4'b1111) expected "
+        "mcause=7 (got faults=%u mcause=%u)",
+        g_expected_fault_count, g_last_mcause);
+    failures++;
+  }
+
+  // 4) Unmapped offset 0x70 within AW=7 (0x80) aperture must raise Load/Store
+  // Access Fault (mcause = 5 / 7) with ERR_CODE remaining 0.
+  g_expected_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kRstmgrBase + 0x70u);
+  if (g_expected_fault_count != 1u || g_last_mcause != 5u) {
+    LOG_ERROR(
+        "RTL_MISMATCH: read from addrmiss 0x70 expected mcause=5 (got "
+        "faults=%u mcause=%u)",
+        g_expected_fault_count, g_last_mcause);
+    failures++;
+  }
+  uint32_t err_code = abs_mmio_read32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET);
+  if (err_code != 0u) {
+    LOG_ERROR("RTL_MISMATCH: ERR_CODE expected 0 after wr_err/addrmiss, got 0x%x",
+              err_code);
+    failures++;
+  }
+
   CHECK(failures == 0u, "rstmgr_rtl_consistency_test failed with %u mismatches",
         failures);
   return true;
 }
+
