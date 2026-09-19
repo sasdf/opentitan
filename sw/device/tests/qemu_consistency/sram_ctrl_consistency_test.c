@@ -5,10 +5,13 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/dif/dif_sram_ctrl.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
@@ -27,6 +30,17 @@ static const uint32_t kTestPattern[kTestWords] = {
     0x6b4abfaeu, 0x63bdb6e7u, 0x87f99b1au, 0xa214dffeu,
     0xb12291f9u, 0xd0cd1abeu, 0x5c95e716u, 0xe887aab1u,
 };
+
+static volatile bool kLoadStoreFault = false;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  kLoadStoreFault = true;
+  uint32_t mepc = ibex_mepc_read();
+  uint16_t inst = *(volatile uint16_t *)mepc;
+  uint32_t step = ((inst & 0x3u) == 0x3u) ? 4u : 2u;
+  CSR_WRITE(CSR_REG_MEPC, mepc + step);
+}
 
 #define EXPECT_RTL(cond, ...)                   \
   do {                                          \
@@ -205,6 +219,35 @@ bool test_main(void) {
              "Simultaneous RENEW_SCR_KEY | INIT must rotate key (0x6)");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4True);
+
+  // 6c. Wave 5: Verify SRAM_CTRL_REGS_PERMIT sub-word write error (wr_err) and
+  // addrmiss decode error (sram_ctrl_reg_pkg.sv:152-162,
+  // sram_ctrl_regs_reg_top.sv:656-670).
+  kLoadStoreFault = false;
+  abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET + 1u, 0x06u);
+  EXPECT_RTL(kLoadStoreFault,
+             "Expected Store Access Fault on 8-bit write to byte 1 of "
+             "SRAM_CTRL_EXEC (PERMIT=4'b0001)");
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET) ==
+                 kMultiBitBool4False,
+             "EXEC must remain 0x9 after rejected sub-word write to byte 1");
+
+  kLoadStoreFault = false;
+  abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
+                  kMultiBitBool4True);
+  EXPECT_RTL(!kLoadStoreFault &&
+                 abs_mmio_read32(kSramRetRegsBase +
+                                 SRAM_CTRL_EXEC_REG_OFFSET) ==
+                     kMultiBitBool4True,
+             "8-bit write to byte 0 of SRAM_CTRL_EXEC (PERMIT=4'b0001) must "
+             "succeed");
+  abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
+                  kMultiBitBool4False);
+
+  kLoadStoreFault = false;
+  (void)abs_mmio_read32(kSramRetRegsBase + 0x24u);
+  EXPECT_RTL(kLoadStoreFault,
+             "Expected Load Access Fault on unmapped offset 0x24 (addrmiss)");
 
   // 7. Lock REGWEN registers (W0C) and verify locked registers ignore writes.
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 0u);
