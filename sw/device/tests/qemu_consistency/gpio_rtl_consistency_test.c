@@ -7,11 +7,13 @@
 
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_pinmux.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "gpio_regs.h"
@@ -25,6 +27,28 @@ enum {
   kPinmuxBase = TOP_EARLGREY_PINMUX_AON_BASE_ADDR,
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
 };
+
+static volatile bool g_expect_access_fault = false;
+static volatile uint32_t g_access_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  if (g_expect_access_fault && (mcause == 5u || mcause == 7u)) {
+    g_access_fault_count++;
+    g_last_mcause = mcause;
+    uint32_t mepc = 0;
+    CSR_READ(CSR_REG_MEPC, &mepc);
+    uint16_t inst16 = *(const uint16_t *)mepc;
+    uint32_t step = ((inst16 & 0x3u) != 0x3u) ? 2u : 4u;
+    CSR_WRITE(CSR_REG_MEPC, mepc + step);
+    return;
+  }
+  ottf_generic_fault_print(exc_info, "FAULT", mcause);
+  abort();
+}
 
 #define EXPECT_RTL(cond, ...)                 \
   do {                                        \
@@ -250,6 +274,45 @@ bool test_main(void) {
   EXPECT_RTL(intr_rise == 1u && intr_rise_cleared == 0u,
              "[7] Edge interrupt INTR_STATE[2] rise=%u cleared=%u, expected 1,0",
              intr_rise, intr_rise_cleared);
+
+  // 8. Wave 5: GPIO_PERMIT sub-word write wr_err and addrmiss checks.
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0xa5a55a5au);
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0x11u);
+  g_expect_access_fault = false;
+  uint32_t out_after_sb =
+      abs_mmio_read32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET);
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u &&
+                 out_after_sb == 0xa5a55a5au,
+             "[8a] 8-bit write to DIRECT_OUT (PERMIT=4'b1111) must raise Store "
+             "Access Fault (mcause=7) and preserve 0xa5a55a5a (got count=%u "
+             "mcause=%u val=0x%08x)",
+             g_access_fault_count, g_last_mcause, out_after_sb);
+
+  g_access_fault_count = 0;
+  abs_mmio_write8(kGpioBase + GPIO_ALERT_TEST_REG_OFFSET, 0u);
+  EXPECT_RTL(g_access_fault_count == 0u,
+             "[8b] 8-bit write to ALERT_TEST+0 (PERMIT=4'b0001) must succeed");
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kGpioBase + GPIO_ALERT_TEST_REG_OFFSET + 1u, 0u);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u,
+             "[8c] 8-bit write to ALERT_TEST+1 (PERMIT=4'b0001, reg_be=4'b0010) "
+             "must raise Store Access Fault (mcause=7)");
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  (void)abs_mmio_read32(kGpioBase + 0x40u);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 5u,
+             "[8d] 32-bit read at unmapped offset 0x40 (addrmiss) must raise "
+             "Load Access Fault (mcause=5)");
 
   // Cleanup
   abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 0u);
