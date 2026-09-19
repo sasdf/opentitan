@@ -252,6 +252,73 @@ bool test_main(void) {
         "0x%x",
         intr_status);
 
+  // 9. Wave 2 Check E: Unsatisfiable filters (COND=1 [0, 0x3ff] and
+  // COND=0 [0x300, 0x100]) must NOT set FILTER_STATUS, and mutually exclusive
+  // filters ([0, 0x1ff] vs [0x200, 0x3ff]) on CH0 must match only one branch.
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  for (int k = 0; k < 8; ++k) {
+    mmio_region_write32(adc,
+                        ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET + (k * 4),
+                        0u);
+    mmio_region_write32(adc,
+                        ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET + (k * 4),
+                        0u);
+  }
+  mmio_region_write32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 1u);
+  mmio_region_write32(adc, ADC_CTRL_ADC_PD_CTL_REG_OFFSET,
+                      (1u << ADC_CTRL_ADC_PD_CTL_PWRUP_TIME_OFFSET) |
+                          (2u << ADC_CTRL_ADC_PD_CTL_WAKEUP_TIME_OFFSET));
+  // Filter 0: COND=1 (out-of-range) with [0x000, 0x3ff] -> impossible for 10b
+  uint32_t impossible_oor =
+      (0u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MIN_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_COND_0_BIT) |
+      (0x3ffu << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MAX_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_EN_0_BIT);
+  // Filter 1: COND=0 (in-range) with min_v=0x300 > max_v=0x100 -> impossible
+  uint32_t impossible_ir =
+      (0x300u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MIN_V_0_OFFSET) |
+      (0x100u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MAX_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_EN_0_BIT);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
+                      impossible_oor);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_1_REG_OFFSET,
+                      impossible_ir);
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                      1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT);
+  busy_spin_micros(600);
+  filter_status = mmio_region_read32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET);
+  CHECK((filter_status & 0x3u) == 0u,
+        "Unsatisfiable filters must not match, got FILTER_STATUS=0x%x",
+        filter_status);
+
+  // Now configure mutually exclusive CH0 filters: Filter 0 = [0, 0x1ff],
+  // Filter 1 = [0x200, 0x3ff]. Exactly one must match.
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  mmio_region_write32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
+  uint32_t low_half =
+      (0u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MIN_V_0_OFFSET) |
+      (0x1ffu << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MAX_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_EN_0_BIT);
+  uint32_t high_half =
+      (0x200u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MIN_V_0_OFFSET) |
+      (0x3ffu << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MAX_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_EN_0_BIT);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET, low_half);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_1_REG_OFFSET,
+                      high_half);
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                      1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT);
+  busy_spin_micros(600);
+  filter_status = mmio_region_read32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET);
+  CHECK(((filter_status & 0x3u) == 0x1u) || ((filter_status & 0x3u) == 0x2u),
+        "Mutually exclusive CH0 filters [0,0x1ff] and [0x200,0x3ff] cannot "
+        "both match simultaneously, got FILTER_STATUS=0x%x",
+        filter_status);
+
   mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
   return true;
 }
