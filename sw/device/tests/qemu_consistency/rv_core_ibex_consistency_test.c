@@ -7,12 +7,15 @@
 #include <stdint.h>
 
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/csr.h"
+#include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_rv_core_ibex.h"
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "alert_handler_regs.h"
@@ -20,6 +23,40 @@
 #include "rv_core_ibex_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
+
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
+
+static bool expect_load_fault_32(mmio_region_t base, uint32_t offset) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  (void)mmio_region_read32(base, (ptrdiff_t)offset);
+  return (fault_count == before + 1u) && (last_mcause == 5u);
+}
+
+static bool expect_store_fault_32(mmio_region_t base, uint32_t offset,
+                                  uint32_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write32(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
+
+static bool expect_store_fault_8(mmio_region_t base, uint32_t offset,
+                                 uint8_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write8(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
 
 enum {
   kIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
@@ -332,6 +369,33 @@ bool test_main(void) {
               kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
           0x6789a000u);
   }
+
+  // 7. Wave 3 Convergence Checks:
+  // 7a. Unmapped gap offsets 0x64..0x7c (between FPGA_INFO at 0x60 and
+  // DV_SIM_WINDOW at 0x80) and 0xa0..0xfc decode to addrmiss = 1'b1 in
+  // rv_core_ibex_cfg_reg_top.sv, returning d_error = 1 (Load Access Fault
+  // mcause = 5 on read, Store Access Fault mcause = 7 on write) without
+  // asserting intg_err_o.
+  mmio_region_t ibex_mmio = mmio_region_from_addr(kIbexBase);
+  CHECK(expect_load_fault_32(ibex_mmio, 0x64u));
+  CHECK(expect_store_fault_32(ibex_mmio, 0x64u, 0xdeadbeefu));
+  CHECK(expect_load_fault_32(ibex_mmio, 0x7cu));
+  CHECK(expect_store_fault_32(ibex_mmio, 0x7cu, 0xdeadbeefu));
+  CHECK(expect_load_fault_32(ibex_mmio, 0xa0u));
+  CHECK(expect_store_fault_32(ibex_mmio, 0xa0u, 0xdeadbeefu));
+
+  // 7b. Sub-word write permit checks (RV_CORE_IBEX_CFG_PERMIT / wr_err):
+  // - ERR_STATUS (PERMIT = 4'b0011) rejects 1-byte write (reg_be = 4'b0001).
+  // - SW_RECOV_ERR (PERMIT = 4'b0001) rejects byte write to offset +1
+  //   (reg_be = 4'b0010).
+  // - FPGA_INFO (PERMIT = 4'b1111) rejects 1-byte write (reg_be = 4'b0001).
+  CHECK(expect_store_fault_8(ibex_mmio, RV_CORE_IBEX_ERR_STATUS_REG_OFFSET,
+                             0xffu));
+  CHECK(expect_store_fault_8(
+      ibex_mmio, RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET + 1u, 0x06u));
+  CHECK(expect_store_fault_8(ibex_mmio, RV_CORE_IBEX_FPGA_INFO_REG_OFFSET,
+                             0x55u));
+  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) == 0u);
 
   return true;
 }
