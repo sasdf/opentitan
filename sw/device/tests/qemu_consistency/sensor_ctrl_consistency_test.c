@@ -7,6 +7,7 @@
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
@@ -14,6 +15,15 @@
 #include "sensor_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
+
+static volatile bool g_fault_seen = false;
+static volatile uint32_t g_fault_mcause = 0u;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
 
 enum {
   kSensorCtrlBase = TOP_EARLGREY_SENSOR_CTRL_AON_BASE_ADDR,
@@ -166,6 +176,25 @@ bool test_main(void) {
         kMultiBitBool4True);
   abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET, 0x7ffu);
   CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET) == 0u);
+
+  LOG_INFO("8. Testing SENSOR_CTRL_PERMIT sub-word wr_err and addrmiss TL-UL faults...");
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 0u);
+  g_fault_seen = false;
+  abs_mmio_write8(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 1u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET) == 0u);
+
+  g_fault_seen = false;
+  abs_mmio_write8(kSensorCtrlBase + SENSOR_CTRL_INTR_ENABLE_REG_OFFSET + 1u, 1u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kSensorCtrlBase + 0x74u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  abs_mmio_write32(kSensorCtrlBase + 0x74u, 0x1u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
 
   return true;
 }
