@@ -151,6 +151,106 @@ bool test_main(void) {
   for (int i = 0; i < 4; ++i) {
     (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
   }
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+
+  // 5. Verify UNINSTANTIATE zeroizes RESEED_COUNTER_2 and all 14 words of
+  // INT_STATE_VAL (including Key[0..7] and Status/FIPS word 13)
+  // (csrng_core.sv:1765-1771, csrng_state_db.sv:178, 187-201).
+  uint32_t rc2_before =
+      abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET);
+  CHECK(rc2_before == 1u,
+        "Expected RESEED_COUNTER_2 == 1 after 1 GENERATE cmd, got %u",
+        rc2_before);
+
+  CHECK_DIF_OK(dif_csrng_uninstantiate(&csrng));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+
+  uint32_t rc2_after =
+      abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET);
+  CHECK(rc2_after == 0u,
+        "Expected RESEED_COUNTER_2 == 0 after UNINSTANTIATE, got %u",
+        rc2_after);
+
+  uint32_t ctrl_read_int_on =
+      (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+      (kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+      (kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_on);
+  abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 2u);
+  for (uint32_t i = 0; i < 14; ++i) {
+    uint32_t st_word =
+        abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET);
+    CHECK(st_word == 0u,
+          "Expected INT_STATE_VAL word %u == 0 after UNINSTANTIATE, got 0x%08x",
+          i, st_word);
+  }
+
+  // 6. Verify GENBITS_VLD is NOT gated by CTRL.SW_APP_ENABLE, and reading
+  // GENBITS while CTRL.SW_APP_ENABLE == kMultiBitBool4False returns 0 while
+  // still popping the 32-bit packer FIFO (csrng_core.sv:948-952, 968-983).
+  const dif_csrng_seed_material_t kSeed2 = {
+      .seed_material = {0x11223344, 0x55667788, 0x99aabbcc, 0xddeeff00,
+                        0x12345678, 0x9abcdef0, 0x0fedcba9, 0x87654321,
+                        0xa5a5a5a5, 0x5a5a5a5a, 0xdeadbeef, 0xcafebabe},
+      .seed_material_len = 12,
+  };
+  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
+                                     &kSeed2));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
+  do {
+    genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+
+  uint32_t ctrl_sw_app_off =
+      (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_sw_app_off);
+
+  genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  CHECK(bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT),
+        "Expected GENBITS_VLD == 1 even when CTRL.SW_APP_ENABLE is False");
+
+  for (int i = 0; i < 4; ++i) {
+    uint32_t gb = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+    CHECK(gb == 0u,
+          "Expected GENBITS read %d == 0 when SW_APP_ENABLE is False, got "
+          "0x%08x",
+          i, gb);
+  }
+  genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT),
+        "Expected GENBITS_VLD == 0 after 4 reads of GENBITS even when "
+        "SW_APP_ENABLE is False");
+
+  // 7. Verify disabling CTRL.ENABLE clears cs_rdata_capt_vld_q so generating
+  // from the same deterministic seed kSeed2 after re-enabling does NOT raise
+  // CS_BUS_CMP_ALERT (csrng_core.sv:1008-1015).
+  uint32_t ctrl_disabled =
+      (kMultiBitBool4False << CSRNG_CTRL_ENABLE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_disabled);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
+  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
+                                     &kSeed2));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
+  do {
+    genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(recov_sts,
+                             CSRNG_RECOV_ALERT_STS_CS_BUS_CMP_ALERT_BIT),
+        "Expected CS_BUS_CMP_ALERT == 0 after CTRL.ENABLE toggle, got 0x%x",
+        recov_sts);
+  for (int i = 0; i < 4; ++i) {
+    (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  }
 
   return true;
 }
