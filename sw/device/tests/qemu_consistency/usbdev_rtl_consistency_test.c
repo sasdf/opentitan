@@ -31,6 +31,15 @@ enum {
     }                                     \
   } while (0)
 
+static volatile bool g_fault_seen = false;
+static volatile uint32_t g_fault_mcause = 0u;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
+
 bool test_main(void) {
   bool all_ok = true;
   dif_rstmgr_t rstmgr;
@@ -294,6 +303,33 @@ bool test_main(void) {
       "VBUS loss with USBCTRL.enable=1 must not clear DEVICE_ADDRESS or "
       "AVSETUP/AVOUT FIFOs (usbstat=0x%08x, usbctrl=0x%08x)",
       usbstat, usbctrl);
+
+  // 10. Wave 5: USBDEV_PERMIT sub-word wr_err, addrmiss (0xac), and buffer SRAM ByteAccess=0.
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0u);
+  g_fault_seen = false;
+  abs_mmio_write8(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0x5u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "sb to INTR_ENABLE (PERMIT=0x7) must fault with MCAUSE=7");
+  EXPECT_RTL(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET) == 0u,
+             "sb to INTR_ENABLE must not modify register");
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kUsbdevBase + 0xacu);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+             "addrmiss read at 0xac must fault with MCAUSE=5");
+
+  g_fault_seen = false;
+  abs_mmio_write32(kUsbdevBase + 0xacu, 0x1u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "addrmiss write at 0xac must fault with MCAUSE=7");
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET, 0x11223344u);
+  g_fault_seen = false;
+  abs_mmio_write8(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET, 0xffu);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "sb to USBDEV_BUFFER (ByteAccess=0) must fault with MCAUSE=7");
+  EXPECT_RTL(abs_mmio_read32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET) == 0x11223344u,
+             "sb to USBDEV_BUFFER must not modify word");
 
   return all_ok;
 }
