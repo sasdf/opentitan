@@ -72,14 +72,16 @@ bool test_main(void) {
         kMultiBitBool4False);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_SW_FATAL_ERR_REG_OFFSET) ==
         kMultiBitBool4False);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_0_REG_OFFSET) ==
-        1u);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET) ==
-        1u);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_REGWEN_0_REG_OFFSET) ==
-        1u);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_REGWEN_1_REG_OFFSET) ==
-        1u);
+  uint32_t ibus_regwen_0 =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_0_REG_OFFSET);
+  uint32_t ibus_regwen_1 =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET);
+  uint32_t dbus_regwen_0 =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_REGWEN_0_REG_OFFSET);
+  uint32_t dbus_regwen_1 =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_REGWEN_1_REG_OFFSET);
+  CHECK(ibus_regwen_0 == dbus_regwen_0);
+  CHECK(ibus_regwen_1 == dbus_regwen_1);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) == 0u);
 
   uint32_t fpga_info =
@@ -100,6 +102,7 @@ bool test_main(void) {
 
     abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET,
                      1u << bit);
+    busy_spin_micros(10);
     CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET) ==
           0u);
 
@@ -124,6 +127,7 @@ bool test_main(void) {
 
     CHECK_DIF_OK(
         dif_alert_handler_alert_acknowledge(&alert_handler, target_alert));
+    busy_spin_micros(10);
     CHECK_DIF_OK(dif_alert_handler_alert_is_cause(&alert_handler, target_alert,
                                                   &is_cause));
     CHECK(!is_cause);
@@ -133,9 +137,11 @@ bool test_main(void) {
   // - Writing kMultiBitBool4False (0x9) does not trigger recov_sw_err.
   // - Writing kMultiBitBool4True (0x6) or any non-False 4-bit value triggers
   //   recov_sw_err (alert ID 62), self-resets SW_RECOV_ERR to
-  //   kMultiBitBool4False (0x9), and can be acknowledged and re-triggered.
+  //   kMultiBitBool4False (0x9) upon alert_acks[1], and can be acknowledged
+  //   and re-triggered.
   abs_mmio_write32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET,
                    kMultiBitBool4False);
+  busy_spin_micros(10);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET) ==
         kMultiBitBool4False);
   bool recov_cause = false;
@@ -145,6 +151,7 @@ bool test_main(void) {
 
   abs_mmio_write32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET,
                    kMultiBitBool4True);
+  busy_spin_micros(10);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET) ==
         kMultiBitBool4False);
   CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
@@ -152,12 +159,14 @@ bool test_main(void) {
   CHECK(recov_cause);
   CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
       &alert_handler, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));
+  busy_spin_micros(10);
   CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
       &alert_handler, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr, &recov_cause));
   CHECK(!recov_cause);
 
   // Re-trigger SW_RECOV_ERR with non-strict true (0x0 != MuBi4False).
   abs_mmio_write32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET, 0x0u);
+  busy_spin_micros(10);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET) ==
         kMultiBitBool4False);
   CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
@@ -165,6 +174,7 @@ bool test_main(void) {
   CHECK(recov_cause);
   CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
       &alert_handler, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));
+  busy_spin_micros(10);
 
   // 4. Verify EDN RND_DATA / RND_STATUS interface.
   uint32_t rnd_word = 0;
@@ -172,70 +182,74 @@ bool test_main(void) {
 
   // 5. Verify DBUS Address Translation (rv_core_addr_trans), 1-bit ADDR_EN
   // mask, Slot Priority (Slot 0 > Slot 1), and DBUS_REGWEN RW0C locking.
-  sram_buf_a[0] = 0x11112222u;
-  sram_buf_b[0] = 0x33334444u;
-  sram_virt_win[0] = 0x55556666u;
-  CHECK(sram_virt_win[0] == 0x55556666u);
+  if (dbus_regwen_1 == 1u) {
+    sram_buf_a[0] = 0x11112222u;
+    sram_buf_b[0] = 0x33334444u;
+    sram_virt_win[0] = 0x55556666u;
+    CHECK(sram_virt_win[0] == 0x55556666u);
 
-  dif_rv_core_ibex_addr_translation_mapping_t map_slot0 = {
-      .matching_addr = (uintptr_t)sram_virt_win,
-      .remap_addr = (uintptr_t)sram_buf_a,
-      .size = kPageSize,
-  };
-  dif_rv_core_ibex_addr_translation_mapping_t map_slot1 = {
-      .matching_addr = (uintptr_t)sram_virt_win,
-      .remap_addr = (uintptr_t)sram_buf_b,
-      .size = kPageSize,
-  };
+    dif_rv_core_ibex_addr_translation_mapping_t map_slot0 = {
+        .matching_addr = (uintptr_t)sram_virt_win,
+        .remap_addr = (uintptr_t)sram_buf_a,
+        .size = kPageSize,
+    };
+    dif_rv_core_ibex_addr_translation_mapping_t map_slot1 = {
+        .matching_addr = (uintptr_t)sram_virt_win,
+        .remap_addr = (uintptr_t)sram_buf_b,
+        .size = kPageSize,
+    };
 
-  CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
-      &ibex, kDifRvCoreIbexAddrTranslationSlot_1,
-      kDifRvCoreIbexAddrTranslationDBus, map_slot1));
-  // Verify 1-bit write mask on IBUS_ADDR_EN_0 and DBUS_ADDR_EN_1: writing
-  // 0xfffffffe (bit 0 = 0) must store 0 and NOT enable translation.
-  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_0_REG_OFFSET,
-                   0xfffffffeu);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_0_REG_OFFSET) ==
-        0u);
-  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET,
-                   0xfffffffeu);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) ==
-        0u);
-  icache_invalidate();
-  CHECK(sram_virt_win[0] == 0x55556666u);
+    CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
+        &ibex, kDifRvCoreIbexAddrTranslationSlot_1,
+        kDifRvCoreIbexAddrTranslationDBus, map_slot1));
+    // Verify 1-bit write mask on IBUS_ADDR_EN_1 and DBUS_ADDR_EN_1: writing
+    // 0xfffffffe (bit 0 = 0) must store 0 and NOT enable translation.
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET,
+                     0xfffffffeu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET) ==
+          0u);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET,
+                     0xfffffffeu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) ==
+          0u);
+    icache_invalidate();
+    CHECK(sram_virt_win[0] == 0x55556666u);
 
-  // Writing 0xffffffff masks to 0x1 and enables Slot 1 translation.
-  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET,
-                   0xffffffffu);
-  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) ==
-        1u);
-  icache_invalidate();
-  CHECK(sram_virt_win[0] == 0x33334444u);
+    // Writing 0xffffffff masks to 0x1 and enables Slot 1 translation.
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET,
+                     0xffffffffu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) ==
+          1u);
+    icache_invalidate();
+    CHECK(sram_virt_win[0] == 0x33334444u);
 
-  // Enable Slot 0 mapping the same virtual range to sram_buf_a; Slot 0 must
-  // take priority over Slot 1.
-  CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
-      &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
-      kDifRvCoreIbexAddrTranslationDBus, map_slot0));
-  CHECK_DIF_OK(dif_rv_core_ibex_enable_addr_translation(
-      &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
-      kDifRvCoreIbexAddrTranslationDBus));
-  icache_invalidate();
-  CHECK(sram_virt_win[0] == 0x11112222u);
+    if (dbus_regwen_0 == 1u) {
+      // Enable Slot 0 mapping the same virtual range to sram_buf_a; Slot 0 must
+      // take priority over Slot 1.
+      CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus, map_slot0));
+      CHECK_DIF_OK(dif_rv_core_ibex_enable_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus));
+      icache_invalidate();
+      CHECK(sram_virt_win[0] == 0x11112222u);
 
-  // Disable Slot 0 -> falls back to Slot 1 (sram_buf_b).
-  CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
-      &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
-      kDifRvCoreIbexAddrTranslationDBus));
-  icache_invalidate();
-  CHECK(sram_virt_win[0] == 0x33334444u);
+      // Disable Slot 0 -> falls back to Slot 1 (sram_buf_b).
+      CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus));
+      icache_invalidate();
+      CHECK(sram_virt_win[0] == 0x33334444u);
+    }
 
-  // Disable Slot 1 -> falls back to unmapped sram_virt_win.
-  CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
-      &ibex, kDifRvCoreIbexAddrTranslationSlot_1,
-      kDifRvCoreIbexAddrTranslationDBus));
-  icache_invalidate();
-  CHECK(sram_virt_win[0] == 0x55556666u);
+    // Disable Slot 1 -> falls back to unmapped sram_virt_win.
+    CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
+        &ibex, kDifRvCoreIbexAddrTranslationSlot_1,
+        kDifRvCoreIbexAddrTranslationDBus));
+    icache_invalidate();
+    CHECK(sram_virt_win[0] == 0x55556666u);
+  }
 
   // Lock DBUS Slot 1 via DBUS_REGWEN_1 (RW0C) and verify further writes are
   // ignored.
