@@ -150,7 +150,108 @@ bool test_main(void) {
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0x0u);
   aon_cdc_wait();
   abs_mmio_write32(kAdcBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
-  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  // 5. Wave 2 Check A: Oneshot mode with ADC_INTR_CTL == 0 must NOT set
+  // ADC_INTR_STATUS.ONESHOT, and FSM must return to PWRDN (0) when done.
+  mmio_region_t adc = mmio_region_from_addr(kAdcBase);
+  uint32_t fsm_state;
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  mmio_region_write32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_CTL_REG_OFFSET, 0u);
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                      (1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT) |
+                          (1u << ADC_CTRL_ADC_EN_CTL_ONESHOT_MODE_BIT));
+  busy_spin_micros(600);
+  fsm_state = mmio_region_read32(adc, ADC_CTRL_ADC_FSM_STATE_REG_OFFSET);
+  CHECK(fsm_state == 0u,
+        "Expected FSM state == PWRDN (0) after oneshot completion, got %u",
+        fsm_state);
+  uint32_t intr_status =
+      mmio_region_read32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET);
+  CHECK(intr_status == 0u,
+        "Expected ADC_INTR_STATUS == 0 when ADC_INTR_CTL == 0 after oneshot, "
+        "got 0x%x",
+        intr_status);
 
+  // 6. Wave 2 Check B: Oneshot mode with ADC_INTR_CTL.ONESHOT_EN == 1 sets
+  // ADC_INTR_STATUS.ONESHOT and captures matching ADC_CHN_VALUE &
+  // ADC_CHN_VALUE_INTR.
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_CTL_REG_OFFSET,
+                      1u << ADC_CTRL_ADC_INTR_CTL_ONESHOT_EN_BIT);
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                      (1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT) |
+                          (1u << ADC_CTRL_ADC_EN_CTL_ONESHOT_MODE_BIT));
+  busy_spin_micros(600);
+  intr_status = mmio_region_read32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET);
+  CHECK((intr_status & (1u << ADC_CTRL_ADC_INTR_STATUS_ONESHOT_BIT)) != 0u,
+        "Expected ADC_INTR_STATUS.ONESHOT set when ONESHOT_EN == 1, got 0x%x",
+        intr_status);
+  uint32_t chn0_reg =
+      mmio_region_read32(adc, ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
+  uint32_t chn0_val =
+      (chn0_reg >> ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_0_OFFSET) &
+      ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_0_MASK;
+  uint32_t chn0_val_intr =
+      (chn0_reg >> ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_OFFSET) &
+      ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_MASK;
+  CHECK(chn0_val == chn0_val_intr,
+        "Expected CHN0 value (0x%x) == CHN0 intr value (0x%x) after oneshot",
+        chn0_val, chn0_val_intr);
+
+  // 7. Wave 2 Check C: Pulsing ADC_FSM_RST (1 -> 0) while ADC_ENABLE == 1
+  // re-triggers the FSM (trigger_l2h) and runs another oneshot conversion.
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  CHECK(mmio_region_read32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET) == 0u,
+        "Expected ADC_INTR_STATUS cleared before ADC_FSM_RST re-trigger");
+  mmio_region_write32(adc, ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 1u);
+  busy_spin_micros(50);
+  mmio_region_write32(adc, ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 0u);
+  busy_spin_micros(600);
+  intr_status = mmio_region_read32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET);
+  CHECK((intr_status & (1u << ADC_CTRL_ADC_INTR_STATUS_ONESHOT_BIT)) != 0u,
+        "Expected releasing ADC_FSM_RST while ADC_ENABLE==1 to re-trigger "
+        "oneshot, got ADC_INTR_STATUS=0x%x",
+        intr_status);
+
+  // 8. Wave 2 Check D: Low-Power mode (LP_MODE = 1) matching filter sets
+  // FILTER_STATUS.TRANS (bit 8) and FILTER_STATUS.MATCH_0 (bit 0) while
+  // ADC_INTR_CTL == 0 keeps ADC_INTR_STATUS == 0.
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  mmio_region_write32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  mmio_region_write32(adc, ADC_CTRL_ADC_INTR_CTL_REG_OFFSET, 0u);
+  uint32_t match_all_filter =
+      (0x3ffu << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_MAX_V_0_OFFSET) |
+      (1u << ADC_CTRL_ADC_CHN0_FILTER_CTL_0_EN_0_BIT);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
+                      match_all_filter);
+  mmio_region_write32(adc, ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET,
+                      match_all_filter);
+  mmio_region_write32(adc, ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET, 2u);
+  mmio_region_write32(adc, ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 2u);
+  mmio_region_write32(adc, ADC_CTRL_ADC_PD_CTL_REG_OFFSET,
+                      (1u << ADC_CTRL_ADC_PD_CTL_LP_MODE_BIT) |
+                          (1u << ADC_CTRL_ADC_PD_CTL_PWRUP_TIME_OFFSET) |
+                          (2u << ADC_CTRL_ADC_PD_CTL_WAKEUP_TIME_OFFSET));
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                      1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT);
+  busy_spin_micros(2000);
+  uint32_t filter_status =
+      mmio_region_read32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET);
+  CHECK((filter_status & 0x101u) == 0x101u,
+        "Expected FILTER_STATUS.TRANS (bit 8) and MATCH_0 (bit 0) set in "
+        "LP_MODE, got 0x%x",
+        filter_status);
+  intr_status = mmio_region_read32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET);
+  CHECK(intr_status == 0u,
+        "Expected ADC_INTR_STATUS == 0 when ADC_INTR_CTL == 0 in LP_MODE, got "
+        "0x%x",
+        intr_status);
+
+  mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
   return true;
 }
