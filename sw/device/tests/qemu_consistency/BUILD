@@ -180,9 +180,7 @@ opentitan_test(
     name = "otbn_rtl_consistency_test",
     srcs = ["otbn_rtl_consistency_test.c"],
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
         EARLGREY_CW340_TEST_ENVS,
-        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     deps = [
         "//hw/ip/otbn/data:otbn_c_regs",

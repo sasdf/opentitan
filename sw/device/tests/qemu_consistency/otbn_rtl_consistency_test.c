@@ -66,6 +66,17 @@ enum {
   ((((uint32_t)(wrs2) & 0x1fu) << 20) |                          \
    (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x5u << 12) |           \
    (((uint32_t)(wrd) & 0x1fu) << 7) | 0x2bu)
+#define OTBN_CSRRW(rd, csr, rs1)                                 \
+  ((((uint32_t)(csr) & 0xfffu) << 20) |                          \
+   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x1u << 12) |            \
+   (((uint32_t)(rd) & 0x1fu) << 7) | 0x73u)
+#define OTBN_CSRRS(rd, csr, rs1)                                 \
+  ((((uint32_t)(csr) & 0xfffu) << 20) |                          \
+   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x2u << 12) |            \
+   (((uint32_t)(rd) & 0x1fu) << 7) | 0x73u)
+#define OTBN_BN_WSRR(wrd, wsr)                                   \
+  ((((uint32_t)(wsr) & 0xffu) << 20) | (0x7u << 12) |            \
+   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x0bu)
 #define OTBN_BN_WSRW(wsr, wrs1)                                  \
   ((1u << 31) | (((uint32_t)(wsr) & 0xffu) << 20) |              \
    (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x7u << 12) | 0x0bu)
@@ -211,6 +222,62 @@ bool test_main(void) {
              "JAL at end of active loop must set ERR_BITS.LOOP "
              "(expected 0x10, got 0x%08x)",
              err_bits);
+
+  // 5c. CSR FLAGS (0x7c8) write mapping to FG0 (0x7c0, bits[3:0]) and FG1
+  // (0x7c1, bits[7:4]) (otbn_controller.sv:1357-1379, otbn_alu_bignum.sv:323).
+  // Writing 0xab to CSR FLAGS (0x7c8) must set FG0 = 0xb and FG1 = 0xa, and
+  // we also write non-zero values to MOD0 (0x7d0) and ACC (WSR 0x1) before
+  // ECALL to test inter-execution wipe/init in 5d.
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 4, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 8, 0u);
+  const uint32_t prog_csr_flags[] = {
+      OTBN_ADDI(2, 0, 0xab),        // x2 = 0xab (FG1=0xa, FG0=0xb)
+      OTBN_CSRRW(0, 0x7c8, 2),      // CSR FLAGS (0x7c8) = 0xab
+      OTBN_CSRRS(3, 0x7c0, 0),      // x3 = CSR FG0 (0x7c0) -> 0xb
+      OTBN_CSRRS(4, 0x7c1, 0),      // x4 = CSR FG1 (0x7c1) -> 0xa
+      OTBN_CSRRS(5, 0x7c8, 0),      // x5 = CSR FLAGS (0x7c8) -> 0xab
+      OTBN_SW(3, 0, 0),             // DMEM[0] = FG0
+      OTBN_SW(4, 0, 4),             // DMEM[4] = FG1
+      OTBN_SW(5, 0, 8),             // DMEM[8] = FLAGS
+      OTBN_CSRRW(0, 0x7d0, 2),      // CSR MOD0 (0x7d0) = 0xab
+      OTBN_BN_XOR(0, 0, 0),         // w0 = 0
+      OTBN_BN_ADDI(1, 0, 0x55),     // w1 = 0x55
+      OTBN_BN_WSRW(3, 1),           // WSR ACC (0x3) = 0x55
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_csr_flags, ARRAYSIZE(prog_csr_flags));
+  uint32_t fg0_val = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0);
+  uint32_t fg1_val = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 4);
+  uint32_t flags_val = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 8);
+  EXPECT_RTL(fg0_val == 0xbu && fg1_val == 0xau && flags_val == 0xabu,
+             "Writing 0xab to CSR FLAGS (0x7c8) must set FG0=0xb, FG1=0xa, "
+             "FLAGS=0xab (got FG0=0x%x, FG1=0x%x, FLAGS=0x%x)",
+             fg0_val, fg1_val, flags_val);
+
+  // 5d. Inter-execution secure wipe of FLAGS (sec_wipe_zero_o) and zero
+  // initialization of MOD and ACC on CMD.EXECUTE (ispr_init_o)
+  // (otbn_start_stop_control.sv:201-203, 308-315, otbn_alu_bignum.sv:388, 428).
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0, 0xdeadbeefu);
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 32, 0xdeadbeefu);
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 36, 0xdeadbeefu);
+  const uint32_t prog_check_init_zero[] = {
+      OTBN_BN_WSRR(0, 3),           // w0 = WSR ACC (0x3) -> must be 0
+      OTBN_BN_SID_ZERO_OFF(0, 0),   // DMEM[0..31] = w0 (ACC)
+      OTBN_CSRRS(2, 0x7c8, 0),      // x2 = CSR FLAGS (0x7c8) -> must be 0
+      OTBN_CSRRS(3, 0x7d0, 0),      // x3 = CSR MOD0 (0x7d0) -> must be 0
+      OTBN_SW(2, 0, 32),            // DMEM[32] = FLAGS
+      OTBN_SW(3, 0, 36),            // DMEM[36] = MOD0
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_check_init_zero, ARRAYSIZE(prog_check_init_zero));
+  uint32_t acc0_init = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0);
+  uint32_t flags_init = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 32);
+  uint32_t mod0_init = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 36);
+  EXPECT_RTL(acc0_init == 0u && flags_init == 0u && mod0_init == 0u,
+             "At start of CMD.EXECUTE, ACC, FLAGS, and MOD0 must be 0 "
+             "(got ACC[31:0]=0x%08x, FLAGS=0x%08x, MOD0=0x%08x)",
+             acc0_init, flags_init, mod0_init);
 
   // 6. Host IMEM read during BUSY_EXECUTE triggers ILLEGAL_BUS_ACCESS, locks
   // OTBN (STATUS == 0xff), latches FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS, and
