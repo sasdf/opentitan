@@ -49,6 +49,15 @@ enum {
     }                                          \
   } while (0)
 
+static volatile uint32_t g_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_count++;
+  g_last_mcause = ibex_mcause_read();
+}
+
 static void write_shadowed(uint32_t addr, uint32_t val) {
   abs_mmio_write32(addr, val);
   abs_mmio_write32(addr, val);
@@ -475,6 +484,62 @@ bool test_main(void) {
              "cfg_regwen=%u",
              op_st, err_code, start_reg, cfg_regwen);
   clear_keymgr_status_and_err();
+
+  // ---------------------------------------------------------------------------
+  // Check 7: Wave 5 KEYMGR_PERMIT sub-word write wr_err and addrmiss checks
+  // ---------------------------------------------------------------------------
+  // 7a. SALT_0 has KEYMGR_PERMIT = 0xf (4'b1111): sub-word sb/sh writes MUST
+  // fault with mcause=7 (Store/AMO access fault) and MUST NOT modify SALT_0.
+  abs_mmio_write32(kKeymgrBase + KEYMGR_SALT_0_REG_OFFSET, 0xa5a5a5a5u);
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kKeymgrBase + KEYMGR_SALT_0_REG_OFFSET, 0x12u);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u &&
+                 abs_mmio_read32(kKeymgrBase + KEYMGR_SALT_0_REG_OFFSET) ==
+                     0xa5a5a5a5u,
+             "sb to SALT_0 (PERMIT=0xf) expected fault(mcause=7) & unchanged "
+             "0xa5a5a5a5, got faults=%u mcause=%u val=0x%08x",
+             g_fault_count, g_last_mcause,
+             abs_mmio_read32(kKeymgrBase + KEYMGR_SALT_0_REG_OFFSET));
+
+  // 7b. CONTROL_SHADOWED has KEYMGR_PERMIT = 0x3 (4'b0011): sb at byte 0 MUST
+  // fault with mcause=7, whereas sh at halfword 0 (reg_be=0x3) is permitted.
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, 0x10u);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u,
+             "sb to CONTROL_SHADOWED (PERMIT=0x3) expected fault(mcause=7), "
+             "got faults=%u mcause=%u",
+             g_fault_count, g_last_mcause);
+
+  // 7c. INTR_ENABLE has KEYMGR_PERMIT = 0x1 (4'b0001): sb at byte 0 (reg_be=0x1)
+  // is permitted, whereas sb at byte 1 (reg_be=0x2) MUST fault with mcause=7.
+  g_fault_count = 0;
+  abs_mmio_write8(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET, 0x1u);
+  EXPECT_RTL(g_fault_count == 0u &&
+                 abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) ==
+                     0x1u,
+             "sb at byte 0 of INTR_ENABLE (PERMIT=0x1) should succeed, got "
+             "faults=%u val=0x%x",
+             g_fault_count,
+             abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
+  abs_mmio_write8(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET + 1u, 0x0u);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u &&
+                 abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) ==
+                     0x1u,
+             "sb at byte 1 of INTR_ENABLE (PERMIT=0x1) expected fault(mcause=7)"
+             " & unchanged 0x1, got faults=%u mcause=%u val=0x%x",
+             g_fault_count, g_last_mcause,
+             abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
+  abs_mmio_write32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET, 0x0u);
+
+  // 7d. Out-of-bounds offset 0xfc (past DEBUG at 0xf8) MUST fault on read/write.
+  g_fault_count = 0;
+  (void)abs_mmio_read32(kKeymgrBase + 0xfcu);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 5u,
+             "read at 0xfc (addrmiss) expected fault(mcause=5), got faults=%u "
+             "mcause=%u",
+             g_fault_count, g_last_mcause);
 
   CHECK(all_ok);
   return true;
