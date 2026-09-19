@@ -316,5 +316,50 @@ bool test_main(void) {
   (void)abs_mmio_read32(0x40132000u);
   CHECK(load_access_fault_count == faults_before_prim + 1u);
 
+  // 10. Test `OTP_CTRL_CORE_PERMIT` (`otp_ctrl_core_reg_top.sv:2049-2106`) and
+  // `OTP_CTRL_PRIM_PERMIT` (`otp_ctrl_prim_reg_top.sv:1282-1292`) sub-word
+  // write `wr_err` enforcement.
+  uint32_t faults_before_subword = load_access_fault_count;
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_WDATA_0_REG_OFFSET,
+                   0x11223344u);
+  abs_mmio_write8(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_WDATA_0_REG_OFFSET,
+                  0x99u);
+  CHECK(load_access_fault_count == faults_before_subword + 1u);
+  CHECK(abs_mmio_read32(kOtpCoreBase +
+                        OTP_CTRL_DIRECT_ACCESS_WDATA_0_REG_OFFSET) ==
+        0x11223344u);
+
+  // Byte write to offset + 1 of INTR_ENABLE (PERMIT = 4'b0001) must fault,
+  // while byte write to offset + 0 (reg_be = 4'b0001) is permitted.
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET, 0x0u);
+  abs_mmio_write8(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET + 1u, 0x3u);
+  CHECK(load_access_fault_count == faults_before_subword + 2u);
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET) ==
+        0x0u);
+  abs_mmio_write8(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET, 0x2u);
+  CHECK(load_access_fault_count == faults_before_subword + 2u);
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET) ==
+        0x2u);
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_ENABLE_REG_OFFSET, 0x0u);
+
+  if (lc_dft_en) {
+    uint32_t faults_before_prim_subword = load_access_fault_count;
+    abs_mmio_write32(kOtpPrimBase + 0x00u, 0x07ff3ff7u);
+    abs_mmio_write8(kOtpPrimBase + 0x00u, 0x00u);
+    CHECK(load_access_fault_count == faults_before_prim_subword + 1u);
+    CHECK(abs_mmio_read32(kOtpPrimBase + 0x00u) == 0x07ff3ff7u);
+    abs_mmio_write32(kOtpPrimBase + 0x00u, 0x0u);
+
+    // CSR2 has OTP_CTRL_PRIM_PERMIT[2] = 4'b0001: byte 0 write succeeds, byte 1
+    // write faults.
+    abs_mmio_write8(kOtpPrimBase + 0x08u, 0x1u);
+    CHECK(load_access_fault_count == faults_before_prim_subword + 1u);
+    CHECK(abs_mmio_read32(kOtpPrimBase + 0x08u) == 0x1u);
+    abs_mmio_write8(kOtpPrimBase + 0x08u + 1u, 0x0u);
+    CHECK(load_access_fault_count == faults_before_prim_subword + 2u);
+    CHECK(abs_mmio_read32(kOtpPrimBase + 0x08u) == 0x1u);
+    abs_mmio_write32(kOtpPrimBase + 0x08u, 0x0u);
+  }
+
   return true;
 }
