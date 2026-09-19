@@ -32,13 +32,13 @@ enum {
 bool test_main(void) {
   bool all_ok = true;
 
-  // 1. WO registers (INTR_TEST, ALERT_TEST, PROG_FIFO) must read back as 0.
+  // 1. WO registers (INTR_TEST, ALERT_TEST) must read back as 0.
+  // Note: PROG_FIFO (0x1b0) is a tlul_adapter_sram window with ErrOnRead=1
+  // in flash_ctrl.sv, which raises a Load Access Fault on RTL/FPGA when read.
   EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_INTR_TEST_REG_OFFSET) == 0u,
              "INTR_TEST is WO and must read back as 0");
   EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
              "ALERT_TEST is WO and must read back as 0");
-  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET) == 0u,
-             "PROG_FIFO is WO and must read back as 0");
 
   // 2. INIT (0x18) is rw1s: once set to 1, writing 0 must keep INIT == 1.
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_INIT_REG_OFFSET, 1u);
