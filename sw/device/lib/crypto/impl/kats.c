@@ -8,6 +8,7 @@
 #include "sw/device/lib/crypto/drivers/entropy.h"
 #include "sw/device/lib/crypto/drivers/entropy_kat.h"
 #include "sw/device/lib/crypto/impl/keyblob.h"
+#include "sw/device/lib/crypto/impl/state.h"
 #include "sw/device/lib/crypto/impl/status.h"
 #include "sw/device/lib/crypto/include/aes.h"
 #include "sw/device/lib/crypto/include/aes_gcm.h"
@@ -1185,6 +1186,13 @@ otcrypto_status_t run_kats(kat_id_t tests) {
   if (tests.flags == 0 || tests.flags >= (1UL << kTestLastBit)) {
     return OTCRYPTO_BAD_ARGS;
   }
+
+#ifdef FIPS_MODE
+  crypto_state_t *state = NULL;
+  if (status_ok(read_state_pointer(&state)) && state != NULL) {
+    state->kat_state |= tests.flags;
+  }
+#endif
 
   if ((tests.flags & OTCRYPTO_KAT_HASH_SHA256) != 0) {
     HARDENED_TRY(kat_sha256_hash());
