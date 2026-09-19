@@ -116,7 +116,48 @@ bool test_main(void) {
   busy_spin_micros(5);
   CHECK((abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET) & 1u) == 0u);
 
-  LOG_INFO("5. Testing CFG_REGWEN RW0C lock on ALERT_EN and FATAL_ALERT_EN...");
+  LOG_INFO("5. Testing continuous ALERT_TRIG=1 re-latching RECOV_ALERT on RW1C and mubi4_test_true_loose...");
+  // While ALERT_EN_0 is True (0x6), hold ALERT_TRIG bit 0 = 1.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET) & 1u) == 1u);
+  // Attempting RW1C clear on RECOV_ALERT while ALERT_TRIG bit 0 is still 1 must re-latch bit 0.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET) & 1u) == 1u);
+  // Clear ALERT_TRIG bit 0 to 0, then RW1C clear RECOV_ALERT bit 0 -> must now stay 0.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 0u);
+  busy_spin_micros(5);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET) & 1u) == 0u);
+
+  // Test mubi4_test_true_loose on ALERT_EN_0: a non-False corrupt nibble (e.g. 0x5) must still enable the alert.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET, 0x5u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET) == 0x5u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 0u);
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET) & 1u) == 1u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET, 1u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET,
+                   kMultiBitBool4True);
+
+  LOG_INFO("6. Testing INTR_TEST (WO) and INTR_STATE (RW1C)...");
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET) == 0u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_INTR_TEST_REG_OFFSET, 0x3u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET) == 0x3u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET, 0x1u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET) == 0x2u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET, 0x2u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_INTR_STATE_REG_OFFSET) == 0u);
+
+  LOG_INFO("7. Testing CFG_REGWEN RW0C lock on ALERT_EN and FATAL_ALERT_EN...");
   abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_CFG_REGWEN_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_CFG_REGWEN_REG_OFFSET) == 0u);
   abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET,
