@@ -9,7 +9,6 @@ load(
     "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
     "EARLGREY_TEST_ENVS",
     "opentitan_test",
-    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -346,9 +345,6 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         EARLGREY_CW340_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-    ),
-    qemu = qemu_params(
-        tags = ["broken"],
     ),
     deps = [
         "//hw/ip/adc_ctrl/data:adc_ctrl_c_regs",
