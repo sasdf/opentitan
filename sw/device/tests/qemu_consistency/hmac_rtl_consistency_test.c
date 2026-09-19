@@ -56,6 +56,7 @@ bool test_main(void) {
              "CFG(0xffff8000) reserved bits should be masked out, got 0x%08x",
              cfg);
 
+
   // 2. WIPE_SECRET readback endianness on DIGEST_0..15.
   // In RTL (prim_sha2.sv:148 & hmac.sv:270), writing WIPE_SECRET = V sets each
   // 32-bit digest word to V, and reading DIGEST_k returns conv_endian32(V, digest_swap):
@@ -190,6 +191,17 @@ bool test_main(void) {
              err_code);
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
                    1u << HMAC_INTR_STATE_HMAC_ERR_BIT);
+
+  // 7. Writing CMD.hash_stop when idle (including with CFG.digest_size = SHA2_None)
+  // must not crash or clear STATUS.hmac_idle.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_STOP_BIT);
+  uint32_t status = abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  EXPECT_RTL((status & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) != 0u,
+             "STATUS.hmac_idle must remain 1 after CMD.hash_stop while idle "
+             "(got 0x%08x)",
+             status);
 
   return all_ok;
 }
