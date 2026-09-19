@@ -306,10 +306,31 @@ static void test_fifo_depth_and_err_code_test(void) {
   // prim_alert_sender #(.IsFatal(1)) latches alert_set_q = 1 until hardware
   // reset, which would otherwise re-trigger ottf_alert_isr continuously.
   irq_external_ctrl(false);
+  uint32_t edn0_recov_cause_reg =
+      kAlertHandlerBase + ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+      4u * (uint32_t)kTopEarlgreyAlertIdEdn0RecovAlert;
   uint32_t edn0_fatal_cause_reg =
       kAlertHandlerBase + ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
       4u * (uint32_t)kTopEarlgreyAlertIdEdn0FatalAlert;
+  abs_mmio_write32(edn0_recov_cause_reg, 1u);
   abs_mmio_write32(edn0_fatal_cause_reg, 1u);
+
+  // Verify continuous RECOV_ALERT_STS MuBi4 field alert re-assertion across rw0c
+  // while CTRL holds an invalid mubi4 value (edn_core.sv:473-475).
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
+                   make_edn_ctrl(kMultiBitBool4False, kMultiBitBool4False,
+                                 kMultiBitBool4False, (multi_bit_bool_t)0x0));
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
+        (1u << EDN_RECOV_ALERT_STS_CMD_FIFO_RST_FIELD_ALERT_BIT));
+  // Writing 0 (rw0c) while CTRL still has an invalid mubi4 must keep bit 3 set!
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
+        (1u << EDN_RECOV_ALERT_STS_CMD_FIFO_RST_FIELD_ALERT_BIT));
+  // Restoring CTRL to valid mubi4 (0x9999) allows rw0c to clear RECOV_ALERT_STS.
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0u);
+  abs_mmio_write32(edn0_recov_cause_reg, 1u);
 
   // Enable EDN0 with CMD_FIFO_RST = kMultiBitBool4True (level reset active).
   // In edn_core.sv:702, 745 (sfifo_rescmd_clr / sfifo_gencmd_clr), while
