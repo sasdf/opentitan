@@ -14,6 +14,7 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -23,6 +24,13 @@ enum {
   kAonTimerBase = TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR,
   kAonTimerWkupBit = 1u << PWRMGR_PARAM_AON_TIMER_AON_WKUP_REQ_IDX,
 };
+
+static volatile bool access_fault_seen = false;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  access_fault_seen = true;
+}
 
 static void pwrmgr_cdc_sync(void) {
   abs_mmio_write32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET,
@@ -245,6 +253,38 @@ bool test_main(void) {
 
   abs_mmio_write32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET, 0x3u);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET) == 0x0u);
+
+  // 6. Verify PWRMGR_PERMIT sub-word write wr_err (pwrmgr_reg_pkg.sv:259-277):
+  // - CONTROL (0x14) has PERMIT = 4'b0011:
+  //   8-bit (sb) write fails with StoreAccessFault without modifying CONTROL,
+  //   while 16-bit (sh) write at offset +0 succeeds without fault.
+  // - INTR_ENABLE (0x04) and WAKEUP_EN (0x20) have PERMIT = 4'b0001:
+  //   8-bit write at offset +0 succeeds, while 8-bit write at offset +1 fails.
+  uint32_t orig_ctrl = abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
+  access_fault_seen = false;
+  abs_mmio_write8(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET, 0x00u);
+  CHECK(access_fault_seen,
+        "Expected StoreAccessFault on 8-bit write to CONTROL (PERMIT=4'b0011)");
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET) == orig_ctrl,
+        "Blocked 8-bit write to CONTROL must not modify CONTROL");
+
+  access_fault_seen = false;
+  *(volatile uint16_t *)(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET) =
+      (uint16_t)orig_ctrl;
+  CHECK(!access_fault_seen,
+        "Expected no StoreAccessFault on 16-bit write to CONTROL+0");
+
+  access_fault_seen = false;
+  abs_mmio_write8(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0x01u);
+  CHECK(!access_fault_seen,
+        "Expected no StoreAccessFault on 8-bit write to INTR_ENABLE+0 (PERMIT=4'b0001)");
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET) == 0x01u);
+
+  access_fault_seen = false;
+  abs_mmio_write8(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET + 1u, 0x00u);
+  CHECK(access_fault_seen,
+        "Expected StoreAccessFault on 8-bit write to INTR_ENABLE+1 (PERMIT=4'b0001)");
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0x00u);
 
   return true;
 }
