@@ -157,23 +157,27 @@ bool test_main(void) {
              "BN.ADDM with a + b == MOD (60 + 40 == 100) must return 0, got %u",
              addm_res);
 
-  // 4. Call stack (x1) dual-read port semantics (otbn_rf_base.sv:101-135).
+  // 4. Call stack (x1) simultaneous pop+push & dual-read port semantics
+  // (otbn_rf_base.sv:101-135, otbn_stack.sv:8-15).
   // Push one entry onto x1 (`jal x1, +4` at PC=0 pushes 4), then execute
-  // `add x2, x1, x1`. Both read ports read the same top-of-stack value (4) and
-  // pop the stack ONCE at commit, yielding x2 = 8 with ERR_BITS == 0.
+  // `addi x1, x1, 10` (pop 4 ordered before push 14 -> top of stack is 14),
+  // then `add x2, x1, x1` (both read ports read 14 and pop ONCE at commit ->
+  // x2 = 28, ERR_BITS == 0).
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0u);
   const uint32_t prog_x1_dual_read[] = {
       OTBN_JAL_PLUS4(1),   // PC=0: pushes 4 onto x1 call stack, jumps to PC=4
-      OTBN_ADD(2, 1, 1),   // PC=4: reads x1 on both ports (4 + 4 = 8), pops once
+      OTBN_ADDI(1, 1, 10), // PC=4: pops 4 and pushes 14 onto x1 call stack
+      OTBN_ADD(2, 1, 1),   // PC=8: reads x1 on both ports (14 + 14 = 28), pops once
       OTBN_SW(2, 0, 0),    // DMEM[0] = x2
       OTBN_ECALL(),
   };
   otbn_run_program(prog_x1_dual_read, ARRAYSIZE(prog_x1_dual_read));
   err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
   uint32_t x2_val = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
-  EXPECT_RTL(err_bits == 0u && x2_val == 8u,
-             "Dual read `add x2, x1, x1` with 1 stack entry must yield x2=8 "
-             "and ERR_BITS=0 (got x2=%u, ERR_BITS=0x%08x)",
+  EXPECT_RTL(err_bits == 0u && x2_val == 28u,
+             "Simultaneous pop+push `addi x1, x1, 10` and dual read `add x2, "
+             "x1, x1` with 1 stack entry must yield x2=28 and ERR_BITS=0 "
+             "(got x2=%u, ERR_BITS=0x%08x)",
              x2_val, err_bits);
 
   // 5a. LOOPI at the end instruction of an outer loop (otbn_loop_controller.sv:162).
