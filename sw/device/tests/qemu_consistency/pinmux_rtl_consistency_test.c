@@ -222,6 +222,41 @@ bool test_main(void) {
                "WKUP_CAUSE[0] did not clear on rw0c write of 0xfe: got 0x%02x",
                wkup_cause);
 
+  // ---------------------------------------------------------------------------
+  // 6. Enabling a Posedge wakeup detector while the selected input (PADSEL=1,
+  //    ConstantOne) is already steady high must NOT trigger a spurious wakeup
+  //    (pinmux_wkup.sv: filter_out_q tracks filter_out_d even while wkup_en_i=0)
+  // ---------------------------------------------------------------------------
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_0_REG_OFFSET,
+                   PINMUX_WKUP_DETECTOR_0_MODE_0_VALUE_POSEDGE);
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_PADSEL_0_REG_OFFSET, 1u);
+  busy_spin_micros(50);
+
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_EN_0_REG_OFFSET, 1u);
+  busy_spin_micros(50);
+
+  wkup_cause = abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET);
+  EXPECT_CHECK((wkup_cause & 0x1u) == 0x0u,
+               "WKUP_CAUSE[0] falsely triggered on Posedge enable while "
+               "PADSEL=1 was already steady high: got 0x%02x",
+               wkup_cause);
+
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_PADSEL_0_REG_OFFSET, 0u);
+  busy_spin_micros(50);
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_PADSEL_0_REG_OFFSET, 1u);
+  busy_spin_micros(50);
+
+  wkup_cause = abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET);
+  EXPECT_CHECK((wkup_cause & 0x1u) == 0x1u,
+               "WKUP_CAUSE[0] did not trigger on Posedge transition PADSEL "
+               "0 -> 1 while enabled: got 0x%02x",
+               wkup_cause);
+
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_EN_0_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET, 0xfeu);
+  busy_spin_micros(20);
+
   LOG_INFO("pinmux_rtl_consistency_test completed with %u failures", failures);
   return failures == 0;
 }
