@@ -46,10 +46,98 @@ static void pwrmgr_cdc_sync(void) {
   }
 }
 
+static volatile uint32_t g_access_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+static volatile bool g_expect_access_fault = false;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = ibex_mcause_read();
+  uint32_t mepc = ibex_mepc_read();
+  if (g_expect_access_fault && (mcause == 5u || mcause == 7u)) {
+    g_access_fault_count++;
+    g_last_mcause = mcause;
+    uint16_t insn16 = *(const uint16_t *)mepc;
+    uint32_t step = ((insn16 & 0x3u) == 0x3u) ? 4u : 2u;
+    asm volatile("csrw mepc, %0" : : "r"(mepc + step));
+    return;
+  }
+  CHECK(false, "Unexpected exception mcause=0x%x mepc=0x%x", mcause, mepc);
+}
+
+static void test_w5_permit_subword_wr_err_and_addrmiss(void) {
+  // 1. Valid 8-bit store to byte 0 of CLK_HINTS (CLKMGR_PERMIT[7] = 4'b0001,
+  // reg_be = 4'b0001): (4'b0001 & ~4'b0001) == 0 -> succeeds without fault.
+  g_access_fault_count = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET, 0x05u);
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 0u,
+        "W5-1: 8-bit write to byte 0 of CLK_HINTS (PERMIT=4'b0001) must "
+        "succeed without fault");
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET) == 0x05u,
+        "W5-1: CLK_HINTS should be 0x05 after valid byte-0 write, got 0x%08x",
+        abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET));
+
+  // 2. Illegal 8-bit store to byte 1 of CLK_HINTS (CLKMGR_PERMIT[7] = 4'b0001,
+  // reg_be = 4'b0010): (4'b0001 & ~4'b0010) != 0 -> wr_err = 1 (mcause = 7)
+  // and register value remains 0x05.
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET + 1u, 0x0fu);
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+        "W5-2: 8-bit write to byte 1 of CLK_HINTS (PERMIT=4'b0001) must fault "
+        "with Store Access Fault (mcause=7), got count=%u mcause=%u",
+        g_access_fault_count, g_last_mcause);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET) == 0x05u,
+        "W5-2: CLK_HINTS must remain 0x05 after rejected sub-word write");
+  abs_mmio_write32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET, 0x0fu);
+
+  // 3. Illegal 16-bit store to IO_MEAS_CTRL_SHADOWED (CLKMGR_PERMIT[11] =
+  // 4'b0111, reg_be = 4'b0011): (4'b0111 & ~4'b0011) != 0 -> wr_err = 1.
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  *(volatile uint16_t *)(kClkmgrBase +
+                         CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) = 0x1234u;
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+        "W5-3: 16-bit write to IO_MEAS_CTRL_SHADOWED (PERMIT=4'b0111) must "
+        "fault with Store Access Fault (mcause=7), got count=%u mcause=%u",
+        g_access_fault_count, g_last_mcause);
+
+  // 4. Illegal 8-bit store to byte 0 of RECOV_ERR_CODE (CLKMGR_PERMIT[20] =
+  // 4'b0011, reg_be = 4'b0001): (4'b0011 & ~4'b0001) != 0 -> wr_err = 1.
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET, 0x01u);
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+        "W5-4: 8-bit write to RECOV_ERR_CODE (PERMIT=4'b0011) must fault with "
+        "Store Access Fault (mcause=7), got count=%u mcause=%u",
+        g_access_fault_count, g_last_mcause);
+
+  // 5. Out-of-bounds read at offset 0x58 (past FATAL_ERR_CODE at 0x54) must
+  // fault with Load Access Fault (mcause = 5).
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  (void)abs_mmio_read32(kClkmgrBase + 0x58u);
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 1u && g_last_mcause == 5u,
+        "W5-5: 32-bit read at out-of-bounds offset 0x58 must fault with Load "
+        "Access Fault (mcause=5), got count=%u mcause=%u",
+        g_access_fault_count, g_last_mcause);
+}
+
 bool test_main(void) {
   retention_sram_t *ret_sram = retention_sram_get();
   uint32_t phase = ret_sram->creator.reserved[0];
   uint32_t reset_info = ret_sram->creator.reset_reasons;
+
 
   if (phase == kPhaseDeepSleep) {
     CHECK_STATUS_OK(
@@ -144,6 +232,8 @@ bool test_main(void) {
           "RECOV_ERR_CODE did not reset on SW_RESET");
     return true;
   }
+
+  test_w5_permit_subword_wr_err_and_addrmiss();
 
   // 1. Verify ALERT_TEST single-shot pulse for recov_fault.
   CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
