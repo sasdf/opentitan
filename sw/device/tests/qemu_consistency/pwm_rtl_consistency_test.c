@@ -142,6 +142,34 @@ bool test_main(void) {
   EXPECT_RTL(!is_cause,
              "ALERT_CAUSE remained set after acknowledge (PWM ALERT_TEST "
              "latched high instead of pulsing)");
+  EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_ALERT_TEST_REG_OFFSET) == 0u,
+             "ALERT_TEST (WO) readback must be 0");
+
+  // 5. Verify REGWEN (rw0c) locks CFG, PWM_EN, INVERT, PWM_PARAM_0,
+  // DUTY_CYCLE_0, and BLINK_PARAM_0 while leaving ALERT_TEST functional.
+  abs_mmio_write32(kPwmBase + PWM_REGWEN_REG_OFFSET, 0u);
+  EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_REGWEN_REG_OFFSET) == 0u,
+             "REGWEN did not clear on write 0");
+  abs_mmio_write32(kPwmBase + PWM_REGWEN_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_REGWEN_REG_OFFSET) == 0u,
+             "REGWEN (rw0c) must not set back to 1 on write 1");
+
+  abs_mmio_write32(kPwmBase + PWM_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kPwmBase + PWM_PWM_EN_REG_OFFSET, 0x3fu);
+  abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 0x3fu);
+  abs_mmio_write32(kPwmBase + PWM_PWM_PARAM_0_REG_OFFSET, 0xc000ffffu);
+  abs_mmio_write32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET, 0x12345678u);
+  abs_mmio_write32(kPwmBase + PWM_BLINK_PARAM_0_REG_OFFSET, 0x12345678u);
+  busy_spin_micros(20);
+
+  EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_CFG_REG_OFFSET) == 0x38008000u &&
+                 abs_mmio_read32(kPwmBase + PWM_PWM_EN_REG_OFFSET) == 0u &&
+                 abs_mmio_read32(kPwmBase + PWM_INVERT_REG_OFFSET) == 0u &&
+                 abs_mmio_read32(kPwmBase + PWM_PWM_PARAM_0_REG_OFFSET) == 0u &&
+                 abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) ==
+                     0x7fff7fffu &&
+                 abs_mmio_read32(kPwmBase + PWM_BLINK_PARAM_0_REG_OFFSET) == 0u,
+             "PWM configuration registers modified while REGWEN == 0");
 
   return all_ok;
 }
