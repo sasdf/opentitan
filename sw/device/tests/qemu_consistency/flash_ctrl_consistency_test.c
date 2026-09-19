@@ -272,5 +272,162 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kFlashPrimBase + 0x50u) == 0x00u,
              "CSR20 rw1c/ro bits must not be set by software writes");
 
+  // 10. Wave 2: ERR_ADDR latching semantics (flash_ctrl.sv:1083-1086) and
+  // erase MP_ERR page/bank alignment (flash_ctrl_erase.sv:58-62).
+  uint32_t orig_default_region =
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET);
+  uint32_t dis_default_region =
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_RD_EN_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_PROG_EN_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_ERASE_EN_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_SCRAMBLE_EN_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_ECC_EN_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_HE_EN_FIELD,
+                             kMultiBitBool4False);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
+                   dis_default_region);
+
+  // 10a. Page Erase MP_ERR at unaligned intra-page address 0x81234 must latch
+  // page-aligned ERR_ADDR 0x81000 (op_addr_i & PageAddrMask in flash_ctrl_erase.sv).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x81234u);
+  uint32_t pg_erase_ctrl =
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_ERASE) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_ERASE_SEL_BIT, false) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   pg_erase_ctrl);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
+                 0x81000u,
+             "Page erase MP_ERR at 0x81234 must latch page-aligned ERR_ADDR 0x81000 (got 0x%08x)",
+             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
+  // 10b. Bank Erase MP_ERR at unaligned address 0x81234 must latch
+  // bank-aligned ERR_ADDR 0x80000 (op_addr_i & BankAddrMask in flash_ctrl_erase.sv).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x81234u);
+  uint32_t bk_erase_ctrl =
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_ERASE) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_ERASE_SEL_BIT, true) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   bk_erase_ctrl);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
+                 0x80000u,
+             "Bank erase MP_ERR at 0x81234 must latch bank-aligned ERR_ADDR 0x80000 (got 0x%08x)",
+             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
+  // 10c. Read MP_ERR (with NUM=1 so u_flash_ctrl_rd enters StErr) at 0x81234
+  // must latch word-aligned ERR_ADDR 0x81234.
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x81234u);
+  uint32_t rd_err_ctrl =
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_READ) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, rd_err_ctrl);
+  (void)abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET);
+  (void)abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
+                 0x81234u,
+             "Read MP_ERR at 0x81234 must latch ERR_ADDR 0x81234 (got 0x%08x)",
+             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
+                   orig_default_region);
+
+  // 10d. OP_ERR must NOT overwrite ERR_ADDR (hw2reg.err_addr.de is only
+  // mp_err | rd_err | prog_err in flash_ctrl.sv:1084-1086).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x00100u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, bad_ctrl);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
+                 0x81234u,
+             "OP_ERR must not overwrite ERR_ADDR (expected 0x81234, got 0x%08x)",
+             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
+  // 11. Wave 2: PROG_WIN_ERR & PROG_TYPE_ERR simultaneous reporting,
+  // ERR_ADDR preservation, and StErr PROG_FIFO draining (flash_ctrl_prog.sv:164-178).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x8003cu);
+  uint32_t win_and_type_err_ctrl =
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_PROG) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_PROG_SEL_BIT, true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u) |
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   win_and_type_err_ctrl);
+
+  uint32_t pre_drain_err_code =
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET);
+  uint32_t expected_win_type_bits =
+      (1u << FLASH_CTRL_ERR_CODE_PROG_WIN_ERR_BIT) |
+      (1u << FLASH_CTRL_ERR_CODE_PROG_TYPE_ERR_BIT);
+  EXPECT_RTL((pre_drain_err_code & expected_win_type_bits) ==
+                 expected_win_type_bits,
+             "PROG with both window crossing and disabled PROG_SEL must set both PROG_WIN_ERR and PROG_TYPE_ERR (got 0x%08x)",
+             pre_drain_err_code);
+
+  uint32_t pre_drain_op_status =
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  EXPECT_RTL(pre_drain_op_status == (1u << FLASH_CTRL_OP_STATUS_ERR_BIT),
+             "Before PROG_FIFO drains NUM+1 words in StErr, OP_STATUS must be ERR=1, DONE=0 (got 0x%08x)",
+             pre_drain_op_status);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CTRL_REGWEN_REG_OFFSET) ==
+                 0u,
+             "CTRL_REGWEN must be 0 while StErr is waiting to drain PROG_FIFO");
+
+  // Push NUM+1 (2) words into PROG_FIFO to complete StErr draining.
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET,
+                   0xffffffffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET,
+                   0xffffffffu);
+
+  uint32_t post_drain_op_status =
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  EXPECT_RTL(post_drain_op_status ==
+                 ((1u << FLASH_CTRL_OP_STATUS_DONE_BIT) |
+                  (1u << FLASH_CTRL_OP_STATUS_ERR_BIT)),
+             "After draining PROG_FIFO in StErr, OP_STATUS must be DONE|ERR (got 0x%08x)",
+             post_drain_op_status);
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
+                 0x81234u,
+             "PROG_WIN_ERR/PROG_TYPE_ERR must not overwrite ERR_ADDR (expected 0x81234, got 0x%08x)",
+             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
   return all_ok;
 }
