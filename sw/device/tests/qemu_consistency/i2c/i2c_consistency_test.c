@@ -96,6 +96,8 @@ static void test_fifo_preload_when_disabled(mmio_region_t i2c_base) {
   uint32_t status = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(status, I2C_STATUS_FMTEMPTY_BIT),
         "Expected STATUS.FMTEMPTY=0 when FMTLVL=2");
+  CHECK(bitfield_bit32_read(status, I2C_STATUS_HOSTIDLE_BIT),
+        "Expected STATUS.HOSTIDLE=1 when ENABLEHOST=0 even with FMTLVL=2");
 
   intr_state = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
   CHECK(!bitfield_bit32_read(intr_state, I2C_INTR_STATE_FMT_THRESHOLD_BIT),
@@ -155,6 +157,125 @@ static void test_alert_test_pulse(mmio_region_t i2c_base,
         "(ALERT_TEST must pulse, not latch high)");
 }
 
+#include "sw/device/lib/dif/dif_pinmux.h"
+#include "sw/device/lib/runtime/hart.h"
+
+static void test_intr_test_status_vs_event(mmio_region_t i2c_base) {
+  // Ensure CTRL=0, thresholds=0 so all status interrupts are 0.
+  mmio_region_write32(i2c_base, I2C_CTRL_REG_OFFSET, 0u);
+  mmio_region_write32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0u);
+  mmio_region_write32(i2c_base, I2C_TARGET_FIFO_CONFIG_REG_OFFSET, 0u);
+  mmio_region_write32(i2c_base, I2C_INTR_TEST_REG_OFFSET, 0u);
+  mmio_region_write32(i2c_base, I2C_INTR_STATE_REG_OFFSET, 0xffffffffu);
+
+  uint32_t intr_state = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+  CHECK(intr_state == 0u, "Expected INTR_STATE=0 initially, got 0x%x",
+        intr_state);
+
+  // In prim_intr_hw.sv:
+  // - IntrT("Status") stores intr_test_q in `test_q` (cleared only when SW
+  //   writes 0 to INTR_TEST, NOT by RW1C to INTR_STATE).
+  // - IntrT("Event") latches in intr_state_q and IS cleared by RW1C to
+  //   INTR_STATE.
+  uint32_t status_mask = (1u << I2C_INTR_COMMON_CONTROLLER_HALT_BIT) |
+                         (1u << I2C_INTR_COMMON_RX_THRESHOLD_BIT) |
+                         (1u << I2C_INTR_COMMON_ACQ_THRESHOLD_BIT);
+  uint32_t event_mask = (1u << I2C_INTR_COMMON_CMD_COMPLETE_BIT);
+  mmio_region_write32(i2c_base, I2C_INTR_TEST_REG_OFFSET,
+                      status_mask | event_mask);
+
+  intr_state = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+  CHECK(intr_state == (status_mask | event_mask),
+        "Expected INTR_STATE=0x%x after INTR_TEST write, got 0x%x",
+        status_mask | event_mask, intr_state);
+
+  // RW1C to INTR_STATE clears Event bit (CMD_COMPLETE), while Status bits stay
+  // asserted via `test_q` until INTR_TEST is written with 0.
+  mmio_region_write32(i2c_base, I2C_INTR_STATE_REG_OFFSET,
+                      status_mask | event_mask);
+  intr_state = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+  CHECK(intr_state == status_mask,
+        "Expected Status bits (0x%x) to remain set after INTR_STATE RW1C, got "
+        "0x%x",
+        status_mask, intr_state);
+
+  // Writing 0 to INTR_TEST clears `test_q` for Status bits.
+  mmio_region_write32(i2c_base, I2C_INTR_TEST_REG_OFFSET, 0u);
+  intr_state = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+  CHECK(intr_state == 0u,
+        "Expected INTR_STATE=0 after writing 0 to INTR_TEST, got 0x%x",
+        intr_state);
+}
+
+static void precharge_i2c0_pads_high(const dif_pinmux_t *pinmux) {
+  CHECK_DIF_OK(dif_pinmux_output_select(
+      pinmux, kTopEarlgreyPinmuxMioOutIoa7,
+      kTopEarlgreyPinmuxOutselConstantOne));
+  CHECK_DIF_OK(dif_pinmux_output_select(
+      pinmux, kTopEarlgreyPinmuxMioOutIoa8,
+      kTopEarlgreyPinmuxOutselConstantOne));
+  busy_spin_micros(2);
+  CHECK_DIF_OK(dif_pinmux_output_select(
+      pinmux, kTopEarlgreyPinmuxMioOutIoa7,
+      kTopEarlgreyPinmuxOutselI2c0Sda));
+  CHECK_DIF_OK(dif_pinmux_output_select(
+      pinmux, kTopEarlgreyPinmuxMioOutIoa8,
+      kTopEarlgreyPinmuxOutselI2c0Scl));
+  busy_spin_micros(2);
+}
+
+static void test_val_and_ovrd(mmio_region_t i2c_base) {
+  dif_pinmux_t pinmux;
+  CHECK_DIF_OK(dif_pinmux_init(
+      mmio_region_from_addr(TOP_EARLGREY_PINMUX_AON_BASE_ADDR), &pinmux));
+
+  // Route I2C0 SDA to IOA7 and SCL to IOA8.
+  CHECK_DIF_OK(dif_pinmux_input_select(
+      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Sda,
+      kTopEarlgreyPinmuxInselIoa7));
+  CHECK_DIF_OK(dif_pinmux_input_select(
+      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Scl,
+      kTopEarlgreyPinmuxInselIoa8));
+
+  mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
+  precharge_i2c0_pads_high(&pinmux);
+  uint32_t val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
+  CHECK(val == 0xffffffffu,
+        "Expected VAL=0xffffffff when bus is idle (SCL=1, SDA=1), got 0x%x",
+        val);
+
+  // Override SCL=0, SDA=1 (TXOVRDEN=1, SCLVAL=0, SDAVAL=1 -> 0x5).
+  uint32_t ovrd = bitfield_bit32_write(0, I2C_OVRD_TXOVRDEN_BIT, true);
+  ovrd = bitfield_bit32_write(ovrd, I2C_OVRD_SCLVAL_BIT, false);
+  ovrd = bitfield_bit32_write(ovrd, I2C_OVRD_SDAVAL_BIT, true);
+  mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, ovrd);
+  busy_spin_micros(5);
+  val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
+  CHECK(val == 0xffff0000u,
+        "Expected VAL=0xffff0000 when OVRD drives SCL=0, SDA=1, got 0x%x",
+        val);
+
+  // Override SCL=1, SDA=0 (TXOVRDEN=1, SCLVAL=1, SDAVAL=0 -> 0x3).
+  mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
+  precharge_i2c0_pads_high(&pinmux);
+  ovrd = bitfield_bit32_write(0, I2C_OVRD_TXOVRDEN_BIT, true);
+  ovrd = bitfield_bit32_write(ovrd, I2C_OVRD_SCLVAL_BIT, true);
+  ovrd = bitfield_bit32_write(ovrd, I2C_OVRD_SDAVAL_BIT, false);
+  mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, ovrd);
+  busy_spin_micros(5);
+  val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
+  CHECK(val == 0x0000ffffu,
+        "Expected VAL=0x0000ffff when OVRD drives SCL=1, SDA=0, got 0x%x",
+        val);
+
+  // Disable override (OVRD=0) -> bus returns to idle high (0xffffffff).
+  mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
+  precharge_i2c0_pads_high(&pinmux);
+  val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
+  CHECK(val == 0xffffffffu,
+        "Expected VAL=0xffffffff after clearing OVRD, got 0x%x", val);
+}
+
 bool test_main(void) {
   mmio_region_t i2c0_base = mmio_region_from_addr(TOP_EARLGREY_I2C0_BASE_ADDR);
 
@@ -165,6 +286,8 @@ bool test_main(void) {
 
   test_csr_masks_and_access(i2c0_base);
   test_fifo_preload_when_disabled(i2c0_base);
+  test_intr_test_status_vs_event(i2c0_base);
+  test_val_and_ovrd(i2c0_base);
   test_alert_test_pulse(i2c0_base, &alert_handler);
 
   LOG_INFO("i2c_consistency_test passed!");
