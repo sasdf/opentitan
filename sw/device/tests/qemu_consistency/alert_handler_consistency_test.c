@@ -209,5 +209,78 @@ bool test_main(void) {
                  ping_timeout_before,
              "PING_TIMEOUT_CYC_SHADOWED must ignore writes when PING_TIMER_REGWEN == 0");
 
+  // 7. Wave 2 Deep-Pass Checks:
+  //    (a) CLASSA_CLR_SHADOWED is SwAccessRW (.de=0) and retains committed 1 on readback.
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET) == 1u,
+             "CLASSA_CLR_SHADOWED is SwAccessRW and must read back as 1 after committing 1");
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 0u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET) == 0u,
+             "CLASSA_CLR_SHADOWED must read back as 0 after committing 0");
+
+  //    (b) Enabling CLASSA_CTRL_SHADOWED or setting CLASSA_TIMEOUT_CYC_SHADOWED > 0 while
+  //        irq[0] (INTR_STATE.CLASSA & INTR_ENABLE.CLASSA) is active transitions Idle -> Timeout (1).
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_PHASE0_CYC_SHADOWED_REG_OFFSET,
+                 100000u);
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CTRL_SHADOWED_REG_OFFSET,
+                 0x3910u);  // EN=0, LOCK=0, EN_E2=1 (Phase2), EN_E0..1,3=0
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET, 0u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_TEST_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_TEST_CLASSA_BIT);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig | (1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 0u,
+             "CLASSA_STATE must be Idle (0) when EN=0 and TIMEOUT_CYC=0");
+
+  // Enable CLASSA_CTRL_SHADOWED (EN=1) while TIMEOUT_CYC == 0 -> still Idle (0).
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CTRL_SHADOWED_REG_OFFSET,
+                 0x3911u);  // EN=1, LOCK=0, EN_E2=1 (Phase2), EN_E0..1,3=0
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 0u,
+             "CLASSA_STATE must remain Idle (0) when TIMEOUT_CYC == 0");
+
+  // Set CLASSA_TIMEOUT_CYC_SHADOWED = 100000 while irq[0] == 1 and EN == 1 -> enters Timeout (1)!
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET,
+                 100000u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 1u,
+             "CLASSA_STATE must enter Timeout (1) when TIMEOUT_CYC_SHADOWED > 0 is committed while irq active");
+
+  //    (c) Writing CLASSA_CLR_SHADOWED = 1 while in Timeout (1) does NOT exit Timeout (1)
+  //        as long as irq[0] (timeout_en_i) remains 1 (CheckClr_A in alert_handler_esc_timer.sv).
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 1u,
+             "CLASSA_STATE must remain in Timeout (1) after CLASSA_CLR_SHADOWED write while irq[0] is active");
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 0u);
+
+  //    (d) Lowering CLASSA_ACCUM_THRESH_SHADOWED to 0 when ACCUM_CNT == 1 without a new alert trigger
+  //        (class_trig_i == 0) must NOT trigger Phase0 on INTR_ENABLE toggle (accu_trig_o is gated by trig_gated).
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET, 10u);
+  // Trigger local alert 5 into Class A once so CLASSA_ACCUM_CNT becomes 1.
+  write_shadowed(loc_class5_addr, 0u);  // Class A
+  write_shadowed(loc_en5_addr, 1u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET, 10u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET, 11u);
+  write_shadowed(loc_en5_addr, 0u);
+  abs_mmio_write32(loc_cause5_addr, 1u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET) == 1u,
+             "CLASSA_ACCUM_CNT must be 1 after single local alert");
+  // Now lower CLASSA_ACCUM_THRESH_SHADOWED to 0 (so ACCUM_CNT=1 > THRESH=0) WITHOUT firing any new alert:
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET, 0u);
+  // Enable INTR_ENABLE.CLASSA while INTR_STATE.CLASSA == 1 -> must enter Timeout (1), NOT Phase0 (4)!
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig | (1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 1u,
+             "CLASSA_STATE must enter Timeout (1), NOT Phase0 (4), when ACCUM_CNT > THRESH without new class_trig_i");
+
+  // Clean up Class A state.
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 1u);
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 0u);
+
   return all_ok;
 }
