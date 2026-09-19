@@ -35,6 +35,18 @@ enum {
     }                                                 \
   } while (0)
 
+static volatile uint32_t kFaultCount = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mepc;
+  __asm__ volatile("csrr %0, mepc" : "=r"(mepc));
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  uint32_t step = ((insn16 & 0x3u) == 0x3u) ? 4u : 2u;
+  __asm__ volatile("csrw mepc, %0" : : "r"(mepc + step));
+  kFaultCount++;
+}
+
 bool test_main(void) {
   uint32_t failures = 0;
 
@@ -231,6 +243,31 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) ==
                  0u,
              "[6e] INTR_STATE after RW1C write 0x3 must be 0");
+
+  // 7. Verify PATTGEN_PERMIT sub-word write checks (pattgen_reg_top.sv wr_err):
+  // - Sub-word write to DATA_CH0_0 (PATTGEN_PERMIT = 4'b1111) faults and blocks write.
+  // - Sub-word write to CTRL+1 (PATTGEN_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
+  // - Byte-0 sub-word write to CTRL (PATTGEN_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  abs_mmio_write32(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET, 0x12345678u);
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET)) = 0x99u;
+  EXPECT_RTL(kFaultCount == 1u &&
+                 abs_mmio_read32(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET) ==
+                     0x12345678u,
+             "[7a] Sub-word write to DATA_CH0_0 must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPattgenBase + PATTGEN_CTRL_REG_OFFSET + 1u)) = 0x11u;
+  EXPECT_RTL(kFaultCount == 1u &&
+                 abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0u,
+             "[7b] Sub-word write to CTRL+1 must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kPattgenBase + PATTGEN_CTRL_REG_OFFSET)) = 0x0cu;
+  EXPECT_RTL(kFaultCount == 0u &&
+                 abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0x0cu,
+             "[7c] Byte-0 sub-word write to CTRL (PATTGEN_PERMIT=4'b0001) must succeed");
+  abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, 0u);
 
   return failures == 0;
 }
