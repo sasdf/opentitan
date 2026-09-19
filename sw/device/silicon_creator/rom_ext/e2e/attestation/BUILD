@@ -149,7 +149,6 @@ VARIANTS = {
             test_cmd = info["test_cmd"],
             test_harness = "//sw/host/tests/attestation:attestation_test",
             testopt_bootstrap = "False",
-            timeout = "moderate",
         ),
         qemu = qemu_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_b}",
@@ -160,7 +159,6 @@ VARIANTS = {
             tags = info.get("tags", []),
             test_cmd = info["test_cmd"],
             test_harness = "//sw/host/tests/attestation:attestation_test",
-            timeout = "moderate",
         ),
     )
     for name, info in VARIANTS.items()
