@@ -297,6 +297,28 @@ opentitan_test(
 )
 
 opentitan_test(
+    name = "lc_ctrl_rtl_consistency_test",
+    srcs = ["lc_ctrl_rtl_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        EARLGREY_CW340_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+    ),
+    deps = [
+        "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
     name = "alert_handler_consistency_test",
     srcs = ["alert_handler_consistency_test.c"],
     exec_env = dicts.add(
