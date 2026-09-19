@@ -303,18 +303,34 @@ bool test_main(void) {
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
              "addrmiss read at 0x2c must fault with MCAUSE=5");
 
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
+  abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0x11u);
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "sb to IMEM (ByteAccess=0) must fault with MCAUSE=7");
-
-  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x22u);
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "sb to DMEM (ByteAccess=0) must fault with MCAUSE=7");
+  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
+             "sub-word write faults to IMEM/DMEM must not advance LOAD_CHECKSUM");
   EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0x89abcdefu,
              "sb to DMEM must not modify word");
+
+  // 5f. Wave 6: Idle host IMEM read advances LOAD_CHECKSUM with wr_data=0
+  // (otbn.sv:737-746, tlul_adapter_host.sv:94, tlul_adapter_sram.sv:390,429).
+  abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0u);
+  uint32_t crc_imem0_zero =
+      abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET);
+  abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
+  (void)abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET);
+  uint32_t crc_after_imem0_read =
+      abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET);
+  EXPECT_RTL(crc_imem0_zero != 0u && crc_after_imem0_read == crc_imem0_zero,
+             "Idle IMEM[0] read must advance LOAD_CHECKSUM to 0x%08x (got 0x%08x)",
+             crc_imem0_zero, crc_after_imem0_read);
 
   // 6. Host IMEM read during BUSY_EXECUTE triggers ILLEGAL_BUS_ACCESS, locks
   // OTBN (STATUS == 0xff), latches FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS, and
