@@ -396,44 +396,42 @@ bool test_main(void) {
   // ---------------------------------------------------------------------------
   uint32_t pre_adv_ws =
       abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  if (pre_adv_ws != KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_KEY) {
+  if (pre_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY) {
+    abs_mmio_write32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET, 0u);
     abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
     write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
     abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
     op_st = wait_keymgr_op_done_bounded(5000);
 
-    if (op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS) {
-      // CreatorRootKey -> OwnerIntKey succeeded (CreatorSecret was valid).
-      // Now advance OwnerIntKey -> OwnerKey, which uses the all-zero
-      // OwnerSecret programmed in init_flash_and_otp_with_zero_owner_seed().
-      clear_keymgr_status_and_err();
-      pre_adv_ws =
-          abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-      EXPECT_RTL(
-          pre_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY,
-          "Expected WORKING_STATE == OwnerIntKey(3), got %u", pre_adv_ws);
-      abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
-      write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET,
-                     ctrl_adv);
-      abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
-      op_st = wait_keymgr_op_done_bounded(5000);
-    }
-
+    // In RTL (keymgr.sv:460, 538, 550), during CreatorRootKey -> OwnerIntKey
+    // (stage_sel == OwnerInt), adv_matrix[OwnerInt] hashes creator_seed, while
+    // adv_dvalid[OwnerInt] = owner_seed_vld and
+    // hw2reg.debug.invalid_owner_seed.de = adv_en & (stage_sel == OwnerInt) &
+    // ~owner_seed_vld. Because OwnerSeed is all-zero, this ADVANCE in
+    // CreatorRootKey MUST immediately fail with DONE_ERROR(3),
+    // ERR_CODE.INVALID_KMAC_INPUT(2), DEBUG.INVALID_OWNER_SEED(2),
+    // WORKING_STATE remaining CREATOR_ROOT_KEY(2), and SW_BINDING_REGWEN
+    // remaining 0.
     err_code = abs_mmio_read32(kKeymgrBase + KEYMGR_ERR_CODE_REG_OFFSET);
-    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
-                   err_code == (1u << KEYMGR_ERR_CODE_INVALID_KMAC_INPUT_BIT),
-               "Advance with invalid flash seed expected DONE_ERROR(3) & "
-               "INVALID_KMAC_INPUT(2), got op_st=%u err=0x%x",
-               op_st, err_code);
-
+    uint32_t debug_val = abs_mmio_read32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET);
     uint32_t post_adv_ws =
         abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
     uint32_t post_adv_bind_regwen =
         abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
-    EXPECT_RTL(post_adv_ws == pre_adv_ws,
-               "Failed ADVANCE (INVALID_KMAC_INPUT) must NOT advance "
-               "WORKING_STATE (expected %u, got %u)",
-               pre_adv_ws, post_adv_ws);
+    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
+                   err_code == (1u << KEYMGR_ERR_CODE_INVALID_KMAC_INPUT_BIT),
+               "Advance CreatorRootKey->OwnerIntKey with zero OwnerSeed "
+               "expected DONE_ERROR(3) & INVALID_KMAC_INPUT(2), got op_st=%u "
+               "err=0x%x",
+               op_st, err_code);
+    EXPECT_RTL(debug_val == (1u << KEYMGR_DEBUG_INVALID_OWNER_SEED_BIT),
+               "DEBUG after CreatorRootKey->OwnerIntKey with zero OwnerSeed "
+               "expected INVALID_OWNER_SEED (0x2), got 0x%x",
+               debug_val);
+    EXPECT_RTL(post_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
+               "Failed ADVANCE (INVALID_KMAC_INPUT) must stay in "
+               "CREATOR_ROOT_KEY(2), got %u",
+               post_adv_ws);
     EXPECT_RTL(post_adv_bind_regwen == 0u,
                "Failed ADVANCE (INVALID_KMAC_INPUT) must NOT unlock "
                "SW_BINDING_REGWEN (expected 0, got %u)",
