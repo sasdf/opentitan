@@ -577,3 +577,26 @@ opentitan_test(
     ],
 )
 
+opentitan_test(
+    name = "rv_timer_rtl_consistency_test",
+    srcs = ["rv_timer_rtl_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_CW340_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+    ),
+    deps = [
+        "//hw/ip/rv_timer/data:rv_timer_c_regs",
+        "//hw/top_earlgrey:alert_handler_c_regs",
+        "//hw/top_earlgrey:rv_plic_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
