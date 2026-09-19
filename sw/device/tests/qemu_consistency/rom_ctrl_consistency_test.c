@@ -113,6 +113,38 @@ static void test_csr_semantics_and_digests(void) {
   }
   CHECK(any_nonzero && any_non_ones,
         "ROM digest must be neither all-zeros nor all-ones");
+
+  // 4. Verify ROM_CTRL_REGS_PERMIT sub-word write wr_err (rom_ctrl_reg_pkg.sv:115-134,
+  // rom_ctrl_regs_reg_top.sv:713-733):
+  // - ALERT_TEST (0x00) and FATAL_ALERT_CAUSE (0x04) have PERMIT = 4'b0001:
+  //   8-bit write at offset +0 (reg_be = 4'b0001) succeeds without fault, while
+  //   8-bit write at offset +1 (reg_be = 4'b0010) fails with StoreAccessFault.
+  // - DIGEST_0..7 (0x08..0x24) and EXP_DIGEST_0..7 (0x28..0x44) have PERMIT = 4'b1111:
+  //   8-bit (sb) and 16-bit (sh) writes fail with StoreAccessFault (wr_err = 1).
+  store_access_fault_seen = false;
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET, 0u);
+  CHECK(!store_access_fault_seen,
+        "Expected no StoreAccessFault on 8-bit write to ALERT_TEST+0");
+
+  store_access_fault_seen = false;
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET, 0x3u);
+  CHECK(!store_access_fault_seen,
+        "Expected no StoreAccessFault on 8-bit write to FATAL_ALERT_CAUSE+0");
+
+  store_access_fault_seen = false;
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET + 1u, 1u);
+  CHECK(store_access_fault_seen,
+        "Expected StoreAccessFault on 8-bit write to ALERT_TEST+1 (PERMIT=4'b0001)");
+
+  store_access_fault_seen = false;
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET, 0xaau);
+  CHECK(store_access_fault_seen,
+        "Expected StoreAccessFault on 8-bit write to DIGEST_0 (PERMIT=4'b1111)");
+
+  store_access_fault_seen = false;
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET, 0x55u);
+  CHECK(store_access_fault_seen,
+        "Expected StoreAccessFault on 8-bit write to EXP_DIGEST_0 (PERMIT=4'b1111)");
 }
 
 static void test_alert_test_pulse_and_clear(void) {
