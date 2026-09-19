@@ -296,5 +296,39 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0u);
   busy_spin_micros(20);
 
+  // 6. ULP_CTL is NOT gated by REGWEN (sysrst_ctrl.hjson:266-278).
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 1u);
+  busy_spin_micros(20);
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET) == 1u,
+             "ULP_CTL must remain writable when REGWEN == 0");
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET, 1u);
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
+  busy_spin_micros(20);
+
+  // 7. Status-type INTR_STATE / INTR_TEST behavior (prim_intr_hw IntrT="Status")
+  // and WO readback for INTR_TEST / ALERT_TEST.
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET) ==
+                 0u,
+             "INTR_TEST (WO) readback must be 0");
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ALERT_TEST_REG_OFFSET) ==
+                 0u,
+             "ALERT_TEST (WO) readback must be 0");
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
+                 1u,
+             "INTR_STATE must assert when INTR_TEST=1");
+  // Writing 1 to INTR_STATE must NOT clear it (Status-type RO interrupt).
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
+                 1u,
+             "INTR_STATE (Status-type RO) must not clear on write 1");
+  // Writing 0 to INTR_TEST clears test_q and deasserts INTR_STATE.
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET, 0u);
+  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
+                 0u,
+             "INTR_STATE must deassert when INTR_TEST=0 and all status registers are 0");
+
   return all_ok;
 }
