@@ -151,8 +151,10 @@ opentitan_test(
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/dif:hmac",
+        "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )

@@ -6,8 +6,10 @@
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/dif/dif_hmac.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hmac_regs.h"
@@ -23,6 +25,18 @@ enum {
   kHmacErrPushMsgWhenDisallowed = 0x5u,
   kHmacErrInvalidConfig = 0x6u,
 };
+
+static volatile bool load_access_fault_seen = false;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  uint32_t mcause = ibex_mcause_read();
+  if ((ibex_exc_t)(mcause & kIbexExcMax) == kIbexExcLoadAccessFault) {
+    load_access_fault_seen = true;
+  } else {
+    ottf_generic_fault_print(exc_info, "Unexpected Load/Store Fault", mcause);
+    abort();
+  }
+}
 
 #define EXPECT_RTL(cond, ...)                    \
   do {                                           \
@@ -242,6 +256,29 @@ bool test_main(void) {
              "Write to DIGEST_8 in SHA2_256 mode must be ignored and DIGEST_8 "
              "must still mirror DIGEST_0 (0x13572468), got d0=0x%08x d8=0x%08x",
              d0, d8);
+
+  // 9. Wave 4: Reading from write-only `MSG_FIFO` window (`0x1000..0x1fff`):
+  // In RTL (`hmac.sv:588`, `u_tlul_adapter` `.ErrOnRead(1)`), a TL-UL Get
+  // asserts `rd_vld_error = 1'b1` (`error_internal = 1'b1`), returning
+  // `tl_win_d2h.d_error = 1'b1` (Ibex Load Access Fault `MCAUSE = 5`) and
+  // suppressing `req_o` (`msg_fifo_req = 0`), so `INTR_STATE.hmac_err` is NOT
+  // asserted and `ERR_CODE` is NOT modified.
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);
+  uint32_t err_before = abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET);
+  load_access_fault_seen = false;
+  (void)abs_mmio_read32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET);
+  EXPECT_RTL(load_access_fault_seen,
+             "Reading MSG_FIFO must raise a synchronous Load Access Fault "
+             "(ErrOnRead=1 in u_tlul_adapter)");
+  uint32_t intr_after = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  uint32_t err_after = abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET);
+  EXPECT_RTL((intr_after & (1u << HMAC_INTR_STATE_HMAC_ERR_BIT)) == 0u,
+             "Reading MSG_FIFO must NOT assert INTR_STATE.hmac_err (got 0x%08x)",
+             intr_after);
+  EXPECT_RTL(err_after == err_before,
+             "Reading MSG_FIFO must NOT modify ERR_CODE (expected 0x%08x, got "
+             "0x%08x)",
+             err_before, err_after);
 
   return all_ok;
 }
