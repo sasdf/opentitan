@@ -530,18 +530,29 @@ bool test_main(void) {
              "Rejected 8-bit write to INTR_ENABLE+1 must not modify INTR_ENABLE");
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET, 0u);
 
-  // PROG_FIFO (0x1b0) uses tlul_adapter_sram with .ByteAccess(0) -> sub-word
-  // writes must raise Store Access Fault.
+  // PROG_FIFO (0x1b0) uses tlul_adapter_sram with .ByteAccess(0) and
+  // .EnableDataIntgGen(0) -> sub-word writes must raise Store Access Fault and
+  // latch RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR (bit 8).
+  const uint32_t kIbexErrStatusAddr =
+      TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR + 0x88u;
+  const uint32_t kIbexFatalIntgErrBit = 1u << 8;
+  abs_mmio_write32(kIbexErrStatusAddr, kIbexFatalIntgErrBit);
   g_fault_count = 0;
   abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET, 0xaau);
   EXPECT_RTL(g_fault_count == 1u,
              "8-bit write to PROG_FIFO (.ByteAccess(0)) must raise Store Access Fault");
+  EXPECT_RTL((abs_mmio_read32(kIbexErrStatusAddr) & kIbexFatalIntgErrBit) != 0u,
+             "8-bit write to PROG_FIFO must latch RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR");
+  abs_mmio_write32(kIbexErrStatusAddr, kIbexFatalIntgErrBit);
 
   g_fault_count = 0;
   *(volatile uint16_t *)(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET) =
       0x55aau;
   EXPECT_RTL(g_fault_count == 1u,
              "16-bit write to PROG_FIFO (.ByteAccess(0)) must raise Store Access Fault");
+  EXPECT_RTL((abs_mmio_read32(kIbexErrStatusAddr) & kIbexFatalIntgErrBit) != 0u,
+             "16-bit write to PROG_FIFO must latch RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR");
+  abs_mmio_write32(kIbexErrStatusAddr, kIbexFatalIntgErrBit);
 
   // FLASH_CTRL_PRIM_PERMIT verification on CSR1 (0x04, PERMIT=0x3) and
   // CSR2 (0x08, PERMIT=0x1, RW bits 0x88 ungated by CSR0_REGWEN).
@@ -574,10 +585,6 @@ bool test_main(void) {
   // 21. Wave 7: Direct CPU writes (sw/sb) to the eFlash memory window
   // (u_tl_adapter_eflash with ErrOnWrite = 1 in flash_ctrl.sv:1302-1315) must
   // raise a Store Access Fault (mcause = 7) and leave eFlash contents unchanged.
-  // Ignore RvCoreIbexFatalHwErr (Alert 60), which u_tl_adapter_eflash triggers
-  // on RTL due to EnableDataIntgGen=0 returning SecdedInv3932ZeroEcc on OpWrite.
-  CHECK_STATUS_OK(
-      ottf_alerts_ignore_alert(kTopEarlgreyAlertIdRvCoreIbexFatalHwErr));
   uint32_t eflash_test_addr = (uint32_t)((uintptr_t)&test_main) & ~0x3u;
   uint32_t eflash_orig_word = abs_mmio_read32(eflash_test_addr);
   g_fault_count = 0;
