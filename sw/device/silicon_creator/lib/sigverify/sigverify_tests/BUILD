@@ -40,7 +40,7 @@ opentitan_test(
     qemu = qemu_params(
         timeout = "moderate",
         data = _TEST_VECTORS,
-        test_cmd = "--timeout=60s " + _TEST_ARGS,
+        test_cmd = _TEST_ARGS,
         test_harness = "//sw/host/tests/crypto/ecdsa_kat:harness",
     ),
     deps = [
