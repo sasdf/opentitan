@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_rom_ctrl.h"
@@ -21,6 +22,7 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kRomCtrlRegsBase = TOP_EARLGREY_ROM_CTRL_REGS_BASE_ADDR,
   kRomCtrlRomBase = TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR,
+  kRomCtrlRomSize = TOP_EARLGREY_ROM_CTRL_ROM_SIZE_BYTES,
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
   kRomCtrlAlertId = kTopEarlgreyAlertIdRomCtrlFatal,
 };
@@ -28,8 +30,13 @@ enum {
 static volatile bool store_access_fault_seen = false;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
-  (void)exc_info;
-  store_access_fault_seen = true;
+  uint32_t mcause = ibex_mcause_read();
+  if ((ibex_exc_t)(mcause & kIbexExcMax) == kIbexExcStoreAccessFault) {
+    store_access_fault_seen = true;
+  } else {
+    ottf_generic_fault_print(exc_info, "Unexpected Load/Store Fault", mcause);
+    abort();
+  }
 }
 
 static void shadow_write32(uint32_t addr, uint32_t val) {
@@ -139,6 +146,31 @@ static void test_alert_test_pulse_and_clear(void) {
 }
 
 static void test_rom_write_protection(void) {
+  // Under sival_rom_ext, ROM_EXT clears ePMP entries 0..7 before jumping to
+  // BL0 while MSECCFG.MMWP == 1 denies unmatched addresses; under
+  // rom_with_fake_keys, ROM maps the ROM window as read-only in ePMP entry 2.
+  // Configure highest-priority PMP entry 0 as NAPOT Read+Write covering the
+  // ROM window so CPU loads succeed and CPU stores reach rom_ctrl over TL-UL
+  // (testing rom_ctrl's ErrOnWrite TL-UL rejection rather than CPU ePMP).
+  uint32_t orig_pmpaddr0 = 0;
+  uint32_t orig_pmpcfg0 = 0;
+  CSR_READ(CSR_REG_PMPADDR0, &orig_pmpaddr0);
+  CSR_READ(CSR_REG_PMPCFG0, &orig_pmpcfg0);
+
+  const uint32_t kRomNapotAddr =
+      (kRomCtrlRomBase >> 2) | ((kRomCtrlRomSize - 1u) >> 3);
+  // L=1 (bit 7), A=NAPOT (3 << 3), X=0, W=1 (bit 1), R=1 (bit 0) -> 0x9b.
+  // Also set L=0 fallback (0x1b) in case RLB is cleared.
+  const uint32_t kPmp0CfgRwLocked = 0x9bu;
+  const uint32_t kPmp0CfgRwUnlocked = 0x1bu;
+  CSR_WRITE(CSR_REG_PMPADDR0, kRomNapotAddr);
+  CSR_WRITE(CSR_REG_PMPCFG0, (orig_pmpcfg0 & ~0xffu) | kPmp0CfgRwLocked);
+  uint32_t active_pmpcfg0 = 0;
+  CSR_READ(CSR_REG_PMPCFG0, &active_pmpcfg0);
+  if ((active_pmpcfg0 & 0xffu) != kPmp0CfgRwLocked) {
+    CSR_WRITE(CSR_REG_PMPCFG0, (orig_pmpcfg0 & ~0xffu) | kPmp0CfgRwUnlocked);
+  }
+
   uint32_t orig_word = abs_mmio_read32(kRomCtrlRomBase);
   store_access_fault_seen = false;
   abs_mmio_write32(kRomCtrlRomBase, ~orig_word);
@@ -146,6 +178,9 @@ static void test_rom_write_protection(void) {
         "Expected StoreAccessFault when writing to ROM window");
   CHECK(abs_mmio_read32(kRomCtrlRomBase) == orig_word,
         "ROM contents modified by rejected write");
+
+  CSR_WRITE(CSR_REG_PMPCFG0, orig_pmpcfg0);
+  CSR_WRITE(CSR_REG_PMPADDR0, orig_pmpaddr0);
 }
 
 bool test_main(void) {
