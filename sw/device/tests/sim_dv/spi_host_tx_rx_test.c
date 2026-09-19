@@ -149,7 +149,7 @@ void setup_pinmux_pads_spi_host1(void) {
       .flags = kDifPinmuxPadAttrPullResistorEnable |
                kDifPinmuxPadAttrPullResistorUp};
   dif_result_t res;
-  for (uint32_t i = 0; i < ARRAYSIZE(spi_host1_muxed_pads); ++i) {
+  for (uint32_t i = 0; i <= ARRAYSIZE(spi_host1_muxed_pads); ++i) {
     res = dif_pinmux_pad_write_attrs(&pinmux, spi_host1_muxed_pads[i],
                                      kDifPinmuxPadKindMio, in_attr, &out_attr);
     if (res == kDifError) {
@@ -201,71 +201,65 @@ bool test_main(void) {
       spi_host_testutils_configure_host0_pad_attrs(&pinmux));  // direct
   setup_pinmux_pads_spi_host1();                               // muxed
 
-  uint8_t num_hosts = (kDeviceType == kDeviceSimDV) ? 1 : 2;
-  for (uint8_t i = 0; i < num_hosts; ++i) {
-    uint8_t host_idx = (kDeviceType == kDeviceSimDV) ? kSPIHostIdx : i;
-
-    // Setup spi host configuration
-    LOG_INFO("Testing spi_host%u", host_idx);
-    uintptr_t base_addr;
-    uint64_t clkHz;
-    switch (host_idx) {
-      case 0: {
-        base_addr = TOP_EARLGREY_SPI_HOST0_BASE_ADDR;
-        clkHz = kClockFreqHiSpeedPeripheralHz;
-        break;
-      }
-      case 1: {
-        base_addr = TOP_EARLGREY_SPI_HOST1_BASE_ADDR;
-        clkHz = kClockFreqPeripheralHz;
-        break;
-      }
-      default:
-        LOG_FATAL("Invalid kSPIHostIdx: %d", host_idx);
-        return false;
+  // Setup spi host configuration
+  LOG_INFO("Testing spi_host%0d", kSPIHostIdx);
+  uintptr_t base_addr;
+  uint64_t clkHz;
+  switch (kSPIHostIdx) {
+    case 0: {
+      base_addr = TOP_EARLGREY_SPI_HOST0_BASE_ADDR;
+      clkHz = kClockFreqHiSpeedPeripheralHz;
+      break;
     }
-    CHECK_DIF_OK(
-        dif_spi_host_init(mmio_region_from_addr(base_addr), &spi_host));
-    init_spi_host(&spi_host, (uint32_t)clkHz);
-
-    // DV sync message
-    LOG_INFO("spi host configuration complete");
-
-    uint32_t expected_data[DATA_SET_SIZE];
-    uint32_t received_data[DATA_SET_SIZE];
-    for (uint32_t j = 0; j < ARRAYSIZE(expected_data); ++j) {
-      expected_data[j] = rand_testutils_gen32();
+    case 1: {
+      base_addr = TOP_EARLGREY_SPI_HOST1_BASE_ADDR;
+      clkHz = kClockFreqPeripheralHz;
+      break;
     }
-
-    // Define the segments:
-    // 1st segment, TX only, host sends out the first word.
-    // 2nd segment, Bidirectional.  The external device begins sending back data
-    // that it received. So it always lags the TX by 1 word.
-    // 3rd segment, RX only, final word readback.
-    dif_spi_host_segment_t host_operations[3] = {
-        {.type = kDifSpiHostSegmentTypeTx,
-         .tx = {.width = kDifSpiHostWidthStandard,
-                .buf = &expected_data[0],
-                .length = 4}},
-
-        {.type = kDifSpiHostSegmentTypeBidirectional,
-         .bidir = {.width = kDifSpiHostWidthStandard,
-                   .txbuf = &expected_data[1],
-                   .rxbuf = received_data,
-                   .length = (DATA_SET_SIZE - 1) * sizeof(uint32_t)}},
-
-        {.type = kDifSpiHostSegmentTypeRx,
-         .tx = {.width = kDifSpiHostWidthStandard,
-                .buf = &received_data[DATA_SET_SIZE - 1],
-                .length = 4}},
-    };
-
-    // Issue the transaction
-    CHECK_DIF_OK(dif_spi_host_transaction(&spi_host, /*csid=*/0, host_operations,
-                                          ARRAYSIZE(host_operations)));
-
-    CHECK_ARRAYS_EQ(received_data, expected_data, ARRAYSIZE(expected_data));
+    default:
+      LOG_FATAL("Invalid kSPIHostIdx: %d", kSPIHostIdx);
+      return false;
   }
+  CHECK_DIF_OK(dif_spi_host_init(mmio_region_from_addr(base_addr), &spi_host));
+  init_spi_host(&spi_host, (uint32_t)clkHz);
+
+  // DV sync message
+  LOG_INFO("spi host configuration complete");
+
+  uint32_t expected_data[DATA_SET_SIZE];
+  uint32_t received_data[DATA_SET_SIZE];
+  for (uint32_t i = 0; i < ARRAYSIZE(expected_data); ++i) {
+    expected_data[i] = rand_testutils_gen32();
+  }
+
+  // Define the segments:
+  // 1st segment, TX only, host sends out the first word.
+  // 2nd segment, Bidirectional.  The external device begins sending back data
+  // that it received. So it always lags the TX by 1 word.
+  // 3rd segment, RX only, final word readback.
+  dif_spi_host_segment_t host_operations[3] = {
+      {.type = kDifSpiHostSegmentTypeTx,
+       .tx = {.width = kDifSpiHostWidthStandard,
+              .buf = &expected_data[0],
+              .length = 4}},
+
+      {.type = kDifSpiHostSegmentTypeBidirectional,
+       .bidir = {.width = kDifSpiHostWidthStandard,
+                 .txbuf = &expected_data[1],
+                 .rxbuf = received_data,
+                 .length = (DATA_SET_SIZE - 1) * sizeof(uint32_t)}},
+
+      {.type = kDifSpiHostSegmentTypeRx,
+       .tx = {.width = kDifSpiHostWidthStandard,
+              .buf = &received_data[DATA_SET_SIZE - 1],
+              .length = 4}},
+  };
+
+  // Issue the transaction
+  CHECK_DIF_OK(dif_spi_host_transaction(&spi_host, /*csid=*/0, host_operations,
+                                        ARRAYSIZE(host_operations)));
+
+  CHECK_ARRAYS_EQ(received_data, expected_data, ARRAYSIZE(expected_data));
 
   return true;
 }

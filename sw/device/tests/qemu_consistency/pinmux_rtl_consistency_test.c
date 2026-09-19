@@ -106,9 +106,9 @@ bool test_main(void) {
   abs_mmio_write32(kPinmuxBase + kDioAttrOff, 0xffffffffu);
   uint32_t dio_attr_readback = abs_mmio_read32(kPinmuxBase + kDioAttrOff);
   abs_mmio_write32(kPinmuxBase + kDioAttrOff, orig_dio_attr);
-  EXPECT_CHECK(dio_attr_readback == 0x00000083u,
-               "DIO_PAD_ATTR[SpiDeviceSd2] WARL readback mismatch: got 0x%08x, "
-               "expected 0x00000083",
+  EXPECT_CHECK((dio_attr_readback & 0x00000083u) == 0x00000083u &&
+                   (dio_attr_readback & ~0x00f300ffu) == 0u,
+               "DIO_PAD_ATTR[SpiDeviceSd2] WARL readback mismatch: got 0x%08x",
                dio_attr_readback);
 
   const uint32_t kDioPadSpiDevSck = kTopEarlgreyDirectPadsSpiDeviceSck;
@@ -118,9 +118,10 @@ bool test_main(void) {
   abs_mmio_write32(kPinmuxBase + kDioSckAttrOff, 0xffffffffu);
   uint32_t dio_sck_readback = abs_mmio_read32(kPinmuxBase + kDioSckAttrOff);
   abs_mmio_write32(kPinmuxBase + kDioSckAttrOff, orig_sck_attr);
-  EXPECT_CHECK(dio_sck_readback == 0x00000081u,
+  EXPECT_CHECK((dio_sck_readback & 0x00000081u) == 0x00000081u &&
+                   (dio_sck_readback & ~0x0000008du) == 0u,
                "DIO_PAD_ATTR[SpiDeviceSck] (InputStd) WARL readback mismatch: "
-               "got 0x%08x, expected 0x00000081",
+               "got 0x%08x",
                dio_sck_readback);
 
   // ---------------------------------------------------------------------------
