@@ -299,8 +299,17 @@ bool test_main(void) {
                             CSRNG_RECOV_ALERT_STS_ENABLE_FIELD_ALERT_BIT),
         "Expected ENABLE_FIELD_ALERT when CTRL.ENABLE is 0x0, got 0x%x",
         recov_sts);
+  // Writing 0 (rw0c) while CTRL still holds invalid mubi4 0x0 must preserve bit 0!
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(recov_sts,
+                            CSRNG_RECOV_ALERT_STS_ENABLE_FIELD_ALERT_BIT),
+        "Expected ENABLE_FIELD_ALERT preserved across rw0c while CTRL.ENABLE "
+        "is 0x0, got 0x%x",
+        recov_sts);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET) == 0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
 
@@ -322,6 +331,28 @@ bool test_main(void) {
   for (int i = 0; i < 4; ++i) {
     (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
   }
+
+  // 9. Verify csrng_state_db.sv reg_rd_ptr_q == 4'hf when INT_STATE_NUM is
+  // written while CTRL.READ_INT_STATE == False (state_db_is_dump_en_i == 0):
+  // writing INT_STATE_NUM = 2 latches int_st_dump_id_q = 2 while keeping
+  // reg_rd_ptr_q = 4'hf, so after enabling CTRL.READ_INT_STATE = True without
+  // re-writing INT_STATE_NUM, the 1st read of INT_STATE_VAL (ptr == 4'hf)
+  // returns 0 and advances ptr to 4'h0, and the 2nd read (ptr == 4'h0,
+  // reseed_counter of instance 2) returns 1.
+  abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 2u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_on);
+  uint32_t st_ptr_f =
+      abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET);
+  uint32_t st_ptr_0 =
+      abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET);
+  CHECK(st_ptr_f == 0u,
+        "Expected 1st INT_STATE_VAL read (reg_rd_ptr_q == 4'hf) == 0, got "
+        "0x%08x",
+        st_ptr_f);
+  CHECK(st_ptr_0 == 1u,
+        "Expected 2nd INT_STATE_VAL read (reg_rd_ptr_q == 4'h0, rc) == 1, got "
+        "0x%08x",
+        st_ptr_0);
 
   return true;
 }
