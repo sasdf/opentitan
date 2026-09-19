@@ -21,7 +21,21 @@ enum {
   kAonTimerBase = TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR,
   kRstmgrBase = TOP_EARLGREY_RSTMGR_AON_BASE_ADDR,
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
+  kRvCoreIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
+  kRvCoreIbexNmiStateRegOffset = 0x50,
+  kRvCoreIbexNmiStateWdogBit = 1,
 };
+
+static volatile uint32_t wdog_nmi_fired = 0;
+
+void ottf_internal_isr(uint32_t *exc_info) {
+  (void)exc_info;
+  wdog_nmi_fired++;
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET,
+                   1u << AON_TIMER_INTR_STATE_WDOG_TIMER_BARK_BIT);
+  abs_mmio_write32(kRvCoreIbexBase + kRvCoreIbexNmiStateRegOffset,
+                   1u << kRvCoreIbexNmiStateWdogBit);
+}
 
 #define EXPECT_RTL(cond, ...)                   \
   do {                                          \
@@ -182,6 +196,43 @@ bool test_main(void) {
              "latched high instead of pulsing)");
   CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
       &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault));
+
+  // 6. Watchdog bark sets WKUP_CAUSE (`wkup_cause_d = wkup_intr_o | wdog_intr_o
+  // | wkup_cause_q`) and `INTR_STATE.wdog_timer_bark` uses level-type edge
+  // detection on `wdog_intr_o = wdog_incr & (wdog_count >= wdog_bark_thold)`:
+  // clearing `INTR_STATE` while `WDOG_COUNT >= WDOG_BARK_THOLD` does not re-set
+  // `INTR_STATE.wdog_timer_bark` until `WDOG_COUNT` is cleared below
+  // `WDOG_BARK_THOLD`.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_COUNT_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_BARK_THOLD_REG_OFFSET, 2u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_BITE_THOLD_REG_OFFSET,
+                   0xffffffffu);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+  wdog_nmi_fired = 0;
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WDOG_CTRL_ENABLE_BIT);
+  busy_spin_micros(50);
+  uint32_t wkup_cause =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET);
+  uint32_t intr_state =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL((wkup_cause & 1u) == 1u,
+             "Watchdog bark did not set WKUP_CAUSE (got 0x%08x)", wkup_cause);
+  EXPECT_RTL(wdog_nmi_fired == 1u,
+             "Expected watchdog bark NMI to fire exactly once (got %u)",
+             wdog_nmi_fired);
+  EXPECT_RTL(
+      (intr_state & (1u << AON_TIMER_INTR_STATE_WDOG_TIMER_BARK_BIT)) == 0u,
+      "INTR_STATE.wdog_timer_bark re-latched while WDOG_COUNT stayed >= "
+      "WDOG_BARK_THOLD (got 0x%08x)",
+      intr_state);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
 
   return all_ok;
 }
