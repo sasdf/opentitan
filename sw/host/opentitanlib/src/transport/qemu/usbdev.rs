@@ -110,7 +110,9 @@ enum HostChannelEvent {
         answer: mpsc::Sender<Option<DeviceInfo>>,
     },
     /// Request to be notified on any device change (connection or disconnection).
-    NotifyDeviceChange { answer: mpsc::Sender<()> },
+    NotifyDeviceChange {
+        answer: mpsc::Sender<Option<DeviceInfo>>,
+    },
     /// Send a SETUP packet.
     SendSetup {
         generation: u32,
@@ -171,7 +173,7 @@ impl QemuUsbHost {
 
     /// Wait for a device change or a timeout. Return an error if no
     /// changes occurred within the time limit.
-    fn wait_device_change(&self, timeout: Duration) -> UsbResult<()> {
+    fn wait_device_change(&self, timeout: Duration) -> UsbResult<Option<DeviceInfo>> {
         let (send, recv) = mpsc::channel();
         self.host_channel
             .send(HostChannelEvent::NotifyDeviceChange { answer: send })?;
@@ -225,13 +227,10 @@ impl QemuUsbHost {
         timeout: Duration,
     ) -> anyhow::Result<Box<dyn UsbDevice>> {
         let deadline = Instant::now() + timeout;
+        let mut cur_dev_info = self.device_info()?;
 
         loop {
-            let now = Instant::now();
-            if now > deadline {
-                return Err(anyhow!("no device found"));
-            }
-            if let Some(dev_info) = self.device_info()? {
+            if let Some(dev_info) = cur_dev_info.take() {
                 let dev = QemuUsbDevice::new(self, dev_info);
                 match self.device_matches_filter(&dev, usb_vid_pid, usb_protocol, usb_serial) {
                     Ok(true) => return Ok(Box::new(dev)),
@@ -241,10 +240,14 @@ impl QemuUsbHost {
                     }
                 }
             }
+            let now = Instant::now();
+            if now > deadline {
+                return Err(anyhow!("no device found"));
+            }
             // If the device did not match our expectation, wait until
             // a new device shows up.
             log::info!("wait for device change");
-            self.wait_device_change(deadline - now)?;
+            cur_dev_info = self.wait_device_change(deadline - now)?;
         }
     }
 }
@@ -879,7 +882,7 @@ struct QemuHostThread {
     next_id: u32,
     /// List of pending channels that should be notified on a
     /// device change.
-    pending_dev_changes: Vec<mpsc::Sender<()>>,
+    pending_dev_changes: Vec<mpsc::Sender<Option<DeviceInfo>>>,
     /// Pending IN transfers.
     pending_in_transfers: HashMap<PacketId, (u8, mpsc::Sender<UsbResult<Vec<u8>>>)>,
     /// Active IN transfer ID per endpoint index.
@@ -1673,10 +1676,10 @@ impl QemuHostThread {
         }
     }
 
-    fn notify_device_change(&mut self) {
+    fn notify_device_change(&mut self, dev_info: Option<DeviceInfo>) {
         for send in &self.pending_dev_changes {
             // Ignore errors (receiver might have disconnected after a timeout).
-            let _ = send.send(());
+            let _ = send.send(dev_info.clone());
         }
         self.pending_dev_changes.clear();
     }
@@ -1751,7 +1754,7 @@ impl QemuHostThread {
             };
             log::info!("USB Host: device configured: {dev_info:?}");
 
-            self.notify_device_change();
+            self.notify_device_change(Some(dev_info.clone()));
 
             // Handle messages until the device disconnects.
             match self.serve_device_requests(dev_info) {
@@ -1764,7 +1767,7 @@ impl QemuHostThread {
                     // Pretend that device has disconnected.
                 }
             }
-            self.notify_device_change();
+            self.notify_device_change(None);
         }
     }
 
