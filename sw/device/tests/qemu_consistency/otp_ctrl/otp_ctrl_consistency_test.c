@@ -194,6 +194,54 @@ bool test_main(void) {
   status = abs_mmio_read32(kOtpCoreBase + OTP_CTRL_STATUS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(status, OTP_CTRL_STATUS_DAI_ERROR_BIT));
   CHECK(bitfield_bit32_read(status, OTP_CTRL_STATUS_VENDOR_TEST_ERROR_BIT));
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
+
+  // 7. Test reading VENDOR_TEST_DIGEST_OFFSET (56) via SW_CFG_WINDOW and via
+  // DAI while VENDOR_TEST_READ_LOCK == 0:
+  // - Core CSRs VENDOR_TEST_DIGEST_0/1 remain readable without fault.
+  // - SW_CFG_WINDOW read at VENDOR_TEST_DIGEST_OFFSET must still raise a TL-UL
+  //   bus error (Load Access Fault) and set ERR_CODE_0 = AccessError
+  //   (otp_ctrl_part_unbuf.sv:248 has no digest exception).
+  // - DAI Read at VENDOR_TEST_DIGEST_OFFSET must set ERR_CODE_11 = AccessError
+  //   and STATUS.DAI_ERROR = 1 because VENDOR_TEST has sw_digest=1, hw_digest=0
+  //   and otp_ctrl_dai.sv:315 only exempts PartInfo[part_idx].hw_digest.
+  (void)abs_mmio_read32(kOtpCoreBase + OTP_CTRL_VENDOR_TEST_DIGEST_0_REG_OFFSET);
+  (void)abs_mmio_read32(kOtpCoreBase + OTP_CTRL_VENDOR_TEST_DIGEST_1_REG_OFFSET);
+  CHECK(load_access_fault_count == 1u);
+
+  (void)abs_mmio_read32(kOtpCoreBase + OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET +
+                        OTP_CTRL_PARAM_VENDOR_TEST_DIGEST_OFFSET);
+  CHECK(load_access_fault_count == 2u);
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_0_REG_OFFSET) ==
+        kOtpErrAccessError);
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
+
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
+                   OTP_CTRL_PARAM_VENDOR_TEST_DIGEST_OFFSET);
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
+                   1u << OTP_CTRL_DIRECT_ACCESS_CMD_RD_BIT);
+  wait_for_dai_idle();
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_11_REG_OFFSET) ==
+        kOtpErrAccessError);
+  status = abs_mmio_read32(kOtpCoreBase + OTP_CTRL_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(status, OTP_CTRL_STATUS_DAI_ERROR_BIT));
+  CHECK((abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET) &
+         0x3u) == 0x3u);
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
+
+  // 8. Test DAI Read with unaligned byte address in the last word of unlocked
+  // CREATOR_SW_CFG (e.g. offset + size - 1 = 431). In RTL
+  // (otp_ctrl_dai.sv:721-722, 754-769), part_sel_oh checks
+  // dai_addr_i < PartEndInt and masks the lower 2/3 address bits, so the read
+  // succeeds with ERR_CODE_11 == NoError.
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
+                   OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET +
+                       OTP_CTRL_PARAM_CREATOR_SW_CFG_SIZE - 1u);
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
+                   1u << OTP_CTRL_DIRECT_ACCESS_CMD_RD_BIT);
+  wait_for_dai_idle();
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_11_REG_OFFSET) ==
+        kOtpErrNoError);
 
   return true;
 }
