@@ -24,6 +24,17 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   g_fault_count++;
 }
 
+// In flash_ctrl.sv, u_to_prog_fifo (0x1b0), u_to_rd_fifo (0x1b4), and
+// u_tl_adapter_eflash (0x20000000) instantiate tlul_adapter_sram with
+// .EnableDataIntgGen(0) and .EnableDataIntgPt(1), returning
+// d_data = 0xffffffff and data_intg = SecdedInv3932ZeroEcc (0x39) on OpWrite.
+// On RTL/FPGA, ibex_load_store_unit asserts store_resp_intg_err_o = 1, which
+// raises kIbexInternalIrqLoadInteg (mcause = 0xffffffe0) and Alert 60
+// (kTopEarlgreyAlertIdRvCoreIbexFatalHwErr) alongside StoreAccessFault.
+void ottf_load_integrity_error_handler(uint32_t *exc_info) {
+  (void)exc_info;
+}
+
 enum {
   kFlashCoreBase = TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR,
   kFlashPrimBase = TOP_EARLGREY_FLASH_CTRL_PRIM_BASE_ADDR,
@@ -39,6 +50,9 @@ enum {
 
 bool test_main(void) {
   bool all_ok = true;
+
+  CHECK_STATUS_OK(
+      ottf_alerts_ignore_alert(kTopEarlgreyAlertIdRvCoreIbexFatalHwErr));
 
   // 1. WO registers (INTR_TEST, ALERT_TEST) must read back as 0.
   // Note: PROG_FIFO (0x1b0) is a tlul_adapter_sram window with ErrOnRead=1
@@ -282,20 +296,19 @@ bool test_main(void) {
 
   // 10. Wave 2: ERR_ADDR latching semantics (flash_ctrl.sv:1083-1086) and
   // erase MP_ERR page/bank alignment (flash_ctrl_erase.sv:58-62).
+  // Preserve RD_EN, SCRAMBLE_EN, ECC_EN, and HE_EN in DEFAULT_REGION because
+  // under sival_rom_ext the owner test stage executes from 0x20010480 (outside
+  // ROM_EXT MP_REGION_CFG_0/1) using DEFAULT_REGION.
   uint32_t orig_default_region =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET);
-  uint32_t dis_default_region =
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_RD_EN_FIELD,
-                             kMultiBitBool4False) |
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_PROG_EN_FIELD,
-                             kMultiBitBool4False) |
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_ERASE_EN_FIELD,
-                             kMultiBitBool4False) |
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_SCRAMBLE_EN_FIELD,
-                             kMultiBitBool4False) |
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_ECC_EN_FIELD,
-                             kMultiBitBool4False) |
-      bitfield_field32_write(0u, FLASH_CTRL_DEFAULT_REGION_HE_EN_FIELD,
+  uint32_t dis_default_region = orig_default_region;
+  dis_default_region =
+      bitfield_field32_write(dis_default_region,
+                             FLASH_CTRL_DEFAULT_REGION_PROG_EN_FIELD,
+                             kMultiBitBool4False);
+  dis_default_region =
+      bitfield_field32_write(dis_default_region,
+                             FLASH_CTRL_DEFAULT_REGION_ERASE_EN_FIELD,
                              kMultiBitBool4False);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
                    dis_default_region);
