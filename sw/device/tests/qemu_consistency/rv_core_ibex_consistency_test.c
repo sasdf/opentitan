@@ -274,5 +274,64 @@ bool test_main(void) {
             kIbexBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) ==
         saved_matching_1);
 
+  // 6. Wave 2 Deep-Pass Checks:
+  // 6a. NMI_ENABLE (0x44) and NMI_STATE (0x48) 2-bit mask (NMI_MASK = 0x3):
+  // Writing upper bits [31:2] with bits [1:0] = 0 must be ignored and read back
+  // as 0 without enabling NMI.
+  uint32_t orig_nmi_enable =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET);
+  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET, 0xfffffffcu);
+  CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET) ==
+        orig_nmi_enable);
+  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_NMI_STATE_REG_OFFSET, 0xfffffffcu);
+  CHECK((abs_mmio_read32(kIbexBase + RV_CORE_IBEX_NMI_STATE_REG_OFFSET) &
+         0xfffffffcu) == 0u);
+
+  // 6b. RND_DATA (0x50) consume clears RND_STATUS.RND_DATA_VALID (0x54) and
+  // automatically triggers a new EDN request until valid again.
+  uint32_t rnd_word2 = 0;
+  CHECK_DIF_OK(dif_rv_core_ibex_read_rnd_data(&ibex, &rnd_word2));
+
+  // 6c. Lock IBUS Slot 1 via IBUS_REGWEN_1 (RW0C) and verify further writes to
+  // IBUS_ADDR_EN_1 / IBUS_ADDR_MATCHING_1 / IBUS_REMAP_ADDR_1 are ignored.
+  if (ibus_regwen_1 == 1u) {
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET,
+                     0x12345000u);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET,
+                     0x6789a000u);
+    CHECK(abs_mmio_read32(
+              kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+          0x12345000u);
+    CHECK(abs_mmio_read32(
+              kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
+          0x6789a000u);
+
+    // Writing 0xfffffffe (bit 0 = 0) clears IBUS_REGWEN_1 (1-bit W0C).
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET,
+                     0xfffffffeu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET) ==
+          0u);
+    // Writing 0xffffffff cannot unlock W0C register.
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET,
+                     0xffffffffu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET) ==
+          0u);
+
+    // Locked IBUS Slot 1 registers must ignore writes.
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET, 1u);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET,
+                     0xdeadbeefu);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET,
+                     0xcafebabeu);
+    CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET) ==
+          0u);
+    CHECK(abs_mmio_read32(
+              kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+          0x12345000u);
+    CHECK(abs_mmio_read32(
+              kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
+          0x6789a000u);
+  }
+
   return true;
 }
