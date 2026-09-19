@@ -5,9 +5,11 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "sysrst_ctrl_regs.h"
@@ -17,6 +19,28 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kSysrstBase = TOP_EARLGREY_SYSRST_CTRL_AON_BASE_ADDR,
 };
+
+static volatile bool g_expect_access_fault = false;
+static volatile uint32_t g_access_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  if (g_expect_access_fault && (mcause == 5u || mcause == 7u)) {
+    g_access_fault_count++;
+    g_last_mcause = mcause;
+    uint32_t mepc = 0;
+    CSR_READ(CSR_REG_MEPC, &mepc);
+    uint16_t inst16 = *(const uint16_t *)mepc;
+    uint32_t step = ((inst16 & 0x3u) != 0x3u) ? 2u : 4u;
+    CSR_WRITE(CSR_REG_MEPC, mepc + step);
+    return;
+  }
+  ottf_generic_fault_print(exc_info, "FAULT", mcause);
+  abort();
+}
 
 #define EXPECT_RTL(cond, ...)                   \
   do {                                          \
@@ -329,6 +353,54 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
                  0u,
              "INTR_STATE must deassert when INTR_TEST=0 and all status registers are 0");
+
+  // 8. Wave 5: SYSRST_CTRL_PERMIT sub-word write wr_err and addrmiss checks.
+  g_access_fault_count = 0;
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0x55u);
+  busy_spin_micros(20);
+  EXPECT_RTL(g_access_fault_count == 0u &&
+                 abs_mmio_read32(kSysrstBase +
+                                 SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET) == 0x55u,
+             "8-bit write to PIN_OUT_VALUE+0 (PERMIT=4'b0001) must succeed");
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET + 1u, 0xaau);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u &&
+                 abs_mmio_read32(kSysrstBase +
+                                 SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET) == 0x55u,
+             "8-bit write to PIN_OUT_VALUE+1 (PERMIT=4'b0001, reg_be=4'b0010) "
+             "must raise Store Access Fault (mcause=7) and preserve 0x55");
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0u);
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET, 0x10u);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u,
+             "8-bit write to EC_RST_CTL (PERMIT=4'b0011) must raise Store "
+             "Access Fault (mcause=7)");
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_COM_DET_CTL_0_REG_OFFSET, 0x10u);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u,
+             "8-bit write to COM_DET_CTL_0 (PERMIT=4'b1111) must raise Store "
+             "Access Fault (mcause=7)");
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  (void)abs_mmio_read32(kSysrstBase + 0xacu);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 5u,
+             "32-bit read at unmapped offset 0xac (addrmiss) must raise Load "
+             "Access Fault (mcause=5)");
 
   return all_ok;
 }
