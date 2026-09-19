@@ -211,8 +211,52 @@ bool test_main(void) {
         "RTL");
   }
 
-  // Cleanup
+  // 6. Verify MASKED_OUT_{LOWER,UPPER} and MASKED_OE_{LOWER,UPPER} mask bits
+  // [31:16] read back 0 (`hw2reg.masked_*.mask.d = 16'h0` in `gpio.sv:70-74,
+  // 93-96`) and alias to DIRECT_OUT / DIRECT_OE.
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0x12345678u);
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET, 0x00ff00a5u);
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET, 0xff005a00u);
+  uint32_t dir_out = abs_mmio_read32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET);
+  uint32_t m_lower =
+      abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET);
+  uint32_t m_upper =
+      abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET);
+  EXPECT_RTL(dir_out == 0x5a3456a5u,
+             "[6a] DIRECT_OUT after masked writes = 0x%08x, expected 0x5a3456a5",
+             dir_out);
+  EXPECT_RTL(m_lower == 0x000056a5u && m_upper == 0x00005a34u,
+             "[6b] MASKED_OUT_{LOWER,UPPER} readback = (0x%08x, 0x%08x), "
+             "expected (0x000056a5, 0x00005a34) with mask[31:16]=0",
+             m_lower, m_upper);
+
+  // 7. Verify INTR_CTRL_EN_RISING / INTR_CTRL_EN_FALLING edge interrupts latch
+  // on 0->1 and 1->0 transitions and clear to 0 on INTR_STATE RW1C.
   abs_mmio_write32(kPinmuxBase + ioa2_attr_off, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 1u << 2);
+  busy_spin_micros(10);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 1u << 2);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET, 1u << 2);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffffffffu);
+
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 1u << 2);
+  busy_spin_micros(10);
+  uint32_t intr_rise =
+      (abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) >> 2) & 1u;
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u << 2);
+  uint32_t intr_rise_cleared =
+      (abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) >> 2) & 1u;
+  EXPECT_RTL(intr_rise == 1u && intr_rise_cleared == 0u,
+             "[7] Edge interrupt INTR_STATE[2] rise=%u cleared=%u, expected 1,0",
+             intr_rise, intr_rise_cleared);
+
+  // Cleanup
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kPinmuxBase + ioa2_attr_off, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
 
   return failures == 0;
