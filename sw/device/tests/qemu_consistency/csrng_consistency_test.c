@@ -4,6 +4,7 @@
 
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/base/multibits.h"
@@ -13,12 +14,47 @@
 #include "sw/device/lib/testing/entropy_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "csrng_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
+
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
+
+static bool expect_load_fault_32(mmio_region_t base, uint32_t offset) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  (void)mmio_region_read32(base, (ptrdiff_t)offset);
+  return (fault_count == before + 1u) && (last_mcause == 5u);
+}
+
+static bool expect_store_fault_32(mmio_region_t base, uint32_t offset,
+                                  uint32_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write32(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
+
+static bool expect_store_fault_8(mmio_region_t base, uint32_t offset,
+                                 uint8_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write8(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
 
 enum {
   kCsrngBase = TOP_EARLGREY_CSRNG_BASE_ADDR,
@@ -353,6 +389,24 @@ bool test_main(void) {
         "Expected 2nd INT_STATE_VAL read (reg_rd_ptr_q == 4'h0, rc) == 1, got "
         "0x%08x",
         st_ptr_0);
+
+  // 10. Wave 5 Convergence Checks:
+  // 10a. Unmapped offset 0x60..0x7c (within AW = 7 128-byte aperture) returns
+  // addrmiss = 1'b1 (d_error = 1: Load Access Fault mcause = 5 on read, Store
+  // Access Fault mcause = 7 on write).
+  mmio_region_t csrng_mmio = mmio_region_from_addr(kCsrngBase);
+  CHECK(expect_load_fault_32(csrng_mmio, 0x60u));
+  CHECK(expect_store_fault_32(csrng_mmio, 0x60u, 0xdeadbeefu));
+
+  // 10b. Sub-word write permit checks (CSRNG_PERMIT / wr_err):
+  // - CTRL (PERMIT = 4'b0011) rejects 1-byte write (reg_be = 4'b0001) without
+  //   modifying CTRL.
+  // - RESEED_INTERVAL (PERMIT = 4'b1111) rejects 1-byte write (reg_be = 4'b0001).
+  // - REGWEN (PERMIT = 4'b0001) rejects byte write to offset +1 (reg_be = 4'b0010).
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_CTRL_REG_OFFSET, 0x99u));
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_CTRL_REG_OFFSET) == ctrl_read_int_on);
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_RESEED_INTERVAL_REG_OFFSET, 0x12u));
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_REGWEN_REG_OFFSET + 1u, 0x00u));
 
   return true;
 }
