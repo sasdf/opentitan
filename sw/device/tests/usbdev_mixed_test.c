@@ -181,13 +181,13 @@ bool test_main(void) {
       transfer_bytes = TRANSFER_BYTES_VERILATOR;
       break;
     case kDeviceSimDV:
-    case kDeviceSimQemu:
       transfer_bytes = TRANSFER_BYTES_DVSIM;
       break;
     case kDeviceSilicon:
       transfer_bytes = TRANSFER_BYTES_SILICON;
       break;
     case kDeviceFpgaCw340:
+    case kDeviceSimQemu:
       break;
     default:
       CHECK(kDeviceType == kDeviceFpgaCw310);
