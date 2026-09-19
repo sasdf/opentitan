@@ -19,6 +19,7 @@ enum {
   kAlertBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
   kUart1Base = TOP_EARLGREY_UART1_BASE_ADDR,
   kUart1AlertId = kTopEarlgreyAlertIdUart1FatalFault,
+  kLocAlertShadowUpdateErr = 5u,
 };
 
 #define EXPECT_RTL(cond, ...)                   \
@@ -37,9 +38,16 @@ static void write_shadowed(uint32_t addr, uint32_t val) {
 bool test_main(void) {
   bool all_ok = true;
 
-  // 1. WO register INTR_TEST (0x08) must read back as 0.
+  // 1. WO register INTR_TEST (0x08) must read back as 0, and INTR_ENABLE (0x04) masks to 0xf.
   EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_TEST_REG_OFFSET) == 0u,
              "INTR_TEST is WO and must read back as 0");
+  uint32_t intr_en_orig =
+      abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   0xfffffff0u | intr_en_orig);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET) ==
+                 (intr_en_orig & 0xfu),
+             "INTR_ENABLE upper bits [31:4] must read as 0");
 
   // 2. RO registers CLASSA_ACCUM_CNT, CLASSA_ESC_CNT, CLASSA_STATE ignore software writes.
   abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET, 0x1234u);
@@ -52,14 +60,48 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 0u,
              "CLASSA_STATE is RO and must remain Idle (0)");
 
-  // 3. Two-step shadow register write semantics on CLASSA_ACCUM_THRESH_SHADOWED.
-  // Single write followed by read must not commit and must reset shadow phase.
+  // 3. Two-step shadow register write semantics & LOCAL_ALERT_SHADOW_REG_UPDATE_ERROR (loc_alert 5).
+  uint32_t loc_en5_addr =
+      kAlertBase + ALERT_HANDLER_LOC_ALERT_EN_SHADOWED_0_REG_OFFSET +
+      4u * kLocAlertShadowUpdateErr;
+  uint32_t loc_class5_addr =
+      kAlertBase + ALERT_HANDLER_LOC_ALERT_CLASS_SHADOWED_0_REG_OFFSET +
+      4u * kLocAlertShadowUpdateErr;
+  uint32_t loc_cause5_addr =
+      kAlertBase + ALERT_HANDLER_LOC_ALERT_CAUSE_0_REG_OFFSET +
+      4u * kLocAlertShadowUpdateErr;
+
+  write_shadowed(loc_class5_addr, 1u);  // Class B
+  write_shadowed(loc_en5_addr, 1u);     // Enable local alert 5
+
+  // Class B: EN=1, LOCK=0, EN_E0..3=0 (0x0001) -> class_en must be false when all EN_E0..3 are 0.
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSB_CTRL_SHADOWED_REG_OFFSET, 0x0001u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_STATE_CLASSB_BIT);
+
+  // Trigger shadow update error on CLASSA_ACCUM_THRESH_SHADOWED (write 0x11 then 0x22).
   abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
-                   0x0010u);
-  EXPECT_RTL(abs_mmio_read32(kAlertBase +
-                             ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET) == 0u,
-             "CLASSA_ACCUM_THRESH_SHADOWED must not update on single write");
-  // Two consecutive matching writes commit value.
+                   0x0011u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
+                   0x0022u);
+
+  EXPECT_RTL(abs_mmio_read32(loc_cause5_addr) == 1u,
+             "Mismatched shadow write must set LOC_ALERT_CAUSE[5] (shadow_reg_update_error)");
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSB_ACCUM_CNT_REG_OFFSET) == 0u,
+             "CLASSB_ACCUM_CNT must not increment when EN=1 but EN_E0..3 are all 0");
+
+  // Disable LOC_ALERT_EN_SHADOWED[5] BEFORE reading/clearing LOC_ALERT_CAUSE[5]:
+  // In RTL, LOC_ALERT_CAUSE[5] remains readable as 1 even after LOC_ALERT_EN_SHADOWED[5] is 0.
+  write_shadowed(loc_en5_addr, 0u);
+  EXPECT_RTL(abs_mmio_read32(loc_cause5_addr) == 1u,
+             "LOC_ALERT_CAUSE[5] must still read back as 1 when LOC_ALERT_EN_SHADOWED[5] == 0");
+  abs_mmio_write32(loc_cause5_addr, 1u);
+  EXPECT_RTL(abs_mmio_read32(loc_cause5_addr) == 0u,
+             "LOC_ALERT_CAUSE[5] must clear to 0 on W1C write");
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_STATE_CLASSB_BIT);
+
+  // 4. Commit CLASSA_ACCUM_THRESH_SHADOWED = 0x0010 via two matching writes.
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
                  0x0010u);
   EXPECT_RTL(abs_mmio_read32(kAlertBase +
@@ -67,8 +109,10 @@ bool test_main(void) {
                  0x0010u,
              "CLASSA_ACCUM_THRESH_SHADOWED must commit on two matching writes");
 
-  // 4. Configure UART1 fatal_fault alert (Alert ID 1) into Class A with threshold = 10,
-  // timeout = 0, and trigger via UART1.ALERT_TEST.
+  // 5. Configure UART1 fatal_fault alert (Alert ID 1) into Class A with:
+  //    - LOCK = 1 (bit 1) in CLASSA_CTRL_SHADOWED (0x393f)
+  //    - TIMEOUT_CYC_SHADOWED = 100000
+  //    - INTR_ENABLE.CLASSA = 0 initially
   uint32_t alert_en_addr =
       kAlertBase + ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET + 4u * kUart1AlertId;
   uint32_t alert_class_addr =
@@ -80,43 +124,90 @@ bool test_main(void) {
 
   write_shadowed(alert_class_addr, 0u);  // Class A
   write_shadowed(alert_en_addr, 1u);     // Enabled
-  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET, 0u);
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET,
+                 100000u);
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CTRL_SHADOWED_REG_OFFSET,
-                 0x393du);  // EN=1, LOCK=0, EN_E0..3=1
+                 0x393fu);  // EN=1, LOCK=1, EN_E0..3=1
 
-  // Clear any prior Class A interrupt state.
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
   abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
                    1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
 
   // Trigger UART1 alert via UART1.ALERT_TEST.
   abs_mmio_write32(kUart1Base + UART_ALERT_TEST_REG_OFFSET, 1u);
 
-  // Verify ALERT_CAUSE[1] == 1, CLASSA_ACCUM_CNT == 1, INTR_STATE.CLASSA == 1.
+  // Verify ALERT_CAUSE[1] == 1, CLASSA_ACCUM_CNT == 1, INTR_STATE.CLASSA == 1,
+  // and CLASSA_STATE == Idle (0) because INTR_ENABLE.CLASSA == 0!
   EXPECT_RTL(abs_mmio_read32(alert_cause_addr) == 1u,
              "ALERT_CAUSE[%u] must be 1 after UART1 ALERT_TEST", kUart1AlertId);
   EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET) == 1u,
              "CLASSA_ACCUM_CNT must be 1 after single alert trigger");
-  EXPECT_RTL((abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET) &
-              (1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT)) != 0u,
-             "INTR_STATE.CLASSA must be set when Class A alert triggers");
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 0u,
+             "CLASSA_STATE must remain Idle (0) when INTR_ENABLE.CLASSA == 0");
 
-  // Clear ALERT_CAUSE[1] (W1C), INTR_STATE.CLASSA (W1C), and CLASSA_ACCUM_CNT via CLASSA_CLR_SHADOWED.
-  abs_mmio_write32(alert_cause_addr, 1u);
-  EXPECT_RTL(abs_mmio_read32(alert_cause_addr) == 0u,
-             "ALERT_CAUSE[%u] must clear to 0 on W1C write", kUart1AlertId);
-  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
-                   1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
+  // Enabling INTR_ENABLE.CLASSA while INTR_STATE.CLASSA == 1 asserts irq[0] and enters Timeout (1).
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig | (1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 1u,
+             "CLASSA_STATE must enter Timeout (1) when INTR_ENABLE.CLASSA is set");
+
+  // Disabling INTR_ENABLE.CLASSA deasserts irq[0] and returns CLASSA_STATE to Idle (0).
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+                   intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET) == 0u,
+             "CLASSA_STATE must return to Idle (0) when INTR_ENABLE.CLASSA is cleared");
+
+  // Even with CLASSA_CTRL_SHADOWED.LOCK == 1, before escalation (Phase0) has triggered,
+  // CLASSA_CLR_REGWEN is still 1 so software can clear CLASSA_ACCUM_CNT via CLASSA_CLR_SHADOWED.
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_CLR_REGWEN_REG_OFFSET) == 1u,
+             "CLASSA_CLR_REGWEN must remain 1 before escalation triggers");
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 1u);
   EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET) == 0u,
-             "CLASSA_ACCUM_CNT must clear to 0 after writing CLASSA_CLR_SHADOWED");
+             "CLASSA_ACCUM_CNT must clear via CLASSA_CLR_SHADOWED before escalation triggers");
 
-  // Restore UART1 alert back to Class D (3) for OTTF and lock ALERT_REGWEN[1] (rw0c) test.
+  // Clear ALERT_CAUSE[1] and INTR_STATE.CLASSA, restore UART1 alert to Class D (3),
+  // and verify ALERT_REGWEN[1] locks ALERT_CLASS_SHADOWED[1].
+  abs_mmio_write32(alert_cause_addr, 1u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET,
+                   1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
   write_shadowed(alert_class_addr, 3u);
   abs_mmio_write32(alert_regwen_addr, 0u);
   abs_mmio_write32(alert_regwen_addr, 1u);
   EXPECT_RTL(abs_mmio_read32(alert_regwen_addr) == 0u,
              "ALERT_REGWEN[%u] is rw0c and must remain 0 once cleared",
              kUart1AlertId);
+  write_shadowed(alert_class_addr, 0u);
+  EXPECT_RTL(abs_mmio_read32(alert_class_addr) == 3u,
+             "ALERT_CLASS_SHADOWED[%u] must ignore writes when ALERT_REGWEN[%u] == 0",
+             kUart1AlertId, kUart1AlertId);
+
+  // 6. Verify REGWEN protection on shadowed registers (CLASSC_REGWEN & PING_TIMER_REGWEN).
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSC_ACCUM_THRESH_SHADOWED_REG_OFFSET,
+                 0x0055u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSC_REGWEN_REG_OFFSET, 0u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_CLASSC_REGWEN_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSC_REGWEN_REG_OFFSET) == 0u,
+             "CLASSC_REGWEN is rw0c and must remain 0 once cleared");
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSC_ACCUM_THRESH_SHADOWED_REG_OFFSET,
+                 0x00aau);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase +
+                             ALERT_HANDLER_CLASSC_ACCUM_THRESH_SHADOWED_REG_OFFSET) ==
+                 0x0055u,
+             "CLASSC_ACCUM_THRESH_SHADOWED must ignore writes when CLASSC_REGWEN == 0");
+
+  uint32_t ping_timeout_before =
+      abs_mmio_read32(kAlertBase + ALERT_HANDLER_PING_TIMEOUT_CYC_SHADOWED_REG_OFFSET);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_PING_TIMER_REGWEN_REG_OFFSET, 0u);
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_PING_TIMER_REGWEN_REG_OFFSET, 1u);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase + ALERT_HANDLER_PING_TIMER_REGWEN_REG_OFFSET) == 0u,
+             "PING_TIMER_REGWEN is rw0c and must remain 0 once cleared");
+  write_shadowed(kAlertBase + ALERT_HANDLER_PING_TIMEOUT_CYC_SHADOWED_REG_OFFSET,
+                 ping_timeout_before ^ 0x00ffu);
+  EXPECT_RTL(abs_mmio_read32(kAlertBase +
+                             ALERT_HANDLER_PING_TIMEOUT_CYC_SHADOWED_REG_OFFSET) ==
+                 ping_timeout_before,
+             "PING_TIMEOUT_CYC_SHADOWED must ignore writes when PING_TIMER_REGWEN == 0");
 
   return all_ok;
 }
