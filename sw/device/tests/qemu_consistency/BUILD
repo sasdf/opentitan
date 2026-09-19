@@ -774,6 +774,7 @@ opentitan_test(
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:lc_ctrl",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
         "//sw/device/lib/testing/test_framework:ottf_isrs",

@@ -7,6 +7,7 @@
 
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/mmio.h"
+#include "sw/device/lib/dif/dif_lc_ctrl.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
@@ -58,14 +59,32 @@ static void test_otp_prim_crossbar_decode(void) {
   // In tl_peri_pkg.sv:
   // - ADDR_SPACE_OTP_CTRL__CORE = 0x40130000, ADDR_MASK = 0x00000fff
   // - ADDR_SPACE_OTP_CTRL__PRIM = 0x40138000, ADDR_MASK = 0x0000001f (CSR0..CSR7)
+  // In otp_ctrl.sv:778-792, OTP_CTRL__PRIM is gated by tlul_lc_gate with
+  // lc_dft_en[0] (enabled in TEST_UNLOCKED*, DEV, RMA; disabled in PROD/PROD_END).
   const uint32_t otp_prim_base = TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR;
   CHECK(otp_prim_base == 0x40138000u,
         "Expected TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR=0x40138000, got 0x%08x",
         otp_prim_base);
 
-  // Valid accesses inside OTP_CTRL__PRIM (0x40138000..0x4013801c).
-  expect_read_ok(otp_prim_base + 0x00u, "OTP_CTRL__PRIM CSR0");
-  expect_read_ok(otp_prim_base + 0x1cu, "OTP_CTRL__PRIM CSR7");
+  dif_lc_ctrl_t lc_ctrl;
+  CHECK_DIF_OK(dif_lc_ctrl_init(
+      mmio_region_from_addr(TOP_EARLGREY_LC_CTRL_BASE_ADDR), &lc_ctrl));
+  dif_lc_ctrl_state_t lc_state;
+  CHECK_DIF_OK(dif_lc_ctrl_get_state(&lc_ctrl, &lc_state));
+  bool lc_dft_en = (lc_state != kDifLcCtrlStateProd &&
+                    lc_state != kDifLcCtrlStateProdEnd);
+
+  if (lc_dft_en) {
+    // Valid accesses inside OTP_CTRL__PRIM (0x40138000..0x4013801c) when lc_dft_en=On.
+    expect_read_ok(otp_prim_base + 0x00u, "OTP_CTRL__PRIM CSR0");
+    expect_read_ok(otp_prim_base + 0x1cu, "OTP_CTRL__PRIM CSR7");
+  } else {
+    // When lc_dft_en=Off (PROD/PROD_END), tlul_lc_gate rejects OTP_CTRL__PRIM with d_error=1.
+    expect_read_fault(otp_prim_base + 0x00u,
+                      "OTP_CTRL__PRIM CSR0 gated by lc_dft_en=Off");
+    expect_read_fault(otp_prim_base + 0x1cu,
+                      "OTP_CTRL__PRIM CSR7 gated by lc_dft_en=Off");
+  }
 
   // Out-of-bounds offset 0x20 (outside ADDR_MASK_OTP_CTRL__PRIM = 0x1f).
   expect_read_fault(otp_prim_base + 0x20u, "OTP_CTRL__PRIM + 0x20");
@@ -126,17 +145,32 @@ static void test_vmapper_dbus_remap(void) {
   CHECK((paddr_base & 0xfffu) == 0u,
         "Expected 4KiB-aligned target buffer, got 0x%08x", paddr_base);
 
+  uint32_t dbus_regwen_0 =
+      mmio_region_read32(ibex_base, RV_CORE_IBEX_DBUS_REGWEN_0_REG_OFFSET);
+
   // When DBUS_ADDR_EN_0 = 0, reading 0x42000000 must fault in xbar_main.
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_ADDR_EN_0_REG_OFFSET, 0u);
   expect_read_fault(vaddr_base, "Unmapped 0x42000000 with DBUS_ADDR_EN_0=0");
 
-  // Enable 4 KiB NAPOT remap window: match_addr = vaddr_base | 0x7ff.
+  // Attempt to enable 4 KiB NAPOT remap window: match_addr = vaddr_base | 0x7ff.
   remap_target_buf[0] = 0xcafebabeu;
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_ADDR_MATCHING_0_REG_OFFSET,
                       vaddr_base | 0x7ffu);
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_REMAP_ADDR_0_REG_OFFSET,
                       paddr_base);
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_ADDR_EN_0_REG_OFFSET, 1u);
+
+  if (dbus_regwen_0 == 0u) {
+    // Under sival_rom_ext, ROM_EXT locks DBUS_REGWEN_0=0 before jumping to
+    // owner code. Verify that the writes were ignored by hardware and that
+    // 0x42000000 still faults.
+    CHECK(mmio_region_read32(ibex_base,
+                             RV_CORE_IBEX_DBUS_ADDR_EN_0_REG_OFFSET) == 0u,
+          "Expected DBUS_ADDR_EN_0 write to be blocked when DBUS_REGWEN_0=0");
+    expect_read_fault(vaddr_base,
+                      "Unmapped 0x42000000 when DBUS_REGWEN_0=0 blocks remap");
+    return;
+  }
 
   uint32_t val = *(volatile uint32_t *)vaddr_base;
   CHECK(val == 0xcafebabeu,
