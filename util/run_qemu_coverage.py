@@ -74,27 +74,37 @@ def load_expected_gcno_stamps(cov_build_dir: str) -> Dict[str, bytes]:
     return stamps
 
 
-def expand_qemu_test_targets(ot_dir: str, patterns: List[str]) -> List[str]:
-    """Expand target patterns to runnable qemu-tagged test targets."""
-    explicit = [p for p in patterns if not any(w in p for w in ("...", ":all", "*"))]
-    wildcards = [p for p in patterns if any(w in p for w in ("...", ":all", "*"))]
-    expanded: Set[str] = set(explicit)
-    if wildcards:
-        union_expr = " + ".join(wildcards)
-        query_expr = (
-            f'attr(tags, "qemu", tests({union_expr})) '
-            f'except attr(tags, "broken|manual", tests({union_expr}))'
-        )
-        out = subprocess.check_output(
-            ["./bazelisk.sh", "query", query_expr],
-            cwd=ot_dir,
-            text=True,
-        )
-        for line in out.splitlines():
-            label = line.strip()
-            if label.startswith("//") and "/sim_dv:" not in label:
-                expanded.add(label)
-    return sorted(expanded)
+def split_bazel_args_and_targets(extra: List[str]) -> Tuple[List[str], List[str]]:
+    """Partition unconsumed CLI arguments into Bazel flags and target patterns."""
+    bazel_flags: List[str] = []
+    targets: List[str] = []
+    bool_short_flags = {"-k", "-s", "-q", "-i"}
+    i = 0
+    while i < len(extra):
+        tok = extra[i]
+        if tok == "--":
+            targets.extend(extra[i + 1 :])
+            break
+        if tok.startswith(("//", "@", ":", "-//", "-@", "-:")):
+            targets.append(tok)
+            i += 1
+        elif tok.startswith("-"):
+            bazel_flags.append(tok)
+            if (
+                "=" not in tok
+                and tok not in bool_short_flags
+                and not tok.startswith("--no")
+                and i + 1 < len(extra)
+                and not extra[i + 1].startswith(("-", "//", "@", ":"))
+            ):
+                bazel_flags.append(extra[i + 1])
+                i += 2
+            else:
+                i += 1
+        else:
+            targets.append(tok)
+            i += 1
+    return bazel_flags, targets
 
 
 def run_bazel_coverage_tests(
@@ -104,16 +114,34 @@ def run_bazel_coverage_tests(
     bazel_args: List[str],
 ) -> int:
     """Run bazelisk.sh test with --config=qemu_coverage and write BEP JSON to bep_path."""
-    if not targets:
-        raise SystemExit("No QEMU test targets matched the given pattern(s).")
-    cmd = [
-        "./bazelisk.sh",
-        "test",
-        "--config=qemu_coverage",
-        f"--build_event_json_file={bep_path}",
-        "--keep_going",
-    ] + bazel_args + ["--"] + targets
-    print(f"Running {len(targets)} QEMU test target(s) with --config=qemu_coverage...")
+    has_tag_filter = any(
+        a == "--test_tag_filters" or a.startswith("--test_tag_filters=")
+        for a in bazel_args
+    )
+    has_target_pattern_file = any(
+        a == "--target_pattern_file" or a.startswith("--target_pattern_file=")
+        for a in bazel_args
+    )
+    if not targets and not has_target_pattern_file:
+        targets = ["//sw/device/tests/...", "-//sw/device/tests/sim_dv/..."]
+
+    default_flags: List[str] = []
+    if not has_tag_filter:
+        default_flags.append("--test_tag_filters=qemu,-broken")
+
+    cmd = (
+        [
+            "./bazelisk.sh",
+            "test",
+            "--config=qemu_coverage",
+            f"--build_event_json_file={bep_path}",
+            "--keep_going",
+        ]
+        + default_flags
+        + bazel_args
+        + (["--"] + targets if targets else [])
+    )
+    print(f"Running Bazel coverage test command: {' '.join(cmd)}")
     res = subprocess.run(cmd, cwd=ot_dir)
     return res.returncode
 
@@ -409,9 +437,16 @@ def resolve_cov_build_dir(out_base: str, qemu_dir: str, explicit_dir: Optional[s
 
 def main() -> None:
     default_ot_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("targets", nargs="*", default=["//sw/device/tests/..."],
-                        help="Bazel test target patterns to run and collect coverage for (default: //sw/device/tests/...)")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Any additional arguments or flags not listed above (e.g. "
+            "--test_tag_filters=qemu,-broken, --build_tag_filters=..., "
+            "--test_timeout=60, --jobs=32, --target_pattern_file=..., "
+            "//sw/device/tests/..., -//sw/device/tests/sim_dv/...) are passed "
+            "directly through to `./bazelisk.sh test`."
+        ),
+    )
     parser.add_argument("--ot-dir", default=default_ot_dir,
                         help="Path to OpenTitan workspace (defaults to repo root of this script)")
     parser.add_argument("--qemu-dir", default=None,
@@ -428,7 +463,18 @@ def main() -> None:
                         help="Optional explicit path for uncovered_chunks.json")
     parser.add_argument("--out-summary", default=None,
                         help="Optional explicit path for summary.md")
-    args = parser.parse_args()
+
+    import sys
+    raw_argv = sys.argv[1:]
+    if "--" in raw_argv:
+        dd_idx = raw_argv.index("--")
+        args, extra_before = parser.parse_known_args(raw_argv[:dd_idx])
+        extra = extra_before + ["--"] + raw_argv[dd_idx + 1 :]
+    else:
+        args, extra = parser.parse_known_args(raw_argv)
+
+    passthrough_flags, targets = split_bazel_args_and_targets(extra)
+    all_bazel_args = list(args.bazel_arg) + passthrough_flags
 
     ot_dir = os.path.abspath(args.ot_dir)
     qemu_dir = infer_qemu_dir(ot_dir, args.qemu_dir)
@@ -447,8 +493,7 @@ def main() -> None:
         bep_path = os.path.abspath(args.bep_file)
     else:
         bep_path = os.path.join(report_dir, "last_coverage_bep.json")
-        expanded_targets = expand_qemu_test_targets(ot_dir, args.targets)
-        run_bazel_coverage_tests(ot_dir, expanded_targets, bep_path, args.bazel_arg)
+        run_bazel_coverage_tests(ot_dir, targets, bep_path, all_bazel_args)
 
     cov_build_dir = resolve_cov_build_dir(out_base, qemu_dir, args.cov_build_dir)
     expected_stamps = load_expected_gcno_stamps(cov_build_dir)
