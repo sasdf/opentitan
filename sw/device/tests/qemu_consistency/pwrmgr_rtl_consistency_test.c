@@ -10,6 +10,7 @@
 #include "pwrmgr_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
@@ -124,6 +125,93 @@ bool test_main(void) {
                    1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT);
   busy_spin_micros(30);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET) == 0u);
+
+  // 4b. Wave 2 Check: Shallow sleep (MAIN_PD_N=1, LOW_POWER_HINT=1) wakeup via
+  // AON timer auto-clears CONTROL.LOW_POWER_HINT, sets INTR_STATE.WAKEUP, and
+  // keeps WAKE_INFO recording active (record_en=1) after wakeup until
+  // WAKE_INFO_CAPTURE_DIS is written 1.
+  {
+    const uint32_t kPlicBase = TOP_EARLGREY_RV_PLIC_BASE_ADDR;
+    const uint32_t kPwrmgrIrq = kTopEarlgreyPlicIrqIdPwrmgrAonWakeup;
+    // Enable kTopEarlgreyPlicIrqIdPwrmgrAonWakeup in RV_PLIC with priority 1,
+    // keeping mstatus.MIE=0 and mie.MEIE=1 so WFI resumes inline without ISR.
+    irq_global_ctrl(false);
+    irq_external_ctrl(true);
+    abs_mmio_write32(kPlicBase + 0x0u + (kPwrmgrIrq * 4u), 1u);
+    uint32_t ie_off = 0x2000u + ((kPwrmgrIrq / 32u) * 4u);
+    uint32_t ie_val = abs_mmio_read32(kPlicBase + ie_off);
+    abs_mmio_write32(kPlicBase + ie_off, ie_val | (1u << (kPwrmgrIrq % 32u)));
+    abs_mmio_write32(kPlicBase + 0x200000u, 0u);
+
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 0x1u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0x1u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET,
+                     kAonTimerWkupBit);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET,
+                     (1u << PWRMGR_CONTROL_MAIN_PD_N_BIT) |
+                         (1u << PWRMGR_CONTROL_USB_CLK_EN_ACTIVE_BIT) |
+                         (1u << PWRMGR_CONTROL_LOW_POWER_HINT_BIT));
+    pwrmgr_cdc_sync();
+
+    // Start AON timer to fire wakeup in ~50us (10 AON ticks) and enter WFI.
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_HI_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 10u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                     1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+    wait_for_interrupt();
+
+    // Verify LOW_POWER_HINT auto-cleared, INTR_STATE.WAKEUP set, and WAKE_INFO
+    // recorded kAonTimerWkupBit.
+    uint32_t ctrl_after =
+        abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
+    CHECK((ctrl_after & (1u << PWRMGR_CONTROL_LOW_POWER_HINT_BIT)) == 0u,
+          "Expected CONTROL.LOW_POWER_HINT cleared after shallow sleep wakeup, "
+          "got 0x%08x",
+          ctrl_after);
+    CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET) == 0x1u,
+          "Expected INTR_STATE.WAKEUP == 1 after shallow sleep wakeup");
+    uint32_t wake_info =
+        abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
+    CHECK((wake_info & kAonTimerWkupBit) != 0u,
+          "Expected WAKE_INFO to capture AON_TIMER wakeup, got 0x%08x",
+          wake_info);
+
+    // While WAKE_INFO_CAPTURE_DIS == 0 (record_en == 1) and AON_TIMER wkup_req
+    // is still asserted, W1C clearing WAKE_INFO must immediately re-latch
+    // kAonTimerWkupBit on the next clock cycle.
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
+    wake_info = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
+    CHECK((wake_info & kAonTimerWkupBit) != 0u,
+          "Expected WAKE_INFO to re-latch active wakeup while record_en=1 "
+          "(WAKE_INFO_CAPTURE_DIS=0), got 0x%08x",
+          wake_info);
+
+    // Once WAKE_INFO_CAPTURE_DIS is set to 1 (record_en=0), W1C clearing
+    // WAKE_INFO must stay 0 even while AON_TIMER wkup_req is still asserted.
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 1u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
+    wake_info = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
+    CHECK(wake_info == 0u,
+          "Expected WAKE_INFO == 0 after WAKE_INFO_CAPTURE_DIS=1 + W1C, got "
+          "0x%08x",
+          wake_info);
+
+    // Clean up AON timer, PLIC, and pwrmgr interrupt state.
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0u);
+    pwrmgr_cdc_sync();
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET,
+                     1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 0x1u);
+    abs_mmio_write32(kPlicBase + ie_off, ie_val);
+    irq_external_ctrl(false);
+  }
 
   // 5. Verify WAKEUP_EN_REGWEN and RESET_EN_REGWEN are RW0C (Write-0-to-Clear)
   // and cannot be re-enabled by writing 1 once cleared.
