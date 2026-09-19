@@ -558,5 +558,28 @@ bool test_main(void) {
              "Rejected 8-bit write to PRIM CSR2+1 must not modify PRIM CSR2");
   abs_mmio_write32(kFlashPrimBase + 0x08u, 0x00u);
 
+  // 21. Wave 7: Direct CPU writes (sw/sb) to the eFlash memory window
+  // (u_tl_adapter_eflash with ErrOnWrite = 1 in flash_ctrl.sv:1302-1315) must
+  // raise a Store Access Fault (mcause = 7) and leave eFlash contents unchanged.
+  // Ignore RvCoreIbexFatalHwErr (Alert 60), which u_tl_adapter_eflash triggers
+  // on RTL due to EnableDataIntgGen=0 returning SecdedInv3932ZeroEcc on OpWrite.
+  CHECK_STATUS_OK(
+      ottf_alerts_ignore_alert(kTopEarlgreyAlertIdRvCoreIbexFatalHwErr));
+  uint32_t eflash_test_addr = (uint32_t)((uintptr_t)&test_main) & ~0x3u;
+  uint32_t eflash_orig_word = abs_mmio_read32(eflash_test_addr);
+  g_fault_count = 0;
+  abs_mmio_write32(eflash_test_addr, eflash_orig_word ^ 0xffffffffu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "32-bit direct write to eFlash window (ErrOnWrite=1) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(eflash_test_addr) == eflash_orig_word,
+             "Rejected 32-bit direct write to eFlash window must not modify eFlash data");
+
+  g_fault_count = 0;
+  abs_mmio_write8(eflash_test_addr, (uint8_t)(eflash_orig_word ^ 0xffu));
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit direct write to eFlash window (ErrOnWrite=1) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(eflash_test_addr) == eflash_orig_word,
+             "Rejected 8-bit direct write to eFlash window must not modify eFlash data");
+
   return all_ok;
 }
