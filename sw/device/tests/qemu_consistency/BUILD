@@ -358,3 +358,27 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
+opentitan_test(
+    name = "gpio_rtl_consistency_test",
+    srcs = ["gpio_rtl_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        EARLGREY_CW340_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+    ),
+    deps = [
+        "//hw/ip/gpio/data:gpio_c_regs",
+        "//hw/ip/pinmux/data:pinmux_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/dif:pinmux",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
