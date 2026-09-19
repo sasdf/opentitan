@@ -5,20 +5,33 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "aon_timer_regs.h"
 #include "clkmgr_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "pwrmgr_regs.h"
+#include "rstmgr_regs.h"
+#include "sw/device/lib/arch/boot_stage.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+#include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
 enum {
   kClkmgrBase = TOP_EARLGREY_CLKMGR_AON_BASE_ADDR,
+  kPwrmgrBase = TOP_EARLGREY_PWRMGR_AON_BASE_ADDR,
+  kRstmgrBase = TOP_EARLGREY_RSTMGR_AON_BASE_ADDR,
+  kAonTimerBase = TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR,
+  kAonTimerWkupBit = 1u << PWRMGR_PARAM_AON_TIMER_AON_WKUP_REQ_IDX,
+  kPhaseDeepSleep = 0x434c4b31u,
+  kPhaseWarmReset = 0x434c4b32u,
+  kCustomIoDiv4Meas = 0x00001085u,
 };
 
 static void write_shadowed(uint32_t offset, uint32_t val) {
@@ -26,7 +39,112 @@ static void write_shadowed(uint32_t offset, uint32_t val) {
   abs_mmio_write32(kClkmgrBase + offset, val);
 }
 
+static void pwrmgr_cdc_sync(void) {
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET,
+                   1u << PWRMGR_CFG_CDC_SYNC_SYNC_BIT);
+  while (abs_mmio_read32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET) != 0u) {
+  }
+}
+
 bool test_main(void) {
+  retention_sram_t *ret_sram = retention_sram_get();
+  uint32_t phase = ret_sram->creator.reserved[0];
+  uint32_t reset_info = ret_sram->creator.reset_reasons;
+
+  if (phase == kPhaseDeepSleep) {
+    CHECK_STATUS_OK(
+        ottf_alerts_ignore_alert(kTopEarlgreyAlertIdClkmgrAonRecovFault));
+    // Clean up AON timer and PWRMGR wakeup state after deep-sleep exit.
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+    abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0u);
+    pwrmgr_cdc_sync();
+    abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 1u);
+
+    CHECK((reset_info & (1u << RSTMGR_RESET_INFO_LOW_POWER_EXIT_BIT)) != 0u,
+          "Expected LOW_POWER_EXIT reset_info bit, got 0x%08x", reset_info);
+
+    // In top_earlgrey.sv (u_clkmgr_aon), all clkmgr resets belong to
+    // DomainAonSel, which is NOT asserted during deep-sleep wakeup
+    // (low_power_exit). All CLKMGR CSRs and measurement shadow registers must
+    // preserve their pre-sleep state.
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET) ==
+              0u,
+          "EXTCLK_CTRL_REGWEN not preserved across deep sleep");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) == 0x69u,
+          "EXTCLK_CTRL not preserved across deep sleep: got 0x%08x",
+          abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET));
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 0u,
+          "JITTER_REGWEN not preserved across deep sleep");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET) ==
+              kMultiBitBool4True,
+          "JITTER_ENABLE not preserved across deep sleep: got 0x%08x",
+          abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET));
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET) == 0x7u,
+          "CLK_ENABLES not preserved across deep sleep: got 0x%08x",
+          abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET));
+    CHECK(abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) == 1u,
+          "MEASURE_CTRL_REGWEN must be re-enabled (1) by calib_rdy=MuBi4False "
+          "during deep sleep (clkmgr.sv:555-558)");
+    CHECK(abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
+              kMultiBitBool4False,
+          "IO_DIV4_MEAS_CTRL_EN must be cleared to MuBi4False by "
+          "calib_rdy=MuBi4False during deep sleep (clkmgr_meas_chk.sv:81-85)");
+    CHECK(abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+              kCustomIoDiv4Meas,
+          "IO_DIV4_MEAS_CTRL_SHADOWED not preserved across deep sleep: got "
+          "0x%08x",
+          abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET));
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) ==
+              (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT),
+          "RECOV_ERR_CODE not preserved across deep sleep: got 0x%08x",
+          abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET));
+
+    // Now trigger a non-sleep warm reset via RSTMGR.RESET_REQ, which resets
+    // DomainAonSel and must restore all CLKMGR CSRs to their reset defaults.
+    if (kBootStage != kBootStageOwner) {
+      abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET, reset_info);
+    }
+    ret_sram->creator.reserved[0] = kPhaseWarmReset;
+    abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET,
+                     kMultiBitBool4True);
+    wait_for_interrupt();
+  }
+
+  if (phase == kPhaseWarmReset) {
+    ret_sram->creator.reserved[0] = 0u;
+    CHECK((reset_info & (1u << RSTMGR_RESET_INFO_SW_RESET_BIT)) != 0u,
+          "Expected SW_RESET reset_info bit, got 0x%08x", reset_info);
+
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET) ==
+              1u,
+          "EXTCLK_CTRL_REGWEN did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) == 0x99u,
+          "EXTCLK_CTRL did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 1u,
+          "JITTER_REGWEN did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET) ==
+              kMultiBitBool4False,
+          "JITTER_ENABLE did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET) == 0xfu,
+          "CLK_ENABLES did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) == 1u,
+          "MEASURE_CTRL_REGWEN did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase +
+                          CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+              0x00006e82u,
+          "IO_DIV4_MEAS_CTRL_SHADOWED did not reset on SW_RESET");
+    CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0u,
+          "RECOV_ERR_CODE did not reset on SW_RESET");
+    return true;
+  }
+
   // 1. Verify ALERT_TEST single-shot pulse for recov_fault.
   CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
       kTopEarlgreyAlertIdClkmgrAonRecovFault));
@@ -104,10 +222,28 @@ bool test_main(void) {
         0x0003ffff);
   write_shadowed(CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET, usb_meas);
 
+  // 3b. Verify shadow phase clear on read and SHADOW_UPDATE_ERR on mismatched
+  // second write.
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00001234u);
+  // Reading before second write returns committed value and clears phase.
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        io_div4_meas);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0u);
+  // Mismatched two-step write triggers SHADOW_UPDATE_ERR.
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00001234u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00005678u);
+  busy_spin_micros(10);
+  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
+         (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT)) != 0u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET,
+                   1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0u);
+
   // 4. Verify JITTER_ENABLE and JITTER_REGWEN behavior.
-  // In clkmgr_reg_top.sv, JITTER_REGWEN is W0C (reset 1) but does NOT gate
-  // JITTER_ENABLE writes, and ANY write to JITTER_ENABLE sets it to MuBi4True
-  // (0x6) regardless of the written data.
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 1);
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET) ==
         kMultiBitBool4False);
@@ -140,10 +276,7 @@ bool test_main(void) {
 
   // 6. Verify measurement error detection with mubi4_test_true_loose (e.g. 0x0)
   // and continuous RECOV_ERR_CODE re-assertion while measurement remains enabled.
-  // Set IO_DIV4_MEAS_CTRL_SHADOWED to an out-of-range window (LO=5, HI=10 ->
-  // 0x050a, whereas actual IO_DIV4 count is ~120).
   write_shadowed(CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET, 0x0000050a);
-  // Enable measurement using 0x0 (which satisfies mubi4_test_true_loose != 0x9).
   abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET, 0x0);
   busy_spin_micros(30);
 
@@ -155,9 +288,6 @@ bool test_main(void) {
         "0x%08x",
         recov_err);
 
-  // Attempt to clear IO_DIV4_MEASURE_ERR while measurement is still enabled
-  // and out-of-range: hardware must re-assert IO_DIV4_MEASURE_ERR on the next
-  // clk_aon cycle.
   abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET,
                    1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT);
   busy_spin_micros(30);
@@ -166,14 +296,65 @@ bool test_main(void) {
             0,
         "Expected IO_DIV4_MEASURE_ERR to re-assert while MEAS_CTRL_EN is active");
 
-  // Now disable IO_DIV4_MEAS_CTRL_EN (0x9) and restore threshold, then clear
-  // RECOV_ERR_CODE and verify it stays 0.
+  // Disable IO_DIV4_MEAS_CTRL_EN (0x9) and set a custom in-range threshold
+  // (kCustomIoDiv4Meas), then clear RECOV_ERR_CODE and re-enable
+  // IO_DIV4_MEAS_CTRL_EN (0x6) with the valid window.
   abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET,
                    kMultiBitBool4False);
-  write_shadowed(CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET, io_div4_meas);
+  write_shadowed(CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                 kCustomIoDiv4Meas);
   busy_spin_micros(30);
   abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET, 0x7ff);
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET,
+                   kMultiBitBool4True);
+  busy_spin_micros(30);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0);
 
-  return true;
+  // 7. Set up CLKMGR state to test DomainAonSel preservation across deep sleep:
+  // Trigger a sticky SHADOW_UPDATE_ERR in RECOV_ERR_CODE, then lock
+  // MEASURE_CTRL_REGWEN=0 and EXTCLK_CTRL_REGWEN=0, and set CLK_HINTS=0x5.
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00001111u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00002222u);
+  busy_spin_micros(10);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) ==
+        (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT));
+
+  abs_mmio_write32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) ==
+        0u);
+  // Writes while MEASURE_CTRL_REGWEN=0 must be ignored.
+  write_shadowed(CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET, io_div4_meas);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        kCustomIoDiv4Meas);
+
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET, 0x69u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET, 0u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET, 0x99u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) == 0x69u);
+
+  abs_mmio_write32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET, 0x7u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET) == 0x7u);
+
+  // Enter deep sleep (MAIN_PD_N = 0, LOW_POWER_HINT = 1) with AON_TIMER wakeup.
+  ret_sram->creator.reserved[0] = kPhaseDeepSleep;
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 20u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, kAonTimerWkupBit);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET,
+                   1u << PWRMGR_CONTROL_LOW_POWER_HINT_BIT);
+  pwrmgr_cdc_sync();
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  wait_for_interrupt();
+
+  return false;
 }

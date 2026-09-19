@@ -436,14 +436,20 @@ opentitan_test(
     ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/clkmgr:clkmgr_c_regs",
+        "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
+        "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/arch:boot_stage",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:multibits",
         "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
         "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib/drivers:retention_sram",
+        "//hw/ip/aon_timer/data:aon_timer_c_regs",
     ],
 )
 
