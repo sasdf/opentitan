@@ -320,13 +320,10 @@ def run_gcov_on_obj(args: Tuple[str, str, str]) -> Dict:
     for f_entry in data.get("files", []):
         f_path = f_entry.get("file", "")
         rel_path = f_path[3:] if f_path.startswith("../") else f_path
+        if rel_path.startswith(qemu_dir + "/"):
+            rel_path = rel_path[len(qemu_dir) + 1:]
         if not is_earlgrey_model_source(rel_path):
             continue
-        src_abs = os.path.join(qemu_dir, rel_path)
-        src_lines = []
-        if os.path.exists(src_abs):
-            with open(src_abs, "r", errors="replace") as sf:
-                src_lines = sf.readlines()
 
         line_map = {}
         func_for_line = {}
@@ -337,71 +334,92 @@ def run_gcov_on_obj(args: Tuple[str, str, str]) -> Dict:
             if l_info.get("function_name"):
                 func_for_line[ln] = l_info["function_name"]
 
-        funcs = []
+        funcs = {}
         for fn in f_entry.get("functions", []):
-            funcs.append({
-                "name": fn["name"],
-                "start_line": fn["start_line"],
-                "end_line": fn.get("end_line", fn["start_line"]),
-                "execution_count": fn["execution_count"],
-            })
-
-        exec_lines = sorted(line_map.keys())
-        covered_lines = [ln for ln in exec_lines if line_map[ln] > 0]
-        uncovered_lines = [ln for ln in exec_lines if line_map[ln] == 0]
-
-        chunks = []
-        if uncovered_lines:
-            start = uncovered_lines[0]
-            prev = start
-            chunk_unexec = [start]
-            for ln in uncovered_lines[1:]:
-                has_covered_between = any(
-                    (prev < k < ln) and line_map[k] > 0 for k in exec_lines
-                )
-                if not has_covered_between and (ln - prev) <= 4:
-                    chunk_unexec.append(ln)
-                    prev = ln
-                else:
-                    chunks.append((start, prev, chunk_unexec))
-                    start = ln
-                    prev = ln
-                    chunk_unexec = [ln]
-            chunks.append((start, prev, chunk_unexec))
-
-        formatted_chunks = []
-        for c_start, c_end, c_lines in chunks:
-            c_funcs = sorted({func_for_line.get(ln, "") for ln in c_lines if func_for_line.get(ln)})
-            snippet = ""
-            if src_lines:
-                lo = max(1, c_start - 1)
-                hi = min(len(src_lines), c_end + 1)
-                snippet = "".join(
-                    f"{idx}: {src_lines[idx - 1]}" for idx in range(lo, hi + 1)
-                )
-            formatted_chunks.append({
-                "start_line": c_start,
-                "end_line": c_end,
-                "uncovered_executable_lines": len(c_lines),
-                "functions": c_funcs,
-                "snippet": snippet,
-            })
+            name = fn["name"]
+            cnt = fn["execution_count"]
+            if name not in funcs or cnt > funcs[name]["execution_count"]:
+                funcs[name] = {
+                    "name": name,
+                    "start_line": fn["start_line"],
+                    "end_line": fn.get("end_line", fn["start_line"]),
+                    "execution_count": cnt,
+                }
 
         results[rel_path] = {
-            "file": rel_path,
-            "total_executable_lines": len(exec_lines),
-            "covered_executable_lines": len(covered_lines),
-            "uncovered_executable_lines": len(uncovered_lines),
-            "line_coverage_pct": round(100.0 * len(covered_lines) / len(exec_lines), 2) if exec_lines else 100.0,
-            "total_functions": len(funcs),
-            "covered_functions": sum(1 for fn in funcs if fn["execution_count"] > 0),
-            "uncovered_functions": [fn["name"] for fn in funcs if fn["execution_count"] == 0],
-            "function_coverage_pct": round(
-                100.0 * sum(1 for fn in funcs if fn["execution_count"] > 0) / len(funcs), 2
-            ) if funcs else 100.0,
-            "uncovered_chunks": formatted_chunks,
+            "line_map": line_map,
+            "func_for_line": func_for_line,
+            "funcs": funcs,
         }
     return results
+
+
+def build_file_summary(rel_path: str, raw_entry: Dict, qemu_dir: str) -> Dict:
+    src_abs = os.path.join(qemu_dir, rel_path)
+    src_lines = []
+    if os.path.exists(src_abs):
+        with open(src_abs, "r", errors="replace") as sf:
+            src_lines = sf.readlines()
+
+    line_map = raw_entry["line_map"]
+    func_for_line = raw_entry["func_for_line"]
+    funcs = list(raw_entry["funcs"].values())
+
+    exec_lines = sorted(line_map.keys())
+    covered_lines = [ln for ln in exec_lines if line_map[ln] > 0]
+    uncovered_lines = [ln for ln in exec_lines if line_map[ln] == 0]
+
+    chunks = []
+    if uncovered_lines:
+        start = uncovered_lines[0]
+        prev = start
+        chunk_unexec = [start]
+        for ln in uncovered_lines[1:]:
+            has_covered_between = any(
+                (prev < k < ln) and line_map[k] > 0 for k in exec_lines
+            )
+            if not has_covered_between and (ln - prev) <= 4:
+                chunk_unexec.append(ln)
+                prev = ln
+            else:
+                chunks.append((start, prev, chunk_unexec))
+                start = ln
+                prev = ln
+                chunk_unexec = [ln]
+        chunks.append((start, prev, chunk_unexec))
+
+    formatted_chunks = []
+    for c_start, c_end, c_lines in chunks:
+        c_funcs = sorted({func_for_line.get(ln, "") for ln in c_lines if func_for_line.get(ln)})
+        snippet = ""
+        if src_lines:
+            lo = max(1, c_start - 1)
+            hi = min(len(src_lines), c_end + 1)
+            snippet = "".join(
+                f"{idx}: {src_lines[idx - 1]}" for idx in range(lo, hi + 1)
+            )
+        formatted_chunks.append({
+            "start_line": c_start,
+            "end_line": c_end,
+            "uncovered_executable_lines": len(c_lines),
+            "functions": c_funcs,
+            "snippet": snippet,
+        })
+
+    return {
+        "file": rel_path,
+        "total_executable_lines": len(exec_lines),
+        "covered_executable_lines": len(covered_lines),
+        "uncovered_executable_lines": len(uncovered_lines),
+        "line_coverage_pct": round(100.0 * len(covered_lines) / len(exec_lines), 2) if exec_lines else 100.0,
+        "total_functions": len(funcs),
+        "covered_functions": sum(1 for fn in funcs if fn["execution_count"] > 0),
+        "uncovered_functions": [fn["name"] for fn in funcs if fn["execution_count"] == 0],
+        "function_coverage_pct": round(
+            100.0 * sum(1 for fn in funcs if fn["execution_count"] > 0) / len(funcs), 2
+        ) if funcs else 100.0,
+        "uncovered_chunks": formatted_chunks,
+    }
 
 
 def infer_qemu_dir(ot_dir: str, explicit_qemu_dir: Optional[str]) -> str:
@@ -528,10 +546,29 @@ def main() -> None:
                 obj_rel = os.path.join(sub, os.path.basename(gcno)[:-5] + ".o")
                 obj_targets.append((eval_build, obj_rel, qemu_dir))
 
-        all_files: Dict[str, Dict] = {}
+        raw_files: Dict[str, Dict] = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
             for file_dict in pool.map(run_gcov_on_obj, obj_targets):
-                all_files.update(file_dict)
+                for rel_path, entry in file_dict.items():
+                    if rel_path not in raw_files:
+                        raw_files[rel_path] = {
+                            "line_map": dict(entry["line_map"]),
+                            "func_for_line": dict(entry["func_for_line"]),
+                            "funcs": dict(entry["funcs"]),
+                        }
+                    else:
+                        cur = raw_files[rel_path]
+                        for ln, cnt in entry["line_map"].items():
+                            cur["line_map"][ln] = max(cur["line_map"].get(ln, 0), cnt)
+                        cur["func_for_line"].update(entry["func_for_line"])
+                        for fname, fn in entry["funcs"].items():
+                            if fname not in cur["funcs"] or fn["execution_count"] > cur["funcs"][fname]["execution_count"]:
+                                cur["funcs"][fname] = dict(fn)
+
+        all_files: Dict[str, Dict] = {
+            rel_path: build_file_summary(rel_path, entry, qemu_dir)
+            for rel_path, entry in raw_files.items()
+        }
 
     sorted_files = sorted(
         all_files.values(),
