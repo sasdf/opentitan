@@ -127,19 +127,33 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
              "CTRL is WO and must read back as 0");
 
-  // Clear SCR_KEY_ROTATED again and verify W1C.
+  // Verify MuBi4 W1C (mubi4_and_hi) semantics on SCR_KEY_ROTATED (q = 0x6):
+  // - Writing 0x9 (~wd = 0x6) preserves 0x6.
+  // - Writing 0x0 (~wd = 0xf) sets q = 0xf.
+  // - Writing 0x6 (~wd = 0x9) clears q = 0x9 (MuBi4False).
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
+                   kMultiBitBool4False);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+                 kMultiBitBool4True,
+             "SCR_KEY_ROTATED (0x6) should remain 0x6 after writing 0x9");
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET, 0x0u);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+                 0xfu,
+             "SCR_KEY_ROTATED (0x6) should become 0xf after writing 0x0");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4True);
   EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
                  kMultiBitBool4False,
-             "SCR_KEY_ROTATED should clear to 0x9 (MuBi4False)");
+             "SCR_KEY_ROTATED should clear to 0x9 (MuBi4False) after writing 0x6");
 
-  // 6. CTRL.INIT (0x14 bit 1): initializes SRAM and sets STATUS.INIT_DONE.
+  // 6. CTRL.INIT (0x14 bit 1): initializes SRAM, CTRL reads as 0 immediately, and sets STATUS.INIT_DONE.
   for (size_t i = 0; i < kTestWords; ++i) {
     abs_mmio_write32(ret_buf + i * sizeof(uint32_t), kTestPattern[i]);
   }
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
                    1u << SRAM_CTRL_CTRL_INIT_BIT);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
+             "CTRL is WO and must read back as 0 even immediately after CTRL.INIT write");
   do {
     status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT));
