@@ -309,6 +309,75 @@ static void test_w2_ingress_unmapped_hole_read_fault(void) {
                g_access_fault_count, g_last_mcause);
 }
 
+/**
+ * Wave 5 Check 10 (W5-1): `SPI_DEVICE_PERMIT` sub-word write error (`wr_err`)
+ * (`spi_device_reg_pkg.sv:837-911`, `spi_device_reg_top.sv` vs
+ * `ot_spi_device.c:3110-3124`).
+ *
+ * - `CFG` (`0x14`, `PERMIT = 4'b1111`) and `TPM_STS` (`0x814`, `PERMIT = 4'b1111`)
+ *   reject sub-word writes (`sb`/`sh`) with a Store Access Fault (`mcause = 7`)
+ *   and leave register values unchanged.
+ * - `TPM_RID` (`0x82c`, `PERMIT = 4'b0001`) accepts a byte write at offset +0
+ *   (`reg_be = 4'b0001`) and rejects a byte write at offset +1 (`reg_be = 4'b0010`)
+ *   with `mcause = 7`.
+ */
+static void test_w5_spi_device_permit_subword_wr_err(void) {
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET, 0x00000004u);
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET, 0x03u);
+  g_expect_access_fault = false;
+  uint32_t cfg_val =
+      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET);
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u &&
+                   cfg_val == 0x00000004u,
+               "W5-1a: 8-bit write to CFG (PERMIT=4'b1111) must raise Store "
+               "Access Fault (mcause=7) and preserve CFG=0x04, got count=%u "
+               "mcause=%u cfg=0x%08x",
+               g_access_fault_count, g_last_mcause, cfg_val);
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET, 0u);
+
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_TPM_STS_REG_OFFSET, 0x12345678u);
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_TPM_STS_REG_OFFSET, 0xaau);
+  g_expect_access_fault = false;
+  uint32_t tpm_sts =
+      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_STS_REG_OFFSET);
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u &&
+                   tpm_sts == 0x12345678u,
+               "W5-1b: 8-bit write to TPM_STS (PERMIT=4'b1111) must raise "
+               "Store Access Fault (mcause=7) and preserve TPM_STS=0x12345678, "
+               "got count=%u mcause=%u tpm_sts=0x%08x",
+               g_access_fault_count, g_last_mcause, tpm_sts);
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_TPM_STS_REG_OFFSET, 0u);
+
+  g_access_fault_count = 0;
+  abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET, 0x5au);
+  uint32_t tpm_rid =
+      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET);
+  EXPECT_CHECK(g_access_fault_count == 0u && tpm_rid == 0x5au,
+               "W5-1c: 8-bit write to TPM_RID+0 (PERMIT=4'b0001) must succeed "
+               "(got count=%u tpm_rid=0x%08x)",
+               g_access_fault_count, tpm_rid);
+
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET + 1u, 0xa5u);
+  g_expect_access_fault = false;
+  tpm_rid = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET);
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u &&
+                   tpm_rid == 0x5au,
+               "W5-1d: 8-bit write to TPM_RID+1 (PERMIT=4'b0001, reg_be=4'b0010) "
+               "must raise Store Access Fault (mcause=7) and preserve 0x5a, "
+               "got count=%u mcause=%u tpm_rid=0x%08x",
+               g_access_fault_count, g_last_mcause, tpm_rid);
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET, 0u);
+}
+
 bool test_main(void) {
   CHECK_DIF_OK(dif_alert_handler_init(
       mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
@@ -323,6 +392,7 @@ bool test_main(void) {
   test_w2_egress_sram_subword_write_fault();
   test_w2_egress_unmapped_hole_write_fault();
   test_w2_ingress_unmapped_hole_read_fault();
+  test_w5_spi_device_permit_subword_wr_err();
   LOG_INFO("spi_device_rtl_consistency_test finished with %u failure(s).",
            g_failures);
   return g_failures == 0;
