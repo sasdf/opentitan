@@ -31,15 +31,9 @@ rom_error_t dice_storage_load_page(dice_storage_page_t *page) {
 rom_error_t dice_storage_flush_page(const dice_storage_page_t *page) {
   RETURN_IF_ERROR(flash_ctrl_info_erase(&kFlashCtrlInfoPageDiceCerts,
                                         kFlashCtrlEraseTypePage));
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_storage_page_t, data),
-      sizeof(page->data) / (sizeof(uint32_t)), page->data));
-  RETURN_IF_ERROR(flash_ctrl_info_write(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_storage_page_t, digest),
-      sizeof(page->digest) / (sizeof(uint32_t)), &page->digest));
-  return flash_ctrl_info_write(
-      &kFlashCtrlInfoPageDiceCerts, offsetof(dice_storage_page_t, cdi_key_ids),
-      sizeof(page->cdi_key_ids) / (sizeof(uint32_t)), page->cdi_key_ids);
+  return flash_ctrl_info_write(&kFlashCtrlInfoPageDiceCerts, 0,
+                               sizeof(dice_storage_page_t) / sizeof(uint32_t),
+                               page);
 }
 
 rom_error_t dice_storage_get_key_id(dice_key_id_index_t index,
