@@ -5,18 +5,57 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "rv_dm_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/base/multibits.h"
+#include "sw/device/lib/dif/dif_lc_ctrl.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
 enum {
   kRvDmRegsBase = TOP_EARLGREY_RV_DM_REGS_BASE_ADDR,
+  kRvDmMemBase = TOP_EARLGREY_RV_DM_MEM_BASE_ADDR,
+  kLcCtrlBase = TOP_EARLGREY_LC_CTRL_BASE_ADDR,
 };
+
+static volatile bool load_fault_seen;
+static volatile bool store_fault_seen;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = ibex_mcause_read();
+  if (mcause == kIbexExcLoadAccessFault) {
+    load_fault_seen = true;
+  } else if (mcause == kIbexExcStoreAccessFault) {
+    store_fault_seen = true;
+  } else {
+    CHECK(false, "Unexpected exception mcause=0x%x", mcause);
+  }
+}
+
+static bool try_read32(uint32_t addr, uint32_t *out_val) {
+  load_fault_seen = false;
+  uint32_t val = abs_mmio_read32(addr);
+  if (load_fault_seen) {
+    return false;
+  }
+  if (out_val != NULL) {
+    *out_val = val;
+  }
+  return true;
+}
+
+static bool try_write32(uint32_t addr, uint32_t val) {
+  store_fault_seen = false;
+  abs_mmio_write32(addr, val);
+  return !store_fault_seen;
+}
 
 bool test_main(void) {
   // 1. Verify ALERT_TEST (0x00) is WO (reads back 0) and generates a transient
@@ -34,7 +73,27 @@ bool test_main(void) {
     busy_spin_micros(10);
   }
 
-  // 2. Verify LATE_DEBUG_ENABLE_REGWEN (0x04, rw0c) and LATE_DEBUG_ENABLE (0x08).
+  // 2. Determine life cycle state to check RV_DM.MEM gating and memory map.
+  dif_lc_ctrl_t lc_ctrl;
+  CHECK_DIF_OK(
+      dif_lc_ctrl_init(mmio_region_from_addr(kLcCtrlBase), &lc_ctrl));
+  dif_lc_ctrl_state_t lc_state;
+  CHECK_DIF_OK(dif_lc_ctrl_get_state(&lc_ctrl, &lc_state));
+
+  bool lc_hw_debug_en =
+      (lc_state == kDifLcCtrlStateTestUnlocked0 ||
+       lc_state == kDifLcCtrlStateTestUnlocked1 ||
+       lc_state == kDifLcCtrlStateTestUnlocked2 ||
+       lc_state == kDifLcCtrlStateTestUnlocked3 ||
+       lc_state == kDifLcCtrlStateTestUnlocked4 ||
+       lc_state == kDifLcCtrlStateTestUnlocked5 ||
+       lc_state == kDifLcCtrlStateTestUnlocked6 ||
+       lc_state == kDifLcCtrlStateTestUnlocked7 ||
+       lc_state == kDifLcCtrlStateDev ||
+       lc_state == kDifLcCtrlStateRma);
+
+  // 3. Verify LATE_DEBUG_ENABLE_REGWEN (0x04, rw0c) and LATE_DEBUG_ENABLE (0x08),
+  // as well as RV_DM.MEM (0x00010000) gating and dm_mem.sv / debug_rom.sv semantics.
   uint32_t regwen = abs_mmio_read32(
       kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET);
   CHECK((regwen & ~1u) == 0u);
@@ -51,12 +110,82 @@ bool test_main(void) {
     CHECK(abs_mmio_read32(kRvDmRegsBase +
                           RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET) == 1u);
 
-    // Toggle LATE_DEBUG_ENABLE while unlocked.
+    // Enable LATE_DEBUG_ENABLE (0x96969696) so lc_hw_debug_en_gated selects
+    // lc_hw_debug_en (rv_dm.sv:238-243).
     abs_mmio_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
                      kMultiBitBool32True);
     CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
           kMultiBitBool32True);
 
+    if (lc_hw_debug_en) {
+      uint32_t val = 0;
+
+      // 3a. Verify Debug ROM (0x10800..0x1089c) matches debug_rom.sv:
+      // HaltAddress (0x800) = j 0x818 (0x0180006f), 0x804 = nop (0x00000013)
+      // ResumeAddress (0x808) = j 0x88c (0x0840006f), 0x80c = nop (0x00000013)
+      // ExceptionAddress (0x810) = j 0x860 (0x0500006f), 0x814 = nop (0x00000013)
+      CHECK(try_read32(kRvDmMemBase + 0x800u, &val) && val == 0x0180006fu);
+      CHECK(try_read32(kRvDmMemBase + 0x804u, &val) && val == 0x00000013u);
+      CHECK(try_read32(kRvDmMemBase + 0x808u, &val) && val == 0x0840006fu);
+      CHECK(try_read32(kRvDmMemBase + 0x80cu, &val) && val == 0x00000013u);
+      CHECK(try_read32(kRvDmMemBase + 0x810u, &val) && val == 0x0500006fu);
+      CHECK(try_read32(kRvDmMemBase + 0x814u, &val) && val == 0x00000013u);
+      CHECK(try_read32(kRvDmMemBase + 0x818u, &val) && val == 0x0ff0000fu);
+      CHECK(try_read32(kRvDmMemBase + 0x89cu, &val) && val == 0x7b200073u);
+      CHECK(try_read32(kRvDmMemBase + 0x8a0u, &val) && val == 0x00000000u);
+
+      // 3b. Writing to Debug ROM (0x800..0xfff) must return a TL-UL bus error
+      // (err_d = we_i in dm_mem.sv:400) and leave ROM contents intact.
+      CHECK(!try_write32(kRvDmMemBase + 0x800u, 0xdeadbeefu));
+      CHECK(try_read32(kRvDmMemBase + 0x800u, &val) && val == 0x0180006fu);
+
+      // 3c. Verify default Abstract Command ROM (0x338..0x35c, dm_mem.sv:425-436)
+      // and verify CPU writes to it are ignored without bus error.
+      CHECK(try_read32(kRvDmMemBase + 0x338u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x33cu, &val) && val == 0x00000517u);
+      CHECK(try_read32(kRvDmMemBase + 0x340u, &val) && val == 0x00c55513u);
+      CHECK(try_read32(kRvDmMemBase + 0x344u, &val) && val == 0x00c51513u);
+      CHECK(try_read32(kRvDmMemBase + 0x348u, &val) && val == 0x00000013u);
+      CHECK(try_read32(kRvDmMemBase + 0x358u, &val) && val == 0x7b302573u);
+      CHECK(try_read32(kRvDmMemBase + 0x35cu, &val) && val == 0x00100073u);
+      CHECK(try_write32(kRvDmMemBase + 0x33cu, 0xdeadbeefu));
+      CHECK(try_read32(kRvDmMemBase + 0x33cu, &val) && val == 0x00000517u);
+
+      // 3d. Verify WhereTo (0x300), ProgBuf (0x360..0x37c), and Flags (0x400..0x7fc)
+      // read 0 and ignore CPU writes without bus error.
+      CHECK(try_read32(kRvDmMemBase + 0x300u, &val) && val == 0x00000000u);
+      CHECK(try_write32(kRvDmMemBase + 0x300u, 0x12345678u));
+      CHECK(try_read32(kRvDmMemBase + 0x300u, &val) && val == 0x00000000u);
+
+      CHECK(try_read32(kRvDmMemBase + 0x360u, &val) && val == 0x00000000u);
+      CHECK(try_write32(kRvDmMemBase + 0x360u, 0x12345678u));
+      CHECK(try_read32(kRvDmMemBase + 0x360u, &val) && val == 0x00000000u);
+
+      CHECK(try_read32(kRvDmMemBase + 0x400u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x7fcu, &val) && val == 0x00000000u);
+
+      // 3e. Verify Data0 (0x380) and Data1 (0x384) accept writes without bus
+      // error, and read back 0 while dmcontrol.dmactive == 0 (dm_csrs.sv:627,647).
+      CHECK(try_write32(kRvDmMemBase + 0x380u, 0xa5a55a5au));
+      CHECK(try_write32(kRvDmMemBase + 0x384u, 0x12345678u));
+      CHECK(try_read32(kRvDmMemBase + 0x380u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x384u, &val) && val == 0x00000000u);
+
+      // 3f. Verify 8-byte aligned Action registers (0x100, 0x108, 0x110, 0x118)
+      // read 0 without fault, while unmapped holes (0x000, 0x104, 0x304, 0x388)
+      // return TL-UL bus errors (dm_mem.sv:390-402).
+      CHECK(try_read32(kRvDmMemBase + 0x100u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x108u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x110u, &val) && val == 0x00000000u);
+      CHECK(try_read32(kRvDmMemBase + 0x118u, &val) && val == 0x00000000u);
+
+      CHECK(!try_read32(kRvDmMemBase + 0x000u, &val));
+      CHECK(!try_read32(kRvDmMemBase + 0x104u, &val));
+      CHECK(!try_read32(kRvDmMemBase + 0x304u, &val));
+      CHECK(!try_read32(kRvDmMemBase + 0x388u, &val));
+    }
+
+    // Restore original LATE_DEBUG_ENABLE.
     abs_mmio_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
                      orig_val);
     CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
