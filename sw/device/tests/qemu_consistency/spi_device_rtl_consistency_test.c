@@ -11,8 +11,10 @@
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "spi_device_regs.h"
@@ -26,6 +28,20 @@ enum {
 
 static dif_alert_handler_t alert_handler;
 static uint32_t g_failures = 0;
+static volatile bool g_expect_access_fault = false;
+static volatile uint32_t g_access_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  if (g_expect_access_fault) {
+    g_last_mcause = ibex_mcause_read();
+    ++g_access_fault_count;
+    return;
+  }
+  ottf_generic_fault_print(exc_info, "Unhandled Load/Store Fault",
+                           ibex_mcause_read());
+  abort();
+}
 
 #define EXPECT_CHECK(cond, ...) \
   do {                          \
@@ -223,6 +239,76 @@ static void test_tpm_register_bitmasks(void) {
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET, 0u);
 }
 
+/**
+ * Wave 2 Check 7 (W2-1): Egress SRAM `ByteAccess(0)` sub-word write fault
+ * (`spi_device.sv:1660`, `tlul_adapter_sram.sv:144-147` vs
+ * `ot_spi_device.c:2567-2601, 3122`).
+ *
+ * In RTL, `u_tlul2sram_egress` is instantiated with `.ByteAccess(0)`. Any
+ * partial write (`a_mask != 4'b1111 || a_size != 2'h2`) asserts
+ * `wr_attr_error = 1'b1` (`tl_o.d_error = 1'b1`), raising a synchronous Store
+ * Access Fault (`mcause = 7`).
+ */
+static void test_w2_egress_sram_subword_write_fault(void) {
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_EGRESS_BUFFER_REG_OFFSET, 0x5au);
+  g_expect_access_fault = false;
+
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+               "W2-1: 8-bit write to SPI_DEVICE Egress SRAM (0x1000) must "
+               "raise Store Access Fault (mcause=7) due to ByteAccess(0) in "
+               "u_tlul2sram_egress, got count=%u mcause=%u",
+               g_access_fault_count, g_last_mcause);
+}
+
+/**
+ * Wave 2 Check 8 (W2-2): Unmapped SRAM hole `[0x1d40..0x1dff]` write fault
+ * (`spi_device_reg_top.sv:131-137, 171` vs `ot_spi_device.c:2580-2586`).
+ *
+ * In RTL, `u_tlul2sram_egress` maps `[4096:7487]` (`0x1000..0x1d3f`, 848 words).
+ * Offsets `0x1d40..0x1dff` (`7488..7679`) steer to `reg_steer = 2'd2`
+ * (`u_reg_if`), where `addrmiss = 1 -> reg_error = 1` (`d_error = 1`),
+ * raising a Store Access Fault (`mcause = 7`).
+ */
+static void test_w2_egress_unmapped_hole_write_fault(void) {
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write32(kSpiDeviceBase + 0x1d40u, 0xdeadbeefu);
+  g_expect_access_fault = false;
+
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+               "W2-2: 32-bit write to unmapped SPI_DEVICE offset 0x1d40 "
+               "(between Egress [0x1000..0x1d3f] and Ingress [0x1e00..0x1fbf]) "
+               "must raise Store Access Fault (mcause=7), got count=%u mcause=%u",
+               g_access_fault_count, g_last_mcause);
+}
+
+/**
+ * Wave 2 Check 9 (W2-3): Unmapped SRAM hole `[0x1fc0..0x1fff]` read fault
+ * (`spi_device_reg_top.sv:131-137, 171` vs `ot_spi_device.c:2544-2564`).
+ *
+ * In RTL, `u_tlul2sram_ingress` maps `[7680:8127]` (`0x1e00..0x1fbf`, 112 words).
+ * Offsets `0x1fc0..0x1fff` (`8128..8191`) steer to `reg_steer = 2'd2`
+ * (`u_reg_if`), where `addrmiss = 1 -> reg_error = 1` (`d_error = 1`),
+ * raising a Load Access Fault (`mcause = 5`).
+ */
+static void test_w2_ingress_unmapped_hole_read_fault(void) {
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  (void)abs_mmio_read32(kSpiDeviceBase + 0x1fc0u);
+  g_expect_access_fault = false;
+
+  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 5u,
+               "W2-3: 32-bit read from unmapped SPI_DEVICE offset 0x1fc0 "
+               "(past Ingress [0x1e00..0x1fbf]) must raise Load Access Fault "
+               "(mcause=5), got count=%u mcause=%u",
+               g_access_fault_count, g_last_mcause);
+}
+
 bool test_main(void) {
   CHECK_DIF_OK(dif_alert_handler_init(
       mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
@@ -234,6 +320,9 @@ bool test_main(void) {
   test_addr_mode_pending_on_sw_write();
   test_flash_status_committed_readback_while_idle();
   test_tpm_register_bitmasks();
+  test_w2_egress_sram_subword_write_fault();
+  test_w2_egress_unmapped_hole_write_fault();
+  test_w2_ingress_unmapped_hole_read_fault();
   LOG_INFO("spi_device_rtl_consistency_test finished with %u failure(s).",
            g_failures);
   return g_failures == 0;
