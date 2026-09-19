@@ -24,10 +24,14 @@ enum {
   kRomCtrlRomBase = TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR,
   kRomCtrlRomSize = TOP_EARLGREY_ROM_CTRL_ROM_SIZE_BYTES,
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
+  kIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
   kRomCtrlAlertId = kTopEarlgreyAlertIdRomCtrlFatal,
+  kIbexFatalHwErrAlertId = kTopEarlgreyAlertIdRvCoreIbexFatalHwErr,
 };
 
 static volatile bool store_access_fault_seen = false;
+static volatile bool load_integrity_fault_seen = false;
+static volatile uint32_t load_integrity_fault_mtval = 0;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   uint32_t mcause = ibex_mcause_read();
@@ -35,6 +39,17 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
     store_access_fault_seen = true;
   } else {
     ottf_generic_fault_print(exc_info, "Unexpected Load/Store Fault", mcause);
+    abort();
+  }
+}
+
+void ottf_internal_isr(uint32_t *exc_info) {
+  uint32_t mcause = ibex_mcause_read();
+  if (mcause == 0xffffffe0u) {
+    load_integrity_fault_seen = true;
+    load_integrity_fault_mtval = ibex_mtval_read();
+  } else {
+    ottf_generic_fault_print(exc_info, "Unexpected Internal IRQ", mcause);
     abort();
   }
 }
@@ -119,6 +134,13 @@ static void test_alert_test_pulse_and_clear(void) {
   CHECK(abs_mmio_read32(cause_addr) == 0u,
         "Expected ALERT_CAUSE[60] to be 0 before ALERT_TEST");
 
+  // Verify 1-bit write mask on ALERT_TEST: writing 0xfffffffe (bit 0 = 0)
+  // must be ignored and NOT trigger ALERT_CAUSE[60].
+  abs_mmio_write32(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET,
+                   0xfffffffeu);
+  CHECK(abs_mmio_read32(cause_addr) == 0u,
+        "Expected ALERT_CAUSE[60] == 0 after writing 0xfffffffe to ALERT_TEST");
+
   // Trigger ALERT_TEST = 1 -> should pulse once, setting ALERT_CAUSE[60] = 1.
   abs_mmio_write32(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET,
                    1u << ROM_CTRL_ALERT_TEST_FATAL_BIT);
@@ -131,10 +153,10 @@ static void test_alert_test_pulse_and_clear(void) {
   CHECK(abs_mmio_read32(cause_addr) == 0u,
         "ALERT_CAUSE[60] remained 1 after rw1c clear (ALERT_TEST was latched!)");
 
-  // Trigger ALERT_TEST = 1 a second time without writing 0 first -> must fire
-  // again.
+  // Trigger ALERT_TEST = 0xffffffff (masked to bit 0 = 1) a second time
+  // without writing 0 first -> must fire again.
   abs_mmio_write32(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET,
-                   1u << ROM_CTRL_ALERT_TEST_FATAL_BIT);
+                   0xffffffffu);
   CHECK(abs_mmio_read32(cause_addr) == 1u,
         "Expected ALERT_CAUSE[60] == 1 after second ALERT_TEST write");
 
@@ -175,9 +197,58 @@ static void test_rom_write_protection(void) {
   store_access_fault_seen = false;
   abs_mmio_write32(kRomCtrlRomBase, ~orig_word);
   CHECK(store_access_fault_seen,
-        "Expected StoreAccessFault when writing to ROM window");
+        "Expected StoreAccessFault when writing to ROM window base");
   CHECK(abs_mmio_read32(kRomCtrlRomBase) == orig_word,
         "ROM contents modified by rejected write");
+
+  // Last non-digest ROM word (0x0000ffdc, immediately preceding the top 8
+  // EXP_DIGEST words at 0x0000ffe0..0x0000fffc) has valid ECC and can be read
+  // normally, while writes trigger StoreAccessFault.
+  uint32_t last_code_word_addr =
+      kRomCtrlRomBase + kRomCtrlRomSize - 32u - sizeof(uint32_t);
+  uint32_t orig_last_code_word = abs_mmio_read32(last_code_word_addr);
+  store_access_fault_seen = false;
+  abs_mmio_write32(last_code_word_addr, ~orig_last_code_word);
+  CHECK(store_access_fault_seen,
+        "Expected StoreAccessFault when writing to last non-digest ROM word");
+  CHECK(abs_mmio_read32(last_code_word_addr) == orig_last_code_word,
+        "ROM last non-digest word modified by rejected write");
+
+  // Wave 2 Deep-Pass Check:
+  // In Earlgrey RTL (rom_ctrl.sv:184 EnableDataIntgPt=1 & scramble_image.py
+  // lines 319-350), the top 8 words (0x0000ffe0..0x0000fffc) store the raw
+  // EXP_DIGEST with ECC bits specifically chosen so that after PRINCE keystream
+  // unscrambling (clr_rdata_o), every word in 0x0000ffe0..0x0000fffc has an
+  // invalid Hsiao (39,32) ECC checksum. Reading any of the top 8 words over
+  // the bus raises an Ibex Load Integrity NMI (MCAUSE=0xffffffe0,
+  // MTVAL=top_word_addr) and sets RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR (bit 8).
+  uint32_t ibex_fatal_hw_en_addr =
+      kAlertHandlerBase + ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
+      kIbexFatalHwErrAlertId * sizeof(uint32_t);
+  shadow_write32(ibex_fatal_hw_en_addr, 0u);
+
+  uint32_t top_word_addr = kRomCtrlRomBase + kRomCtrlRomSize - sizeof(uint32_t);
+  load_integrity_fault_seen = false;
+  load_integrity_fault_mtval = 0u;
+  (void)abs_mmio_read32(top_word_addr);
+  busy_spin_micros(5);
+  if (!load_integrity_fault_seen || load_integrity_fault_mtval != top_word_addr) {
+    LOG_ERROR(
+        "RTL_MISMATCH: reading top 8 EXP_DIGEST ROM word 0x%08x did not raise "
+        "Load Integrity NMI (seen=%d, mtval=0x%08x)",
+        top_word_addr, load_integrity_fault_seen, load_integrity_fault_mtval);
+    CHECK(false);
+  }
+  uint32_t ibex_err_status = abs_mmio_read32(kIbexBase + 0x54u);
+  if ((ibex_err_status & (1u << 8)) == 0u) {
+    LOG_ERROR(
+        "RTL_MISMATCH: reading top 8 EXP_DIGEST ROM word did not set "
+        "RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR (got 0x%08x)",
+        ibex_err_status);
+    CHECK(false);
+  }
+  // Clear ERR_STATUS.FATAL_INTG_ERR (RW1C).
+  abs_mmio_write32(kIbexBase + 0x54u, 1u << 8);
 
   CSR_WRITE(CSR_REG_PMPCFG0, orig_pmpcfg0);
   CSR_WRITE(CSR_REG_PMPADDR0, orig_pmpaddr0);
