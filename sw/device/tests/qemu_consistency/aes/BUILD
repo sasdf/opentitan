@@ -6,7 +6,6 @@ load(
     "//rules/opentitan:defs.bzl",
     "EARLGREY_TEST_ENVS",
     "opentitan_test",
-    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -14,11 +13,9 @@ package(default_visibility = ["//visibility:public"])
 opentitan_test(
     name = "aes_consistency_test",
     srcs = ["aes_consistency_test.c"],
-    exec_env = EARLGREY_TEST_ENVS,
-    qemu = qemu_params(
-        # Marked broken until fix_rtl_discrepancy_aes_* tasks in ~/tasks/pending/ are resolved.
-        tags = ["broken"],
-    ),
+    exec_env = EARLGREY_TEST_ENVS | {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
     deps = [
         "//hw/ip/aes/data:aes_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
