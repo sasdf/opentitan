@@ -5,13 +5,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_pinmux.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
@@ -23,6 +27,19 @@ enum {
   kPinmuxBase = TOP_EARLGREY_PINMUX_AON_BASE_ADDR,
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
 };
+
+static volatile uint32_t load_fault_count = 0;
+static volatile uint32_t store_fault_count = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = ibex_mcause_read();
+  if (mcause == kIbexExcLoadAccessFault) {
+    load_fault_count++;
+  } else if (mcause == kIbexExcStoreAccessFault) {
+    store_fault_count++;
+  }
+}
 
 #define EXPECT_CHECK(cond, fmt, ...)                \
   do {                                              \
@@ -256,6 +273,95 @@ bool test_main(void) {
   busy_spin_micros(20);
   abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET, 0xfeu);
   busy_spin_micros(20);
+
+  // ---------------------------------------------------------------------------
+  // 7. PINMUX_PERMIT sub-word write error (`wr_err`), valid sub-word read/write,
+  //    and unmapped `addrmiss` (`0x8e0`)
+  // ---------------------------------------------------------------------------
+  load_fault_count = 0;
+  store_fault_count = 0;
+
+  // Sub-word read from MIO_PAD_ATTR (PINMUX_PERMIT = 0x7) must succeed
+  abs_mmio_write32(kPinmuxBase + kMioAttrOff, 0x00000083u);
+  uint8_t mio_attr_b0 = abs_mmio_read8(kPinmuxBase + kMioAttrOff);
+  EXPECT_CHECK(load_fault_count == 0u && mio_attr_b0 == 0x83u,
+               "sub-word read8 from MIO_PAD_ATTR faulted (%u) or returned "
+               "0x%02x (expected 0x83)",
+               load_fault_count, mio_attr_b0);
+
+  // Sub-word write16 to MIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x3) -> wr_err
+  store_fault_count = 0;
+  *(volatile uint16_t *)(kPinmuxBase + kMioAttrOff) = 0x0000u;
+  EXPECT_CHECK(store_fault_count == 1u,
+               "sub-word write16 to MIO_PAD_ATTR (PERMIT=0x7) did not fault: "
+               "store_fault_count=%u",
+               store_fault_count);
+  EXPECT_CHECK(abs_mmio_read32(kPinmuxBase + kMioAttrOff) == 0x00000083u,
+               "MIO_PAD_ATTR modified by rejected sub-word write16");
+  abs_mmio_write32(kPinmuxBase + kMioAttrOff, orig_mio_attr);
+
+  // Sub-word write8 to DIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x1) -> wr_err
+  store_fault_count = 0;
+  abs_mmio_write8(kPinmuxBase + kDioAttrOff, 0x83u);
+  EXPECT_CHECK(store_fault_count == 1u,
+               "sub-word write8 to DIO_PAD_ATTR (PERMIT=0x7) did not fault: "
+               "store_fault_count=%u",
+               store_fault_count);
+
+  // Sub-word write16 to MIO_PAD_SLEEP_STATUS_0 (PINMUX_PERMIT = 0xf) -> wr_err
+  store_fault_count = 0;
+  *(volatile uint16_t *)(kPinmuxBase +
+                         PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET) = 0xffffu;
+  EXPECT_CHECK(store_fault_count == 1u,
+               "sub-word write16 to MIO_PAD_SLEEP_STATUS_0 (PERMIT=0xf) did "
+               "not fault: store_fault_count=%u",
+               store_fault_count);
+
+  // Sub-word write8 to DIO_PAD_SLEEP_STATUS (PINMUX_PERMIT = 0x3) -> wr_err,
+  // whereas write16 (reg_be = 0x3) must succeed
+  store_fault_count = 0;
+  abs_mmio_write8(kPinmuxBase + PINMUX_DIO_PAD_SLEEP_STATUS_REG_OFFSET, 0xffu);
+  EXPECT_CHECK(store_fault_count == 1u,
+               "sub-word write8 to DIO_PAD_SLEEP_STATUS (PERMIT=0x3) did not "
+               "fault: store_fault_count=%u",
+               store_fault_count);
+  store_fault_count = 0;
+  *(volatile uint16_t *)(kPinmuxBase + PINMUX_DIO_PAD_SLEEP_STATUS_REG_OFFSET) =
+      0xffffu;
+  EXPECT_CHECK(store_fault_count == 0u,
+               "sub-word write16 to DIO_PAD_SLEEP_STATUS (PERMIT=0x3, "
+               "reg_be=0x3) faulted: store_fault_count=%u",
+               store_fault_count);
+
+  // Sub-word write8 to WKUP_DETECTOR_CNT_TH_0 (PINMUX_PERMIT = 0x1):
+  // byte 0 (reg_be = 0x1) must succeed; byte 1 (reg_be = 0x2) must fault
+  store_fault_count = 0;
+  abs_mmio_write8(kPinmuxBase + PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET,
+                  0x5au);
+  EXPECT_CHECK(
+      store_fault_count == 0u &&
+          abs_mmio_read32(kPinmuxBase +
+                          PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET) == 0x5au,
+      "sub-word write8 to WKUP_DETECTOR_CNT_TH_0 byte 0 failed: faults=%u "
+      "val=0x%x",
+      store_fault_count,
+      abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET));
+  store_fault_count = 0;
+  abs_mmio_write8(kPinmuxBase + PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET + 1u,
+                  0x11u);
+  EXPECT_CHECK(store_fault_count == 1u,
+               "sub-word write8 to WKUP_DETECTOR_CNT_TH_0 byte 1 "
+               "(PERMIT=0x1, reg_be=0x2) did not fault: store_fault_count=%u",
+               store_fault_count);
+
+  // Unmapped offset 0x8e0 (addrmiss inside 0x1000 window)
+  load_fault_count = 0;
+  store_fault_count = 0;
+  (void)abs_mmio_read32(kPinmuxBase + 0x8e0u);
+  abs_mmio_write32(kPinmuxBase + 0x8e0u, 0u);
+  EXPECT_CHECK(load_fault_count == 1u && store_fault_count == 1u,
+               "unmapped offset 0x8e0 did not fault: load=%u store=%u",
+               load_fault_count, store_fault_count);
 
   LOG_INFO("pinmux_rtl_consistency_test completed with %u failures", failures);
   return failures == 0;
