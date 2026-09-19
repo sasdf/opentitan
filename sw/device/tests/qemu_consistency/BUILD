@@ -390,9 +390,6 @@ opentitan_test(
         EARLGREY_CW340_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
-    qemu = qemu_params(
-        tags = ["broken"],
-    ),
     deps = [
         "//hw/top_earlgrey/ip/ast/data:ast_c_regs",
         "//hw/top_earlgrey/ip/sensor_ctrl/data:sensor_ctrl_c_regs",
