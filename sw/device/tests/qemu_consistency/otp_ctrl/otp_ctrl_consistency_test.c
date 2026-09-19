@@ -361,5 +361,30 @@ bool test_main(void) {
     abs_mmio_write32(kOtpPrimBase + 0x08u, 0x0u);
   }
 
+  // 11. Test SW_CFG_WINDOW sub-word reads (`lb`) and sub-word writes (`sb`):
+  // - `lb` at byte offsets 0..3 of an unlocked SW_CFG partition returns the
+  //   exact bytes of `expected_creator_word` without faulting.
+  // - `sb` and `sw` to a read-locked SW_CFG partition (`VENDOR_TEST`) must
+  //   raise a Store Access Fault (`ErrOnWrite = 1` in `u_tlul_adapter_sram`)
+  //   WITHOUT triggering `part_tlul_req` or setting `INTR_STATE.OTP_ERROR`.
+  uint32_t faults_before_swcfg_subword = load_access_fault_count;
+  uint32_t swcfg_word_addr =
+      kOtpCoreBase + OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET + unlocked_part_offset;
+  uint32_t reconstructed_word =
+      ((uint32_t)abs_mmio_read8(swcfg_word_addr + 0u) << 0) |
+      ((uint32_t)abs_mmio_read8(swcfg_word_addr + 1u) << 8) |
+      ((uint32_t)abs_mmio_read8(swcfg_word_addr + 2u) << 16) |
+      ((uint32_t)abs_mmio_read8(swcfg_word_addr + 3u) << 24);
+  CHECK(load_access_fault_count == faults_before_swcfg_subword);
+  CHECK(reconstructed_word == expected_creator_word);
+
+  abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET) == 0x0u);
+  abs_mmio_write8(kOtpCoreBase + OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET +
+                      OTP_CTRL_PARAM_VENDOR_TEST_OFFSET,
+                  0x5au);
+  CHECK(load_access_fault_count == faults_before_swcfg_subword + 1u);
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET) == 0x0u);
+
   return true;
 }
