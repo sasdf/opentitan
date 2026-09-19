@@ -516,6 +516,7 @@ opentitan_test(
     name = "pwrmgr_rtl_consistency_test",
     srcs = ["pwrmgr_rtl_consistency_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_CW340_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
