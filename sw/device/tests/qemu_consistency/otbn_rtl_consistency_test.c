@@ -5,6 +5,7 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
@@ -12,6 +13,15 @@
 #include "otbn_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
+
+static volatile bool g_fault_seen = false;
+static volatile uint32_t g_fault_mcause = 0u;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
 
 enum {
   kOtbnBase = TOP_EARLGREY_OTBN_BASE_ADDR,
@@ -278,6 +288,33 @@ bool test_main(void) {
              "At start of CMD.EXECUTE, ACC, FLAGS, and MOD0 must be 0 "
              "(got ACC[31:0]=0x%08x, FLAGS=0x%08x, MOD0=0x%08x)",
              acc0_init, flags_init, mod0_init);
+
+  // 5e. Wave 5: OTBN_PERMIT sub-word wr_err, addrmiss (0x2c), and IMEM/DMEM ByteAccess=0.
+  abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0x12345678u);
+  g_fault_seen = false;
+  abs_mmio_write8(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0xffu);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "sb to LOAD_CHECKSUM (PERMIT=0xf) must fault with MCAUSE=7");
+  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0x12345678u,
+             "sb to LOAD_CHECKSUM must not modify register");
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + 0x2cu);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+             "addrmiss read at 0x2c must fault with MCAUSE=5");
+
+  g_fault_seen = false;
+  abs_mmio_write8(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0x11u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "sb to IMEM (ByteAccess=0) must fault with MCAUSE=7");
+
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
+  g_fault_seen = false;
+  abs_mmio_write8(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x22u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "sb to DMEM (ByteAccess=0) must fault with MCAUSE=7");
+  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0x89abcdefu,
+             "sb to DMEM must not modify word");
 
   // 6. Host IMEM read during BUSY_EXECUTE triggers ILLEGAL_BUS_ACCESS, locks
   // OTBN (STATUS == 0xff), latches FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS, and
