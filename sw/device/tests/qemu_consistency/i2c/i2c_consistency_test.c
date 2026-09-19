@@ -276,6 +276,95 @@ static void test_val_and_ovrd(mmio_region_t i2c_base) {
         "Expected VAL=0xffffffff after clearing OVRD, got 0x%x", val);
 }
 
+static volatile uint32_t g_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  uint32_t mepc = 0;
+  asm volatile("csrr %0, mcause" : "=r"(mcause));
+  asm volatile("csrr %0, mepc" : "=r"(mepc));
+  g_last_mcause = mcause;
+  g_fault_count++;
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  mepc += ((insn16 & 0x3u) != 0x3u) ? 2u : 4u;
+  asm volatile("csrw mepc, %0" : : "r"(mepc));
+}
+
+static void test_subword_permit_and_unmapped_access(mmio_region_t i2c_base) {
+  uintptr_t base = (uintptr_t)i2c_base.base;
+
+  // 1. Sub-word write to 4'b1111 register (HOST_FIFO_CONFIG at 0x24) via sb/sh
+  // must raise Store Access Fault (mcause = 7) and NOT modify the register.
+  mmio_region_write32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0x00020003u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + I2C_HOST_FIFO_CONFIG_REG_OFFSET) = 0x55u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on sb to HOST_FIFO_CONFIG");
+  *(volatile uint16_t *)(base + I2C_HOST_FIFO_CONFIG_REG_OFFSET) = 0x0007u;
+  CHECK(g_fault_count == 2u && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on sh to HOST_FIFO_CONFIG");
+  CHECK(mmio_region_read32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET) ==
+            0x00020003u,
+        "HOST_FIFO_CONFIG must not be mutated by rejected sub-word writes");
+
+  // 2. Sub-word write to 4'b0111 register (HOST_TIMEOUT_CTRL at 0x60) via sh
+  // must raise Store Access Fault (mcause = 7) and NOT modify the register.
+  mmio_region_write32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0x12345u);
+  g_fault_count = 0;
+  *(volatile uint16_t *)(base + I2C_HOST_TIMEOUT_CTRL_REG_OFFSET) = 0x6789u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on sh to HOST_TIMEOUT_CTRL");
+  CHECK(mmio_region_read32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET) ==
+            0x12345u,
+        "HOST_TIMEOUT_CTRL must remain 0x12345 after rejected sh");
+  mmio_region_write32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0u);
+
+  // 3. Sub-word write to 4'b0011 register (INTR_ENABLE at 0x04):
+  // - sb at +0 must fail (mcause = 7), sh at +2 must fail (mcause = 7)
+  // - sh at +0 must succeed!
+  mmio_region_write32(i2c_base, I2C_INTR_ENABLE_REG_OFFSET, 0u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + I2C_INTR_ENABLE_REG_OFFSET) = 0x15u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected Store Access Fault on sb to INTR_ENABLE");
+  *(volatile uint16_t *)(base + I2C_INTR_ENABLE_REG_OFFSET + 2u) = 0x15u;
+  CHECK(g_fault_count == 2u && g_last_mcause == 7u,
+        "Expected Store Access Fault on sh to INTR_ENABLE+2");
+  CHECK(mmio_region_read32(i2c_base, I2C_INTR_ENABLE_REG_OFFSET) == 0u,
+        "INTR_ENABLE must remain 0 after rejected sub-word writes");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(base + I2C_INTR_ENABLE_REG_OFFSET) = 0x0015u;
+  CHECK(g_fault_count == 0u,
+        "Expected sh to INTR_ENABLE+0 (I2C_PERMIT=4'b0011) to succeed");
+  CHECK(mmio_region_read32(i2c_base, I2C_INTR_ENABLE_REG_OFFSET) == 0x0015u,
+        "Expected INTR_ENABLE=0x15 after sh to +0");
+  mmio_region_write32(i2c_base, I2C_INTR_ENABLE_REG_OFFSET, 0u);
+
+  // 4. Sub-word write to 4'b0001 register (CTRL at 0x10):
+  // - sb at +1 must fail (mcause = 7)
+  // - sb at +0 must succeed!
+  mmio_region_write32(i2c_base, I2C_CTRL_REG_OFFSET, 0u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + I2C_CTRL_REG_OFFSET + 1u) = 0x04u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected Store Access Fault on sb to CTRL+1");
+  CHECK(mmio_region_read32(i2c_base, I2C_CTRL_REG_OFFSET) == 0u,
+        "CTRL must remain 0 after rejected sb to CTRL+1");
+  g_fault_count = 0;
+  *(volatile uint8_t *)(base + I2C_CTRL_REG_OFFSET) =
+      (1u << I2C_CTRL_LLPBK_BIT);
+  CHECK(g_fault_count == 0u,
+        "Expected sb to CTRL+0 (I2C_PERMIT=4'b0001) to succeed");
+  CHECK(mmio_region_read32(i2c_base, I2C_CTRL_REG_OFFSET) ==
+            (1u << I2C_CTRL_LLPBK_BIT),
+        "Expected CTRL.LLPBK=1 after sb to CTRL+0");
+  mmio_region_write32(i2c_base, I2C_CTRL_REG_OFFSET, 0u);
+  mmio_region_write32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0u);
+}
+
 bool test_main(void) {
   mmio_region_t i2c0_base = mmio_region_from_addr(TOP_EARLGREY_I2C0_BASE_ADDR);
 
@@ -289,6 +378,7 @@ bool test_main(void) {
   test_intr_test_status_vs_event(i2c0_base);
   test_val_and_ovrd(i2c0_base);
   test_alert_test_pulse(i2c0_base, &alert_handler);
+  test_subword_permit_and_unmapped_access(i2c0_base);
 
   LOG_INFO("i2c_consistency_test passed!");
   return true;
