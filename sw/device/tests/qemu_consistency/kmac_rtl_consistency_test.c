@@ -466,5 +466,49 @@ bool test_main(void) {
                      0x11223344u,
              "sb to KMAC_PREFIX_0 (PERMIT=0xf) expected fault(7) & unchanged");
 
+  // 15. Wave 7 Check: KMAC_STATE sub-word read (`lb`) with STATE_ENDIANNESS=1.
+  // In kmac_staterd.sv:90, conv_endian32() swaps the 32-bit word tlram_rdata
+  // ({s[0], s[1], s[2], s[3]} = 0xa7ffc6f8 for SHA3-256("")), so lb at byte
+  // offsets 0..3 (share0 ^ share1) returns 0xf8, 0xc6, 0xff, 0xa7.
+  uint32_t endian_cfg = sha3_cfg;
+  endian_cfg =
+      bitfield_bit32_write(endian_cfg, KMAC_CFG_SHADOWED_STATE_ENDIANNESS_BIT,
+                           true);
+  write_cfg_shadowed(endian_cfg);
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_START));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
+
+  uint32_t state_w0 =
+      abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET) ^
+      abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u);
+  uint32_t state_reconstructed = 0;
+  for (uint32_t i = 0; i < 4u; ++i) {
+    uint8_t b =
+        abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + i) ^
+        abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u + i);
+    state_reconstructed |= ((uint32_t)b << (i * 8u));
+  }
+  EXPECT_RTL(state_w0 == 0xa7ffc6f8u && state_reconstructed == state_w0,
+             "KMAC_STATE sub-word lb with STATE_ENDIANNESS=1 mismatch: "
+             "w0=0x%08x reconstructed=0x%08x",
+             state_w0, state_reconstructed);
+
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_DONE));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
+
   return all_ok;
 }
