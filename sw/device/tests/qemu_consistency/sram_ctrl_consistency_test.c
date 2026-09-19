@@ -167,6 +167,45 @@ bool test_main(void) {
   }
   EXPECT_RTL(any_changed, "CTRL.INIT must wipe/re-initialize SRAM contents");
 
+  // 6b. Writing CTRL.RENEW_SCR_KEY while CTRL.INIT is in progress (init_q == 1)
+  // must be ignored (sram_ctrl.sv: key_req gated by !init_q).
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
+                   kMultiBitBool4True);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+                 kMultiBitBool4False,
+             "SCR_KEY_ROTATED must be 0x9 before CTRL.INIT test");
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   1u << SRAM_CTRL_CTRL_INIT_BIT);
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   1u << SRAM_CTRL_CTRL_RENEW_SCR_KEY_BIT);
+  do {
+    status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT));
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+                 kMultiBitBool4False,
+             "CTRL.RENEW_SCR_KEY written while CTRL.INIT is active must be "
+             "ignored (SCR_KEY_ROTATED expected 0x9, got 0x%x)",
+             abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET));
+
+  // Simultaneous CTRL.RENEW_SCR_KEY | CTRL.INIT in a single write when idle
+  // must trigger both key renewal and initialization.
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   (1u << SRAM_CTRL_CTRL_RENEW_SCR_KEY_BIT) |
+                       (1u << SRAM_CTRL_CTRL_INIT_BIT));
+  do {
+    status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT) ||
+           !bitfield_bit32_read(status, SRAM_CTRL_STATUS_SCR_KEY_VALID_BIT));
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+                 kMultiBitBool4True,
+             "Simultaneous RENEW_SCR_KEY | INIT must rotate key (0x6)");
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
+                   kMultiBitBool4True);
+
   // 7. Lock REGWEN registers (W0C) and verify locked registers ignore writes.
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 0u);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 1u);
