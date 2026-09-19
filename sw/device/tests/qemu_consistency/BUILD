@@ -27,6 +27,7 @@ opentitan_test(
         "//sw/device/lib/arch:device",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/dif:pinmux",
         "//sw/device/lib/dif:rstmgr",
         "//sw/device/lib/dif:usbdev",
         "//sw/device/lib/runtime:log",
