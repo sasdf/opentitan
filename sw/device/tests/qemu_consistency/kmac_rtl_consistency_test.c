@@ -247,5 +247,113 @@ bool test_main(void) {
              "(both produced 0x%08x)",
              cshake_d0_b);
 
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
+
+  // 7. Wave 2 Check A: Writing to MSG_FIFO while in StIdle triggers
+  // ErrSwPushedMsgFifo (0x02) with info = {8'h00, 8'(StIdle=0x2be),
+  // 8'(SelNone=0x14)} = 0x00be14 -> ERR_CODE = 0x0200be14
+  // (kmac_app.sv:200,728-734; kmac_pkg.sv:295).
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0xdeadbeefu);
+  err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  EXPECT_RTL(err_code == 0x0200be14u,
+             "ERR_CODE for MSG_FIFO write in StIdle expected 0x0200be14, got "
+             "0x%08x",
+             err_code);
+
+  // 8. Wave 2 Check B: ERR_CODE is a RO prim_subreg gated only by
+  // hw2reg.err_code.de = event_error (kmac.sv:684, kmac_reg_top.sv:2564-2587).
+  // Writing CMD.err_processed = 1 does NOT clear ERR_CODE to 0.
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  EXPECT_RTL(err_code == 0x0200be14u,
+             "ERR_CODE should retain 0x0200be14 after CMD.err_processed, got "
+             "0x%08x",
+             err_code);
+
+  // 9. Wave 2 Check C: In kmac_errchk.sv:336-356, when err_modestrength (or
+  // err_prefix) wins priority over err_entropy_ready on CmdStart, info[23:16]
+  // is {5'h0, err_swsequence, err_modestrength, err_prefix} (bit 19 is 0 even
+  // when err_entropy_ready is 1).
+  // Because step 8 wrote CMD.err_processed = 1, cfg_entropy_ready in
+  // kmac_errchk.sv:279 is now 0. Configure KMAC_EN=1, MODE=SHA3(0),
+  // KSTRENGTH=L128(0) (invalid mode+strength) with PREFIX_0=0 (invalid KMAC
+  // prefix) and without setting ENTROPY_READY:
+  //   err_modestrength=1, err_prefix=1, err_entropy_ready=1 ->
+  //   code = ErrUnexpectedModeStrength (0x06),
+  //   info = {5'h0, 3'b011, 8'h00, 4'h0, 4'h0} = 0x030000 -> 0x06030000.
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0u);
+  uint32_t bad_cfg = 0;
+  bad_cfg = bitfield_bit32_write(bad_cfg, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
+  bad_cfg = bitfield_field32_write(bad_cfg, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                                   KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L128);
+  bad_cfg = bitfield_field32_write(bad_cfg, KMAC_CFG_SHADOWED_MODE_FIELD,
+                                   KMAC_CFG_SHADOWED_MODE_VALUE_SHA3);
+  write_cfg_shadowed(bad_cfg);
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_START));
+  err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  EXPECT_RTL(err_code == 0x06030000u,
+             "ERR_CODE for err_modestrength+err_prefix+err_entropy_ready "
+             "expected 0x06030000, got 0x%08x",
+             err_code);
+
+  // 10. Wave 2 Check D: During a SW hashing operation (kmac_app in StSw),
+  // an errchecker_err (such as issuing CmdDone while in StMsgFeed) blocks the
+  // invalid command and stays in StMsgFeed (STATUS.SHA3_ABSORB=1). Writing
+  // CMD.err_processed = 1 while kmac_app is in StSw (not StError) does NOT
+  // abort the active SHA3 operation back to Idle.
+  write_cfg_shadowed(cfg);
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_START));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT));
+
+  // Issue invalid CmdDone in StMsgFeed -> ERR_CODE = 0x08040116.
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_DONE));
+  err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  EXPECT_RTL(err_code == 0x08040116u,
+             "ERR_CODE for CmdDone in StMsgFeed expected 0x08040116, got "
+             "0x%08x",
+             err_code);
+
+  // Write CMD.err_processed = 1: KMAC must remain in StAbsorb (not abort to
+  // StIdle).
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
+  status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  EXPECT_RTL(bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT) &&
+                 !bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT),
+             "KMAC should remain in SHA3_ABSORB after CMD.err_processed in "
+             "StSw, got status=0x%08x",
+             status);
+
+  // Cleanly finish the operation with CmdProcess -> CmdDone if still in
+  // SHA3_ABSORB.
+  if (bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT)) {
+    abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                     bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                            KMAC_CMD_CMD_VALUE_PROCESS));
+    do {
+      status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+    } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
+    abs_mmio_write32(
+        kKmacBase + KMAC_CMD_REG_OFFSET,
+        bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_DONE));
+    do {
+      status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+    } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
+  }
+
   return all_ok;
 }
