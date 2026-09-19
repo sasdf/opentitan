@@ -5,9 +5,11 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/dif/dif_kmac.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "kmac_regs.h"
@@ -17,6 +19,17 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kKmacBase = TOP_EARLGREY_KMAC_BASE_ADDR,
 };
+
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
 
 #define EXPECT_RTL(cond, ...)                   \
   do {                                          \
@@ -354,6 +367,67 @@ bool test_main(void) {
       status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
     } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
   }
+
+  // 11. Wave 3 Check A: Writing to the STATE window (0x400..0x5ff) triggers a
+  // TL-UL bus error (d_error=1 -> Ibex Store Access Fault mcause=7) because
+  // u_tlul_adapter in kmac_staterd.sv:56 is instantiated with .ErrOnWrite(1).
+  uint32_t faults_before = fault_count;
+  last_mcause = 0;
+  abs_mmio_write32(kKmacBase + KMAC_STATE_REG_OFFSET, 0xdeadbeefu);
+  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 7u,
+             "Write to KMAC STATE window should trigger Store Access Fault "
+             "(mcause=7), got fault_delta=%u mcause=%u",
+             fault_count - faults_before, last_mcause);
+
+  // 12. Wave 3 Check B: Reading from the MSG_FIFO window (0x800..0xfff)
+  // triggers a TL-UL bus error (d_error=1 -> Ibex Load Access Fault mcause=5)
+  // because u_tlul_adapter_msgfifo in kmac.sv:999 is instantiated with
+  // .ErrOnRead(1).
+  faults_before = fault_count;
+  last_mcause = 0;
+  (void)abs_mmio_read32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET);
+  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 5u,
+             "Read from KMAC MSG_FIFO window should trigger Load Access Fault "
+             "(mcause=5), got fault_delta=%u mcause=%u",
+             fault_count - faults_before, last_mcause);
+
+  // 13. Wave 3 Check C: ENTROPY_REFRESH_HASH_CNT (0x28) increments only when
+  // KMAC_EN=1 (in_keyblock_i in kmac_entropy.sv:308-314), not when KMAC_EN=0
+  // (SHA3/cSHAKE), and resets to 0 when reaching
+  // ENTROPY_REFRESH_THRESHOLD_SHADOWED (kmac_entropy.sv:311, 337).
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_bit32_write(0, KMAC_CMD_HASH_CNT_CLR_BIT, true));
+  uint32_t sha3_cfg = 0;
+  sha3_cfg = bitfield_bit32_write(sha3_cfg, KMAC_CFG_SHADOWED_KMAC_EN_BIT,
+                                  false);
+  sha3_cfg = bitfield_field32_write(sha3_cfg, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                                    KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  sha3_cfg = bitfield_field32_write(sha3_cfg, KMAC_CFG_SHADOWED_MODE_FIELD,
+                                    KMAC_CFG_SHADOWED_MODE_VALUE_SHA3);
+  write_cfg_shadowed(sha3_cfg);
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_START));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
+  abs_mmio_write32(
+      kKmacBase + KMAC_CMD_REG_OFFSET,
+      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_DONE));
+  do {
+    status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
+  EXPECT_RTL(
+      abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET) ==
+          0u,
+      "ENTROPY_REFRESH_HASH_CNT must remain 0 after SHA3 (KMAC_EN=0)");
 
   return all_ok;
 }
