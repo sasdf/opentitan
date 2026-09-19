@@ -12,6 +12,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "alert_handler_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "rom_ctrl_regs.h"
 
@@ -20,6 +21,8 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kRomCtrlRegsBase = TOP_EARLGREY_ROM_CTRL_REGS_BASE_ADDR,
   kRomCtrlRomBase = TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR,
+  kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
+  kRomCtrlAlertId = kTopEarlgreyAlertIdRomCtrlFatal,
 };
 
 static volatile bool store_access_fault_seen = false;
@@ -27,6 +30,11 @@ static volatile bool store_access_fault_seen = false;
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   (void)exc_info;
   store_access_fault_seen = true;
+}
+
+static void shadow_write32(uint32_t addr, uint32_t val) {
+  abs_mmio_write32(addr, val);
+  abs_mmio_write32(addr, val);
 }
 
 static void test_csr_semantics_and_digests(void) {
@@ -85,6 +93,51 @@ static void test_csr_semantics_and_digests(void) {
         "ROM digest must be neither all-zeros nor all-ones");
 }
 
+static void test_alert_test_pulse_and_clear(void) {
+  uint32_t en_addr = kAlertHandlerBase +
+                     ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
+                     kRomCtrlAlertId * sizeof(uint32_t);
+  uint32_t class_addr = kAlertHandlerBase +
+                        ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_REG_OFFSET +
+                        kRomCtrlAlertId * sizeof(uint32_t);
+  uint32_t cause_addr = kAlertHandlerBase +
+                        ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+                        kRomCtrlAlertId * sizeof(uint32_t);
+
+  // Route rom_ctrl fatal alert (ID 60) to Class A (which is disabled in OTTF)
+  // while keeping ALERT_EN_SHADOWED[60] = 1 so ALERT_CAUSE[60] records alerts.
+  shadow_write32(class_addr, ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSA);
+  shadow_write32(en_addr, 1u);
+  abs_mmio_write32(cause_addr, 1u);
+  CHECK(abs_mmio_read32(cause_addr) == 0u,
+        "Expected ALERT_CAUSE[60] to be 0 before ALERT_TEST");
+
+  // Trigger ALERT_TEST = 1 -> should pulse once, setting ALERT_CAUSE[60] = 1.
+  abs_mmio_write32(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET,
+                   1u << ROM_CTRL_ALERT_TEST_FATAL_BIT);
+  CHECK(abs_mmio_read32(cause_addr) == 1u,
+        "Expected ALERT_CAUSE[60] == 1 after first ALERT_TEST write");
+
+  // Clear ALERT_CAUSE[60] (rw1c). Because ALERT_TEST is a pulse (not latched),
+  // ALERT_CAUSE[60] must remain 0 after clearing.
+  abs_mmio_write32(cause_addr, 1u);
+  CHECK(abs_mmio_read32(cause_addr) == 0u,
+        "ALERT_CAUSE[60] remained 1 after rw1c clear (ALERT_TEST was latched!)");
+
+  // Trigger ALERT_TEST = 1 a second time without writing 0 first -> must fire
+  // again.
+  abs_mmio_write32(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET,
+                   1u << ROM_CTRL_ALERT_TEST_FATAL_BIT);
+  CHECK(abs_mmio_read32(cause_addr) == 1u,
+        "Expected ALERT_CAUSE[60] == 1 after second ALERT_TEST write");
+
+  // Clean up and restore Class D routing.
+  abs_mmio_write32(cause_addr, 1u);
+  CHECK(abs_mmio_read32(cause_addr) == 0u,
+        "Expected ALERT_CAUSE[60] == 0 after final clear");
+  shadow_write32(class_addr, ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSD);
+}
+
 static void test_rom_write_protection(void) {
   uint32_t orig_word = abs_mmio_read32(kRomCtrlRomBase);
   store_access_fault_seen = false;
@@ -97,6 +150,7 @@ static void test_rom_write_protection(void) {
 
 bool test_main(void) {
   test_csr_semantics_and_digests();
+  test_alert_test_pulse_and_clear();
   test_rom_write_protection();
   return true;
 }
