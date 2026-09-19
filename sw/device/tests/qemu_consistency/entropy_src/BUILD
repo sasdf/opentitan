@@ -6,7 +6,6 @@ load(
     "//rules/opentitan:defs.bzl",
     "EARLGREY_TEST_ENVS",
     "opentitan_test",
-    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -14,11 +13,9 @@ package(default_visibility = ["//visibility:public"])
 opentitan_test(
     name = "entropy_src_consistency_test",
     srcs = ["entropy_src_consistency_test.c"],
-    exec_env = EARLGREY_TEST_ENVS,
-    qemu = qemu_params(
-        # Marked broken until fix_rtl_discrepancy_entropy_src_* tasks in ~/tasks/pending/ are resolved.
-        tags = ["broken"],
-    ),
+    exec_env = EARLGREY_TEST_ENVS | {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
     deps = [
         "//hw/ip/entropy_src/data:entropy_src_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

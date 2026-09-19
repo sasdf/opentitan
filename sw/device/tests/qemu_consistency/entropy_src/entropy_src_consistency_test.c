@@ -178,5 +178,19 @@ bool test_main(void) {
         "is asserted, got %u (DEBUG_STATUS=0x%x)",
         fifo_depth, debug_status);
 
+  // 7. Disable MODULE_ENABLE and verify ERR_CODE_TEST latches ERR_CODE bit 0
+  // (SFIFO_ESRNG_ERR) without triggering a fatal alert when disabled
+  // (entropy_src_core.sv:907-918, 962-963).
+  abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
+                   kMultiBitBool4False);
+  abs_mmio_write32(kEsBase + ENTROPY_SRC_ERR_CODE_TEST_REG_OFFSET,
+                   ENTROPY_SRC_ERR_CODE_SFIFO_ESRNG_ERR_BIT);
+  uint32_t err_code =
+      abs_mmio_read32(kEsBase + ENTROPY_SRC_ERR_CODE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(err_code, ENTROPY_SRC_ERR_CODE_SFIFO_ESRNG_ERR_BIT),
+        "Expected ERR_CODE.SFIFO_ESRNG_ERR latched after ERR_CODE_TEST=0, got "
+        "0x%x",
+        err_code);
+
   return true;
 }
