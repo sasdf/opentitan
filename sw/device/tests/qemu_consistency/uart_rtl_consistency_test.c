@@ -194,6 +194,77 @@ bool test_main(void) {
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_TIMEOUT_BIT) & 1u, 1u,
             "INTR_STATE.RX_TIMEOUT asserts after un-popped RX byte timeout");
 
+  // ---------------------------------------------------------------------------
+  // 7. Wave 2: TIMEOUT_CTRL with EN=1, VAL=0 fires INTR_STATE.RX_TIMEOUT
+  //    immediately even when RX FIFO is empty and CTRL.RX=0
+  //    In uart_core.sv:376:
+  //      assign event_rx_timeout = (rx_timeout_count_q == uart_rxto_val) & uart_rxto_en;
+  //    Because rx_timeout_count_q == 0 when rx_fifo_depth == 0, setting
+  //    TIMEOUT_CTRL = (1 << 31) | 0 immediately asserts event_rx_timeout.
+  // ---------------------------------------------------------------------------
+  abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
+                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+
+  abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET,
+                   (1u << UART_TIMEOUT_CTRL_EN_BIT) | 0u);
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+  EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_TIMEOUT_BIT) & 1u, 1u,
+            "TIMEOUT_CTRL EN=1, VAL=0 immediately sets INTR_STATE.RX_TIMEOUT even when RX FIFO is empty");
+  abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+
+  // ---------------------------------------------------------------------------
+  // 8. Wave 2: OVRD.TXEN=1, OVRD.TXVAL=0 does NOT override rx_in in SLPBK
+  //    In uart_core.sv:213-224, 260:
+  //      ovrd_tx_en overrides tx_out_q (external tx pin), whereas sys_loopback
+  //      routes tx_out (from uart_tx, which is 1 when idle) to rx_in.
+  //      Therefore VAL remains 0xffff in SLPBK when OVRD.TXEN=1, OVRD.TXVAL=0.
+  // ---------------------------------------------------------------------------
+  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET,
+                   (1u << UART_OVRD_TXEN_BIT) | (0u << UART_OVRD_TXVAL_BIT));
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
+                   (0xffffu << UART_CTRL_NCO_OFFSET) |
+                       (1u << UART_CTRL_SLPBK_BIT) |
+                       (1u << UART_CTRL_TX_BIT));
+  busy_spin_micros(20);
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET), 0xffffu,
+            "VAL remains 0xffff in SLPBK when OVRD.TXEN=1, OVRD.TXVAL=0 (sys_loopback taps tx_out before ovrd mux)");
+  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
+
+  // ---------------------------------------------------------------------------
+  // 9. Wave 2: TX shift register & FIFO timing when INTR_ENABLE == 0
+  //    In uart_core.sv:179, 200-211, 324 & uart_tx.sv:58-77:
+  //      When INTR_ENABLE == 0 and CTRL.TX=1, CTRL.NCO=1 (slow baud rate),
+  //      writing 2 bytes to WDATA pops byte 0 into uart_tx (setting
+  //      STATUS.TXIDLE = 0) and keeps byte 1 in u_uart_txfifo (setting
+  //      FIFO_STATUS.TXLVL = 1, STATUS.TXEMPTY = 0, INTR_STATE.TX_DONE = 0).
+  // ---------------------------------------------------------------------------
+  abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
+                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
+                   (1u << UART_CTRL_NCO_OFFSET) | (1u << UART_CTRL_TX_BIT));
+  abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x11u);
+  abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x22u);
+
+  status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
+  fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+
+  EXPECT_EQ((status >> UART_STATUS_TXIDLE_BIT) & 1u, 0u,
+            "STATUS.TXIDLE is 0 while transmitting with INTR_ENABLE=0 and NCO=1");
+  EXPECT_EQ((fifo_status >> UART_FIFO_STATUS_TXLVL_OFFSET) & 0xffu, 1u,
+            "FIFO_STATUS.TXLVL is 1 after writing 2 bytes with INTR_ENABLE=0 and NCO=1");
+  EXPECT_EQ((intr_state >> UART_INTR_COMMON_TX_DONE_BIT) & 1u, 0u,
+            "INTR_STATE.TX_DONE is 0 while transmitting with INTR_ENABLE=0 and NCO=1");
+
   // Clean up UART1 state.
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
