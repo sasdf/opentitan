@@ -99,6 +99,8 @@ static uint32_t pad_attr_mask_get(void) {
     mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_SCHMITT_EN_0_BIT,
                                 true);
     mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_OD_EN_0_BIT, true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
+                                true);
     mask = bitfield_field32_write(mask, PINMUX_MIO_PAD_ATTR_0_SLEW_RATE_0_FIELD,
                                   PINMUX_MIO_PAD_ATTR_0_SLEW_RATE_0_MASK);
     mask = bitfield_field32_write(
