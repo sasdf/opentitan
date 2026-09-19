@@ -37,6 +37,22 @@ static int g_failures = 0;
     }                                                                          \
   } while (0)
 
+static volatile uint32_t g_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  uint32_t mepc = 0;
+  asm volatile("csrr %0, mcause" : "=r"(mcause));
+  asm volatile("csrr %0, mepc" : "=r"(mepc));
+  g_last_mcause = mcause;
+  g_fault_count++;
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  mepc += ((insn16 & 0x3u) != 0x3u) ? 2u : 4u;
+  asm volatile("csrw mepc, %0" : : "r"(mepc));
+}
+
 bool test_main(void) {
   irq_global_ctrl(false);
 
@@ -272,6 +288,68 @@ bool test_main(void) {
                    (1u << UART_FIFO_CTRL_RXRST_BIT) |
                        (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+
+  // ---------------------------------------------------------------------------
+  // 10. Wave 5: UART_PERMIT sub-word write wr_err & addrmiss (0x34..0x3c)
+  // ---------------------------------------------------------------------------
+  // a) 4'b1111 registers (UART_CTRL at 0x10, UART_TIMEOUT_CTRL at 0x30):
+  //    sb/sh must raise Store Access Fault (mcause = 7) and NOT mutate state.
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0x12340000u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_CTRL_REG_OFFSET) = 0x03u;
+  EXPECT_EQ(g_fault_count, 1u, "sb to UART_CTRL raises Store Access Fault");
+  EXPECT_EQ(g_last_mcause, 7u, "sb to UART_CTRL mcause == 7");
+  *(volatile uint16_t *)(kUart1Base + UART_CTRL_REG_OFFSET) = 0x0033u;
+  EXPECT_EQ(g_fault_count, 2u, "sh to UART_CTRL raises Store Access Fault");
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_CTRL_REG_OFFSET), 0x12340000u,
+            "UART_CTRL unchanged after rejected sub-word writes");
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
+
+  // b) 4'b0011 register (UART_INTR_ENABLE at 0x04):
+  //    sb at +0 must fail (mcause = 7), sh at +2 must fail (mcause = 7),
+  //    sh at +0 must succeed!
+  abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET) = 0x05u;
+  EXPECT_EQ(g_fault_count, 1u, "sb to UART_INTR_ENABLE raises Store Access Fault");
+  *(volatile uint16_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET + 2u) = 0x05u;
+  EXPECT_EQ(g_fault_count, 2u,
+            "sh to UART_INTR_ENABLE+2 raises Store Access Fault");
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET), 0u,
+            "UART_INTR_ENABLE unchanged after rejected sub-word writes");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET) = 0x0105u;
+  EXPECT_EQ(g_fault_count, 0u,
+            "sh to UART_INTR_ENABLE+0 (UART_PERMIT=4'b0011) succeeds");
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET), 0x0105u,
+            "UART_INTR_ENABLE updated to 0x0105 after sh to +0");
+  abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
+
+  // c) 4'b0001 register (UART_OVRD at 0x28):
+  //    sb at +1 must fail (mcause = 7), sb at +0 must succeed!
+  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 0u);
+  g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_OVRD_REG_OFFSET + 1u) = 0x03u;
+  EXPECT_EQ(g_fault_count, 1u, "sb to UART_OVRD+1 raises Store Access Fault");
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_OVRD_REG_OFFSET), 0u,
+            "UART_OVRD unchanged after rejected sb to +1");
+  g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_OVRD_REG_OFFSET) = 0x03u;
+  EXPECT_EQ(g_fault_count, 0u,
+            "sb to UART_OVRD+0 (UART_PERMIT=4'b0001) succeeds");
+  EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_OVRD_REG_OFFSET), 0x03u,
+            "UART_OVRD updated to 0x03 after sb to +0");
+  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 0u);
+
+  // d) addrmiss on unmapped offset 0x34 within the 0x40-byte UART1 window:
+  g_fault_count = 0;
+  (void)*(volatile uint32_t *)(kUart1Base + 0x34u);
+  EXPECT_EQ(g_fault_count, 1u, "lw from UART1+0x34 (addrmiss) faults");
+  EXPECT_EQ(g_last_mcause, 5u, "lw from UART1+0x34 mcause == 5");
+  *(volatile uint32_t *)(kUart1Base + 0x34u) = 0u;
+  EXPECT_EQ(g_fault_count, 2u, "sw to UART1+0x34 (addrmiss) faults");
+  EXPECT_EQ(g_last_mcause, 7u, "sw to UART1+0x34 mcause == 7");
 
   return g_failures == 0;
 }
