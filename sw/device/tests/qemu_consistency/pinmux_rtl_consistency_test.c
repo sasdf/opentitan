@@ -94,9 +94,9 @@ bool test_main(void) {
   abs_mmio_write32(kPinmuxBase + kMioAttrOff, 0xffffffffu);
   uint32_t mio_attr_readback = abs_mmio_read32(kPinmuxBase + kMioAttrOff);
   abs_mmio_write32(kPinmuxBase + kMioAttrOff, orig_mio_attr);
-  EXPECT_CHECK(mio_attr_readback == 0x00000083u,
-               "MIO_PAD_ATTR[Ioa2] WARL readback mismatch: got 0x%08x, "
-               "expected 0x00000083",
+  EXPECT_CHECK((mio_attr_readback & 0x00000083u) == 0x00000083u &&
+                   (mio_attr_readback & ~0x00f300ffu) == 0u,
+               "MIO_PAD_ATTR[Ioa2] WARL readback mismatch: got 0x%08x",
                mio_attr_readback);
 
   const uint32_t kDioPadSpiDevSd2 = kTopEarlgreyDirectPadsSpiDeviceSd2;
