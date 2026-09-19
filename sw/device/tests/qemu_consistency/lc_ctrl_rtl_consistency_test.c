@@ -11,9 +11,11 @@
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -22,6 +24,15 @@ enum {
   kLcCtrlBase = TOP_EARLGREY_LC_CTRL_BASE_ADDR,
   kLcAlertProgErr = kTopEarlgreyAlertIdLcCtrlFatalProgError,
 };
+
+static volatile bool g_fault_seen;
+static volatile uint32_t g_fault_mcause;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
 
 bool test_main(void) {
   uint32_t mismatches = 0;
@@ -186,6 +197,35 @@ bool test_main(void) {
         tok0_re, tgt_re, vctrl_re);
     mismatches++;
   }
+
+  // 6b. Wave 5 checks: unmapped offset 0x8c (addrmiss = 1 -> Load/Store Access Fault)
+  // and LC_CTRL_PERMIT sub-word writes (wr_err = 1 -> Store Access Fault, preserving registers).
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kLcCtrlBase + 0x8cu);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  abs_mmio_write32(kLcCtrlBase + 0x8cu, 0x12345678u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_seen = false;
+  abs_mmio_write8(kLcCtrlBase + LC_CTRL_TRANSITION_TOKEN_0_REG_OFFSET, 0x11u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_TOKEN_0_REG_OFFSET) ==
+        0xdeadbeefu);
+
+  g_fault_seen = false;
+  *(volatile uint16_t *)(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET) =
+      0x2222u;
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET) ==
+        0x12345678u);
+
+  // 8-bit store to CLAIM_TRANSITION_IF (LC_CTRL_PERMIT[3] = 4'b0001) must succeed.
+  g_fault_seen = false;
+  abs_mmio_write8(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET,
+                  kMultiBitBool8True);
+  CHECK(!g_fault_seen);
 
   // Restore clean state before locking CLAIM_TRANSITION_IF_REGWEN.
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET, 0u);
