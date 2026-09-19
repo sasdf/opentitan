@@ -198,6 +198,107 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
         kEdnStateIdle);
 }
 
+static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
+  LOG_INFO("2b. Testing EDN0 HW_CMD_STS BOOT_MODE/AUTO_MODE latching and max_reqs_cnt restore...");
+
+  // Reset CSRNG state by disabling and re-enabling CSRNG.
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4True
+                        << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4True
+                        << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4False
+                        << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+
+  // Part A: Boot Mode failure -> HW_CMD_STS.BOOT_MODE must remain 1 in RejectCsrngEntropy.
+  // Set BOOT_INS_CMD = 0x00000601 (flag0=True so CSRNG does not block on entropy_src)
+  // and BOOT_GEN_CMD = 0x00000601 (duplicate INSTANTIATE instead of GENERATE).
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET, 0x00000601u);
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET, 0x00000601u);
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdEdn0RecovAlert));
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
+                   make_edn_ctrl(kMultiBitBool4True, kMultiBitBool4True,
+                                 kMultiBitBool4False, kMultiBitBool4False));
+  IBEX_SPIN_FOR(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
+                    kEdnStateRejectCsrngEntropy,
+                1000);
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
+      kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
+      kTopEarlgreyAlertIdEdn0RecovAlert));
+
+  uint32_t hw_sts = abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_BOOT_MODE_BIT) == 1);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_AUTO_MODE_BIT) == 0);
+  CHECK(bitfield_field32_read(hw_sts, EDN_HW_CMD_STS_CMD_TYPE_FIELD) == 1u);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_CMD_ACK_BIT) == 1);
+  CHECK(bitfield_field32_read(hw_sts, EDN_HW_CMD_STS_CMD_STS_FIELD) == 3u);
+
+  // Restore BOOT_INS_CMD / BOOT_GEN_CMD and disable EDN0; verify HW_CMD_STS clears to 0 on Idle.
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET, 0x901u);
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET, 0xfff003u);
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
+        kEdnStateIdle);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET) == 0u);
+
+  // Part B: Auto Mode max_reqs_cnt restore on disable + HW_CMD_STS.AUTO_MODE latch.
+  // Reset CSRNG state and configure MAX_NUM_REQS_BETWEEN_RESEEDS = 0 prior to disable,
+  // then disable EDN0 so main_sm_done_pulse restores max_reqs_cnt = 0.
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4True
+                        << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4True
+                        << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+                       ((uint32_t)kMultiBitBool4False
+                        << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+
+  abs_mmio_write32(kEdn0Base + EDN_MAX_NUM_REQS_BETWEEN_RESEEDS_REG_OFFSET, 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
+                   make_edn_ctrl(kMultiBitBool4True, kMultiBitBool4False,
+                                 kMultiBitBool4True, kMultiBitBool4False));
+  // Load RESEED_CMD with duplicate INSTANTIATE (0x00000601) so that when
+  // AutoDispatch immediately runs AutoCaptReseedCnt -> AutoSendReseedCmd,
+  // CSRNG rejects it with CMD_STS_INVALID_CMD_SEQ (3).
+  abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0x00000601u);
+  abs_mmio_write32(kEdn0Base + EDN_GENERATE_CMD_REG_OFFSET, 0x00001003u);
+
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdEdn0RecovAlert));
+  abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
+  IBEX_SPIN_FOR(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
+                    kEdnStateRejectCsrngEntropy,
+                1000);
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
+      kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
+      kTopEarlgreyAlertIdEdn0RecovAlert));
+  hw_sts = abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_BOOT_MODE_BIT) == 0);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_AUTO_MODE_BIT) == 1);
+  CHECK(bitfield_field32_read(hw_sts, EDN_HW_CMD_STS_CMD_TYPE_FIELD) == 1u);
+  CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_CMD_ACK_BIT) == 1);
+  CHECK(bitfield_field32_read(hw_sts, EDN_HW_CMD_STS_CMD_STS_FIELD) == 3u);
+
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
+        kEdnStateIdle);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET) == 0u);
+}
+
 static void test_fifo_depth_and_err_code_test(void) {
   LOG_INFO("3. Testing EDN0 13-word FIFO depth, overflow, and ERR_CODE_TEST...");
 
@@ -271,6 +372,7 @@ static void test_fifo_depth_and_err_code_test(void) {
 bool test_main(void) {
   test_reset_and_mubi_alerts();
   test_sw_port_mode_and_csrng_ack_err();
+  test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt();
   test_fifo_depth_and_err_code_test();
   return true;
 }
