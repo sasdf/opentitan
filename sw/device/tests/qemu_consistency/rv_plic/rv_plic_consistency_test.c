@@ -10,6 +10,7 @@
 #include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "alert_handler_regs.h"
@@ -17,6 +18,39 @@
 #include "rv_plic_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
+
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
+
+static bool expect_load_fault_32(mmio_region_t base, uint32_t offset) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  (void)mmio_region_read32(base, (ptrdiff_t)offset);
+  return (fault_count == before + 1u) && (last_mcause == 5u);
+}
+
+static bool expect_store_fault_32(mmio_region_t base, uint32_t offset,
+                                  uint32_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write32(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
+
+static bool expect_store_fault_8(mmio_region_t base, uint32_t offset,
+                                 uint8_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write8(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
 
 enum {
   kMipMsipBit = 3,
@@ -144,6 +178,26 @@ static void test_cc0_claim_threshold_and_zero_prio(mmio_region_t plic_base,
   CHECK(!get_mip_meip(), "Expected MIP.MEIP=0 after CC0 claim");
 
   CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
+  // Case D (Wave 2): CC0 completion ID in rv_plic_reg_top.sv (u_cc0) is 8 bits
+  // wide (`assign cc0_wd = reg_wdata[7:0]`). Writing `0xdeadba00u | claimed_id`
+  // to CC0 must still complete `claimed_id` in rv_plic_gateway so a subsequent
+  // interrupt assertion latches into IP!
+  mmio_region_write32(plic_base, RV_PLIC_CC0_REG_OFFSET,
+                      0xdeadba00u | (uint32_t)claimed_id);
+
+  CHECK_DIF_OK(dif_uart_irq_force(uart, kDifUartIrqRxParityErr, true));
+  is_pending = false;
+  CHECK_DIF_OK(dif_rv_plic_irq_is_pending(plic, kIrqId, &is_pending));
+  CHECK(is_pending,
+        "Expected CC0 write with non-zero upper bits [31:8] (0xdeadba00 | %u) "
+        "to truncate to cc0_wd[7:0] and complete gateway, allowing re-pend",
+        claimed_id);
+
+  claimed_id = 0;
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(plic, kTarget, &claimed_id));
+  CHECK(claimed_id == kIrqId, "Expected re-claimed CC0 to return %u, got %u",
+        kIrqId, claimed_id);
+  CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
   CHECK_DIF_OK(dif_rv_plic_irq_complete(plic, kTarget, claimed_id));
 
   // Restore target threshold and disable test IRQ.
@@ -194,6 +248,84 @@ static void test_msip0_and_alert_test(mmio_region_t plic_base,
         "(ALERT_TEST must pulse, not latch high)");
 }
 
+static void test_wave2_unmapped_and_subword_access(mmio_region_t plic_base) {
+  // 1. Unmapped offsets in rv_plic_reg_top.sv set `addrmiss = 1 -> reg_error = 1`,
+  // returning TL-UL `d_error = 1` (Load Access Fault mcause=5 / Store Access Fault mcause=7).
+  const uint32_t kUnmappedPrio186 = RV_PLIC_PRIO185_REG_OFFSET + 4u;  // 0x0002e8
+  const uint32_t kUnmappedIp6 = RV_PLIC_IP_5_REG_OFFSET + 4u;         // 0x001018
+  const uint32_t kUnmappedIe6 = RV_PLIC_IE0_5_REG_OFFSET + 4u;        // 0x002018
+  const uint32_t kUnmappedAfterCc0 = RV_PLIC_CC0_REG_OFFSET + 4u;     // 0x200008
+  const uint32_t kUnmappedAfterMsip0 = RV_PLIC_MSIP0_REG_OFFSET + 4u; // 0x4000004
+
+  CHECK(expect_load_fault_32(plic_base, kUnmappedPrio186),
+        "Expected Load Access Fault (mcause=5) reading unmapped PRIO186 (0x%x)",
+        kUnmappedPrio186);
+  CHECK(expect_store_fault_32(plic_base, kUnmappedPrio186, 1u),
+        "Expected Store Access Fault (mcause=7) writing unmapped PRIO186 (0x%x)",
+        kUnmappedPrio186);
+  CHECK(expect_load_fault_32(plic_base, kUnmappedIp6),
+        "Expected Load Access Fault (mcause=5) reading unmapped IP_6 (0x%x)",
+        kUnmappedIp6);
+  CHECK(expect_load_fault_32(plic_base, kUnmappedIe6),
+        "Expected Load Access Fault (mcause=5) reading unmapped IE0_6 (0x%x)",
+        kUnmappedIe6);
+  CHECK(expect_store_fault_32(plic_base, kUnmappedIe6, 1u),
+        "Expected Store Access Fault (mcause=7) writing unmapped IE0_6 (0x%x)",
+        kUnmappedIe6);
+  CHECK(expect_load_fault_32(plic_base, kUnmappedAfterCc0),
+        "Expected Load Access Fault (mcause=5) reading unmapped offset 0x%x",
+        kUnmappedAfterCc0);
+  CHECK(expect_load_fault_32(plic_base, kUnmappedAfterMsip0),
+        "Expected Load Access Fault (mcause=5) reading unmapped offset 0x%x",
+        kUnmappedAfterMsip0);
+  CHECK(expect_store_fault_32(plic_base, kUnmappedAfterMsip0, 1u),
+        "Expected Store Access Fault (mcause=7) writing unmapped offset 0x%x",
+        kUnmappedAfterMsip0);
+
+  // 2. Sub-word access permissions in rv_plic_reg_pkg.sv (`RV_PLIC_PERMIT`):
+  // - Sub-word reads (`lbu`/`lhu`) to mapped registers always succeed (`wr_err = 0`).
+  // - `PRIO1`, `THRESHOLD0`, `CC0`, `MSIP0` have `RV_PLIC_PERMIT = 4'b0001`:
+  //   an 8-bit store (`sb`) to byte 0 (`+0`) has `reg_be = 4'b0001` (`wr_err = 0`)
+  //   and succeeds, whereas an 8-bit store (`sb`) to byte 1 (`+1`) has
+  //   `reg_be = 4'b0010` (`|(4'b0001 & ~4'b0010) == 1 -> wr_err = 1`) and raises
+  //   a synchronous Store Access Fault (`mcause = 7`) without modifying the register!
+  uint32_t before = fault_count;
+  mmio_region_write8(plic_base, RV_PLIC_PRIO1_REG_OFFSET, 0x2u);
+  uint8_t prio1_b0 = mmio_region_read8(plic_base, RV_PLIC_PRIO1_REG_OFFSET);
+  CHECK(fault_count == before,
+        "Expected byte write/read at PRIO1+0 (PERMIT=4'b0001) to succeed without fault");
+  CHECK(prio1_b0 == 0x2u, "Expected PRIO1 byte 0 to read back 0x2, got 0x%x",
+        prio1_b0);
+
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_PRIO1_REG_OFFSET + 1u, 0x3u),
+        "Expected Store Access Fault (mcause=7) on byte write to PRIO1+1");
+  CHECK(mmio_region_read32(plic_base, RV_PLIC_PRIO1_REG_OFFSET) == 0x2u,
+        "Expected PRIO1 to remain 0x2 after rejected byte write to PRIO1+1");
+  mmio_region_write32(plic_base, RV_PLIC_PRIO1_REG_OFFSET, 0u);
+
+  // Check MSIP0 byte 0 write (`+0` succeeds) vs byte 1 write (`+1` faults and preserves MSIP0=1).
+  before = fault_count;
+  mmio_region_write8(plic_base, RV_PLIC_MSIP0_REG_OFFSET, 1u);
+  CHECK(fault_count == before &&
+            mmio_region_read8(plic_base, RV_PLIC_MSIP0_REG_OFFSET) == 1u,
+        "Expected byte write/read at MSIP0+0 (PERMIT=4'b0001) to succeed");
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_MSIP0_REG_OFFSET + 1u, 0u),
+        "Expected Store Access Fault (mcause=7) on byte write to MSIP0+1");
+  CHECK(mmio_region_read32(plic_base, RV_PLIC_MSIP0_REG_OFFSET) == 1u,
+        "Expected MSIP0 to remain 1 after rejected byte write to MSIP0+1");
+  mmio_region_write32(plic_base, RV_PLIC_MSIP0_REG_OFFSET, 0u);
+
+  // - `IE0_0..IE0_5` have `RV_PLIC_PERMIT = 4'b1111`:
+  //   any sub-word write (`sb` even at byte 0) sets `wr_err = 1` and raises
+  //   Store Access Fault (`mcause = 7`) while preserving `IE0_0`.
+  mmio_region_write32(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0x12345678u);
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0xffu),
+        "Expected Store Access Fault (mcause=7) on byte write to IE0_0+0 (PERMIT=4'b1111)");
+  CHECK(mmio_region_read32(plic_base, RV_PLIC_IE0_0_REG_OFFSET) == 0x12345678u,
+        "Expected IE0_0 to remain 0x12345678 after rejected byte write");
+  mmio_region_write32(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0u);
+}
+
 bool test_main(void) {
   mmio_region_t plic_base =
       mmio_region_from_addr(TOP_EARLGREY_RV_PLIC_BASE_ADDR);
@@ -212,6 +344,7 @@ bool test_main(void) {
   test_prio0_and_ie_last_word_masks(plic_base);
   test_cc0_claim_threshold_and_zero_prio(plic_base, &plic, &uart);
   test_msip0_and_alert_test(plic_base, &alert_handler);
+  test_wave2_unmapped_and_subword_access(plic_base);
 
   LOG_INFO("rv_plic_consistency_test passed!");
   return true;
