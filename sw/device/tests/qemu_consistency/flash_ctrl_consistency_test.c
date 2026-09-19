@@ -457,5 +457,106 @@ bool test_main(void) {
              "Writing RD_FIFO (ErrOnWrite=1) must raise Store Access Fault (faults=%u)",
              g_fault_count);
 
+  // 20. FLASH_CTRL_CORE_PERMIT, PROG_FIFO .ByteAccess(0), and
+  //     FLASH_CTRL_PRIM_PERMIT sub-word write (wr_err) verification.
+  //     In flash_ctrl_core_reg_top.sv and flash_ctrl_prim_reg_top.sv:
+  //     wr_err = reg_we & |(PERMIT[i] & ~reg_be).
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_SCRATCH_REG_OFFSET, 0xa55a1234u);
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_SCRATCH_REG_OFFSET, 0xffu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to SCRATCH (PERMIT=0xf) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_SCRATCH_REG_OFFSET) ==
+                 0xa55a1234u,
+             "Rejected 8-bit write must not modify SCRATCH");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kFlashCoreBase + FLASH_CTRL_SCRATCH_REG_OFFSET + 2u) =
+      0xffffu;
+  EXPECT_RTL(g_fault_count == 1u,
+             "16-bit write to SCRATCH+2 (PERMIT=0xf) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_SCRATCH_REG_OFFSET) ==
+                 0xa55a1234u,
+             "Rejected 16-bit write must not modify SCRATCH");
+
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET, 0x00001203u);
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET, 0x1fu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to FIFO_LVL (PERMIT=0x3) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET) ==
+                 0x00001203u,
+             "Rejected 8-bit write must not modify FIFO_LVL");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET) =
+      0x0506u;
+  EXPECT_RTL(g_fault_count == 0u,
+             "16-bit write to FIFO_LVL+0 (be=0x3 covers PERMIT=0x3) must succeed");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET) ==
+                 0x00000506u,
+             "16-bit write to FIFO_LVL+0 must update FIFO_LVL to 0x0506");
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_LVL_REG_OFFSET,
+                   fifo_lvl_orig);
+
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET, 0x15u);
+  EXPECT_RTL(g_fault_count == 0u,
+             "8-bit write to INTR_ENABLE+0 (be=0x1 covers PERMIT=0x1) must succeed");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET) ==
+                 0x15u,
+             "8-bit write to INTR_ENABLE+0 must update INTR_ENABLE to 0x15");
+
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET + 1u,
+                  0x1fu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to INTR_ENABLE+1 (be=0x2 != PERMIT=0x1) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET) ==
+                 0x15u,
+             "Rejected 8-bit write to INTR_ENABLE+1 must not modify INTR_ENABLE");
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_INTR_ENABLE_REG_OFFSET, 0u);
+
+  // PROG_FIFO (0x1b0) uses tlul_adapter_sram with .ByteAccess(0) -> sub-word
+  // writes must raise Store Access Fault.
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET, 0xaau);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to PROG_FIFO (.ByteAccess(0)) must raise Store Access Fault");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET) =
+      0x55aau;
+  EXPECT_RTL(g_fault_count == 1u,
+             "16-bit write to PROG_FIFO (.ByteAccess(0)) must raise Store Access Fault");
+
+  // FLASH_CTRL_PRIM_PERMIT verification on CSR1 (0x04, PERMIT=0x3) and
+  // CSR2 (0x08, PERMIT=0x1, RW bits 0x88 ungated by CSR0_REGWEN).
+  uint32_t csr1_orig = abs_mmio_read32(kFlashPrimBase + 0x04u);
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashPrimBase + 0x04u, 0xffu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to PRIM CSR1 (PERMIT=0x3) must raise Store Access Fault");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kFlashPrimBase + 0x04u) = (uint16_t)csr1_orig;
+  EXPECT_RTL(g_fault_count == 0u,
+             "16-bit write to PRIM CSR1+0 (be=0x3 covers PERMIT=0x3) must succeed");
+
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashPrimBase + 0x08u, 0x88u);
+  EXPECT_RTL(g_fault_count == 0u,
+             "8-bit write to PRIM CSR2+0 (be=0x1 covers PERMIT=0x1) must succeed");
+  EXPECT_RTL(abs_mmio_read32(kFlashPrimBase + 0x08u) == 0x88u,
+             "8-bit write to PRIM CSR2+0 must update ungated RW bits to 0x88");
+
+  g_fault_count = 0;
+  abs_mmio_write8(kFlashPrimBase + 0x08u + 1u, 0x00u);
+  EXPECT_RTL(g_fault_count == 1u,
+             "8-bit write to PRIM CSR2+1 (be=0x2 != PERMIT=0x1) must raise Store Access Fault");
+  EXPECT_RTL(abs_mmio_read32(kFlashPrimBase + 0x08u) == 0x88u,
+             "Rejected 8-bit write to PRIM CSR2+1 must not modify PRIM CSR2");
+  abs_mmio_write32(kFlashPrimBase + 0x08u, 0x00u);
+
   return all_ok;
 }
