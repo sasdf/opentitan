@@ -30,6 +30,22 @@ enum {
     }                                           \
   } while (0)
 
+static volatile uint32_t g_fault_count;
+static volatile uint32_t g_last_mcause;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  uint32_t mepc = 0;
+  asm volatile("csrr %0, mcause" : "=r"(mcause));
+  asm volatile("csrr %0, mepc" : "=r"(mepc));
+  g_fault_count++;
+  g_last_mcause = mcause;
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  mepc += ((insn16 & 0x3u) != 0x3u) ? 2u : 4u;
+  asm volatile("csrw mepc, %0" : : "r"(mepc));
+}
+
 static void write_shadowed(uint32_t addr, uint32_t val) {
   abs_mmio_write32(addr, val);
   abs_mmio_write32(addr, val);
@@ -281,6 +297,47 @@ bool test_main(void) {
                    1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 1u);
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET, 0u);
+
+  // 8. Wave 5 Check: ALERT_HANDLER_PERMIT sub-word write wr_err and addrmiss (0x578)
+  write_shadowed(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET,
+                 0x12345678u);
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET,
+                  0xaau);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u,
+             "1-byte write to CLASSA_TIMEOUT_CYC_SHADOWED (PERMIT=4'b1111) must fault (count=%u, mcause=%u)",
+             g_fault_count, g_last_mcause);
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
+                  0x55u);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u,
+             "1-byte write to CLASSA_ACCUM_THRESH_SHADOWED (PERMIT=4'b0011) must fault (count=%u, mcause=%u)",
+             g_fault_count, g_last_mcause);
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  *(volatile uint16_t *)(kAlertBase +
+                         ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET) =
+      0x0033u;
+  *(volatile uint16_t *)(kAlertBase +
+                         ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET) =
+      0x0033u;
+  EXPECT_RTL(g_fault_count == 0u &&
+                 abs_mmio_read32(
+                     kAlertBase +
+                     ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET) ==
+                     0x0033u,
+             "2-byte write to CLASSA_ACCUM_THRESH_SHADOWED (PERMIT=4'b0011) must succeed");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kAlertBase + 0x578u);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 5u,
+             "Out-of-bounds read at 0x578 (addrmiss) must fault with mcause=5 (count=%u, mcause=%u)",
+             g_fault_count, g_last_mcause);
 
   return all_ok;
 }
