@@ -91,7 +91,9 @@ rom_error_t dice_chain_attestation_creator(
   RETURN_IF_ERROR(
       dice_storage_get_key_id(kDicePageKeyIdxCdi0, &cached_cdi0_id));
 
-  bool cache_valid = cached_cdi0_id == expected_cdi0_id;
+  bool cache_valid = cached_cdi0_id == expected_cdi0_id &&
+                     dice_storage_load_page(&dice_page) == kErrorOk &&
+                     dice_storage_check_digest(&dice_page) == kErrorOk;
 
   if (!cache_valid) {
     // Update the cert page buffer.
@@ -101,6 +103,8 @@ rom_error_t dice_chain_attestation_creator(
         rom_ext_manifest->security_version, &dice_chain_cdi_0_key_ids,
         &static_dice_cdi_0.uds_pubkey, &static_dice_cdi_0.cdi_0_pubkey,
         static_dice_cdi_0.cert_data, &static_dice_cdi_0.cert_size));
+  } else {
+    static_dice_cdi_0.cert_size = 0;
   }
 
   sc_keymgr_sw_binding_unlock_wait();
@@ -175,6 +179,7 @@ rom_error_t dice_chain_attestation_owner(
   uint64_t expected_cdi1_id = read_64(subject_pubkey_id.digest);
 
   bool cache_valid =
+      static_dice_cdi_0.cert_size == 0 &&
       dice_page.cdi_key_ids[kDicePageKeyIdxCdi1] == expected_cdi1_id;
 
   if (!cache_valid) {
