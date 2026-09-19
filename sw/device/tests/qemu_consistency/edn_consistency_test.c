@@ -15,6 +15,7 @@
 #include "sw/device/lib/testing/entropy_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "alert_handler_regs.h"
@@ -390,10 +391,66 @@ static void test_fifo_depth_and_err_code_test(void) {
             EDN_INTR_STATE_EDN_FATAL_ERR_BIT) == 1);
 }
 
+static volatile bool g_fault_seen;
+static volatile uint32_t g_fault_mcause;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
+
+static void test_subword_wr_err_and_addrmiss(void) {
+  LOG_INFO("4. Testing EDN0 addrmiss and EDN_PERMIT sub-word wr_err...");
+
+  CHECK_STATUS_OK(entropy_testutils_stop_all());
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) == 0x901u);
+
+  // 1. Unmapped offset 0x48 (EDN_MAIN_SM_STATE_REG_OFFSET + 4): addrmiss = 1 -> Load/Store Access Fault.
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kEdn0Base + 0x48u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  abs_mmio_write32(kEdn0Base + 0x48u, 0x12345678u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+
+  // 2. Sub-word 8-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): wr_err = 1 -> Store Access Fault,
+  // write blocked, and no spurious recoverable alert asserted.
+  g_fault_seen = false;
+  abs_mmio_write8(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x99u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0u);
+
+  // 3. Sub-word 16-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): reg_be = 4'b0011 -> succeeds!
+  g_fault_seen = false;
+  *(volatile uint16_t *)(kEdn0Base + EDN_CTRL_REG_OFFSET) = 0x9999u;
+  CHECK(!g_fault_seen);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
+
+  // 4. Sub-word 16-bit store to EDN_BOOT_INS_CMD (EDN_PERMIT[6] = 4'b1111): wr_err = 1 -> Store Access Fault,
+  // register value preserved.
+  g_fault_seen = false;
+  *(volatile uint16_t *)(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) = 0xdead;
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) == 0x901u);
+
+  // 5. Sub-word 8-bit store to EDN_INTR_ENABLE (EDN_PERMIT[1] = 4'b0001): succeeds!
+  g_fault_seen = false;
+  abs_mmio_write8(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET, 0x3u);
+  CHECK(!g_fault_seen);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET) == 0x3u);
+  abs_mmio_write32(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET, 0x0u);
+}
+
 bool test_main(void) {
   test_reset_and_mubi_alerts();
   test_sw_port_mode_and_csrng_ack_err();
   test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt();
+  test_subword_wr_err_and_addrmiss();
   test_fifo_depth_and_err_code_test();
   return true;
 }
