@@ -755,3 +755,24 @@ opentitan_test(
         "//sw/device/silicon_creator/lib/drivers:retention_sram",
     ],
 )
+
+opentitan_test(
+    name = "xbar_consistency_test",
+    srcs = ["xbar_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_CW340_TEST_ENVS,
+    ),
+    deps = [
+        "//hw/ip/pattgen/data:pattgen_c_regs",
+        "//hw/ip/rv_core_ibex/data:rv_core_ibex_c_regs",
+        "//hw/ip/spi_host/data:spi_host_c_regs",
+        "//hw/ip/sysrst_ctrl/data:sysrst_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
