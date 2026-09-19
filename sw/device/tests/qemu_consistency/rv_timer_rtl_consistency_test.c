@@ -124,6 +124,12 @@ bool test_main(void) {
   abs_mmio_write32(kRvTimerBase + RV_TIMER_CTRL_REG_OFFSET, 1u);
   CHECK(abs_mmio_read32(kRvTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u,
         "INTR_STATE0 should assert when active and mtime >= mtimecmp even with STEP==0");
+  // While CTRL.ACTIVE0 == 1 and mtime (100) >= mtimecmp (50), intr[0] is
+  // continuously 1 on every clk_i cycle, so a W1C write to INTR_STATE0 is
+  // immediately re-latched to 1 before the next MMIO read completes.
+  abs_mmio_write32(kRvTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kRvTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u,
+        "INTR_STATE0 should remain 1 after W1C while active and mtime >= mtimecmp");
   abs_mmio_write32(kRvTimerBase + RV_TIMER_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kRvTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET, 1u);
   CHECK(abs_mmio_read32(kRvTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u,
