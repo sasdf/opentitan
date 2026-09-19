@@ -5,6 +5,7 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
@@ -13,6 +14,15 @@
 #include "sensor_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
+
+static volatile bool g_fault_seen = false;
+static volatile uint32_t g_fault_mcause = 0u;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_seen = true;
+  g_fault_mcause = ibex_mcause_read();
+}
 
 enum {
   kAstBase = TOP_EARLGREY_AST_BASE_ADDR,
@@ -74,6 +84,24 @@ bool test_main(void) {
     CHECK(abs_mmio_read32(kAstBase + offset) == pattern);
     abs_mmio_write32(kAstBase + offset, 0x00u);
   }
+
+  LOG_INFO("3. Testing AST_PERMIT sub-word wr_err and addrmiss TL-UL faults...");
+  g_fault_seen = false;
+  abs_mmio_write8(kAstBase + AST_REGB_0_REG_OFFSET, 0x55u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kAstBase + AST_REGB_0_REG_OFFSET) == 0x00u);
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kAstBase + 0x9cu);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  abs_mmio_write32(kAstBase + 0x9cu, 0x12345678u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kAstBase + 0x214u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
 
   return true;
 }
