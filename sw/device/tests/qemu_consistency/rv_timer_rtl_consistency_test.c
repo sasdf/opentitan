@@ -203,6 +203,32 @@ bool test_main(void) {
         "Expected write at RV_TIMER + 0x0fc (addrmiss hole) to fault with mcause=7, got count=%u mcause=0x%x",
         fault_count - before_fault, last_mcause);
 
+  // 8. Wave 5: Verify RV_TIMER_PERMIT sub-word write checks (rv_timer_reg_pkg.sv:138-149).
+  // COMPARE_LOWER0_0 (0x118) has RV_TIMER_PERMIT = 4'b1111: an 8-bit write
+  // (reg_be = 4'b0001) must assert wr_err = 1 (mcause = 7) and preserve the register.
+  abs_mmio_write32(kRvTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 0x12345678u);
+  before_fault = fault_count;
+  last_mcause = 0;
+  abs_mmio_write8(kRvTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 0xaau);
+  CHECK(fault_count == before_fault + 1u && last_mcause == 7u,
+        "Expected 8-bit write to COMPARE_LOWER0_0 (PERMIT=4'b1111) to fault with mcause=7, got count=%u mcause=0x%x",
+        fault_count - before_fault, last_mcause);
+  CHECK(abs_mmio_read32(kRvTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET) == 0x12345678u,
+        "Sub-word write with wr_err=1 must not modify COMPARE_LOWER0_0");
+
+  // CTRL (0x004) has RV_TIMER_PERMIT = 4'b0001: an 8-bit write at byte 0
+  // (reg_be = 4'b0001) is permitted (wr_err = 0), whereas byte 1 (reg_be = 4'b0010)
+  // must fault with wr_err = 1 (mcause = 7).
+  before_fault = fault_count;
+  abs_mmio_write8(kRvTimerBase + RV_TIMER_CTRL_REG_OFFSET, 0u);
+  CHECK(fault_count == before_fault,
+        "8-bit write to CTRL byte 0 (PERMIT=4'b0001) must succeed without fault");
+  before_fault = fault_count;
+  last_mcause = 0;
+  abs_mmio_write8(kRvTimerBase + RV_TIMER_CTRL_REG_OFFSET + 1u, 0x1u);
+  CHECK(fault_count == before_fault + 1u && last_mcause == 7u,
+        "Expected 8-bit write to CTRL+1 (PERMIT=4'b0001, reg_be=4'b0010) to fault with mcause=7");
+
   // Restore original rv_timer state for OTTF.
   abs_mmio_write32(kRvTimerBase + RV_TIMER_CFG0_REG_OFFSET, orig_cfg0);
   abs_mmio_write32(kRvTimerBase + RV_TIMER_CTRL_REG_OFFSET, orig_ctrl);
