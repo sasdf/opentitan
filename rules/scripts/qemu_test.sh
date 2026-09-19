@@ -12,16 +12,9 @@ set -e
 # Retrieve/set various templated values from Bazel
 export QEMU_BIN="__qemu_bin__"
 if [ "${OT_QEMU_COVERAGE:-0}" = "1" ]; then
-    if [ -n "${OT_QEMU_COV_BIN:-}" ] && [ -x "${OT_QEMU_COV_BIN}" ]; then
-        export QEMU_BIN="${OT_QEMU_COV_BIN}"
-    elif [ -x "$(dirname "$(realpath "$QEMU_BIN")")/../../../qemu-system-riscv32-cov" ]; then
-        export QEMU_BIN="$(dirname "$(realpath "$QEMU_BIN")")/../../../qemu-system-riscv32-cov"
-    fi
+    export QEMU_BIN="__qemu_cov_bin__"
     if [ -n "${TEST_UNDECLARED_OUTPUTS_DIR:-}" ]; then
         export GCOV_PREFIX="${TEST_UNDECLARED_OUTPUTS_DIR}/gcov"
-        export GCOV_PREFIX_STRIP=99
-    elif [ -n "${OT_GCOV_PREFIX:-}" ]; then
-        export GCOV_PREFIX="${OT_GCOV_PREFIX}/$$"
         export GCOV_PREFIX_STRIP=99
     fi
 fi
@@ -107,7 +100,7 @@ cleanup() {
         ) &
         # Ask QEMU to gracefully terminate (SIGTERM) first
         kill "$qemu_pid"
-        if [ "${OT_QEMU_COVERAGE:-0}" = "1" ]; then
+        if [ -n "${OT_QEMU_COVERAGE:-}" ] && [ "${OT_QEMU_COVERAGE}" != "0" ]; then
             for _ in {1..40}; do
                 kill -0 "$qemu_pid" 2>/dev/null || break
                 sleep 0.05
