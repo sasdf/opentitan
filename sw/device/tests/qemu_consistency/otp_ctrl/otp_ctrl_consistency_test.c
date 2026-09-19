@@ -10,6 +10,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "lc_ctrl_regs.h"
 #include "otp_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -17,6 +18,7 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kOtpCoreBase = TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR,
   kOtpPrimBase = TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR,
+  kLcCtrlBase = TOP_EARLGREY_LC_CTRL_BASE_ADDR,
   kOtpErrNoError = OTP_CTRL_ERR_CODE_0_ERR_CODE_0_VALUE_NO_ERROR,
   kOtpErrAccessError = OTP_CTRL_ERR_CODE_0_ERR_CODE_0_VALUE_ACCESS_ERROR,
 };
@@ -140,13 +142,27 @@ bool test_main(void) {
       OTP_CTRL_INTR_STATE_OTP_ERROR_BIT));
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
 
-  // 4. Test DAI Read of CREATOR_SW_CFG (unlocked) -> sets otp_operation_done
+  // 4. Test DAI Read of an unlocked SW_CFG partition -> sets otp_operation_done
   // and populates DIRECT_ACCESS_RDATA_0 matching SW_CFG_WINDOW.
+  // Note: ROM_EXT locks CREATOR_SW_CFG_READ_LOCK, while ROT_CREATOR_AUTH_CODESIGN
+  // remains unlocked (READ_LOCK == 1) in both ROM and ROM_EXT.
+  bool creator_sw_cfg_unlocked =
+      abs_mmio_read32(kOtpCoreBase +
+                      OTP_CTRL_CREATOR_SW_CFG_READ_LOCK_REG_OFFSET) == 1u;
+  uint32_t unlocked_part_offset =
+      creator_sw_cfg_unlocked
+          ? OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET
+          : OTP_CTRL_PARAM_ROT_CREATOR_AUTH_CODESIGN_OFFSET;
+  uint32_t unlocked_part_size =
+      creator_sw_cfg_unlocked
+          ? OTP_CTRL_PARAM_CREATOR_SW_CFG_SIZE
+          : OTP_CTRL_PARAM_ROT_CREATOR_AUTH_CODESIGN_SIZE;
+
   uint32_t expected_creator_word =
       abs_mmio_read32(kOtpCoreBase + OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET +
-                      OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET);
+                      unlocked_part_offset);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
-                   OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET);
+                   unlocked_part_offset);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
                    1u << OTP_CTRL_DIRECT_ACCESS_CMD_RD_BIT);
   wait_for_dai_idle();
@@ -185,7 +201,7 @@ bool test_main(void) {
   // 6. Verify subsequent valid DAI Read clears ERR_CODE_11 and STATUS.DAI_ERROR
   // while STATUS.VENDOR_TEST_ERROR remains set.
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
-                   OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET);
+                   unlocked_part_offset);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
                    1u << OTP_CTRL_DIRECT_ACCESS_CMD_RD_BIT);
   wait_for_dai_idle();
@@ -230,14 +246,13 @@ bool test_main(void) {
          0x3u) == 0x3u);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
 
-  // 8. Test DAI Read with unaligned byte address in the last word of unlocked
-  // CREATOR_SW_CFG (e.g. offset + size - 1 = 431). In RTL
+  // 8. Test DAI Read with unaligned byte address in the last word of the
+  // unlocked partition (e.g. offset + size - 1). In RTL
   // (otp_ctrl_dai.sv:721-722, 754-769), part_sel_oh checks
   // dai_addr_i < PartEndInt and masks the lower 2/3 address bits, so the read
   // succeeds with ERR_CODE_11 == NoError.
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
-                   OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET +
-                       OTP_CTRL_PARAM_CREATOR_SW_CFG_SIZE - 1u);
+                   unlocked_part_offset + unlocked_part_size - 1u);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
                    1u << OTP_CTRL_DIRECT_ACCESS_CMD_RD_BIT);
   wait_for_dai_idle();
@@ -245,32 +260,56 @@ bool test_main(void) {
         kOtpErrNoError);
 
   // 9. Test `otp_ctrl.prim` (`TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR` = 0x40138000)
+  // `u_tlul_lc_gate` (`lc_dft_en`) qualification (`otp_ctrl.sv:778-792`),
   // CSR0..CSR7 read/write field masks (`otp_ctrl_prim_reg_top.sv` /
-  // `prim_generic_otp.sv`) and verify unmapped `0x40132000` raises a Load
+  // `prim_generic_otp.sv`), and verify unmapped `0x40132000` raises a Load
   // Access Fault.
-  uint32_t faults_before_prim = load_access_fault_count;
-  for (uint32_t off = 0; off < 0x20u; off += 4u) {
-    CHECK(abs_mmio_read32(kOtpPrimBase + off) == 0x0u);
-  }
-  CHECK(load_access_fault_count == faults_before_prim);
+  uint32_t lc_state =
+      abs_mmio_read32(kLcCtrlBase + LC_CTRL_LC_STATE_REG_OFFSET);
+  bool lc_dft_en =
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED0) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED1) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED2) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED3) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED4) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED5) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED6) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_TEST_UNLOCKED7) ||
+      (lc_state == LC_CTRL_LC_STATE_STATE_VALUE_RMA);
 
-  static const uint32_t kPrimExpectedMask[8] = {
-      0x07ff3ff7u,  // CSR0: field0[0], field1[1], field2[2], field3[13:4], field4[26:16]
-      0xffffffffu,  // CSR1: field0..4[31:0]
-      0x00000001u,  // CSR2: field0[0]
-      0x00000000u,  // CSR3: field0..2 W1C (0), field3..8 RO (0)
-      0x000073ffu,  // CSR4: field0[9:0], field1[12], field2[13], field3[14]
-      0xffff00ffu,  // CSR5: field0[5:0], field1[7:6], field6[31:16] RW; field2..5 RO (0)
-      0xffff1bffu,  // CSR6: field0[9:0], field1[11], field2[12], field3[31:16]
-      0x00000000u,  // CSR7: field0..3 RO (0)
-  };
-  for (uint32_t i = 0; i < 8u; ++i) {
-    abs_mmio_write32(kOtpPrimBase + i * 4u, 0xffffffffu);
-    CHECK(abs_mmio_read32(kOtpPrimBase + i * 4u) == kPrimExpectedMask[i]);
-    abs_mmio_write32(kOtpPrimBase + i * 4u, 0x0u);
-    CHECK(abs_mmio_read32(kOtpPrimBase + i * 4u) == 0x0u);
+  uint32_t faults_before_prim = load_access_fault_count;
+  if (lc_dft_en) {
+    for (uint32_t off = 0; off < 0x20u; off += 4u) {
+      CHECK(abs_mmio_read32(kOtpPrimBase + off) == 0x0u);
+    }
+    CHECK(load_access_fault_count == faults_before_prim);
+
+    static const uint32_t kPrimExpectedMask[8] = {
+        0x07ff3ff7u,  // CSR0: field0[0], field1[1], field2[2], field3[13:4], field4[26:16]
+        0xffffffffu,  // CSR1: field0..4[31:0]
+        0x00000001u,  // CSR2: field0[0]
+        0x00000000u,  // CSR3: field0..2 W1C (0), field3..8 RO (0)
+        0x000073ffu,  // CSR4: field0[9:0], field1[12], field2[13], field3[14]
+        0xffff00ffu,  // CSR5: field0[5:0], field1[7:6], field6[31:16] RW; field2..5 RO (0)
+        0xffff1bffu,  // CSR6: field0[9:0], field1[11], field2[12], field3[31:16]
+        0x00000000u,  // CSR7: field0..3 RO (0)
+    };
+    for (uint32_t i = 0; i < 8u; ++i) {
+      abs_mmio_write32(kOtpPrimBase + i * 4u, 0xffffffffu);
+      CHECK(abs_mmio_read32(kOtpPrimBase + i * 4u) == kPrimExpectedMask[i]);
+      abs_mmio_write32(kOtpPrimBase + i * 4u, 0x0u);
+      CHECK(abs_mmio_read32(kOtpPrimBase + i * 4u) == 0x0u);
+    }
+    CHECK(load_access_fault_count == faults_before_prim);
+  } else {
+    // When lc_dft_en == Off (e.g. PROD / DEV in sival_rom_ext), u_tlul_lc_gate
+    // blocks 0x40138000..0x4013801f and returns d_error = 1 (Load Access Fault).
+    (void)abs_mmio_read32(kOtpPrimBase + 0x00u);
+    CHECK(load_access_fault_count == faults_before_prim + 1u);
+    (void)abs_mmio_read32(kOtpPrimBase + 0x1cu);
+    CHECK(load_access_fault_count == faults_before_prim + 2u);
+    faults_before_prim = load_access_fault_count;
   }
-  CHECK(load_access_fault_count == faults_before_prim);
 
   // Reading unmapped 0x40132000 (outside 0x40130000..0x40131fff core and
   // 0x40138000..0x4013801f prim) must raise a Load Access Fault.
