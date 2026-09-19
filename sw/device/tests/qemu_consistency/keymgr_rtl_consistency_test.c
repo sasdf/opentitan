@@ -156,9 +156,9 @@ bool test_main(void) {
   bool all_ok = true;
 
   uint32_t ws = abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  EXPECT_RTL(ws == KEYMGR_WORKING_STATE_STATE_VALUE_RESET,
-             "Initial WORKING_STATE expected RESET(0), got %u", ws);
-  CHECK_STATUS_OK(init_flash_and_otp_with_zero_owner_seed());
+  if (ws == KEYMGR_WORKING_STATE_STATE_VALUE_RESET) {
+    CHECK_STATUS_OK(init_flash_and_otp_with_zero_owner_seed());
+  }
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
 
   dif_kmac_t kmac;
@@ -181,72 +181,88 @@ bool test_main(void) {
   uint32_t op_st = 0;
   uint32_t err_code = 0;
 
-  // Lock SW_BINDING_REGWEN in Reset (ROM also locks this).
-  abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
-  EXPECT_RTL(
-      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 0u,
-      "SW_BINDING_REGWEN should be 0 in Reset after write 0");
+  if (ws == KEYMGR_WORKING_STATE_STATE_VALUE_RESET) {
+    // Lock SW_BINDING_REGWEN in Reset (ROM also locks this).
+    abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
+    EXPECT_RTL(
+        abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) ==
+            0u,
+        "SW_BINDING_REGWEN should be 0 in Reset after write 0");
 
-  // Trigger invalid op (GENERATE_SW_OUTPUT) in Reset.
-  write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_gen_sw);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
-  op_st = wait_keymgr_op_done_bounded(1000);
-  err_code = abs_mmio_read32(kKeymgrBase + KEYMGR_ERR_CODE_REG_OFFSET);
-  EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
-                 err_code == (1u << KEYMGR_ERR_CODE_INVALID_OP_BIT),
-             "GenSwOut in Reset expected DONE_ERROR(3) & INVALID_OP(1), got "
-             "op_st=%u err=0x%x",
-             op_st, err_code);
-  clear_keymgr_status_and_err();
+    // Trigger invalid op (GENERATE_SW_OUTPUT) in Reset.
+    write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET,
+                   ctrl_gen_sw);
+    abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
+    op_st = wait_keymgr_op_done_bounded(1000);
+    err_code = abs_mmio_read32(kKeymgrBase + KEYMGR_ERR_CODE_REG_OFFSET);
+    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
+                   err_code == (1u << KEYMGR_ERR_CODE_INVALID_OP_BIT),
+               "GenSwOut in Reset expected DONE_ERROR(3) & INVALID_OP(1), got "
+               "op_st=%u err=0x%x",
+               op_st, err_code);
+    clear_keymgr_status_and_err();
 
-  // Advance Reset -> Init.
-  write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
-  op_st = wait_keymgr_op_done_bounded(5000);
-  EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
-             "Advance Reset->Init expected DONE_SUCCESS(2), got %u", op_st);
-  clear_keymgr_status_and_err();
+    // Advance Reset -> Init.
+    write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
+    abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
+    op_st = wait_keymgr_op_done_bounded(5000);
+    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
+               "Advance Reset->Init expected DONE_SUCCESS(2), got %u", op_st);
+    clear_keymgr_status_and_err();
 
-  ws = abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  EXPECT_RTL(ws == KEYMGR_WORKING_STATE_STATE_VALUE_INIT,
-             "After Reset->Init, WORKING_STATE expected INIT(1), got %u", ws);
-  // In RTL (keymgr.sv:371), sw_binding_clr = op_done & adv_en & ~err &
-  // ~fault. Because Reset->Init does not assert adv_en (no KMAC KDF),
-  // SW_BINDING_REGWEN remains 0 in Init until Init->CreatorRootKey completes.
-  uint32_t sw_bind_regwen =
-      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
-  EXPECT_RTL(sw_bind_regwen == 0u,
-             "In Init after Reset->Init, SW_BINDING_REGWEN expected 0, got %u",
-             sw_bind_regwen);
+    ws = abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
+    EXPECT_RTL(ws == KEYMGR_WORKING_STATE_STATE_VALUE_INIT,
+               "After Reset->Init, WORKING_STATE expected INIT(1), got %u", ws);
+    // In RTL (keymgr.sv:371), sw_binding_clr = op_done & adv_en & ~err &
+    // ~fault. Because Reset->Init does not assert adv_en (no KMAC KDF),
+    // SW_BINDING_REGWEN remains 0 in Init until Init->CreatorRootKey completes.
+    uint32_t sw_bind_regwen =
+        abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
+    EXPECT_RTL(sw_bind_regwen == 0u,
+               "In Init after Reset->Init, SW_BINDING_REGWEN expected 0, got "
+               "%u",
+               sw_bind_regwen);
 
-  // Advance Init -> CreatorRootKey.
-  write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
-  op_st = wait_keymgr_op_done_bounded(5000);
-  EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
-             "Advance Init->CreatorRootKey expected DONE_SUCCESS(2), got %u",
-             op_st);
-  clear_keymgr_status_and_err();
+    // Advance Init -> CreatorRootKey.
+    write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
+    abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
+    op_st = wait_keymgr_op_done_bounded(5000);
+    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
+               "Advance Init->CreatorRootKey expected DONE_SUCCESS(2), got %u",
+               op_st);
+    clear_keymgr_status_and_err();
 
-  ws = abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  EXPECT_RTL(ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
-             "After Init->CreatorRootKey, WORKING_STATE expected "
-             "CREATOR_ROOT_KEY(2), got %u",
-             ws);
-  sw_bind_regwen =
-      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
-  EXPECT_RTL(sw_bind_regwen == 1u,
-             "After Init->CreatorRootKey, SW_BINDING_REGWEN expected 1, got %u",
-             sw_bind_regwen);
+    ws = abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
+    EXPECT_RTL(ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
+               "After Init->CreatorRootKey, WORKING_STATE expected "
+               "CREATOR_ROOT_KEY(2), got %u",
+               ws);
+    sw_bind_regwen =
+        abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
+    EXPECT_RTL(sw_bind_regwen == 1u,
+               "After Init->CreatorRootKey, SW_BINDING_REGWEN expected 1, got "
+               "%u",
+               sw_bind_regwen);
+  } else {
+    // Under sival_rom_ext, ROM_EXT advances keymgr to OwnerKey (4).
+    CHECK(ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_KEY ||
+          ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY);
+  }
 
   // ---------------------------------------------------------------------------
-  // Check 2: In CreatorRootKey, GEN_SW_OUT with valid KEY_VERSION updates
-  // SW_SHARE0/1_OUTPUT (which are RC), whereas GEN_SW_OUT with invalid
-  // KEY_VERSION (> max_key_ver) fails with INVALID_KMAC_INPUT and MUST NOT
-  // update SW_SHARE0/1_OUTPUT (in RTL data_valid_o = ~op_err).
+  // Check 2: In CreatorRootKey (or OwnerKey under ROM_EXT), GEN_SW_OUT with
+  // valid KEY_VERSION updates SW_SHARE0/1_OUTPUT (which are RC), whereas
+  // GEN_SW_OUT with invalid KEY_VERSION (> max_key_ver) fails with
+  // INVALID_KMAC_INPUT and MUST NOT update SW_SHARE0/1_OUTPUT (in RTL
+  // data_valid_o = ~op_err).
   // ---------------------------------------------------------------------------
-  uint32_t max_creator_ver = abs_mmio_read32(
-      kKeymgrBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET);
+  uint32_t max_ver_reg_offset =
+      (ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_KEY)
+          ? KEYMGR_MAX_OWNER_KEY_VER_SHADOWED_REG_OFFSET
+          : (ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY)
+                ? KEYMGR_MAX_OWNER_INT_KEY_VER_SHADOWED_REG_OFFSET
+                : KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET;
+  uint32_t max_creator_ver = abs_mmio_read32(kKeymgrBase + max_ver_reg_offset);
   abs_mmio_write32(kKeymgrBase + KEYMGR_KEY_VERSION_REG_OFFSET,
                    max_creator_ver);
   abs_mmio_write32(kKeymgrBase + KEYMGR_SALT_0_REG_OFFSET, 0x11223344u);
@@ -389,49 +405,48 @@ bool test_main(void) {
   // ---------------------------------------------------------------------------
   uint32_t pre_adv_ws =
       abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  EXPECT_RTL(pre_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
-             "Before Check 5, WORKING_STATE expected CREATOR_ROOT_KEY(2), got %u",
-             pre_adv_ws);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET, 0u);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
-  write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
-  abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
-  op_st = wait_keymgr_op_done_bounded(5000);
+  if (pre_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY) {
+    abs_mmio_write32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET, 0u);
+    abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
+    write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
+    abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
+    op_st = wait_keymgr_op_done_bounded(5000);
 
-  // In RTL (keymgr.sv:460, 538, 550), during CreatorRootKey -> OwnerIntKey
-  // (stage_sel == OwnerInt), adv_matrix[OwnerInt] hashes creator_seed, while
-  // adv_dvalid[OwnerInt] = owner_seed_vld and
-  // hw2reg.debug.invalid_owner_seed.de = adv_en & (stage_sel == OwnerInt) &
-  // ~owner_seed_vld. Because OwnerSeed is all-zero, this ADVANCE in
-  // CreatorRootKey MUST immediately fail with DONE_ERROR(3),
-  // ERR_CODE.INVALID_KMAC_INPUT(2), DEBUG.INVALID_OWNER_SEED(2),
-  // WORKING_STATE remaining CREATOR_ROOT_KEY(2), and SW_BINDING_REGWEN
-  // remaining 0.
-  err_code = abs_mmio_read32(kKeymgrBase + KEYMGR_ERR_CODE_REG_OFFSET);
-  uint32_t debug_val = abs_mmio_read32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET);
-  uint32_t post_adv_ws =
-      abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
-  uint32_t post_adv_bind_regwen =
-      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
-  EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
-                 err_code == (1u << KEYMGR_ERR_CODE_INVALID_KMAC_INPUT_BIT),
-             "Advance CreatorRootKey->OwnerIntKey with zero OwnerSeed "
-             "expected DONE_ERROR(3) & INVALID_KMAC_INPUT(2), got op_st=%u "
-             "err=0x%x",
-             op_st, err_code);
-  EXPECT_RTL(debug_val == (1u << KEYMGR_DEBUG_INVALID_OWNER_SEED_BIT),
-             "DEBUG after CreatorRootKey->OwnerIntKey with zero OwnerSeed "
-             "expected INVALID_OWNER_SEED (0x2), got 0x%x",
-             debug_val);
-  EXPECT_RTL(post_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
-             "Failed ADVANCE (INVALID_KMAC_INPUT) must stay in "
-             "CREATOR_ROOT_KEY(2), got %u",
-             post_adv_ws);
-  EXPECT_RTL(post_adv_bind_regwen == 0u,
-             "Failed ADVANCE (INVALID_KMAC_INPUT) must NOT unlock "
-             "SW_BINDING_REGWEN (expected 0, got %u)",
-             post_adv_bind_regwen);
-  clear_keymgr_status_and_err();
+    // In RTL (keymgr.sv:460, 538, 550), during CreatorRootKey -> OwnerIntKey
+    // (stage_sel == OwnerInt), adv_matrix[OwnerInt] hashes creator_seed, while
+    // adv_dvalid[OwnerInt] = owner_seed_vld and
+    // hw2reg.debug.invalid_owner_seed.de = adv_en & (stage_sel == OwnerInt) &
+    // ~owner_seed_vld. Because OwnerSeed is all-zero, this ADVANCE in
+    // CreatorRootKey MUST immediately fail with DONE_ERROR(3),
+    // ERR_CODE.INVALID_KMAC_INPUT(2), DEBUG.INVALID_OWNER_SEED(2),
+    // WORKING_STATE remaining CREATOR_ROOT_KEY(2), and SW_BINDING_REGWEN
+    // remaining 0.
+    err_code = abs_mmio_read32(kKeymgrBase + KEYMGR_ERR_CODE_REG_OFFSET);
+    uint32_t debug_val = abs_mmio_read32(kKeymgrBase + KEYMGR_DEBUG_REG_OFFSET);
+    uint32_t post_adv_ws =
+        abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
+    uint32_t post_adv_bind_regwen =
+        abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET);
+    EXPECT_RTL(op_st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR &&
+                   err_code == (1u << KEYMGR_ERR_CODE_INVALID_KMAC_INPUT_BIT),
+               "Advance CreatorRootKey->OwnerIntKey with zero OwnerSeed "
+               "expected DONE_ERROR(3) & INVALID_KMAC_INPUT(2), got op_st=%u "
+               "err=0x%x",
+               op_st, err_code);
+    EXPECT_RTL(debug_val == (1u << KEYMGR_DEBUG_INVALID_OWNER_SEED_BIT),
+               "DEBUG after CreatorRootKey->OwnerIntKey with zero OwnerSeed "
+               "expected INVALID_OWNER_SEED (0x2), got 0x%x",
+               debug_val);
+    EXPECT_RTL(post_adv_ws == KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY,
+               "Failed ADVANCE (INVALID_KMAC_INPUT) must stay in "
+               "CREATOR_ROOT_KEY(2), got %u",
+               post_adv_ws);
+    EXPECT_RTL(post_adv_bind_regwen == 0u,
+               "Failed ADVANCE (INVALID_KMAC_INPUT) must NOT unlock "
+               "SW_BINDING_REGWEN (expected 0, got %u)",
+               post_adv_bind_regwen);
+    clear_keymgr_status_and_err();
+  }
 
   // ---------------------------------------------------------------------------
   // Check 6: Disable keymgr (OPERATION = DISABLE), then issue START=1 in
