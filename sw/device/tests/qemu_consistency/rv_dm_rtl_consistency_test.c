@@ -57,6 +57,18 @@ static bool try_write32(uint32_t addr, uint32_t val) {
   return !store_fault_seen;
 }
 
+static bool try_write16(uint32_t addr, uint16_t val) {
+  store_fault_seen = false;
+  *(volatile uint16_t *)addr = val;
+  return !store_fault_seen;
+}
+
+static bool try_write8(uint32_t addr, uint8_t val) {
+  store_fault_seen = false;
+  abs_mmio_write8(addr, val);
+  return !store_fault_seen;
+}
+
 bool test_main(void) {
   // 1. Verify ALERT_TEST (0x00) is WO (reads back 0) and generates a transient
   // alert pulse on every write of 1 (testing two consecutive pulses).
@@ -207,6 +219,25 @@ bool test_main(void) {
       CHECK(!try_read32(kRvDmMemBase + 0x104u, &val));
       CHECK(!try_read32(kRvDmMemBase + 0x304u, &val));
       CHECK(!try_read32(kRvDmMemBase + 0x388u, &val));
+
+      // Wave 7: dm_mem.sv:374-402 gen_wr_err enforces FullRegMask (4'b1111)
+      // on writes to WhereTo (0x300), AbstractCmd (0x338..0x35f),
+      // ProgBuf (0x360..0x37f), Data0/1 (0x380..0x387), and Flags (0x400..0x7ff),
+      // and HartSelMask/OneBitMask (4'b0001) on Halted/Going/Resuming/Exception
+      // (0x100/0x108/0x110/0x118), while sub-word reads succeed (we_i == 0).
+      CHECK(!try_write8(kRvDmMemBase + 0x300u, 0x11u));
+      CHECK(!try_write16(kRvDmMemBase + 0x338u, 0x2222u));
+      CHECK(!try_write8(kRvDmMemBase + 0x360u, 0x33u));
+      CHECK(!try_write8(kRvDmMemBase + 0x380u, 0x44u));
+      CHECK(!try_write8(kRvDmMemBase + 0x400u, 0x55u));
+      CHECK(!try_write8(kRvDmMemBase + 0x101u, 0x00u));
+
+      // Sub-word 8-bit reads from AbstractCmd[2] (0x340 = 0x00c55513) and
+      // Flags[0]+1 (0x401 = 0x00) must succeed without fault.
+      load_fault_seen = false;
+      uint8_t ac2_b1 = abs_mmio_read8(kRvDmMemBase + 0x340u + 1u);
+      uint8_t flag_b1 = abs_mmio_read8(kRvDmMemBase + 0x401u);
+      CHECK(!load_fault_seen && ac2_b1 == 0x55u && flag_b1 == 0x00u);
     }
 
     // Restore original LATE_DEBUG_ENABLE.
