@@ -84,6 +84,62 @@ bool test_main(void) {
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
   busy_spin_micros(30);
 
+  // 1b. In RTL (aon_timer.sv:177-198 & aon_timer_core.sv:57-65), wkup_intr_o =
+  // wkup_incr & (wkup_count >= wkup_thold) feeds u_aon_intr_flop ->
+  // u_intr_sync (prim_edge_detector q_posedge_pulse_o).
+  // When WKUP_CTRL.PRESCALER == 0 (and prescale_count_q == 0), wkup_incr is 1
+  // on every single clk_aon_i cycle, so once wkup_count >= wkup_thold,
+  // wkup_intr_o remains continuously 1 and u_intr_sync sees no further rising
+  // edge after W1C clear of INTR_STATE.wkup_timer_expired until wkup_count <
+  // wkup_thold (or wkup_ctrl.enable is toggled).
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 2u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  busy_spin_micros(50);
+  uint32_t intr_prescale0 =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL((intr_prescale0 &
+              (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) != 0u,
+             "WKUP_TIMER_EXPIRED did not set initially with PRESCALER=0");
+
+  // Clear INTR_STATE.wkup_timer_expired via W1C while PRESCALER=0 and
+  // WKUP_COUNT >= WKUP_THOLD: must NOT re-latch because wkup_intr_o stays 1.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET,
+                   1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT);
+  busy_spin_micros(50);
+  intr_prescale0 =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL((intr_prescale0 &
+              (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) == 0u,
+             "INTR_STATE.wkup_timer_expired re-latched while PRESCALER=0 and "
+             "wkup_intr_o stayed continuously 1 (got 0x%08x)",
+             intr_prescale0);
+
+  // Toggling WKUP_CTRL.ENABLE (0 -> 1) drops wkup_intr_o to 0 and back to 1,
+  // producing a new rising edge at u_intr_sync while keeping prescale_count_q=0.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  busy_spin_micros(30);
+  intr_prescale0 =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL((intr_prescale0 &
+              (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) != 0u,
+             "INTR_STATE.wkup_timer_expired did not re-latch after toggling "
+             "WKUP_CTRL.ENABLE");
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+
   // 2. Disabling WKUP_CTRL with PRESCALER=0 after running with PRESCALER=200:
   // With prescaler=200 (~1 ms per wakeup tick at 200 kHz), spinning for 80 us
   // (~16 AON clocks) must NOT increment WKUP_COUNT_LO (expected 0).
