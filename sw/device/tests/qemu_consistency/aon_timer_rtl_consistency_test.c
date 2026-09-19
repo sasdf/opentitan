@@ -1,0 +1,187 @@
+// Copyright lowRISC contributors (OpenTitan project).
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "sw/device/lib/base/abs_mmio.h"
+#include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/dif/dif_alert_handler.h"
+#include "sw/device/lib/dif/dif_aon_timer.h"
+#include "sw/device/lib/dif/dif_rstmgr.h"
+#include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/log.h"
+#include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "aon_timer_regs.h"
+
+OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
+
+enum {
+  kAonTimerBase = TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR,
+  kRstmgrBase = TOP_EARLGREY_RSTMGR_AON_BASE_ADDR,
+  kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
+};
+
+#define EXPECT_RTL(cond, ...)                   \
+  do {                                          \
+    if (!(cond)) {                              \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
+      all_ok = false;                           \
+    }                                           \
+  } while (0)
+
+bool test_main(void) {
+  bool all_ok = true;
+
+  // Stop both timers and clear state.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_COUNT_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+
+  // 1. Writing WKUP_COUNT_HI while WKUP_CTRL.enable == 1 (with prescaler=0 so
+  // prescale_count_q stays 0) must NOT lose elapsed ticks in WKUP_COUNT_LO.
+  // In QEMU, writing WKUP_COUNT_HI resets wkup_origin_ns = now without
+  // snapshotting WKUP_COUNT_LO first, discarding elapsed ticks.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_HI_REG_OFFSET,
+                   0xffffffffu);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET,
+                   0xffffffffu);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  busy_spin_micros(100);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 1u);
+  busy_spin_micros(30);
+  uint32_t wkup_lo =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET);
+  EXPECT_RTL(wkup_lo >= 15u,
+             "Writing WKUP_COUNT_HI while enabled lost elapsed WKUP_COUNT_LO "
+             "ticks (expected >= 15, got %u)",
+             wkup_lo);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+
+  // 2. Disabling WKUP_CTRL with PRESCALER=0 after running with PRESCALER=200:
+  // With prescaler=200 (~1 ms per wakeup tick at 200 kHz), spinning for 80 us
+  // (~16 AON clocks) must NOT increment WKUP_COUNT_LO (expected 0).
+  // In QEMU, writing WKUP_CTRL=0 overwrites PRESCALER=0 before computing
+  // elapsed ticks, falsely inflating WKUP_COUNT_LO to ~20.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  uint32_t ctrl_prescaled =
+      bitfield_field32_write(0u, AON_TIMER_WKUP_CTRL_PRESCALER_FIELD, 200u) |
+      (1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   ctrl_prescaled);
+  busy_spin_micros(80);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  wkup_lo = abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET);
+  EXPECT_RTL(wkup_lo == 0u,
+             "Disabling WKUP_CTRL with prescaler=0 after 80us (prescaler=200) "
+             "must keep WKUP_COUNT_LO == 0, got %u",
+             wkup_lo);
+
+  // 3. In RTL (aon_timer_core.sv), prescale_count_q is ONLY updated when
+  // prescale_en is high and is NOT cleared when WKUP_CTRL.ENABLE is cleared.
+  // Because prescale_count_q is ~16 from the previous 80us run, re-enabling
+  // WKUP_CTRL with prescaler=0 means (prescale_count_q == prescaler) is false
+  // until the 12-bit prescale_count_q wraps around (4080 AON clocks = ~20.4ms).
+  // Thus after 100us, WKUP_COUNT_LO must still be 0!
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
+  busy_spin_micros(100);
+  wkup_lo = abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET);
+  EXPECT_RTL(wkup_lo == 0u,
+             "prescale_count_q must not reset on WKUP_CTRL disable; re-enabling "
+             "with prescaler=0<prescale_count_q must not tick before 12-bit "
+             "wraparound (expected 0, got %u)",
+             wkup_lo);
+  // Reset prescale_count_q back to 0 by setting prescaler=200 and waiting 1.1ms
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   ctrl_prescaled);
+  busy_spin_micros(1100);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  busy_spin_micros(30);
+
+  // 4. Threshold comparison (`wkup_intr_o = wkup_incr & (wkup_count >=
+  // wkup_thold)`) is gated by `wkup_incr` (when `prescale_count_q ==
+  // prescaler`). When WKUP_COUNT=0 and WKUP_THOLD=0 with prescaler=200,
+  // WKUP_CAUSE and INTR_STATE must NOT assert immediately upon enable before
+  // the prescaler period (~1ms) elapses.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_HI_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   ctrl_prescaled);
+  busy_spin_micros(50);
+  uint32_t intr_early =
+      abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL((intr_early &
+              (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) == 0u,
+             "WKUP_TIMER_EXPIRED fired before prescaler period elapsed "
+             "(intr_state=0x%08x)",
+             intr_early);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
+  busy_spin_micros(30);
+
+  // 5. ALERT_TEST is a pulse (`alert_test.q & alert_test.qe`), so writing 1
+  // to ALERT_TEST a second time after clearing ALERT_CAUSE must re-trigger
+  // alert_handler.
+  dif_alert_handler_t alert_handler;
+  CHECK_DIF_OK(dif_alert_handler_init(
+      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_configure_alert(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault,
+      kDifAlertHandlerClassD, kDifToggleEnabled, kDifToggleDisabled));
+
+  CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault));
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_ALERT_TEST_REG_OFFSET, 1u);
+  busy_spin_micros(10);
+  bool is_cause = false;
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault, &is_cause));
+  EXPECT_RTL(is_cause, "First write to ALERT_TEST did not set alert cause");
+
+  CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault));
+  busy_spin_micros(10);
+  is_cause = true;
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault, &is_cause));
+  EXPECT_RTL(!is_cause,
+             "ALERT_CAUSE remained set after acknowledge (ALERT_TEST latched "
+             "high instead of pulsing)");
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_ALERT_TEST_REG_OFFSET, 1u);
+  busy_spin_micros(10);
+  is_cause = false;
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault, &is_cause));
+  EXPECT_RTL(is_cause,
+             "Second write to ALERT_TEST did not set alert cause (ALERT_TEST "
+             "latched high instead of pulsing)");
+  CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
+      &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault));
+
+  return all_ok;
+}
