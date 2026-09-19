@@ -24,6 +24,18 @@ static void aon_cdc_wait(void) {
   busy_spin_micros(40);
 }
 
+static volatile uint32_t kFaultCount = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mepc;
+  __asm__ volatile("csrr %0, mepc" : "=r"(mepc));
+  uint16_t insn16 = *(const uint16_t *)mepc;
+  uint32_t step = ((insn16 & 0x3u) == 0x3u) ? 4u : 2u;
+  __asm__ volatile("csrw mepc, %0" : : "r"(mepc + step));
+  kFaultCount++;
+}
+
 bool test_main(void) {
   // 1. Check reset defaults and reserved bitmasks on ADC_PD_CTL and
   // ADC_CHN0/1_FILTER_CTL_0.
@@ -320,5 +332,35 @@ bool test_main(void) {
         filter_status);
 
   mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  aon_cdc_wait();
+
+  // 10. Verify ADC_CTRL_PERMIT sub-word write checks (adc_ctrl_reg_top.sv wr_err):
+  // - Sub-word write to ADC_PD_CTL (ADC_CTRL_PERMIT = 4'b1111) faults and blocks write.
+  // - Sub-word write to ADC_LP_SAMPLE_CTL+1 (ADC_CTRL_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
+  // - Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  uint32_t orig_pd = abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET);
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET)) = 0x55u;
+  CHECK(kFaultCount == 1u &&
+            abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) == orig_pd,
+        "Sub-word write to ADC_PD_CTL must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET + 1u)) =
+      0x11u;
+  CHECK(kFaultCount == 1u &&
+            abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) ==
+                2u,
+        "Sub-word write to ADC_LP_SAMPLE_CTL+1 must fault and not modify register");
+
+  kFaultCount = 0;
+  *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET)) =
+      0x09u;
+  aon_cdc_wait();
+  CHECK(kFaultCount == 0u &&
+            abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) ==
+                0x09u,
+        "Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT=4'b0001) must succeed");
+
   return true;
 }
