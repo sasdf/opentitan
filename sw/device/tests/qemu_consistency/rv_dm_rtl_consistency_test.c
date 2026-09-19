@@ -98,10 +98,34 @@ bool test_main(void) {
       kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET);
   CHECK((regwen & ~1u) == 0u);
 
+  // 2b. Verify unmapped offset 0x0c in RV_DM.REGS (RegsAw=4, 16-byte aperture)
+  // returns addrmiss TL-UL bus error (Load/Store Access Fault).
+  CHECK(!try_read32(kRvDmRegsBase + 0x0cu, NULL));
+  CHECK(!try_write32(kRvDmRegsBase + 0x0cu, 0x12345678u));
+
   if (regwen == 1u) {
     uint32_t orig_val =
         abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET);
     CHECK(orig_val == kMultiBitBool32False || orig_val == kMultiBitBool32True);
+
+    // Sub-word (8-bit and 16-bit) writes to LATE_DEBUG_ENABLE (RV_DM_REGS_PERMIT[2] = 4'b1111)
+    // must assert wr_err (Store Access Fault) and preserve LATE_DEBUG_ENABLE.
+    store_fault_seen = false;
+    abs_mmio_write8(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET, 0x12u);
+    CHECK(store_fault_seen);
+    store_fault_seen = false;
+    *(volatile uint16_t *)(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) =
+        0x1234u;
+    CHECK(store_fault_seen);
+    CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
+          orig_val);
+
+    // Sub-word 8-bit write to LATE_DEBUG_ENABLE_REGWEN (RV_DM_REGS_PERMIT[1] = 4'b0001)
+    // must succeed without bus error.
+    store_fault_seen = false;
+    abs_mmio_write8(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET,
+                    0xffu);
+    CHECK(!store_fault_seen);
 
     // Writing 1 to rw0c LATE_DEBUG_ENABLE_REGWEN must keep it 1, and upper bits
     // [31:1] must be masked to 0.
