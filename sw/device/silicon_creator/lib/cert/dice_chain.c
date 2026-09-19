@@ -91,9 +91,7 @@ rom_error_t dice_chain_attestation_creator(
   RETURN_IF_ERROR(
       dice_storage_get_key_id(kDicePageKeyIdxCdi0, &cached_cdi0_id));
 
-  bool cache_valid = cached_cdi0_id == expected_cdi0_id &&
-                     dice_storage_load_page(&dice_page) == kErrorOk &&
-                     dice_storage_check_digest(&dice_page) == kErrorOk;
+  bool cache_valid = cached_cdi0_id == expected_cdi0_id;
 
   if (!cache_valid) {
     // Update the cert page buffer.
