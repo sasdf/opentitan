@@ -429,5 +429,42 @@ bool test_main(void) {
           0u,
       "ENTROPY_REFRESH_HASH_CNT must remain 0 after SHA3 (KMAC_EN=0)");
 
+  // 14. Wave 5 Check: KMAC_PERMIT sub-word read/write and addrmiss checks.
+  // 14a. Sub-word read (lb) on KMAC_STATUS (0x1c) succeeds without fault.
+  faults_before = fault_count;
+  uint8_t status_b0 = abs_mmio_read8(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  EXPECT_RTL(fault_count == faults_before && (status_b0 & 0x1u) == 0x1u,
+             "lb from KMAC_STATUS expected SHA3_IDLE=1 without fault, got "
+             "fault_delta=%u status_b0=0x%02x",
+             fault_count - faults_before, status_b0);
+
+  // 14b. KMAC_INTR_ENABLE has KMAC_PERMIT = 0x1: sb at byte 0 succeeds,
+  // whereas sb at byte 1 faults with mcause=7.
+  faults_before = fault_count;
+  abs_mmio_write8(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET, 0x3u);
+  EXPECT_RTL(fault_count == faults_before &&
+                 abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) ==
+                     0x3u,
+             "sb at byte 0 of KMAC_INTR_ENABLE (PERMIT=0x1) should succeed");
+  faults_before = fault_count;
+  last_mcause = 0;
+  abs_mmio_write8(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET + 1u, 0x0u);
+  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 7u &&
+                 abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) ==
+                     0x3u,
+             "sb at byte 1 of KMAC_INTR_ENABLE (PERMIT=0x1) expected fault(7)");
+  abs_mmio_write32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET, 0u);
+
+  // 14c. KMAC_PREFIX_0 has KMAC_PERMIT = 0xf: sb at byte 0 faults with mcause=7
+  // and does not modify KMAC_PREFIX_0.
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x11223344u);
+  faults_before = fault_count;
+  last_mcause = 0;
+  abs_mmio_write8(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x99u);
+  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 7u &&
+                 abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET) ==
+                     0x11223344u,
+             "sb to KMAC_PREFIX_0 (PERMIT=0xf) expected fault(7) & unchanged");
+
   return all_ok;
 }
