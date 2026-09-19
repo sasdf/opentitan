@@ -191,5 +191,74 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET) == 0u,
         "Expected CTRL_AUX_REGWEN to remain 0 after writing 1 (rw0c)");
 
+  // 8. Verify TRIGGER.DATA_OUT_CLEAR when STATUS.OUTPUT_VALID=1 sets
+  // STATUS.OUTPUT_LOST=1 (aes_control_fsm.sv:601, 760-762):
+  write_ctrl_shadowed(ecb_manual_ctrl);
+  write_dummy_key(0x55aa55aau);
+  write_dummy_data_in(0x500u);
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  wait_for_idle();
+  status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(status, AES_STATUS_OUTPUT_VALID_BIT),
+        "Expected STATUS.OUTPUT_VALID=1 before DATA_OUT_CLEAR");
+  CHECK(!bitfield_bit32_read(status, AES_STATUS_OUTPUT_LOST_BIT),
+        "Expected STATUS.OUTPUT_LOST=0 before DATA_OUT_CLEAR");
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_DATA_OUT_CLEAR_BIT);
+  wait_for_idle();
+  status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(status, AES_STATUS_OUTPUT_VALID_BIT),
+        "Expected STATUS.OUTPUT_VALID=0 after DATA_OUT_CLEAR");
+  CHECK(bitfield_bit32_read(status, AES_STATUS_OUTPUT_LOST_BIT),
+        "Expected STATUS.OUTPUT_LOST=1 when DATA_OUT_CLEAR overwrites unread "
+        "DATA_OUT");
+
+  // 9. Verify first (staged) write to CTRL_SHADOWED clears data_in_new_q and
+  // sets STATUS.INPUT_READY=1 (aes_control_fsm.sv:705, 711-713, 738-739):
+  write_dummy_data_in(0x600u);
+  status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(status, AES_STATUS_INPUT_READY_BIT),
+        "Expected STATUS.INPUT_READY=0 after writing all 4 DATA_IN words in "
+        "manual mode");
+  abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, ecb_manual_ctrl);
+  status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(status, AES_STATUS_INPUT_READY_BIT),
+        "Expected STATUS.INPUT_READY=1 after first (staged) CTRL_SHADOWED "
+        "write");
+  abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, ecb_manual_ctrl);
+
+  // 10. Verify overwriting a single DATA_IN word before cipher load updates the
+  // block encrypted on TRIGGER.START (aes_core.sv:280-285, 429):
+  write_dummy_key(0xdeadbeefu);
+  write_dummy_data_in(0x700u);
+  // Overwrite only DATA_IN_0 before starting manual encryption:
+  abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET, 0x77777777u);
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  wait_for_idle();
+  uint32_t out_overwritten[4];
+  for (uint32_t i = 0; i < 4; ++i) {
+    out_overwritten[i] =
+        abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4);
+  }
+
+  // Encrypt the same 4 words written directly without overwrite:
+  abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET, 0x77777777u);
+  for (uint32_t i = 1; i < 4; ++i) {
+    abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4, 0x700u + i);
+  }
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  wait_for_idle();
+  for (uint32_t i = 0; i < 4; ++i) {
+    uint32_t out_direct =
+        abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4);
+    CHECK(out_overwritten[i] == out_direct,
+          "DATA_OUT_%u mismatch after single-word DATA_IN_0 overwrite: "
+          "0x%08x vs 0x%08x",
+          i, out_overwritten[i], out_direct);
+  }
+
   return true;
 }
