@@ -4,11 +4,14 @@
 
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/multibits.h"
+#include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/entropy_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "entropy_src_regs.h"
@@ -19,6 +22,17 @@ OTTF_DEFINE_TEST_CONFIG();
 enum {
   kEsBase = TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR,
 };
+
+static volatile bool kLoadStoreFault = false;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  kLoadStoreFault = true;
+  uint32_t mepc = ibex_mepc_read();
+  uint16_t inst = *(volatile uint16_t *)mepc;
+  uint32_t step = ((inst & 0x3u) == 0x3u) ? 4u : 2u;
+  CSR_WRITE(CSR_REG_MEPC, mepc + step);
+}
 
 bool test_main(void) {
   CHECK_STATUS_OK(entropy_testutils_stop_all());
@@ -403,6 +417,36 @@ bool test_main(void) {
   CHECK(bitfield_bit32_read(intr_state, ENTROPY_SRC_INTR_STATE_ES_FATAL_ERR_BIT),
         "Expected INTR_STATE.ES_FATAL_ERR set on 12th empty read, got 0x%x",
         intr_state);
+
+  // 12. Wave 5: Verify ENTROPY_SRC_PERMIT sub-word write error (wr_err) and
+  // addrmiss decode error (entropy_src_reg_pkg.sv:980-1038,
+  // entropy_src_reg_top.sv:3466-3523).
+  uint32_t conf_before = abs_mmio_read32(kEsBase + ENTROPY_SRC_CONF_REG_OFFSET);
+  kLoadStoreFault = false;
+  abs_mmio_write8(kEsBase + ENTROPY_SRC_CONF_REG_OFFSET, 0x66u);
+  CHECK(kLoadStoreFault,
+        "Expected Store Access Fault on 8-bit write to ENTROPY_SRC_CONF "
+        "(PERMIT=4'b1111)");
+  CHECK(abs_mmio_read32(kEsBase + ENTROPY_SRC_CONF_REG_OFFSET) == conf_before,
+        "Expected ENTROPY_SRC_CONF unchanged after rejected sub-word write");
+
+  kLoadStoreFault = false;
+  abs_mmio_write8(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET + 1u, 0x09u);
+  CHECK(kLoadStoreFault,
+        "Expected Store Access Fault on 8-bit write to byte 1 of "
+        "ENTROPY_SRC_MODULE_ENABLE (PERMIT=4'b0001)");
+
+  kLoadStoreFault = false;
+  abs_mmio_write8(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
+                  kMultiBitBool4False);
+  CHECK(!kLoadStoreFault,
+        "Expected 8-bit write to byte 0 of ENTROPY_SRC_MODULE_ENABLE "
+        "(PERMIT=4'b0001) to succeed");
+
+  kLoadStoreFault = false;
+  (void)abs_mmio_read32(kEsBase + 0xe4u);
+  CHECK(kLoadStoreFault,
+        "Expected Load Access Fault on unmapped offset 0xe4 (addrmiss)");
 
   return true;
 }
