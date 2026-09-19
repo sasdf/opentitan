@@ -1,0 +1,218 @@
+// Copyright lowRISC contributors (OpenTitan project).
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+#include "sw/device/lib/base/csr.h"
+#include "sw/device/lib/base/mmio.h"
+#include "sw/device/lib/dif/dif_alert_handler.h"
+#include "sw/device/lib/dif/dif_rv_plic.h"
+#include "sw/device/lib/dif/dif_uart.h"
+#include "sw/device/lib/runtime/irq.h"
+#include "sw/device/lib/runtime/log.h"
+#include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "alert_handler_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "rv_plic_regs.h"
+
+OTTF_DEFINE_TEST_CONFIG();
+
+enum {
+  kMipMsipBit = 3,
+  kMipMeipBit = 11,
+};
+
+static bool get_mip_meip(void) {
+  uint32_t mip = 0;
+  CSR_READ(CSR_REG_MIP, &mip);
+  return ((mip >> kMipMeipBit) & 1u) != 0;
+}
+
+static bool get_mip_msip(void) {
+  uint32_t mip = 0;
+  CSR_READ(CSR_REG_MIP, &mip);
+  return ((mip >> kMipMsipBit) & 1u) != 0;
+}
+
+static void test_prio0_and_ie_last_word_masks(mmio_region_t plic_base) {
+  // 1. In rv_plic_reg_top.sv (u_prio0), PRIO0 at offset 0x0 is a 2-bit
+  // SwAccessRW register (mask 0x3), even though interrupt source 0 is tied
+  // off to 0.
+  mmio_region_write32(plic_base, RV_PLIC_PRIO0_REG_OFFSET, 0xffffffffu);
+  uint32_t prio0 = mmio_region_read32(plic_base, RV_PLIC_PRIO0_REG_OFFSET);
+  CHECK(prio0 == 0x3u, "Expected PRIO0=0x3 after writing 0xffffffff, got 0x%x",
+        prio0);
+  mmio_region_write32(plic_base, RV_PLIC_PRIO0_REG_OFFSET, 0u);
+  prio0 = mmio_region_read32(plic_base, RV_PLIC_PRIO0_REG_OFFSET);
+  CHECK(prio0 == 0x0u, "Expected PRIO0=0x0 after clearing, got 0x%x", prio0);
+
+  // 2. In rv_plic_reg_top.sv (u_ie0_5), IE0_5 at offset 0x2014 only has 26
+  // valid bits [25:0] (sources 160..185, mask 0x03ffffff).
+  uint32_t orig_ie5 = mmio_region_read32(plic_base, RV_PLIC_IE0_5_REG_OFFSET);
+  mmio_region_write32(plic_base, RV_PLIC_IE0_5_REG_OFFSET, 0xffffffffu);
+  uint32_t ie5 = mmio_region_read32(plic_base, RV_PLIC_IE0_5_REG_OFFSET);
+  CHECK(ie5 == 0x03ffffffu,
+        "Expected IE0_5=0x03ffffff after writing 0xffffffff, got 0x%x", ie5);
+  mmio_region_write32(plic_base, RV_PLIC_IE0_5_REG_OFFSET, orig_ie5);
+}
+
+static void test_cc0_claim_threshold_and_zero_prio(mmio_region_t plic_base,
+                                                   dif_rv_plic_t *plic,
+                                                   dif_uart_t *uart) {
+  const dif_rv_plic_irq_id_t kIrqId = kTopEarlgreyPlicIrqIdUart0RxParityErr;
+  const dif_rv_plic_target_t kTarget = kTopEarlgreyPlicTargetIbex0;
+
+  irq_global_ctrl(false);
+  irq_external_ctrl(false);
+
+  // Clean state for UART0 RxParityErr IRQ.
+  CHECK_DIF_OK(
+      dif_uart_irq_set_enabled(uart, kDifUartIrqRxParityErr, kDifToggleDisabled));
+  CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
+  CHECK_DIF_OK(
+      dif_rv_plic_irq_set_enabled(plic, kIrqId, kTarget, kDifToggleDisabled));
+
+  // Case A: PRIO = 1, THRESHOLD0 = 2 (prio <= threshold).
+  // In rv_plic_target.sv:
+  //   irq_d    = (max_value > threshold_i) ? max_valid : 1'b0;  -> 0
+  //   irq_id_d = (max_valid) ? max_idx : '0;                    -> kIrqId
+  // So MIP.MEIP must stay 0, but reading CC0 must still return kIrqId and
+  // claim the interrupt (clearing IP).
+  CHECK_DIF_OK(dif_rv_plic_irq_set_priority(plic, kIrqId, 1u));
+  CHECK_DIF_OK(dif_rv_plic_target_set_threshold(plic, kTarget, 2u));
+  CHECK_DIF_OK(
+      dif_rv_plic_irq_set_enabled(plic, kIrqId, kTarget, kDifToggleEnabled));
+
+  CHECK_DIF_OK(
+      dif_uart_irq_set_enabled(uart, kDifUartIrqRxParityErr, kDifToggleEnabled));
+  CHECK_DIF_OK(dif_uart_irq_force(uart, kDifUartIrqRxParityErr, true));
+
+  bool is_pending = false;
+  CHECK_DIF_OK(dif_rv_plic_irq_is_pending(plic, kIrqId, &is_pending));
+  CHECK(is_pending, "Expected IRQ %u to be pending in IP", kIrqId);
+  CHECK(!get_mip_meip(),
+        "Expected MIP.MEIP=0 when PRIO(1) <= THRESHOLD0(2)");
+
+  dif_rv_plic_irq_id_t claimed_id = 0;
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(plic, kTarget, &claimed_id));
+  CHECK(claimed_id == kIrqId,
+        "Expected CC0 claim to return %u even when PRIO(1) <= THRESHOLD0(2), "
+        "got %u",
+        kIrqId, claimed_id);
+
+  // Claiming CC0 must clear IP in rv_plic_gateway.
+  CHECK_DIF_OK(dif_rv_plic_irq_is_pending(plic, kIrqId, &is_pending));
+  CHECK(!is_pending, "Expected IP bit to clear upon CC0 claim");
+
+  // Clear UART0 interrupt source and complete CC0.
+  CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
+  CHECK_DIF_OK(dif_rv_plic_irq_complete(plic, kTarget, claimed_id));
+
+  // Case B: PRIO = 0, THRESHOLD0 = 0 (prio == 0, enabled & pending).
+  // prim_max_tree has valid_i = ip_i & ie_i, so max_valid = 1 and max_idx = kIrqId.
+  // MIP.MEIP must be 0 (0 > 0 is false), and CC0 must return kIrqId.
+  mmio_region_write32(plic_base, RV_PLIC_PRIO0_REG_OFFSET + (kIrqId * 4u), 0u);
+  CHECK_DIF_OK(dif_rv_plic_target_set_threshold(plic, kTarget, 0u));
+  CHECK_DIF_OK(dif_uart_irq_force(uart, kDifUartIrqRxParityErr, true));
+
+  CHECK_DIF_OK(dif_rv_plic_irq_is_pending(plic, kIrqId, &is_pending));
+  CHECK(is_pending, "Expected IRQ %u to be pending in IP", kIrqId);
+  CHECK(!get_mip_meip(),
+        "Expected MIP.MEIP=0 when PRIO(0) <= THRESHOLD0(0)");
+
+  claimed_id = 0;
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(plic, kTarget, &claimed_id));
+  CHECK(claimed_id == kIrqId,
+        "Expected CC0 claim to return %u when PRIO=0 and IE=1, got %u",
+        kIrqId, claimed_id);
+
+  CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
+  CHECK_DIF_OK(dif_rv_plic_irq_complete(plic, kTarget, claimed_id));
+
+  // Case C: PRIO = 2, THRESHOLD0 = 1 (prio > threshold).
+  // MIP.MEIP must be 1 until CC0 is claimed.
+  CHECK_DIF_OK(dif_rv_plic_irq_set_priority(plic, kIrqId, 2u));
+  CHECK_DIF_OK(dif_rv_plic_target_set_threshold(plic, kTarget, 1u));
+  CHECK_DIF_OK(dif_uart_irq_force(uart, kDifUartIrqRxParityErr, true));
+
+  CHECK(get_mip_meip(), "Expected MIP.MEIP=1 when PRIO(2) > THRESHOLD0(1)");
+  claimed_id = 0;
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(plic, kTarget, &claimed_id));
+  CHECK(claimed_id == kIrqId, "Expected CC0 claim to return %u, got %u",
+        kIrqId, claimed_id);
+  CHECK(!get_mip_meip(), "Expected MIP.MEIP=0 after CC0 claim");
+
+  CHECK_DIF_OK(dif_uart_irq_acknowledge(uart, kDifUartIrqRxParityErr));
+  CHECK_DIF_OK(dif_rv_plic_irq_complete(plic, kTarget, claimed_id));
+
+  // Restore target threshold and disable test IRQ.
+  CHECK_DIF_OK(
+      dif_rv_plic_irq_set_enabled(plic, kIrqId, kTarget, kDifToggleDisabled));
+  CHECK_DIF_OK(dif_rv_plic_target_set_threshold(plic, kTarget, 0u));
+  CHECK_DIF_OK(
+      dif_uart_irq_set_enabled(uart, kDifUartIrqRxParityErr, kDifToggleDisabled));
+}
+
+static void test_msip0_and_alert_test(mmio_region_t plic_base,
+                                      dif_alert_handler_t *alert_handler) {
+  irq_software_ctrl(false);
+
+  // MSIP0 reset value is 0.
+  uint32_t msip0 = mmio_region_read32(plic_base, RV_PLIC_MSIP0_REG_OFFSET);
+  CHECK(msip0 == 0u, "Expected MSIP0=0 at start, got 0x%x", msip0);
+  CHECK(!get_mip_msip(), "Expected MIP.MSIP=0 when MSIP0=0");
+
+  // Write 0xffffffff to MSIP0 -> 1-bit RW register (mask 0x1), asserts MIP.MSIP.
+  mmio_region_write32(plic_base, RV_PLIC_MSIP0_REG_OFFSET, 0xffffffffu);
+  msip0 = mmio_region_read32(plic_base, RV_PLIC_MSIP0_REG_OFFSET);
+  CHECK(msip0 == 1u, "Expected MSIP0=1 after writing 0xffffffff, got 0x%x",
+        msip0);
+  CHECK(get_mip_msip(), "Expected MIP.MSIP=1 when MSIP0=1");
+
+  // Clear MSIP0 -> deasserts MIP.MSIP.
+  mmio_region_write32(plic_base, RV_PLIC_MSIP0_REG_OFFSET, 0u);
+  msip0 = mmio_region_read32(plic_base, RV_PLIC_MSIP0_REG_OFFSET);
+  CHECK(msip0 == 0u, "Expected MSIP0=0 after writing 0, got 0x%x", msip0);
+  CHECK(!get_mip_msip(), "Expected MIP.MSIP=0 after clearing MSIP0");
+
+  // Write 1 to ALERT_TEST -> must pulse alert 41 (kTopEarlgreyAlertIdRvPlicFatalFault)
+  // and allow W1C acknowledgement in alert_handler.
+  mmio_region_write32(plic_base, RV_PLIC_ALERT_TEST_REG_OFFSET, 1u);
+
+  bool is_cause = false;
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
+      alert_handler, kTopEarlgreyAlertIdRvPlicFatalFault, &is_cause));
+  CHECK(is_cause, "Expected RV_PLIC fatal_fault alert_cause to be set");
+
+  CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
+      alert_handler, kTopEarlgreyAlertIdRvPlicFatalFault));
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
+      alert_handler, kTopEarlgreyAlertIdRvPlicFatalFault, &is_cause));
+  CHECK(!is_cause,
+        "Expected RV_PLIC fatal_fault alert_cause to clear after W1C ack "
+        "(ALERT_TEST must pulse, not latch high)");
+}
+
+bool test_main(void) {
+  mmio_region_t plic_base =
+      mmio_region_from_addr(TOP_EARLGREY_RV_PLIC_BASE_ADDR);
+  dif_rv_plic_t plic;
+  CHECK_DIF_OK(dif_rv_plic_init(plic_base, &plic));
+
+  dif_uart_t uart;
+  CHECK_DIF_OK(
+      dif_uart_init(mmio_region_from_addr(TOP_EARLGREY_UART0_BASE_ADDR), &uart));
+
+  dif_alert_handler_t alert_handler;
+  CHECK_DIF_OK(dif_alert_handler_init(
+      mmio_region_from_addr(TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR),
+      &alert_handler));
+
+  test_prio0_and_ie_last_word_masks(plic_base);
+  test_cc0_claim_threshold_and_zero_prio(plic_base, &plic, &uart);
+  test_msip0_and_alert_test(plic_base, &alert_handler);
+
+  LOG_INFO("rv_plic_consistency_test passed!");
+  return true;
+}
