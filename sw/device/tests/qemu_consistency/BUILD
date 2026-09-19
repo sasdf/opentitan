@@ -581,6 +581,7 @@ opentitan_test(
     name = "rv_timer_rtl_consistency_test",
     srcs = ["rv_timer_rtl_consistency_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_CW340_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
