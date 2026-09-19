@@ -210,8 +210,24 @@ static void test_fifo_depth_and_err_code_test(void) {
       4u * (uint32_t)kTopEarlgreyAlertIdEdn0FatalAlert;
   abs_mmio_write32(edn0_fatal_cause_reg, 1u);
 
-  // Enable EDN0 in SWPortMode.
+  // Enable EDN0 with CMD_FIFO_RST = kMultiBitBool4True (level reset active).
+  // In edn_core.sv:702, 745 (sfifo_rescmd_clr / sfifo_gencmd_clr), while
+  // CTRL.CMD_FIFO_RST == kMultiBitBool4True, both replay FIFOs are held in
+  // synchronous clear, so writing >13 words to RESEED_CMD / GENERATE_CMD must
+  // not fill or overflow either FIFO.
   abs_mmio_write32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET, 0x3u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
+                   make_edn_ctrl(kMultiBitBool4True, kMultiBitBool4False,
+                                 kMultiBitBool4False, kMultiBitBool4True));
+  for (uint32_t i = 0; i < 14; ++i) {
+    abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0x2000u + i);
+    abs_mmio_write32(kEdn0Base + EDN_GENERATE_CMD_REG_OFFSET, 0x3000u + i);
+  }
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_ERR_CODE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(edn0_fatal_cause_reg) == 0u);
+
+  // Deassert CMD_FIFO_RST (set to kMultiBitBool4False) in SWPortMode.
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4True, kMultiBitBool4False,
                                  kMultiBitBool4False, kMultiBitBool4False));
