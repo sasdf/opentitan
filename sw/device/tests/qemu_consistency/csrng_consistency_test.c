@@ -252,5 +252,76 @@ bool test_main(void) {
     (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
   }
 
+  // 8a. Verify UNINSTANTIATE does NOT clear cs_rdata_capt_vld_q
+  // (csrng_core.sv:1008-1015): re-instantiating with identical seed kSeed2 and
+  // generating 1 block triggers RECOV_ALERT_STS.CS_BUS_CMP_ALERT (bit 12).
+  CHECK_DIF_OK(dif_csrng_uninstantiate(&csrng));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
+                                     &kSeed2));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
+  do {
+    genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(recov_sts,
+                            CSRNG_RECOV_ALERT_STS_CS_BUS_CMP_ALERT_BIT),
+        "Expected CS_BUS_CMP_ALERT after UNINSTANTIATE + re-instantiate with "
+        "identical seed, got 0x%x",
+        recov_sts);
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
+  for (int i = 0; i < 4; ++i) {
+    (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  }
+
+  // 8b. Verify any CTRL.ENABLE != kMultiBitBool4True (e.g. invalid MuBi4 0x0)
+  // disables CSRNG (SW_CMD_STS.CMD_RDY == 0) AND clears cs_rdata_capt_vld_q
+  // (csrng_core.sv:787-789, 1008-1011).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
+  uint32_t ctrl_bad_en_mubi =
+      (0x0u << CSRNG_CTRL_ENABLE_OFFSET) |
+      (kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_bad_en_mubi);
+  sw_cmd_sts = abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(sw_cmd_sts, CSRNG_SW_CMD_STS_CMD_RDY_BIT),
+        "Expected SW_CMD_STS.CMD_RDY == 0 when CTRL.ENABLE is 0x0, got 0x%x",
+        sw_cmd_sts);
+  recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(recov_sts,
+                            CSRNG_RECOV_ALERT_STS_ENABLE_FIELD_ALERT_BIT),
+        "Expected ENABLE_FIELD_ALERT when CTRL.ENABLE is 0x0, got 0x%x",
+        recov_sts);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
+
+  // Re-instantiate with identical seed kSeed2 and generate 1 block: since
+  // disabling CSRNG cleared cs_rdata_capt_vld_q, CS_BUS_CMP_ALERT must remain 0.
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
+                                     &kSeed2));
+  CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
+  CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
+  do {
+    genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
+  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(recov_sts == 0u,
+        "Expected RECOV_ALERT_STS == 0 after CTRL.ENABLE disable cleared "
+        "cs_rdata_capt_vld_q, got 0x%x",
+        recov_sts);
+  for (int i = 0; i < 4; ++i) {
+    (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  }
+
   return true;
 }
