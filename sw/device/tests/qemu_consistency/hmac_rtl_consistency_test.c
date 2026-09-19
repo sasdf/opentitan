@@ -27,11 +27,15 @@ enum {
 };
 
 static volatile bool load_access_fault_seen = false;
+static volatile bool store_access_fault_seen = false;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   uint32_t mcause = ibex_mcause_read();
-  if ((ibex_exc_t)(mcause & kIbexExcMax) == kIbexExcLoadAccessFault) {
+  ibex_exc_t exc = (ibex_exc_t)(mcause & kIbexExcMax);
+  if (exc == kIbexExcLoadAccessFault) {
     load_access_fault_seen = true;
+  } else if (exc == kIbexExcStoreAccessFault) {
+    store_access_fault_seen = true;
   } else {
     ottf_generic_fault_print(exc_info, "Unexpected Load/Store Fault", mcause);
     abort();
@@ -279,6 +283,62 @@ bool test_main(void) {
              "Reading MSG_FIFO must NOT modify ERR_CODE (expected 0x%08x, got "
              "0x%08x)",
              err_before, err_after);
+
+  // 10. Wave 5: `HMAC_PERMIT` sub-word read/write check (`hmac_reg_pkg.sv:441-501`,
+  // `hmac_reg_top.sv:2007-2070`) and `addrmiss` decode error (`0x0f0..0xfff`):
+  // (a) Sub-word reads (`lbu`/`lhu`) to valid CSRs (`CFG`) succeed (`d_error = 0`).
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
+  load_access_fault_seen = false;
+  uint16_t cfg_lo16 = *(volatile uint16_t *)(kHmacBase + HMAC_CFG_REG_OFFSET);
+  uint8_t cfg_b1 = abs_mmio_read8(kHmacBase + HMAC_CFG_REG_OFFSET + 1u);
+  EXPECT_RTL(!load_access_fault_seen &&
+                 cfg_lo16 == (uint16_t)cfg_sha256_disabled &&
+                 cfg_b1 == (uint8_t)(cfg_sha256_disabled >> 8),
+             "Sub-word reads (lhu/lbu) of CFG must succeed without Load Access "
+             "Fault (fault=%d, lo16=0x%04x, b1=0x%02x)",
+             load_access_fault_seen, cfg_lo16, cfg_b1);
+
+  // (b) Permitted sub-word writes (`HMAC_PERMIT[INTR_ENABLE] = 4'b0001` via `sb`,
+  // and `HMAC_PERMIT[CFG] = 4'b0011` via `sh`) succeed (`wr_err = 0`).
+  store_access_fault_seen = false;
+  abs_mmio_write8(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET, 0x5u);
+  uint32_t ie_val = abs_mmio_read32(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET);
+  abs_mmio_write8(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET, 0x0u);
+  *(volatile uint16_t *)(kHmacBase + HMAC_CFG_REG_OFFSET) = 0u;
+  uint32_t cfg_after_sh = abs_mmio_read32(kHmacBase + HMAC_CFG_REG_OFFSET);
+  EXPECT_RTL(!store_access_fault_seen && ie_val == 0x5u &&
+                 cfg_after_sh == 0x4100u,
+             "Permitted sub-word writes (sb to INTR_ENABLE, sh to CFG) must "
+             "succeed (fault=%d, ie=0x%x, cfg=0x%04x)",
+             store_access_fault_seen, ie_val, cfg_after_sh);
+
+  // (c) Prohibited sub-word writes (`sb` to `CFG` [`4'b0011`], `sh` to
+  // `MSG_LENGTH_LOWER` [`4'b1111`]) assert `wr_err = 1` (Store Access Fault
+  // `MCAUSE = 7`) and suppress the register write.
+  abs_mmio_write32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET, 0x12345678u);
+  store_access_fault_seen = false;
+  abs_mmio_write8(kHmacBase + HMAC_CFG_REG_OFFSET, 0x02u);
+  EXPECT_RTL(store_access_fault_seen &&
+                 abs_mmio_read32(kHmacBase + HMAC_CFG_REG_OFFSET) == 0x4100u,
+             "8-bit write (sb) to CFG (HMAC_PERMIT=4'b0011) must raise Store "
+             "Access Fault and leave CFG unchanged");
+  store_access_fault_seen = false;
+  *(volatile uint16_t *)(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) = 0xaaaau;
+  EXPECT_RTL(store_access_fault_seen &&
+                 abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) ==
+                     0x12345678u,
+             "16-bit write (sh) to MSG_LENGTH_LOWER (HMAC_PERMIT=4'b1111) must "
+             "raise Store Access Fault and leave MSG_LENGTH_LOWER unchanged");
+
+  // (d) Unmapped CSR offset (`addrmiss` at `0x0f0`): raises Load/Store Access Fault.
+  load_access_fault_seen = false;
+  (void)abs_mmio_read32(kHmacBase + 0x0f0u);
+  store_access_fault_seen = false;
+  abs_mmio_write32(kHmacBase + 0x0f0u, 0x1u);
+  EXPECT_RTL(load_access_fault_seen && store_access_fault_seen,
+             "Unmapped CSR offset 0x0f0 (addrmiss) must raise Load/Store Access "
+             "Fault (load_fault=%d, store_fault=%d)",
+             load_access_fault_seen, store_access_fault_seen);
 
   return all_ok;
 }
