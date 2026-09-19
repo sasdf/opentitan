@@ -45,6 +45,17 @@ static void alert_handler_clear_cause(uint32_t alert_id) {
   abs_mmio_write32(kAlertHandlerBase + cause_offset, 1u);
 }
 
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
+
 bool test_main(void) {
   irq_global_ctrl(false);
   irq_timer_ctrl(false);
@@ -175,6 +186,22 @@ bool test_main(void) {
   alert_handler_clear_cause(kRvTimerAlertId);
   CHECK(!alert_handler_is_cause_set(kRvTimerAlertId),
         "rv_timer alert cause remained stuck at 1 after W1C clear");
+
+  // 7. Verify unmapped hole 0x008..0x0fc (between CTRL at 0x004 and
+  //    INTR_ENABLE0 at 0x100) raises TL-UL bus error (addrmiss=1 -> d_error=1).
+  uint32_t before_fault = fault_count;
+  last_mcause = 0;
+  (void)abs_mmio_read32(kRvTimerBase + 0x008u);
+  CHECK(fault_count == before_fault + 1u && last_mcause == 5u,
+        "Expected read at RV_TIMER + 0x008 (addrmiss hole) to fault with mcause=5, got count=%u mcause=0x%x",
+        fault_count - before_fault, last_mcause);
+
+  before_fault = fault_count;
+  last_mcause = 0;
+  abs_mmio_write32(kRvTimerBase + 0x0fcu, 0xdeadbeefu);
+  CHECK(fault_count == before_fault + 1u && last_mcause == 7u,
+        "Expected write at RV_TIMER + 0x0fc (addrmiss hole) to fault with mcause=7, got count=%u mcause=0x%x",
+        fault_count - before_fault, last_mcause);
 
   // Restore original rv_timer state for OTTF.
   abs_mmio_write32(kRvTimerBase + RV_TIMER_CFG0_REG_OFFSET, orig_cfg0);
