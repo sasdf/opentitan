@@ -760,7 +760,9 @@ opentitan_test(
     name = "xbar_consistency_test",
     srcs = ["xbar_consistency_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_CW340_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     deps = [
         "//hw/ip/pattgen/data:pattgen_c_regs",
