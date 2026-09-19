@@ -9,6 +9,7 @@ load(
     "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
     "EARLGREY_TEST_ENVS",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -338,3 +339,26 @@ opentitan_test(
     ],
 )
 
+opentitan_test(
+    name = "adc_ctrl_rtl_consistency_test",
+    srcs = ["adc_ctrl_rtl_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        EARLGREY_CW340_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+    ),
+    qemu = qemu_params(
+        tags = ["broken"],
+    ),
+    deps = [
+        "//hw/ip/adc_ctrl/data:adc_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
