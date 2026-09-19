@@ -10,11 +10,19 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "flash_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
+
+static volatile uint32_t g_fault_count = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  g_fault_count++;
+}
 
 enum {
   kFlashCoreBase = TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR,
@@ -433,6 +441,21 @@ bool test_main(void) {
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
+  // 12. Wave 4: PROG_FIFO (0x1b0) ErrOnRead=1 (flash_ctrl.sv:528) and
+  // RD_FIFO (0x1b4) ErrOnWrite=1 (flash_ctrl.sv:644) must return TL-UL
+  // d_error=1 (Ibex Load/Store Access Fault).
+  g_fault_count = 0;
+  (void)abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET);
+  EXPECT_RTL(g_fault_count == 1u,
+             "Reading PROG_FIFO (ErrOnRead=1) must raise Load Access Fault (faults=%u)",
+             g_fault_count);
+
+  g_fault_count = 0;
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET, 0xdeadbeefu);
+  EXPECT_RTL(g_fault_count == 1u,
+             "Writing RD_FIFO (ErrOnWrite=1) must raise Store Access Fault (faults=%u)",
+             g_fault_count);
 
   return all_ok;
 }
