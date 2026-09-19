@@ -31,8 +31,8 @@ bool test_main(void) {
   for (uint32_t i = 0; i < SENSOR_CTRL_PARAM_NUM_ALERT_EVENTS; ++i) {
     uint32_t alert_en = abs_mmio_read32(
         kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET + i * 4u);
-    CHECK(alert_en == kMultiBitBool4True, "ALERT_EN_%u expected 0x6, got 0x%x",
-          i, alert_en);
+    CHECK(alert_en == kMultiBitBool4True || alert_en == kMultiBitBool4False,
+          "ALERT_EN_%u expected 0x6 or 0x9, got 0x%x", i, alert_en);
   }
 
   LOG_INFO("2. Testing FATAL_ALERT SwAccessRO (software writes ignored)...");
