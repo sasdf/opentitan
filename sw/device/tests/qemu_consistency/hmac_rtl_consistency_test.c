@@ -203,5 +203,46 @@ bool test_main(void) {
              "(got 0x%08x)",
              status);
 
+  // 8. Wave 2:
+  // (a) `MSG_LENGTH_LOWER` / `MSG_LENGTH_UPPER` is NOT cleared by `CFG.sha_en`
+  // falling edge (1 -> 0); in RTL (hmac.sv:629-650), `message_length` is only
+  // cleared on reset or `hash_start`, so after the 3-byte ('abc') hash in
+  // step 5 and `sha_en` 1->0 in step 6, `MSG_LENGTH_LOWER` must still be 24.
+  uint32_t msg_len_lo =
+      abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET);
+  EXPECT_RTL(msg_len_lo == 24u,
+             "MSG_LENGTH_LOWER must be retained (24 bits) across CFG.sha_en "
+             "1->0 transition, got %u (0x%08x)",
+             msg_len_lo, msg_len_lo);
+
+  // (b) In RTL (hmac.sv:636-643), SW writes to `MSG_LENGTH_LOWER` and
+  // `MSG_LENGTH_UPPER` are gated ONLY by `!cfg_block` (idle), NOT by `!sha_en`.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET,
+                   cfg_sha256_disabled | (1u << HMAC_CFG_SHA_EN_BIT));
+  abs_mmio_write32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET, 0x12345678u);
+  abs_mmio_write32(kHmacBase + HMAC_MSG_LENGTH_UPPER_REG_OFFSET, 0x9abcdef0u);
+  msg_len_lo = abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET);
+  uint32_t msg_len_hi =
+      abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_UPPER_REG_OFFSET);
+  EXPECT_RTL(msg_len_lo == 0x12345678u && msg_len_hi == 0x9abcdef0u,
+             "MSG_LENGTH_LOWER/UPPER must be writable while idle even when "
+             "CFG.sha_en==1 (got 0x%08x_0x%08x)",
+             msg_len_hi, msg_len_lo);
+
+  // (c) In RTL (hmac.sv:240-243), when `CFG.digest_size == SHA2_256` and
+  // `CFG.sha_en == 0`, only `reg2hw.digest[0..7].qe` drives `digest_sw_we[0..7]`.
+  // Writes to `DIGEST_8..15` are ignored, and `DIGEST_8..15` continue to mirror
+  // `DIGEST_0..7`.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
+  abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0x13572468u);
+  abs_mmio_write32(kHmacBase + HMAC_DIGEST_8_REG_OFFSET, 0xdeadc0deu);
+  d0 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET);
+  d8 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_8_REG_OFFSET);
+  EXPECT_RTL(d0 == 0x13572468u && d8 == 0x13572468u,
+             "Write to DIGEST_8 in SHA2_256 mode must be ignored and DIGEST_8 "
+             "must still mirror DIGEST_0 (0x13572468), got d0=0x%08x d8=0x%08x",
+             d0, d8);
+
   return all_ok;
 }
+
