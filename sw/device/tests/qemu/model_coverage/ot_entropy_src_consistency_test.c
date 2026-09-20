@@ -275,21 +275,29 @@ bool test_main(void) {
       abs_mmio_read32(kEntropySrcBase +
                       ENTROPY_SRC_OBSERVE_FIFO_DEPTH_REG_OFFSET) > 0u,
       100000);
-  // Push 12 words (1 packet) via FW_OV_WR_DATA in bypass mode and verify exact
-  // readback from ENTROPY_DATA.
-  for (uint32_t i = 0; i < 12; ++i) {
-    abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
-                     0x1000u + i);
+  // Push 4 packets (48 words) via FW_OV_WR_DATA in bypass mode before reading
+  // ENTROPY_DATA:
+  // - Seed 1 (0x1000+i) moves into swread_fifo (es_rdata_capt staging).
+  // - Seed 2 (0x2000+i) and Seed 3 (0x3000+i) fill esfinal_fifo (24 words).
+  // - Seed 4 (0x4000+i) overflows esfinal_fifo and is dropped (ot_fifo32_reset(&s->bypass_fifo)).
+  for (uint32_t seed = 0; seed < 4; ++seed) {
+    uint32_t base = (seed + 1u) * 0x1000u;
+    for (uint32_t i = 0; i < 12; ++i) {
+      abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                       base + i);
+    }
   }
   CHECK((abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET) &
          (1u << ENTROPY_SRC_INTR_STATE_ES_ENTROPY_VALID_BIT)) != 0u);
-  for (uint32_t i = 0; i < 12; ++i) {
-    uint32_t w =
-        abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
-    CHECK(w == 0x1000u + i, "Expected bypass word 0x%x, got 0x%x", 0x1000u + i,
-          w);
+  for (uint32_t seed = 0; seed < 3; ++seed) {
+    uint32_t base = (seed + 1u) * 0x1000u;
+    for (uint32_t i = 0; i < 12; ++i) {
+      uint32_t w = abs_mmio_read32(kEntropySrcBase +
+                                   ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
+      CHECK(w == base + i, "Expected bypass word 0x%x, got 0x%x", base + i, w);
+    }
   }
-  // Read 12 more words from empty ENTROPY_DATA to trigger SFIFO_ESFINAL_ERR
+  // Read 12 more words from empty ENTROPY_DATA (Seed 4 was dropped) to trigger SFIFO_ESFINAL_ERR
   for (uint32_t i = 0; i < 12; ++i) {
     (void)abs_mmio_read32(kEntropySrcBase +
                           ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
@@ -297,11 +305,15 @@ bool test_main(void) {
   CHECK((abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_ERR_CODE_REG_OFFSET) &
          (1u << ENTROPY_SRC_ERR_CODE_SFIFO_ESFINAL_ERR_BIT)) != 0u,
         "Expected SFIFO_ESFINAL_ERR after 12 reads from empty ENTROPY_DATA");
-  // Toggle FW_OV_SHA3_START in bypass mode (6 -> 9)
+  // Toggle FW_OV_SHA3_START in bypass mode (6 -> 9) and verify MAIN_SM_STATE stays Idle (0xf5)
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x6u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_MAIN_SM_STATE_REG_OFFSET) == 0xf5u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x9u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_MAIN_SM_STATE_REG_OFFSET) == 0xf5u);
 
   // Push 5 full 384-bit seeds (60 words) via FW_OV_WR_DATA in bypass mode
   // without reading ENTROPY_DATA so final_fifo fills completely and the 5th
@@ -372,16 +384,27 @@ bool test_main(void) {
                           ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
   }
 
-  // Also test FW_OV_SHA3_START transition when FW_OV_ENTROPY_INSERT = 9
+  // Also test FW_OV_SHA3_START transition when FW_OV_ENTROPY_INSERT = 9:
+  // Verify MAIN_SM_STATE reaches BootPhaseDone (0x8e) and is NOT corrupted by FW_OV_SHA3_START.
   disable_entropy_complex();
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_CONTROL_REG_OFFSET,
                    0x96u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x6u);
+  IBEX_SPIN_FOR(
+      abs_mmio_read32(kEntropySrcBase +
+                      ENTROPY_SRC_MAIN_SM_STATE_REG_OFFSET) == 0x8eu,
+      100000);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x6u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_MAIN_SM_STATE_REG_OFFSET) == 0x8eu,
+        "Expected MAIN_SM_STATE == BootPhaseDone (0x8e) when FW_OV_ENTROPY_INSERT == 9");
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x9u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_MAIN_SM_STATE_REG_OFFSET) == 0x8eu,
+        "Expected MAIN_SM_STATE == BootPhaseDone (0x8e) when FW_OV_ENTROPY_INSERT == 9");
 
   // 5. Startup health test failure (REPCNTS_TOTAL_FAILS, ADAPTP_LO_TOTAL_FAILS,
   // MARKOV_LO_TOTAL_FAILS, STARTUP_FAIL1 -> ALERT_HANG).
