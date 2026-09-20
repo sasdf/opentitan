@@ -257,5 +257,38 @@ bool test_main(void) {
           i, got, kExpectedCiphertext[i]);
   }
 
+  // 6. AES-192 in manual mode (ot_aes.c:357-359 `ot_aes_get_key_mask` case 0x02u).
+  // In MANUAL_OPERATION mode, `ot_aes_update_key` calls `ot_aes_get_key_mask`
+  // which only requires the 6 lower words (192 bits) of KEY_SHARE0 and KEY_SHARE1.
+  uint32_t ctrl_aes192_manual = make_ctrl_val(
+      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+      AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
+      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
+      /*manual=*/true);
+  write_ctrl_shadowed(ctrl_aes192_manual);
+
+  for (uint32_t i = 0; i < 6u; ++i) {
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
+                     kKey192[i]);
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE1_0_REG_OFFSET + i * 4u, 0u);
+  }
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4u,
+                     kPlaintext[i]);
+  }
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  while ((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+          (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u) {
+  }
+  for (uint32_t i = 0; i < 4u; ++i) {
+    uint32_t got =
+        abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4u);
+    CHECK(got == kExpectedCiphertext[i],
+          "AES-192 manual mode DATA_OUT_%u mismatch: got 0x%08x, expected "
+          "0x%08x",
+          i, got, kExpectedCiphertext[i]);
+  }
+
   return true;
 }
