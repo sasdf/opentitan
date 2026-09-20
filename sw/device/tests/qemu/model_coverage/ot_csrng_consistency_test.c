@@ -291,6 +291,27 @@ bool test_main(void) {
            4u << CSRNG_SW_CMD_STS_CMD_STS_OFFSET);
   disable_all();
 
+  // 4d. Queue SW INSTANTIATE (FLAG0 = False, 0x00000901) via CSRNG_CMD_REQ
+  // while entropy_src is disabled, then push 2 additional words to fill
+  // u_prim_fifo_cmd (AppCmdFifoDepth = 2 in csrng_core.sv:61) on CW340 FPGA and
+  // exercise the queued cmd_req overflow guard in QEMU (ot_csrng.c:2071-2072),
+  // asserting CMD_RDY == 0 on both targets before disabling CSRNG to exercise
+  // the queued command discard loop in ot_csrng_handle_enable.
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
+  CHECK((abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+         (1u << CSRNG_SW_CMD_STS_CMD_RDY_BIT)) != 0u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000901u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000000u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000000u);
+  CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+               (1u << CSRNG_SW_CMD_STS_CMD_RDY_BIT),
+           0u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
+  CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+               (1u << CSRNG_SW_CMD_STS_CMD_RDY_BIT),
+           0u);
+  disable_all();
+
   // 5. INT_STATE_READ_ENABLE_REGWEN, INT_STATE_NUM, ERR_CODE_TEST, and REGWEN.
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REG_OFFSET, 0x5u);
@@ -325,6 +346,21 @@ bool test_main(void) {
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_MAIN_SM_STATE_REG_OFFSET), 0x78u);
   CHECK((abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET) &
          (1u << CSRNG_INTR_STATE_CS_FATAL_ERR_BIT)) != 0u);
+
+  // Issue 2 SW command words (UNINSTANTIATE = 0x00000005) while MAIN_SM_STATE
+  // is locked in Error (0x78): schedules cmd_scheduler BH while s->state !=
+  // CSRNG_IDLE in QEMU (ot_csrng.c:1662) and fills the 2-entry sfifo_cmd in
+  // RTL, clearing CMD_RDY = 0 on both targets, then disable/re-enable CTRL.
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000005u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000005u);
+  CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+               (1u << CSRNG_SW_CMD_STS_CMD_RDY_BIT),
+           0u);
+  CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_MAIN_SM_STATE_REG_OFFSET), 0x78u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
+  CHECK((abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+         (1u << CSRNG_SW_CMD_STS_CMD_RDY_BIT)) != 0u);
 
   // Lock REGWEN = 0 and verify CTRL, FIPS_FORCE, and ERR_CODE_TEST are locked.
   abs_mmio_write32(kCsrngBase + CSRNG_REGWEN_REG_OFFSET, 0u);
