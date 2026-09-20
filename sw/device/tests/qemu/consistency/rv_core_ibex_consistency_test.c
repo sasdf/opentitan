@@ -425,5 +425,67 @@ bool test_main(void) {
                              0x55u));
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) == 0u);
 
+  // 7c. PMU CSRs (mcountinhibit, mcycle/mcycleh, minstret/minstreth) in
+  // ibex_cs_registers.sv:
+  // - mcountinhibit bit 1 (TM) is hardwired to 0; bit 0 (CY) inhibits mcycle;
+  //   bit 2 (IR) inhibits minstret.
+  // - Writing mcycle/mcycleh and minstret/minstreth sets the 64-bit counter
+  //   value; when inhibited, counters hold their written values; when
+  //   uninhibited, counters resume incrementing from the written baseline.
+  uint32_t saved_mcountinhibit = 0;
+  uint32_t saved_mcycleh = 0, saved_mcycle = 0;
+  uint32_t saved_minstreth = 0, saved_minstret = 0;
+  CSR_READ(CSR_REG_MCOUNTINHIBIT, &saved_mcountinhibit);
+  CSR_READ(CSR_REG_MCYCLEH, &saved_mcycleh);
+  CSR_READ(CSR_REG_MCYCLE, &saved_mcycle);
+  CSR_READ(CSR_REG_MINSTRETH, &saved_minstreth);
+  CSR_READ(CSR_REG_MINSTRET, &saved_minstret);
+
+  // Write 0x7 (CY | TM | IR): bit 1 (TM) must read back as 0 -> 0x5.
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, 0x7u);
+  uint32_t mcountinhibit_val = 0;
+  CSR_READ(CSR_REG_MCOUNTINHIBIT, &mcountinhibit_val);
+  CHECK((mcountinhibit_val & 0x7u) == 0x5u);
+
+  // Program 64-bit baselines while CY and IR are inhibited.
+  CSR_WRITE(CSR_REG_MCYCLEH, 0x00000042u);
+  CSR_WRITE(CSR_REG_MCYCLE, 0x12345678u);
+  CSR_WRITE(CSR_REG_MINSTRETH, 0x00000024u);
+  CSR_WRITE(CSR_REG_MINSTRET, 0x87654321u);
+  asm volatile("nop; nop; nop; nop");
+
+  uint32_t cyc_lo_inh = 0, cyc_hi_inh = 0;
+  uint32_t inst_lo_inh = 0, inst_hi_inh = 0;
+  CSR_READ(CSR_REG_MCYCLE, &cyc_lo_inh);
+  CSR_READ(CSR_REG_MCYCLEH, &cyc_hi_inh);
+  CSR_READ(CSR_REG_MINSTRET, &inst_lo_inh);
+  CSR_READ(CSR_REG_MINSTRETH, &inst_hi_inh);
+  CHECK(cyc_lo_inh == 0x12345678u);
+  CHECK(cyc_hi_inh == 0x00000042u);
+  CHECK(inst_lo_inh == 0x87654321u);
+  CHECK(inst_hi_inh == 0x00000024u);
+
+  // Re-enable CY and IR (mcountinhibit = 0) and verify counters advance from
+  // the written 64-bit baselines.
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, 0u);
+  asm volatile("nop; nop; nop; nop");
+  uint32_t cyc_lo_run = 0, cyc_hi_run = 0;
+  uint32_t inst_lo_run = 0, inst_hi_run = 0;
+  CSR_READ(CSR_REG_MCYCLE, &cyc_lo_run);
+  CSR_READ(CSR_REG_MCYCLEH, &cyc_hi_run);
+  CSR_READ(CSR_REG_MINSTRET, &inst_lo_run);
+  CSR_READ(CSR_REG_MINSTRETH, &inst_hi_run);
+  CHECK(cyc_hi_run == 0x00000042u);
+  CHECK(cyc_lo_run > 0x12345678u);
+  CHECK(inst_hi_run == 0x00000024u);
+  CHECK(inst_lo_run > 0x87654321u);
+
+  // Restore original counter baselines and mcountinhibit.
+  CSR_WRITE(CSR_REG_MCYCLEH, saved_mcycleh);
+  CSR_WRITE(CSR_REG_MCYCLE, saved_mcycle);
+  CSR_WRITE(CSR_REG_MINSTRETH, saved_minstreth);
+  CSR_WRITE(CSR_REG_MINSTRET, saved_minstret);
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, saved_mcountinhibit);
+
   return true;
 }
