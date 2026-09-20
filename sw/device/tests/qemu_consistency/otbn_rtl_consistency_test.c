@@ -303,6 +303,11 @@ bool test_main(void) {
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
              "addrmiss read at 0x2c must fault with MCAUSE=5");
 
+  g_fault_seen = false;
+  abs_mmio_write32(kOtbnBase + 0x2cu, 0u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+             "addrmiss write at 0x2c must fault with MCAUSE=7");
+
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   g_fault_seen = false;
