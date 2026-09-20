@@ -670,6 +670,7 @@ opentitan_test(
         timeout = "short",
     ),
     deps = [
+        "//hw/ip/edn/data:edn_c_regs",
         "//hw/ip/kmac/data:kmac_c_regs",
         "//hw/ip/rv_core_ibex/data:rv_core_ibex_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

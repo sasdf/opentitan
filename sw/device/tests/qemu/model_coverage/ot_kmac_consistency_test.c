@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "edn_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "kmac_regs.h"
 #include "rv_core_ibex_regs.h"
@@ -21,6 +22,7 @@ OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 enum {
   kKmacBase = TOP_EARLGREY_KMAC_BASE_ADDR,
   kIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
+  kEdn0Base = TOP_EARLGREY_EDN0_BASE_ADDR,
 };
 
 static volatile bool load_store_fault_seen = false;
@@ -218,6 +220,73 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
   wait_kmac_idle();
+
+  // 4b. ENTROPY_MODE=EdnMode (1) with EDN0 disabled and ENTROPY_PERIOD
+  // WAIT_TIMER=2000: verify KMAC stalls in KMAC_ST_PROCESSING until the wait
+  // timer expires, raising ErrWaitTimerExpired (0x04000000) and unblocking
+  // StProcessing -> StAbsorbed (kmac_entropy.sv:702-703, ot_kmac.c:564), and
+  // verify CMD.ERR_PROCESSED resets StRandErr -> StRandReset so SwMode can be
+  // latched next (kmac_entropy.sv:710).
+  uint32_t saved_edn0_ctrl =
+      abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kKmacBase + KMAC_ENTROPY_PERIOD_REG_OFFSET,
+                   2000u << KMAC_ENTROPY_PERIOD_WAIT_TIMER_OFFSET);
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x4d4b2001u);
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_1_REG_OFFSET, 0x00014341u);
+  abs_mmio_write32(kKmacBase + KMAC_KEY_LEN_REG_OFFSET,
+                   KMAC_KEY_LEN_LEN_VALUE_KEY128);
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
+
+  uint32_t cfg_edn_timeout = 0;
+  cfg_edn_timeout = bitfield_bit32_write(
+      cfg_edn_timeout, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
+  cfg_edn_timeout = bitfield_field32_write(
+      cfg_edn_timeout, KMAC_CFG_SHADOWED_MODE_FIELD,
+      KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
+  cfg_edn_timeout = bitfield_field32_write(
+      cfg_edn_timeout, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+      KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  cfg_edn_timeout = bitfield_field32_write(
+      cfg_edn_timeout, KMAC_CFG_SHADOWED_ENTROPY_MODE_FIELD,
+      KMAC_CFG_SHADOWED_ENTROPY_MODE_VALUE_EDN_MODE);
+  cfg_edn_timeout = bitfield_bit32_write(
+      cfg_edn_timeout, KMAC_CFG_SHADOWED_ENTROPY_READY_BIT, true);
+  write_cfg_shadowed(cfg_edn_timeout);
+
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_absorb();
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x00020100u);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_PROCESS << KMAC_CMD_CMD_OFFSET);
+
+  uint32_t edn_proc_status =
+      abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
+  CHECK((edn_proc_status & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) != 0u &&
+            (edn_proc_status & (1u << KMAC_STATUS_SHA3_SQUEEZE_BIT)) == 0u,
+        "Expected KMAC to be stalled in PROCESSING waiting for EDN timer, got "
+        "0x%08x",
+        edn_proc_status);
+
+  while ((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) &
+          (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) == 0u) {
+  }
+  uint32_t err_edn_timeout =
+      abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  CHECK(err_edn_timeout == 0x04000000u,
+        "Expected ERR_CODE 0x04000000 (ErrWaitTimerExpired), got 0x%08x",
+        err_edn_timeout);
+  wait_kmac_squeeze();
+
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_idle();
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   1u << KMAC_CMD_ERR_PROCESSED_BIT);
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
+  abs_mmio_write32(kKmacBase + KMAC_ENTROPY_PERIOD_REG_OFFSET, 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, saved_edn0_ctrl);
 
   // 5. ENTROPY_MODE=SwMode (2) stalling in KMAC_ST_PROCESSING, ErrSwCmdSequence
   // in KMAC_ST_PROCESSING, 5-word ENTROPY_SEED unblock, and invalid KEY_LEN=5.
