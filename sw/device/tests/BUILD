@@ -6236,7 +6236,7 @@ test_suite(
             test_harness = "//sw/host/tests/chip/rv_dm:mem_access",
         ),
         qemu = qemu_params(
-            timeout = "moderate",
+            timeout = "short",
             needs_jtag = True,
             otp = test_cfg["otp"],
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
@@ -7954,7 +7954,7 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
     ),
     qemu = qemu_params(
-        timeout = "moderate",
+        timeout = "short",
         needs_jtag = True,
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",

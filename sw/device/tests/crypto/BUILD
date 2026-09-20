@@ -751,7 +751,7 @@ opentitan_test(
         tags = ["manual"],
     ),
     qemu = qemu_params(
-        timeout = "long",
+        timeout = "moderate",
     ),
     verilator = verilator_params(
         timeout = "eternal",

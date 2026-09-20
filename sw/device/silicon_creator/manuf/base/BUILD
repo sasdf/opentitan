@@ -161,7 +161,7 @@ opentitan_test(
         testopt_bootstrap = "False",
     ),
     qemu = qemu_params(
-        timeout = "long",
+        timeout = "moderate",
         binaries = {
             ":sram_cp_provision": "sram_cp_provision",
             ":sram_cp_provision_functest": "sram_cp_provision_functest",

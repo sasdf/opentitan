@@ -326,7 +326,7 @@ LC_STATES_DEBUG_DISALLOWED = [
             testopt_bootstrap = "False",
         ),
         qemu = qemu_params(
-            timeout = "moderate",
+            timeout = "short",
             needs_jtag = True,
             otp = ":img_{}_exec_disabled".format(lc_state),
             test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
