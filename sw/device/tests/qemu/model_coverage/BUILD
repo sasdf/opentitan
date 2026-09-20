@@ -2,8 +2,11 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load(
     "//rules/opentitan:defs.bzl",
+    "EARLGREY_CW340_TEST_ENVS",
+    "EARLGREY_TEST_ENVS",
     "fpga_params",
     "opentitan_test",
     "qemu_params",
@@ -171,3 +174,20 @@ opentitan_test(
     ],
 )
 
+opentitan_test(
+    name = "vmapper_consistency_test",
+    srcs = ["vmapper_consistency_test.c"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        EARLGREY_CW340_TEST_ENVS,
+    ),
+    deps = [
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:rv_core_ibex",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)

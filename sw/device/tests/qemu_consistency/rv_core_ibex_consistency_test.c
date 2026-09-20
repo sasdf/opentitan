@@ -278,6 +278,34 @@ bool test_main(void) {
           kDifRvCoreIbexAddrTranslationDBus));
       icache_invalidate();
       CHECK(sram_virt_win[0] == 0x33334444u);
+
+      // Test interior nested higher-priority NAPOT sub-region (Slot 0 strictly
+      // inside Slot 1: start1 < start0 && end0 < end1) so Slot 1 is split into
+      // left [0..255], middle Slot 0 [256..511], and right [512..1023] slices.
+      sram_buf_b[0] = 0x10101010u;
+      sram_buf_b[256] = 0x20202020u;
+      sram_buf_b[512] = 0x30303030u;
+      sram_buf_a[0] = 0x9999aaaau;
+      dif_rv_core_ibex_addr_translation_mapping_t map_slot0_nested = {
+          .matching_addr = (uintptr_t)&sram_virt_win[256],
+          .remap_addr = (uintptr_t)sram_buf_a,
+          .size = 1024,
+      };
+      CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus, map_slot0_nested));
+      CHECK_DIF_OK(dif_rv_core_ibex_enable_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus));
+      icache_invalidate();
+      CHECK(sram_virt_win[0] == 0x10101010u);
+      CHECK(sram_virt_win[256] == 0x9999aaaau);
+      CHECK(sram_virt_win[512] == 0x30303030u);
+
+      CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
+          &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+          kDifRvCoreIbexAddrTranslationDBus));
+      icache_invalidate();
     }
 
     // Disable Slot 1 -> falls back to unmapped sram_virt_win.
