@@ -161,10 +161,20 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       keymgr_testutils_generate_versioned_key(&keymgr, sideload_params));
 
+  const dif_keymgr_versioned_key_dest_t kClearDests[4] = {
+      kDifKeymgrVersionedKeyDestAes,   // clr_val = 1 (AES)
+      kDifKeymgrVersionedKeyDestKmac,  // clr_val = 2 (KMAC)
+      kDifKeymgrVersionedKeyDestOtbn,  // clr_val = 3 (OTBN)
+      kDifKeymgrVersionedKeyDestKmac,  // clr_val = 4 (All slots)
+  };
   for (uint32_t clr_val = 1u; clr_val <= 4u; ++clr_val) {
     abs_mmio_write32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET, clr_val);
     CHECK((abs_mmio_read32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET) & 0x7u) ==
           clr_val);
+    sideload_params.dest = kClearDests[clr_val - 1u];
+    CHECK_STATUS_OK(
+        keymgr_testutils_generate_versioned_key(&keymgr, sideload_params));
+    CHECK(abs_mmio_read32(kBase + KEYMGR_ERR_CODE_REG_OFFSET) == 0x0u);
   }
   abs_mmio_write32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET, 0x0u);
   CHECK((abs_mmio_read32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET) & 0x7u) ==
