@@ -123,6 +123,10 @@ bool test_main(void) {
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x0u);
 
+  // Write 0 (RW0C) to RECOV_ALERT_STS while invalid MuBi4 values are still in CSRs
+  // to verify continuous field alerts remain asserted.
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET,
+                   0x0u);
   uint32_t recov =
       abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
   uint32_t expected_mubi_alerts =
@@ -139,16 +143,28 @@ bool test_main(void) {
       (1u << ENTROPY_SRC_RECOV_ALERT_STS_FW_OV_ENTROPY_INSERT_FIELD_ALERT_BIT) |
       (1u << ENTROPY_SRC_RECOV_ALERT_STS_FW_OV_SHA3_START_FIELD_ALERT_BIT);
   CHECK((recov & expected_mubi_alerts) == expected_mubi_alerts,
-        "Expected all 12 MuBi field alerts set, got 0x%x (expected 0x%x)",
+        "Expected all 12 MuBi field alerts set after RW0C clear, got 0x%x (expected 0x%x)",
         recov, expected_mubi_alerts);
 
   disable_entropy_complex();
   CHECK(abs_mmio_read32(kEntropySrcBase +
                         ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET) == 0u);
 
-  // 3. ENTROPY_DATA reads when disabled & when ENTROPY_DATA_REG_ENABLE = 9 -> 0.
+  // 3. ENTROPY_DATA reads when disabled, when ENTROPY_DATA_REG_ENABLE = 9 -> 0,
+  // and when ENTROPY_DATA_REG_ENABLE = 6 but ES_ROUTE = 9 -> 0.
   CHECK(abs_mmio_read32(kEntropySrcBase +
                         ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET) == 0u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
+                   0x6u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET) == 0u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                   0x12345678u);
+  disable_entropy_complex();
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_CONF_REG_OFFSET,
+                   make_conf(9u, 9u, 9u, 9u, 9u, 6u));
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_CONTROL_REG_OFFSET,
+                   0x99u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x6u);
   CHECK(abs_mmio_read32(kEntropySrcBase +
@@ -187,13 +203,21 @@ bool test_main(void) {
                  (1u << CSRNG_SW_CMD_STS_CMD_ACK_BIT)) != 0u,
                 100000);
 
+  // Also test CSRNG instantiation when ENTROPY_SRC is in FW_OV bypass mode
+  // (FW_OV_MODE=6, FW_OV_ENTROPY_INSERT=6, ES_TYPE=6, ES_ROUTE=9, FIPS_ENABLE=9, FIPS_FLAG=6).
   disable_entropy_complex();
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_CONF_REG_OFFSET,
                    make_conf(9u, 6u, 9u, 9u, 9u, 9u));
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_CONTROL_REG_OFFSET,
-                   0x99u);
+                   0x69u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_CONTROL_REG_OFFSET,
+                   0x66u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x6u);
+  for (uint32_t i = 0; i < 12; ++i) {
+    abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                     0x2000u + i);
+  }
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
   abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET, 0x00000901u);
   IBEX_SPIN_FOR((abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
@@ -245,6 +269,12 @@ bool test_main(void) {
                    0x66u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x6u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_FW_OV_WR_FIFO_FULL_REG_OFFSET) == 0u);
+  IBEX_SPIN_FOR(
+      abs_mmio_read32(kEntropySrcBase +
+                      ENTROPY_SRC_OBSERVE_FIFO_DEPTH_REG_OFFSET) > 0u,
+      100000);
   // Push 12 words (1 packet) via FW_OV_WR_DATA in bypass mode and verify exact
   // readback from ENTROPY_DATA.
   for (uint32_t i = 0; i < 12; ++i) {
@@ -274,8 +304,15 @@ bool test_main(void) {
                    0x9u);
 
   // FW_OV_ENTROPY_INSERT = 6 in SHA3 mode (ES_TYPE = 9):
-  // Test odd word (1 word) -> FW_OV_WR_FIFO_FULL == 0 -> disabling FW_OV_SHA3_START
-  // does NOT assert ES_FW_OV_DISABLE_ALERT (verifies entropy_src_core.sv:2691!).
+  // 1. In FWInsertStart (FW_OV_SHA3_START == 9), sha3_start_o already pulsed in Idle,
+  //    so writing 2 words (0x11111111, 0x22222222) absorbs them into u_sha3 and leaves
+  //    FW_OV_WR_FIFO_FULL == 0.
+  // 2. Setting FW_OV_SHA3_START = 6 transitions FWInsertStart -> FWInsertMsg without
+  //    clearing u_sha3. Writing 1 odd word (0xdeadbeef) leaves 32 bits in precon_fifo
+  //    (FW_OV_WR_FIFO_FULL == 0).
+  // 3. Setting FW_OV_SHA3_START = 9 transitions FWInsertMsg -> Sha3Process -> FWInsertStart,
+  //    does NOT assert ES_FW_OV_DISABLE_ALERT, asserts ES_ENTROPY_VALID, and produces the
+  //    exact SHA3-384 digest of (0x11111111, 0x22222222).
   disable_entropy_complex();
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_CONF_REG_OFFSET,
                    make_conf(6u, 6u, 9u, 9u, 9u, 6u));
@@ -285,6 +322,12 @@ bool test_main(void) {
                    0x66u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    0x6u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                   0x11111111u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                   0x22222222u);
+  CHECK(abs_mmio_read32(kEntropySrcBase +
+                        ENTROPY_SRC_FW_OV_WR_FIFO_FULL_REG_OFFSET) == 0u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x6u);
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
@@ -299,6 +342,19 @@ bool test_main(void) {
          (1u << ENTROPY_SRC_RECOV_ALERT_STS_ES_FW_OV_DISABLE_ALERT_BIT)) == 0u,
         "Expected ES_FW_OV_DISABLE_ALERT == 0 when FW_OV_WR_FIFO_FULL == 0, got 0x%x",
         sha_recov);
+  IBEX_SPIN_FOR(
+      (abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET) &
+       (1u << ENTROPY_SRC_INTR_STATE_ES_ENTROPY_VALID_BIT)) != 0u,
+      100000);
+  uint32_t sha_w0 =
+      abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
+  CHECK(sha_w0 == 0x1d9845a5u,
+        "Expected SHA3-384(0x11111111, 0x22222222) word 0 == 0x1d9845a5, got 0x%x",
+        sha_w0);
+  for (int i = 1; i < 12; ++i) {
+    (void)abs_mmio_read32(kEntropySrcBase +
+                          ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
+  }
 
   // Also test FW_OV_SHA3_START transition when FW_OV_ENTROPY_INSERT = 9
   disable_entropy_complex();
