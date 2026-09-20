@@ -26,7 +26,6 @@ opentitan_test(
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/arch:device",
         "//sw/device/lib/boards/teacup_v1_3_0:leds",
         "//sw/device/lib/dif:i2c",
         "//sw/device/lib/runtime:hart",
