@@ -6,6 +6,9 @@
 #include <stdint.h>
 
 #include "aes_regs.h"
+#include "csrng_regs.h"
+#include "edn_regs.h"
+#include "entropy_src_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "rv_core_ibex_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
@@ -21,6 +24,10 @@ OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
 enum {
   kAesBase = TOP_EARLGREY_AES_BASE_ADDR,
+  kCsrngBase = TOP_EARLGREY_CSRNG_BASE_ADDR,
+  kEdn0Base = TOP_EARLGREY_EDN0_BASE_ADDR,
+  kEdn1Base = TOP_EARLGREY_EDN1_BASE_ADDR,
+  kEntropySrcBase = TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR,
   kIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
 };
 
@@ -287,6 +294,107 @@ bool test_main(void) {
     CHECK(got == kExpectedCiphertext[i],
           "AES-192 manual mode DATA_OUT_%u mismatch: got 0x%08x, expected "
           "0x%08x",
+          i, got, kExpectedCiphertext[i]);
+  }
+
+  // 7. Gate KEY_SHARE and IV writes when STATUS.IDLE == 0 during pending
+  // PRNG_RESEED (aes_control_fsm.sv:315-343, 472-495; ot_aes.c:1360, 1378).
+  uint32_t ctrl_aes192_cbc = make_ctrl_val(
+      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+      AES_CTRL_SHADOWED_MODE_VALUE_AES_CBC,
+      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
+      /*manual=*/true);
+  write_ctrl_shadowed(ctrl_aes192_cbc);
+
+  const uint32_t kKnownIv[4] = {
+      0x10203040u, 0x50607080u, 0x90a0b0c0u, 0xd0e0f001u,
+  };
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u, kKnownIv[i]);
+  }
+  for (uint32_t i = 0; i < 6u; ++i) {
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
+                     kKey192[i]);
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE1_0_REG_OFFSET + i * 4u, 0u);
+  }
+  CHECK(abs_mmio_read32(kAesBase + AES_IV_0_REG_OFFSET) == kKnownIv[0],
+        "Initial IV_0 readback mismatch");
+
+  // Disable EDN0, EDN1, CSRNG, and ENTROPY_SRC so AES stalls in
+  // CTRL_PRNG_RESEED (STATUS.IDLE == 0).
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kEdn1Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
+                   0x9u);
+  while (abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_REGWEN_REG_OFFSET) ==
+         0u) {
+  }
+
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_PRNG_RESEED_BIT);
+  uint32_t reseed_status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK((reseed_status & (1u << AES_STATUS_IDLE_BIT)) == 0u,
+        "Expected STATUS.IDLE == 0 while PRNG_RESEED awaits EDN0, got 0x%08x",
+        reseed_status);
+
+  // Attempt to overwrite IV_0..3 and KEY_SHARE0_0..5 while STATUS.IDLE == 0.
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u, 0xdeadbeefu);
+  }
+  for (uint32_t i = 0; i < 6u; ++i) {
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
+                     0xbadc0de0u + i);
+  }
+
+  // Re-enable ENTROPY_SRC, CSRNG, and EDN0 in boot request mode (0x9966u) and
+  // wait for PRNG_RESEED to complete (STATUS.IDLE == 1).
+  uint32_t conf = (6u << ENTROPY_SRC_CONF_FIPS_ENABLE_OFFSET) |
+                  (6u << ENTROPY_SRC_CONF_FIPS_FLAG_OFFSET) |
+                  (9u << ENTROPY_SRC_CONF_RNG_FIPS_OFFSET) |
+                  (9u << ENTROPY_SRC_CONF_RNG_BIT_ENABLE_OFFSET) |
+                  (9u << ENTROPY_SRC_CONF_THRESHOLD_SCOPE_OFFSET) |
+                  (9u << ENTROPY_SRC_CONF_ENTROPY_DATA_REG_ENABLE_OFFSET);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_CONF_REG_OFFSET, conf);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_HEALTH_TEST_WINDOWS_REG_OFFSET,
+                   0x00100020u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_CONTROL_REG_OFFSET,
+                   0x99u);
+  abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
+                   0x6u);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET, 0x00000601u);
+  abs_mmio_write32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET, 0x00040003u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9966u);
+  wait_aes_idle();
+
+  for (uint32_t i = 0; i < 4u; ++i) {
+    uint32_t iv_after =
+        abs_mmio_read32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u);
+    CHECK(iv_after == kKnownIv[i],
+          "IV_%u write while STATUS.IDLE==0 must be ignored: got 0x%08x, "
+          "expected 0x%08x",
+          i, iv_after, kKnownIv[i]);
+  }
+
+  // Switch back to ECB manual mode (preserving KEY_SHARE registers) and verify
+  // encryption still uses kKey192 rather than the ignored 0xbadc0de0 writes.
+  write_ctrl_shadowed(ctrl_aes192_manual);
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4u,
+                     kPlaintext[i]);
+  }
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  while ((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+          (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u) {
+  }
+  for (uint32_t i = 0; i < 4u; ++i) {
+    uint32_t got =
+        abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4u);
+    CHECK(got == kExpectedCiphertext[i],
+          "KEY_SHARE write while STATUS.IDLE==0 must be ignored: word %u got "
+          "0x%08x, expected 0x%08x",
           i, got, kExpectedCiphertext[i]);
   }
 
