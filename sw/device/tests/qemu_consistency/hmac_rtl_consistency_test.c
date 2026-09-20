@@ -146,7 +146,37 @@ bool test_main(void) {
              "ignored (expected 0x00000000, got 0x%08x)",
              d0);
 
-  // 5. SHA2_256 computation & DIGEST_0..7 replication into DIGEST_8..15.
+  // 5a. SHA2_384 computation populates all 16 DIGEST registers (`DIGEST_12..15`
+  // hold the upper 128 bits `state[6..7]` of the 512-bit SHA-512 state;
+  // `prim_sha2.sv:371-394`, `hmac.sv:256-267`).
+  uint32_t cfg_sha384_active =
+      bitfield_field32_write(0, HMAC_CFG_DIGEST_SIZE_FIELD,
+                             HMAC_CFG_DIGEST_SIZE_VALUE_SHA2_384) |
+      bitfield_field32_write(0, HMAC_CFG_KEY_LENGTH_FIELD,
+                             HMAC_CFG_KEY_LENGTH_VALUE_KEY_NONE) |
+      (1u << HMAC_CFG_SHA_EN_BIT) | (1u << HMAC_CFG_DIGEST_SWAP_BIT);
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha384_active);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_START_BIT);
+  abs_mmio_write8(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 'a');
+  abs_mmio_write8(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 'b');
+  abs_mmio_write8(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 'c');
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_PROCESS_BIT);
+  while ((abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET) &
+          (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)) == 0u) {
+  }
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
+                   1u << HMAC_INTR_STATE_HMAC_DONE_BIT);
+  uint32_t sha384_d0 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET);
+  uint32_t sha384_d12 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_12_REG_OFFSET);
+  uint32_t sha384_d15 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_15_REG_OFFSET);
+  EXPECT_RTL(sha384_d0 == 0x3f7500cbu && sha384_d12 != 0u && sha384_d15 != 0u,
+             "SHA2_384('abc') must write back full 512-bit SHA-512 state to "
+             "DIGEST_0..15 (d0=0x%08x, d12=0x%08x, d15=0x%08x)",
+             sha384_d0, sha384_d12, sha384_d15);
+
+  // 5b. SHA2_256 computation & DIGEST_0..7 replication into DIGEST_8..15.
   // In RTL (hmac.sv:256-261), when digest_size_started_q == SHA2_256,
   // hw2reg.digest[i+8].d = hw2reg.digest[i].d for i = 0..7.
   uint32_t cfg_sha256_active =
@@ -339,6 +369,33 @@ bool test_main(void) {
              "Unmapped CSR offset 0x0f0 (addrmiss) must raise Load/Store Access "
              "Fault (load_fault=%d, store_fault=%d)",
              load_access_fault_seen, store_access_fault_seen);
+
+  // 11. `INTR_TEST` Status (`fifo_empty`) vs Event (`hmac_done`) semantics
+  // (`hmac.sv:486-512`, `prim_intr_hw.sv:60-89`):
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);
+  abs_mmio_write32(kHmacBase + HMAC_INTR_TEST_REG_OFFSET,
+                   (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
+                       (1u << HMAC_INTR_STATE_HMAC_DONE_BIT));
+  uint32_t istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL(istate == ((1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
+                        (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)),
+             "INTR_TEST=0x3 must assert both fifo_empty and hmac_done (got 0x%x)",
+             istate);
+  // W1C on INTR_STATE clears Event (hmac_done) but NOT Status (fifo_empty) while test_q=1
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
+                   (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
+                       (1u << HMAC_INTR_STATE_HMAC_DONE_BIT));
+  istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL(istate == (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT),
+             "W1C to INTR_STATE must clear hmac_done (Event) but NOT fifo_empty "
+             "(Status, RO while test_q=1); got 0x%x",
+             istate);
+  // Writing INTR_TEST=0 deasserts test_q for Status interrupt fifo_empty
+  abs_mmio_write32(kHmacBase + HMAC_INTR_TEST_REG_OFFSET, 0u);
+  istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  EXPECT_RTL(istate == 0u,
+             "INTR_TEST=0 must deassert Status interrupt fifo_empty (got 0x%x)",
+             istate);
 
   return all_ok;
 }
