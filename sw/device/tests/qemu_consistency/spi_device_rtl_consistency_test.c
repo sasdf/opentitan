@@ -297,6 +297,15 @@ static void test_w2_egress_unmapped_hole_write_fault(void) {
  */
 static void test_w2_ingress_unmapped_hole_read_fault(void) {
   g_access_fault_count = 0;
+  (void)abs_mmio_read32(kSpiDeviceBase + 0x1f00u);  // SPI_SRAM_CMD_OFFSET
+  (void)abs_mmio_read32(kSpiDeviceBase + 0x1f40u);  // SPI_SRAM_ADDR_OFFSET
+  EXPECT_CHECK(g_access_fault_count == 0u,
+               "W2-3a: 32-bit reads from valid Ingress CMD (0x1f00) and ADDR "
+               "(0x1f40) buffer ranges must succeed without access fault, got "
+               "count=%u",
+               g_access_fault_count);
+
+  g_access_fault_count = 0;
   g_last_mcause = 0;
   g_expect_access_fault = true;
   (void)abs_mmio_read32(kSpiDeviceBase + 0x1fc0u);
