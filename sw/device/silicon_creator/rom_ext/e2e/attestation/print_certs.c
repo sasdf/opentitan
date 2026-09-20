@@ -288,8 +288,6 @@ static status_t verify_handover(void) {
                 (int32_t)res->mldsa_cdi1_cert_len);
   LOG_INFO("CDI_1_MLDSA: %s", buf);
 
-  msg->hdr.type = 0;
-
 #ifdef POST_PROVISIONING_TESTS
   for (size_t i = 0; i < ARRAYSIZE(mldsa_endorsed_cert_pages); i++) {
     flash_ctrl_cfg_t cfg = {
@@ -327,6 +325,8 @@ static status_t verify_handover(void) {
     LOG_INFO("UDS_MLDSA_CERT: %s", buf);
   }
 #endif  // POST_PROVISIONING_TESTS
+
+  msg->hdr.type = 0;
 
   return OK_STATUS();
 }
