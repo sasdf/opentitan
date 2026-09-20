@@ -2065,7 +2065,6 @@ opentitan_test(
     name = "flash_ctrl_rma_test",
     srcs = ["flash_ctrl_rma_test.c"],
     exec_env = {
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
