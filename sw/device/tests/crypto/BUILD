@@ -230,40 +230,11 @@ cc_library(
 opentitan_test(
     name = "aes_gcm_functest",
     srcs = ["aes_gcm_functest.c"],
-    exec_env = dicts.add(
-        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-        },
-    ),
+    exec_env = CRYPTOTEST_EXEC_ENVS,
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
         # run in CI/nightlies.
-        tags = ["manual"],
-    ),
-    deps = [
-        ":aes_gcm_testutils",
-        ":aes_gcm_testvectors",
-        "//sw/device/lib/crypto/impl:aes_gcm",
-        "//sw/device/lib/crypto/impl:config",
-        "//sw/device/lib/crypto/impl:entropy_src",
-        "//sw/device/lib/crypto/impl:integrity",
-        "//sw/device/lib/crypto/impl:status",
-        "//sw/device/lib/runtime:log",
-        "//sw/device/lib/testing:keymgr_testutils",
-        "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
-)
-
-opentitan_test(
-    name = "aes_gcm_no_rom_ext_functest",
-    srcs = ["aes_gcm_no_rom_ext_functest.c"],
-    exec_env = EARLGREY_TEST_ENVS,
-    verilator = verilator_params(
-        timeout = "eternal",
         tags = ["manual"],
     ),
     deps = [
