@@ -5,13 +5,18 @@
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
+#include "sw/device/lib/dif/dif_aon_timer.h"
 #include "sw/device/lib/dif/dif_pinmux.h"
+#include "sw/device/lib/dif/dif_pwrmgr.h"
 #include "sw/device/lib/dif/dif_rstmgr.h"
 #include "sw/device/lib/dif/dif_usbdev.h"
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
+#include "sw/device/lib/testing/aon_timer_testutils.h"
+#include "sw/device/lib/testing/rstmgr_testutils.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+#include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
 #include "usbdev_regs.h"
 
@@ -21,6 +26,12 @@ enum {
   kUsbdevBase = TOP_EARLGREY_USBDEV_BASE_ADDR,
   kRstmgrBase = TOP_EARLGREY_RSTMGR_AON_BASE_ADDR,
   kPinmuxBase = TOP_EARLGREY_PINMUX_AON_BASE_ADDR,
+  kPwrmgrBase = TOP_EARLGREY_PWRMGR_AON_BASE_ADDR,
+  kAonTimerBase = TOP_EARLGREY_AON_TIMER_AON_BASE_ADDR,
+  kPhaseUnclockedBufRead = 0x55534231u,
+  kPhaseUnclockedBufWrite = 0x55534232u,
+  kUnclockedBufReadAddr = kUsbdevBase + USBDEV_BUFFER_REG_OFFSET + 4u,
+  kUnclockedBufWriteAddr = kUsbdevBase + USBDEV_BUFFER_REG_OFFSET + 8u,
 };
 
 #define EXPECT_RTL(cond, ...)             \
@@ -40,11 +51,77 @@ void ottf_exception_handler(uint32_t *exc_info) {
   g_fault_mcause = ibex_mcause_read();
 }
 
+static void arm_unclocked_usbdev_watchdog(dif_rstmgr_t *rstmgr,
+                                          dif_pwrmgr_t *pwrmgr,
+                                          dif_aon_timer_t *aon_timer) {
+  CHECK_DIF_OK(dif_rstmgr_cpu_info_set_enabled(rstmgr, kDifToggleEnabled));
+  CHECK_STATUS_OK(rstmgr_testutils_pre_reset(rstmgr));
+
+  uint32_t bite_cycles = 0;
+  CHECK_STATUS_OK(
+      aon_timer_testutils_get_aon_cycles_32_from_us(400, &bite_cycles));
+  CHECK_STATUS_OK(aon_timer_testutils_watchdog_config(aon_timer, UINT32_MAX,
+                                                      bite_cycles, false));
+  CHECK_DIF_OK(dif_pwrmgr_set_request_sources(pwrmgr, kDifPwrmgrReqTypeReset,
+                                              kDifPwrmgrResetRequestSourceTwo,
+                                              kDifToggleDisabled));
+  // Disable USB clock in active mode (domain_config = 0).
+  CHECK_DIF_OK(dif_pwrmgr_set_domain_config(pwrmgr, 0, kDifToggleEnabled));
+  busy_spin_micros(50);
+}
+
 bool test_main(void) {
   bool all_ok = true;
   dif_rstmgr_t rstmgr;
   CHECK_DIF_OK(
       dif_rstmgr_init(mmio_region_from_addr(kRstmgrBase), &rstmgr));
+  dif_pwrmgr_t pwrmgr;
+  CHECK_DIF_OK(
+      dif_pwrmgr_init(mmio_region_from_addr(kPwrmgrBase), &pwrmgr));
+  dif_aon_timer_t aon_timer;
+  CHECK_DIF_OK(
+      dif_aon_timer_init(mmio_region_from_addr(kAonTimerBase), &aon_timer));
+
+  retention_sram_t *ret_sram = retention_sram_get();
+  uint32_t phase = ret_sram->creator.reserved[0];
+
+  if (phase == kPhaseUnclockedBufRead) {
+    CHECK_STATUS_OK(aon_timer_testutils_shutdown(&aon_timer));
+    EXPECT_RTL(UNWRAP(rstmgr_testutils_is_reset_info(
+                   &rstmgr, kDifRstmgrResetInfoWatchdog)),
+               "Expected watchdog reset after unclocked USBDEV_BUFFER read");
+    dif_rstmgr_cpu_info_dump_segment_t cpu_dump[DIF_RSTMGR_CPU_INFO_MAX_SIZE];
+    size_t size_read = 0;
+    CHECK_DIF_OK(dif_rstmgr_cpu_info_dump_read(
+        &rstmgr, cpu_dump, DIF_RSTMGR_CPU_INFO_MAX_SIZE, &size_read));
+    EXPECT_RTL(cpu_dump[2] == kUnclockedBufReadAddr,
+               "Expected LAST_DATA_ADDR=0x%08x on unclocked buffer read, got "
+               "0x%08x",
+               kUnclockedBufReadAddr, cpu_dump[2]);
+    CHECK(all_ok);
+
+    ret_sram->creator.reserved[0] = kPhaseUnclockedBufWrite;
+    arm_unclocked_usbdev_watchdog(&rstmgr, &pwrmgr, &aon_timer);
+    abs_mmio_write32(kUnclockedBufWriteAddr, 0xdeadbeefu);
+    LOG_ERROR("Unreachable after unclocked USBDEV_BUFFER write");
+    return false;
+  } else if (phase == kPhaseUnclockedBufWrite) {
+    ret_sram->creator.reserved[0] = 0u;
+    CHECK_STATUS_OK(aon_timer_testutils_shutdown(&aon_timer));
+    EXPECT_RTL(UNWRAP(rstmgr_testutils_is_reset_info(
+                   &rstmgr, kDifRstmgrResetInfoWatchdog)),
+               "Expected watchdog reset after unclocked USBDEV_BUFFER write");
+    dif_rstmgr_cpu_info_dump_segment_t cpu_dump[DIF_RSTMGR_CPU_INFO_MAX_SIZE];
+    size_t size_read = 0;
+    CHECK_DIF_OK(dif_rstmgr_cpu_info_dump_read(
+        &rstmgr, cpu_dump, DIF_RSTMGR_CPU_INFO_MAX_SIZE, &size_read));
+    EXPECT_RTL(cpu_dump[2] == kUnclockedBufWriteAddr,
+               "Expected LAST_DATA_ADDR=0x%08x on unclocked buffer write, got "
+               "0x%08x",
+               kUnclockedBufWriteAddr, cpu_dump[2]);
+    return all_ok;
+  }
+
   dif_pinmux_t pinmux;
   CHECK_DIF_OK(
       dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
@@ -331,5 +408,44 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET) == 0x11223344u,
              "sb to USBDEV_BUFFER must not modify word");
 
-  return all_ok;
+  // 11. Status-type interrupts (PKT_RECEIVED, PKT_SENT, AV_OUT_EMPTY, RX_FULL,
+  // AV_SETUP_EMPTY) in INTR_STATE reflect (live_status | INTR_TEST).
+  abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET, 0x7u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  const uint32_t kStatusIntrMask =
+      (1u << USBDEV_INTR_COMMON_PKT_RECEIVED_BIT) |
+      (1u << USBDEV_INTR_COMMON_PKT_SENT_BIT) |
+      (1u << USBDEV_INTR_COMMON_AV_OUT_EMPTY_BIT) |
+      (1u << USBDEV_INTR_COMMON_RX_FULL_BIT) |
+      (1u << USBDEV_INTR_COMMON_AV_SETUP_EMPTY_BIT);
+  EXPECT_RTL(
+      (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+       kStatusIntrMask) == 0u,
+      "Status-type INTR_STATE bits must be 0 when USBCTRL.enable=0 and "
+      "INTR_TEST=0");
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, kStatusIntrMask);
+  EXPECT_RTL(
+      (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+       kStatusIntrMask) == kStatusIntrMask,
+      "INTR_TEST must assert all 5 status-type INTR_STATE bits");
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0u);
+  EXPECT_RTL(
+      (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+       kStatusIntrMask) == 0u,
+      "Clearing INTR_TEST to 0 must deassert status-type INTR_STATE bits");
+
+  if (!all_ok) {
+    return false;
+  }
+
+  // 12. Unclocked USBDEV_BUFFER read (+4) and write (+8) must stall the CPU
+  // until AON watchdog bite and record the exact hung address in
+  // rstmgr cpu_info LAST_DATA_ADDR (cpu_dump[2]).
+  ret_sram->creator.reserved[0] = kPhaseUnclockedBufRead;
+  arm_unclocked_usbdev_watchdog(&rstmgr, &pwrmgr, &aon_timer);
+  (void)abs_mmio_read32(kUnclockedBufReadAddr);
+  LOG_ERROR("Unreachable after unclocked USBDEV_BUFFER read");
+  return false;
 }
