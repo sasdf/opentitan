@@ -81,6 +81,8 @@ bool test_main(void) {
   abs_mmio_write32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET, 0xffffffffu);
   abs_mmio_write32(kEdn0Base + EDN_ERR_CODE_REG_OFFSET, 0xffffffffu);
   abs_mmio_write32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000001u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x0c1u);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_ERR_CODE_REG_OFFSET) == 0u);
 
   access_fault_count = 0;
@@ -243,11 +245,18 @@ bool test_main(void) {
       100000);
   CHECK((abs_mmio_read32(kEdn1Base + EDN_INTR_STATE_REG_OFFSET) &
          (1u << EDN_INTR_STATE_EDN_FATAL_ERR_BIT)) != 0u);
+  CHECK(abs_mmio_read32(kEdn1Base + EDN_MAIN_SM_STATE_REG_OFFSET) != 0x17eu,
+        "Expected MAIN_SM_STATE != 0x17e (Error) on FIFO_READ_ERR alone, got 0x%x",
+        abs_mmio_read32(kEdn1Base + EDN_MAIN_SM_STATE_REG_OFFSET));
 
   abs_mmio_write32(kEdn1Base + EDN_ERR_CODE_TEST_REG_OFFSET,
                    EDN_ERR_CODE_EDN_MAIN_SM_ERR_BIT);
-  CHECK((abs_mmio_read32(kEdn1Base + EDN_ERR_CODE_REG_OFFSET) &
-         (1u << EDN_ERR_CODE_EDN_MAIN_SM_ERR_BIT)) != 0u);
+  uint32_t exp_sm_errs = (1u << EDN_ERR_CODE_EDN_MAIN_SM_ERR_BIT) |
+                         (1u << EDN_ERR_CODE_EDN_ACK_SM_ERR_BIT);
+  CHECK((abs_mmio_read32(kEdn1Base + EDN_ERR_CODE_REG_OFFSET) & exp_sm_errs) ==
+        exp_sm_errs,
+        "Expected both EDN_MAIN_SM_ERR and EDN_ACK_SM_ERR after ERR_CODE_TEST, got 0x%x",
+        abs_mmio_read32(kEdn1Base + EDN_ERR_CODE_REG_OFFSET));
   CHECK(abs_mmio_read32(kEdn1Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x17eu,
         "Expected MAIN_SM_STATE == 0x17e (Error) after ERR_CODE_TEST, got 0x%x",
         abs_mmio_read32(kEdn1Base + EDN_MAIN_SM_STATE_REG_OFFSET));
