@@ -339,5 +339,12 @@ bool test_main(void) {
              "Out-of-bounds read at 0x578 (addrmiss) must fault with mcause=5 (count=%u, mcause=%u)",
              g_fault_count, g_last_mcause);
 
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kAlertBase + 0x578u, 0xdeadbeefu);
+  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u,
+             "Out-of-bounds write at 0x578 (addrmiss) must fault with mcause=7 (count=%u, mcause=%u)",
+             g_fault_count, g_last_mcause);
+
   return all_ok;
 }
