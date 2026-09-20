@@ -151,15 +151,6 @@ static size_t spi_device_send_frame(ottf_console_t *console, const char *buf,
              available_buffer_size);
   }
 
-  // Clear the magic number slot before writing payload and header metadata
-  // so that concurrent host SPI reads never see a valid magic number until
-  // the entire frame is in place.
-  const uint8_t kZeroWord[4] = {0};
-  if (!status_ok(spi_device_send_data(spi_device, kZeroWord, 4,
-                                      next_write_address))) {
-    return 0;
-  }
-
   // Send aligned data.
   size_t data_write_address =
       (next_write_address + kSpiDeviceFrameHeaderSizeBytes) %
@@ -185,16 +176,9 @@ static size_t spi_device_send_frame(ottf_console_t *console, const char *buf,
     }
   }
 
-  // Send frame header metadata (frame number and length) first, then write
-  // the magic number last to commit the frame atomically.
-  size_t header_meta_address =
-      (next_write_address + 4) % kSpiDeviceReadBufferSizeBytes;
-  if (!status_ok(spi_device_send_data(spi_device, &frame_header_bytes[4],
-                                      kSpiDeviceFrameHeaderSizeBytes - 4,
-                                      header_meta_address))) {
-    return 0;
-  }
-  if (!status_ok(spi_device_send_data(spi_device, frame_header_bytes, 4,
+  // Send frame header.
+  if (!status_ok(spi_device_send_data(spi_device, frame_header_bytes,
+                                      kSpiDeviceFrameHeaderSizeBytes,
                                       next_write_address))) {
     return 0;
   }
