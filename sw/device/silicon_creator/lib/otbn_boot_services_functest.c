@@ -50,6 +50,7 @@ static const sc_keymgr_diversification_t kDiversification = {
     .version = 0,
 };
 
+#ifndef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
 // Test values for attestation key seeds.
 static const uint32_t kSeedValues[3][kAttestationSeedWords] = {
     {0x70717273, 0x74757677, 0x78797a7b, 0x7c7d7e7f, 0x80818283, 0x84858687,
@@ -59,6 +60,7 @@ static const uint32_t kSeedValues[3][kAttestationSeedWords] = {
     {0xd0d1d2d3, 0xd4d5d6d7, 0xd8d9dadb, 0xdcdddedf, 0xe0e1e2e3, 0xe4e5e6e7,
      0xe8e9eaeb, 0xecedeeef, 0xf0b1b2b3, 0xf4f5f6f7},
 };
+#endif
 
 rom_error_t sigverify_test(void) {
   // Hash the test message.
@@ -94,13 +96,26 @@ rom_error_t attestation_keygen_test(void) {
                                                kScKeymgrKeyTypeAttestation,
                                                kDiversification, &pk_uds));
   ecdsa_p256_public_key_t pk_cdi0;
+  ecdsa_p256_public_key_t pk_cdi1;
+#ifdef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
+  sc_keymgr_diversification_t div_cdi0 = kDiversification;
+  sc_keymgr_diversification_t div_cdi1 = kDiversification;
+  div_cdi0.salt[0] ^= 1;
+  div_cdi1.salt[0] ^= 2;
+  RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi0KeySeedIdx,
+                                               kScKeymgrKeyTypeAttestation,
+                                               div_cdi0, &pk_cdi0));
+  RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi1KeySeedIdx,
+                                               kScKeymgrKeyTypeAttestation,
+                                               div_cdi1, &pk_cdi1));
+#else
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi0KeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
                                                kDiversification, &pk_cdi0));
-  ecdsa_p256_public_key_t pk_cdi1;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldCdi1KeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
                                                kDiversification, &pk_cdi1));
+#endif
   ecdsa_p256_public_key_t pk_tpm_ek;
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldTpmEkKeySeedIdx,
                                                kScKeymgrKeyTypeSealing,
@@ -147,6 +162,7 @@ rom_error_t attestation_advance_and_endorse_test(void) {
                                                  kScKeymgrKeyTypeAttestation,
                                                  kDiversification));
 
+#ifndef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
   // Advance keymgr to the next stage.
   if (num_keymgr_advances == 0) {
     CHECK_STATUS_OK(
@@ -161,6 +177,7 @@ rom_error_t attestation_advance_and_endorse_test(void) {
         keymgr_testutils_advance_state(&keymgr, &kOwnerRootKeyParams));
     num_keymgr_advances++;
   }
+#endif
 
   // Run endorsement (should overwrite the key with randomness when done).
   hmac_digest_t digest;
@@ -171,9 +188,17 @@ rom_error_t attestation_advance_and_endorse_test(void) {
   // Check that generating a new key with the same diversification as before
   // now gets a different public key because keymgr has advanced.
   ecdsa_p256_public_key_t pk_adv;
+#ifdef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
+  sc_keymgr_diversification_t next_div = kDiversification;
+  next_div.salt[0] ^= (uint32_t)(++num_keymgr_advances);
+  RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldUdsKeySeedIdx,
+                                               kScKeymgrKeyTypeAttestation,
+                                               next_div, &pk_adv));
+#else
   RETURN_IF_ERROR(otbn_boot_attestation_keygen(kFlashInfoFieldUdsKeySeedIdx,
                                                kScKeymgrKeyTypeAttestation,
                                                kDiversification, &pk_adv));
+#endif
   CHECK_ARRAYS_NE((unsigned char *)&pk, (unsigned char *)&pk_adv, sizeof(pk));
 
   return kErrorOk;
@@ -218,6 +243,13 @@ bool test_main(void) {
   // Initialize the entropy complex, KMAC, and the key manager.
   CHECK_STATUS_OK(entropy_complex_init(kHardenedBoolFalse));
   dif_kmac_t kmac;
+#ifdef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
+  dif_keymgr_state_t keymgr_state;
+  CHECK_STATUS_OK(keymgr_testutils_try_startup(&keymgr, &kmac, &keymgr_state));
+  CHECK(keymgr_state == kDifKeymgrStateOwnerRootKey);
+  CHECK_STATUS_OK(
+      ottf_alerts_ignore_alert(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+#else
   CHECK_STATUS_OK(keymgr_testutils_startup(&keymgr, &kmac));
   CHECK_STATUS_OK(
       keymgr_testutils_check_state(&keymgr, kDifKeymgrStateCreatorRootKey));
@@ -253,6 +285,7 @@ bool test_main(void) {
         seed_fields[i].partition, kSeedValues[i],
         kDifFlashCtrlPartitionTypeInfo, kAttestationSeedWords));
   }
+#endif
 
   // Load the boot services OTBN app.
   CHECK(otbn_boot_app_load() == kErrorOk);

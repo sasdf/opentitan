@@ -548,7 +548,8 @@ opentitan_test(
 
 opentitan_test(
     name = "otbn_boot_services_rom_ext_functest",
-    srcs = ["otbn_boot_services_rom_ext_functest.c"],
+    srcs = ["otbn_boot_services_functest.c"],
+    defines = ["OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
