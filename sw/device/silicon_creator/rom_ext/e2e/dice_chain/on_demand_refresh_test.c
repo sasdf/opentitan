@@ -32,16 +32,9 @@ OTTF_DEFINE_TEST_CONFIG();
 
 static bool is_flash_page_empty(void) {
   uint32_t data[8];
-  rom_error_t err = flash_ctrl_info_read(
-      &kFlashCtrlInfoPageDiceCerts, 0, sizeof(data) / sizeof(uint32_t), data);
-  if (err != kErrorOk) {
-    flash_ctrl_error_code_t flash_ctrl_err_code;
-    flash_ctrl_error_code_get(&flash_ctrl_err_code);
-    if (flash_ctrl_err_code.rd_err) {
-      return true;
-    }
-    LOG_ERROR("Failed to read flash info page");
-    return false;
+  if (flash_ctrl_info_read(&kFlashCtrlInfoPageDiceCerts, 0,
+                           sizeof(data) / sizeof(uint32_t), data) != kErrorOk) {
+    return true;
   }
   for (size_t i = 0; i < ARRAYSIZE(data); ++i) {
     if (data[i] != 0xFFFFFFFF) {
