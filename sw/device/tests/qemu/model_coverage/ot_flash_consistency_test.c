@@ -249,11 +249,29 @@ bool test_main(void) {
         "Expected CURR_FIFO_LVL.RD == 2 before FIFO_RST, got 0x%x", curr_lvl);
 
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_RST_REG_OFFSET, 1u);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_RST_REG_OFFSET, 0u);
   curr_lvl =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CURR_FIFO_LVL_REG_OFFSET);
-  CHECK(curr_lvl == 0u, "Expected CURR_FIFO_LVL == 0 after FIFO_RST, got 0x%x",
+  CHECK(curr_lvl == 0u, "Expected CURR_FIFO_LVL == 0 while FIFO_RST == 1, got 0x%x",
         curr_lvl);
+
+  // While FIFO_RST == 1, execute an OP_READ and verify it completes with DONE
+  // while RD_FIFO remains empty (CURR_FIFO_LVL.RD == 0, STATUS.RD_EMPTY == 1).
+  clear_flash_status();
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x0u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, rd_ctrl);
+  CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+        "OP_READ while FIFO_RST == 1 failed");
+  curr_lvl =
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CURR_FIFO_LVL_REG_OFFSET);
+  CHECK(curr_lvl == 0u,
+        "Expected CURR_FIFO_LVL == 0 after OP_READ with FIFO_RST == 1, got 0x%x",
+        curr_lvl);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_STATUS_REG_OFFSET),
+            FLASH_CTRL_STATUS_RD_EMPTY_BIT),
+        "Expected STATUS.RD_EMPTY == 1 after OP_READ with FIFO_RST == 1");
+
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_RST_REG_OFFSET, 0u);
   clear_flash_status();
 
   // ---------------------------------------------------------------------------
@@ -320,6 +338,103 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERASE_SUSPEND_REG_OFFSET) ==
             0u,
         "ERASE_SUSPEND must auto-clear to 0 once erase completes/suspends");
+  clear_flash_status();
+
+  // (c) Info-Selected Bank Erase (ERASE_SEL = 1, PARTITION_SEL = 1):
+  //     Configure MP_REGION_7 for Bank 1 page 0 (base = 256, size = 1),
+  //     program non-0xFFFFFFFF words into both Bank 1 Data (0x80000) and
+  //     Bank 1 INFO1 (0x80000), set BANK1_INFO1_PAGE_CFG.ERASE_EN = False,
+  //     and execute Bank Erase with PARTITION_SEL = 1. Verify BOTH Info and
+  //     Data partitions of Bank 1 are erased to 0xFFFFFFFF.
+  uint32_t mp_reg7 =
+      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_BASE_7_FIELD,
+                             256u) |
+      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_SIZE_7_FIELD,
+                             1u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET,
+                   mp_reg7);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET,
+                   mp_reg7);
+  abs_mmio_write32(
+      kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
+      kInfoCfgAllowUnscrambled);
+  abs_mmio_write32(
+      kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
+      kInfoCfgAllowUnscrambled);
+
+  // Program 2 words into Bank 1 Data page 0 (0x80000, PARTITION_SEL = 0).
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
+  uint32_t data_prog_ctrl =
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_PROG) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   data_prog_ctrl);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET,
+                   0xa5a55a5au);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET,
+                   0x5a5aa5a5u);
+  CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+        "Bank 1 Data prog failed");
+  clear_flash_status();
+
+  // Program 2 words into Bank 1 INFO1 page 0 (0x80000, PARTITION_SEL = 1).
+  verify_info_page_erase_prog_read(0x80000u, /*info_sel=*/1u, 0x13572468u,
+                                   0x24681357u);
+
+  // Disable ERASE_EN on BANK1_INFO1_PAGE_CFG to verify bank erase ignores
+  // per-page ERASE_EN when MP_BANK_CFG_SHADOWED.ERASE_EN_1 == 1.
+  uint32_t info_cfg_no_erase = bitfield_field32_write(
+      kInfoCfgAllowUnscrambled, FLASH_CTRL_MP_REGION_CFG_7_ERASE_EN_7_FIELD,
+      kMultiBitBool4False);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_BANK1_INFO1_PAGE_CFG_REG_OFFSET,
+                   info_cfg_no_erase);
+
+  // Execute Info-Selected Bank Erase on Bank 1 (ERASE_SEL = 1, PARTITION_SEL = 1).
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
+  uint32_t info_bk_erase_ctrl =
+      bitfield_bit32_write(bk_erase_ctrl, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT,
+                           true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_INFO_SEL_FIELD, 1u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   info_bk_erase_ctrl);
+  bk_status = wait_op_done();
+  CHECK(bk_status == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+        "Bank 1 Info-selected bank erase failed: op_status=0x%x", bk_status);
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET) == 0u,
+        "Expected ERR_CODE == 0 after Info-selected bank erase");
+  clear_flash_status();
+
+  // Verify Bank 1 INFO1 (0x80000) was erased to 0xFFFFFFFF.
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, rd_ctrl);
+  CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+        "Bank 1 INFO1 read after bank erase failed");
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
+            0xffffffffu,
+        "Bank 1 INFO1 word0 not erased by Info-selected bank erase");
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
+            0xffffffffu,
+        "Bank 1 INFO1 word1 not erased by Info-selected bank erase");
+  clear_flash_status();
+
+  // Verify Bank 1 Data (0x80000) was ALSO erased to 0xFFFFFFFF.
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
+  uint32_t data_rd_ctrl =
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_READ) |
+      bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, data_rd_ctrl);
+  CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+        "Bank 1 Data read after Info-selected bank erase failed");
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
+            0xffffffffu,
+        "Bank 1 Data word0 not erased by Info-selected bank erase");
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
+            0xffffffffu,
+        "Bank 1 Data word1 not erased by Info-selected bank erase");
   clear_flash_status();
   write_mp_bank_cfg_shadowed(0u);
 
