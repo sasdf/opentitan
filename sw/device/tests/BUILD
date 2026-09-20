@@ -2041,7 +2041,8 @@ opentitan_test(
 
 opentitan_test(
     name = "flash_ctrl_mem_protection_rom_ext_test",
-    srcs = ["flash_ctrl_mem_protection_rom_ext_test.c"],
+    srcs = ["flash_ctrl_mem_protection_test.c"],
+    defines = ["TEST_ROM_EXT=1"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
