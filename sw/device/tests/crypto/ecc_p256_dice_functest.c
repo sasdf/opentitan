@@ -31,6 +31,7 @@ static dif_keymgr_t keymgr;
 
 OTTF_DEFINE_TEST_CONFIG();
 
+#ifndef ECC_P256_DICE_NO_ROM_EXT
 static status_t get_stored_certificate(
     const char *cert_name, size_t name_size,
     const flash_ctrl_info_page_t *info_page,
@@ -86,6 +87,7 @@ static status_t extract_public_key_from_der(const uint8_t *der_bytes,
 
   return NOT_FOUND();
 }
+#endif
 
 static status_t read_attestation_seed_configured(uint32_t *attestation_data) {
   if (kDeviceType != kDeviceSilicon) {
@@ -109,6 +111,7 @@ static status_t read_attestation_seed_configured(uint32_t *attestation_data) {
 }
 
 status_t dice_test(void) {
+#ifndef ECC_P256_DICE_NO_ROM_EXT
   perso_tlv_cert_obj_view_t target_cert = {0};
 
   TRY(get_stored_certificate("CDI_1", 5, &kFlashCtrlInfoPageDiceCerts,
@@ -122,6 +125,7 @@ status_t dice_test(void) {
   char cert_pk_hex[256];
   hexstr_encode(cert_pk_hex, sizeof(cert_pk_hex), cert_pk, sizeof(cert_pk));
   LOG_INFO("Cert public key: %s\r", cert_pk_hex);
+#endif
 
   char buf[256];
 
@@ -171,6 +175,7 @@ status_t dice_test(void) {
   LOG_INFO("OTBN keygen instruction count: 0x%08x",
            otbn_instruction_count_get());
 
+#ifndef ECC_P256_DICE_NO_ROM_EXT
   // Compare the public key from what is given in the cert.
   // Needs endianness transformations.
   uint32_t pk_be[512 / 32];
@@ -180,6 +185,7 @@ status_t dice_test(void) {
   util_reverse_bytes(pk_be_bytes + 32, 32);
 
   CHECK_ARRAYS_EQ(cert_pk, pk_be, 512 / 32);
+#endif
 
   // Checking the synchronous call and whether the same public key is generated
   // the second time.

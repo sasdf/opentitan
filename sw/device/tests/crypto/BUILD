@@ -361,7 +361,8 @@ opentitan_test(
 
 opentitan_test(
     name = "ecc_p256_dice_no_rom_ext_functest",
-    srcs = ["ecc_p256_dice_no_rom_ext_functest.c"],
+    srcs = ["ecc_p256_dice_functest.c"],
+    defines = ["ECC_P256_DICE_NO_ROM_EXT"],
     exec_env = EARLGREY_TEST_ENVS,
     verilator = verilator_params(
         timeout = "eternal",
@@ -382,6 +383,9 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/base:util",
         "//sw/device/silicon_creator/lib/cert:dice_keys",
+        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
+        "//sw/device/silicon_creator/manuf/base:perso_tlv_data",
+        "//sw/device/silicon_creator/manuf/lib:flash_info_fields",
     ],
 )
 
