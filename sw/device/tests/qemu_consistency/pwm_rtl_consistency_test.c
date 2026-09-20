@@ -183,6 +183,17 @@ bool test_main(void) {
   abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 0u);
   busy_spin_micros(20);
 
+  // 4c. Verify unmapped offset 0x5c (reg >= REGS_COUNT within BlockAw=7 0x80
+  // aperture, pwm_reg_top.sv addrmiss) raises Load/Store Access Faults.
+  kFaultCount = 0;
+  (void)abs_mmio_read32(kPwmBase + 0x5cu);
+  EXPECT_RTL(kFaultCount == 1u,
+             "Reading unmapped PWM offset 0x5c must raise Load Access Fault");
+  kFaultCount = 0;
+  abs_mmio_write32(kPwmBase + 0x5cu, 0xdeadbeefu);
+  EXPECT_RTL(kFaultCount == 1u,
+             "Writing unmapped PWM offset 0x5c must raise Store Access Fault");
+
   // 5. Verify REGWEN (rw0c) locks CFG, PWM_EN, INVERT, PWM_PARAM_0,
   // DUTY_CYCLE_0, and BLINK_PARAM_0 while leaving ALERT_TEST functional.
   abs_mmio_write32(kPwmBase + PWM_REGWEN_REG_OFFSET, 0u);
