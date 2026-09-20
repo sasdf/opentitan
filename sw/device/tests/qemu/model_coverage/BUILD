@@ -201,9 +201,15 @@ opentitan_test(
 opentitan_test(
     name = "vmapper_consistency_test",
     srcs = ["vmapper_consistency_test.c"],
-    exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        EARLGREY_CW340_TEST_ENVS,
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -219,9 +225,15 @@ opentitan_test(
 opentitan_test(
     name = "ot_rom_ctrl_consistency_test",
     srcs = ["ot_rom_ctrl_consistency_test.c"],
-    exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        EARLGREY_CW340_TEST_ENVS,
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
     ),
     deps = [
         "//hw/ip/rom_ctrl/data:rom_ctrl_c_regs",
@@ -286,9 +298,15 @@ opentitan_test(
 opentitan_test(
     name = "ot_sram_ctrl_consistency_test",
     srcs = ["ot_sram_ctrl_consistency_test.c"],
-    exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        EARLGREY_CW340_TEST_ENVS,
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
     ),
     deps = [
         "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
