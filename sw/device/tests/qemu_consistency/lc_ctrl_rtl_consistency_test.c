@@ -227,6 +227,13 @@ bool test_main(void) {
                   kMultiBitBool8True);
   CHECK(!g_fault_seen);
 
+  // On Earlgrey (top_pkg::SecVolatileRawUnlockEn = 0, lc_ctrl.sv:534),
+  // volatile_raw_unlock_q is tied to 1'b0, so writing VOLATILE_RAW_UNLOCK=1
+  // to TRANSITION_CTRL must read back 0.
+  abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET,
+                   1u << LC_CTRL_TRANSITION_CTRL_VOLATILE_RAW_UNLOCK_BIT);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET) == 0u);
+
   // Restore clean state before locking CLAIM_TRANSITION_IF_REGWEN.
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET, 0u);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_OTP_VENDOR_TEST_CTRL_REG_OFFSET, 0u);
