@@ -131,6 +131,18 @@ static void test_w5_permit_subword_wr_err_and_addrmiss(void) {
         "W5-5: 32-bit read at out-of-bounds offset 0x58 must fault with Load "
         "Access Fault (mcause=5), got count=%u mcause=%u",
         g_access_fault_count, g_last_mcause);
+
+  // 6. Out-of-bounds write at offset 0x58 must fault with Store Access Fault
+  // (mcause = 7).
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write32(kClkmgrBase + 0x58u, 0xdeadbeefu);
+  g_expect_access_fault = false;
+  CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
+        "W5-6: 32-bit write at out-of-bounds offset 0x58 must fault with Store "
+        "Access Fault (mcause=7), got count=%u mcause=%u",
+        g_access_fault_count, g_last_mcause);
 }
 
 bool test_main(void) {
