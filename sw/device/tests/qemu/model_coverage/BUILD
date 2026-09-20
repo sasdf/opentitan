@@ -276,6 +276,36 @@ opentitan_test(
 )
 
 opentitan_test(
+    name = "ot_keymgr_consistency_test",
+    srcs = ["ot_keymgr_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
+    ),
+    deps = [
+        "//hw/ip/keymgr/data:keymgr_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/dif:keymgr",
+        "//sw/device/lib/dif:kmac",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing:keymgr_testutils",
+        "//sw/device/lib/testing:kmac_testutils",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
     name = "ot_timer_consistency_test",
     srcs = ["ot_timer_consistency_test.c"],
     exec_env = {
