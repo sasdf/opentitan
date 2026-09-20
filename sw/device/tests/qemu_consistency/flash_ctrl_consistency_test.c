@@ -470,6 +470,12 @@ bool test_main(void) {
              "Writing RD_FIFO (ErrOnWrite=1) must raise Store Access Fault (faults=%u)",
              g_fault_count);
 
+  g_fault_count = 0;
+  (void)abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET);
+  EXPECT_RTL(g_fault_count == 1u,
+             "Reading empty RD_FIFO with no active SW read op (rd_no_op_d=1) must raise Load Access Fault (faults=%u)",
+             g_fault_count);
+
   // 20. FLASH_CTRL_CORE_PERMIT, PROG_FIFO .ByteAccess(0), and
   //     FLASH_CTRL_PRIM_PERMIT sub-word write (wr_err) verification.
   //     In flash_ctrl_core_reg_top.sv and flash_ctrl_prim_reg_top.sv:
