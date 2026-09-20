@@ -402,5 +402,14 @@ bool test_main(void) {
              "32-bit read at unmapped offset 0xac (addrmiss) must raise Load "
              "Access Fault (mcause=5)");
 
+  g_access_fault_count = 0;
+  g_last_mcause = 0;
+  g_expect_access_fault = true;
+  abs_mmio_write32(kSysrstBase + 0xacu, 0x12345678u);
+  g_expect_access_fault = false;
+  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u,
+             "32-bit write at unmapped offset 0xac (addrmiss) must raise Store "
+             "Access Fault (mcause=7)");
+
   return all_ok;
 }
