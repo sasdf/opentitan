@@ -83,7 +83,24 @@ bool test_main(void) {
   CHECK(sram_virt_win[256] == 0x9999aaaau);
   CHECK(sram_virt_win[512] == 0x30303030u);
 
-  // Disable Slot 0 -> interior window falls back to Slot 1 (sram_buf_b[256]).
+  // Configure Slot 0 (higher priority, prio = 0) at the SAME base address
+  // [sram_virt_win, sram_virt_win + 1023] -> sram_buf_a (size = 1024 < 4096).
+  // Because start0 == start1 and end0 < end1, Slot 0 overrides [0..1023] and
+  // shifts Slot 1's active window to [1024..4095] -> sram_buf_b + 1024 (case b1).
+  dif_rv_core_ibex_addr_translation_mapping_t map_slot0_prefix = {
+      .matching_addr = (uintptr_t)&sram_virt_win[0],
+      .remap_addr = (uintptr_t)sram_buf_a,
+      .size = 1024,
+  };
+  CHECK_DIF_OK(dif_rv_core_ibex_configure_addr_translation(
+      &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
+      kDifRvCoreIbexAddrTranslationDBus, map_slot0_prefix));
+  icache_invalidate();
+  CHECK(sram_virt_win[0] == 0x9999aaaau);
+  CHECK(sram_virt_win[256] == 0x20202020u);
+  CHECK(sram_virt_win[512] == 0x30303030u);
+
+  // Disable Slot 0 -> window falls back to full Slot 1 (sram_buf_b[0..1023]).
   CHECK_DIF_OK(dif_rv_core_ibex_disable_addr_translation(
       &ibex, kDifRvCoreIbexAddrTranslationSlot_0,
       kDifRvCoreIbexAddrTranslationDBus));
