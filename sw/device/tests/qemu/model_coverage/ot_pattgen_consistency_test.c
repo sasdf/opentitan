@@ -69,7 +69,7 @@ bool test_main(void) {
 
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, kCtrlPol0);
   abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
-  abs_mmio_write32(kPattgenBase + PATTGEN_PREDIV_CH0_REG_OFFSET, 2000u);
+  abs_mmio_write32(kPattgenBase + PATTGEN_PREDIV_CH0_REG_OFFSET, 50u);
   abs_mmio_write32(kPattgenBase + PATTGEN_SIZE_REG_OFFSET,
                    (7u << PATTGEN_SIZE_LEN_CH0_OFFSET) |
                        (3u << PATTGEN_SIZE_REPS_CH0_OFFSET));
