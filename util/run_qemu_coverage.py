@@ -33,26 +33,89 @@ EARLGREY_SOURCE_PATTERNS = [
     "hw/opentitan/ot_",
     "hw/riscv/ot_earlgrey.c",
     "hw/riscv/ibex_",
+    "hw/riscv/dm.c",
+    "hw/riscv/dtm.c",
     "hw/misc/pulp_rv_dm.c",
     "hw/jtag/tap_ctrl_rbb.c",
     "hw/block/m25p80",
     "hw/nvram/eeprom_at24c.c",
     "hw/intc/sifive_plic.c",
+    "accel/tcg/cputlb.c",
+    "accel/tcg/icount-common.c",
+    "system/cpus.c",
+    "target/riscv/bitmanip_helper.c",
+    "target/riscv/cpu.c",
+    "target/riscv/cpu.h",
+    "target/riscv/cpu_helper.c",
+    "target/riscv/csr.c",
+    "target/riscv/debug.c",
+    "target/riscv/helper.h",
+    "target/riscv/ibex_csr.c",
+    "target/riscv/insn_trans/trans_rvb.c.inc",
+    "target/riscv/insn_trans/trans_rvi.c.inc",
+    "target/riscv/op_helper.c",
+    "target/riscv/pmp.c",
+    "target/riscv/pmp.h",
+    "target/riscv/pmu.c",
+    "target/riscv/pmu.h",
+    "target/riscv/translate.c",
+    "include/exec/icount.h",
+    "include/hw/core/cpu.h",
+    "include/hw/jtag/tap_ctrl_rbb.h",
+    "include/hw/misc/pulp_rv_dm.h",
+    "include/hw/opentitan/",
+    "include/hw/riscv/",
+    "include/system/cpu-timers-internal.h",
 ]
 
 EXCLUDE_PATTERNS = [
     "_dj.c",
+    "_dj.h",
     "ot_keymgr_dpe.c",
+    "ot_keymgr_dpe.h",
     "ot_mbx.c",
+    "ot_mbx.h",
     "ot_dma.c",
+    "ot_dma.h",
     "ot_soc_proxy.c",
+    "ot_soc_proxy.h",
     "ot_soc_dbg_ctrl.c",
+    "ot_soc_dbg_ctrl.h",
+    "arch_dump.c",
+    "common-semi-target.c",
+    "crypto_helper.c",
+    "fpu_helper.c",
+    "gdbstub.c",
+    "m128_helper.c",
+    "target_riscv_machine.c",
+    "target_riscv_monitor.c",
+    "riscv-qmp-cmds.c",
+    "tcg-cpu.c",
+    "th_csr.c",
+    "time_helper.c",
+    "vcrypto_helper.c",
+    "vector_helper.c",
+    "vector_internals.c",
+    "zce_helper.c",
 ]
 
 COV_SUBDIRS = (
     "libsystem-ot-cov.a.p",
     "libqemu-riscv32-softmmu-ot-cov.a.p",
 )
+
+
+def normalize_qemu_rel_path(f_path: str, qemu_dir: str) -> str:
+    rel_path = f_path
+    while rel_path.startswith("../"):
+        rel_path = rel_path[3:]
+    if rel_path.startswith(qemu_dir + "/"):
+        return rel_path[len(qemu_dir) + 1 :]
+    for marker in ("/qemu/", "/+qemu+qemu_opentitan/", "/qemu_opentitan/"):
+        idx = rel_path.find(marker)
+        if idx != -1:
+            return rel_path[idx + len(marker) :]
+    return rel_path
 
 
 def is_earlgrey_model_source(src_path: str) -> bool:
@@ -319,9 +382,7 @@ def run_gcov_on_obj(args: Tuple[str, str, str]) -> Dict:
     results = {}
     for f_entry in data.get("files", []):
         f_path = f_entry.get("file", "")
-        rel_path = f_path[3:] if f_path.startswith("../") else f_path
-        if rel_path.startswith(qemu_dir + "/"):
-            rel_path = rel_path[len(qemu_dir) + 1:]
+        rel_path = normalize_qemu_rel_path(f_path, qemu_dir)
         if not is_earlgrey_model_source(rel_path):
             continue
 
@@ -435,7 +496,7 @@ def infer_qemu_dir(ot_dir: str, explicit_qemu_dir: Optional[str]) -> str:
     sibling = os.path.join(os.path.dirname(ot_dir), "qemu")
     if os.path.exists(sibling):
         return os.path.abspath(sibling)
-    return "/root/src/qemu"
+    return "/root/src/workspaces/732be61e-7364-4417-93e7-d09bc7ad7a10/qemu"
 
 
 def resolve_cov_build_dir(out_base: str, qemu_dir: str, explicit_dir: Optional[str]) -> str:
@@ -534,6 +595,8 @@ def main() -> None:
             os.makedirs(dst_sub, exist_ok=True)
             for gcno in glob.glob(os.path.join(src_sub, "*.gcno")):
                 base = os.path.basename(gcno)
+                if any(ex in base for ex in EXCLUDE_PATTERNS):
+                    continue
                 os.symlink(gcno, os.path.join(dst_sub, base))
                 gcda_name = base[:-5] + ".gcda"
                 merged_gcda = os.path.join(merged_gcda_dir, gcda_name)
