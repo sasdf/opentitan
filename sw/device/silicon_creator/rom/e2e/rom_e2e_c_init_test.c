@@ -84,22 +84,14 @@ static uint32_t pad_attr_mask_get(void) {
              "This test is only supported for CW310/CW340/QEMU");
   }
 
-  // The legal attributes on CW310/CW340 (`prim_xilinx_pad_attr`) are `invert`,
-  // `virtual_od_en`, and `input_disable`. QEMU (`prim_generic_pad_attr`) also
-  // supports `pull_en`, `pull_select`, and `drive_strength[0]`.
+  // The only legal attributes on CW310 are `invert`, `virtual_od_en`, and
+  // `input_disable`.
   uint32_t mask = 0;
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INVERT_0_BIT, true);
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_VIRTUAL_OD_EN_0_BIT,
                               true);
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
                               true);
-  if (kDeviceType == kDeviceSimQemu) {
-    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT, true);
-    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_SELECT_0_BIT,
-                                true);
-    mask = bitfield_field32_write(
-        mask, PINMUX_MIO_PAD_ATTR_0_DRIVE_STRENGTH_0_FIELD, 1);
-  }
 
   // Save the original attributes for pad 0.
   uint32_t attr0_orig =
@@ -109,7 +101,7 @@ static uint32_t pad_attr_mask_get(void) {
   // register for pad 0, and then reading back.
   abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_0_REG_OFFSET, UINT32_MAX);
   uint32_t attr0_legal =
-      abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_0_REG_OFFSET);
+      abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_0_REG_OFFSET) & mask;
   CHECK_EQ(attr0_legal, mask, "Pad attribute mask check");
 
   // Restore the original register value.
@@ -147,7 +139,8 @@ static void pinmux_init_test(void) {
 
     // Pad 22 attributes: pull-down selected and enabled (if legal).
     uint32_t attr22 =
-        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_22_REG_OFFSET);
+        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_22_REG_OFFSET) &
+        attr_mask;
     CHECK_EQ(
         bitfield_bit32_read(attr22, PINMUX_MIO_PAD_ATTR_22_PULL_EN_22_BIT),
         bitfield_bit32_read(attr_mask, PINMUX_MIO_PAD_ATTR_22_PULL_EN_22_BIT),
@@ -164,7 +157,8 @@ static void pinmux_init_test(void) {
 
     // Pad 23 attributes: pull-down selected and enabled (if legal).
     uint32_t attr23 =
-        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_23_REG_OFFSET);
+        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_23_REG_OFFSET) &
+        attr_mask;
     CHECK_EQ(
         bitfield_bit32_read(attr23, PINMUX_MIO_PAD_ATTR_23_PULL_EN_23_BIT),
         bitfield_bit32_read(attr_mask, PINMUX_MIO_PAD_ATTR_23_PULL_EN_23_BIT),
@@ -181,7 +175,8 @@ static void pinmux_init_test(void) {
 
     // Pad 24 attributes: pull-down selected and enabled (if legal).
     uint32_t attr24 =
-        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_24_REG_OFFSET);
+        abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_ATTR_24_REG_OFFSET) &
+        attr_mask;
     CHECK_EQ(
         bitfield_bit32_read(attr24, PINMUX_MIO_PAD_ATTR_24_PULL_EN_24_BIT),
         bitfield_bit32_read(attr_mask, PINMUX_MIO_PAD_ATTR_24_PULL_EN_24_BIT),
