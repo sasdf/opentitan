@@ -135,6 +135,10 @@ fn main() -> Result<()> {
                 )
             })?;
 
+            // Allow OTP LCI programming (ST_CNT_PROG + ST_TRANS_PROG) to finish
+            // reaching PostTransition before asserting reset.
+            std::thread::sleep(Duration::from_millis(50));
+
             log::info!("Resetting into {:?}...", locked_states[i]);
             uart.clear_rx_buffer()?;
             transport.reset(UartRx::Clear)?;
@@ -205,6 +209,7 @@ fn main() -> Result<()> {
         opts.timeout,
     )
     .context("Failed waiting for SW to initiate transition from TEST_UNLOCKED0 to DEV")?;
+    std::thread::sleep(Duration::from_millis(50));
 
     // Phase 3: Reset chip into DEV state (count = 2).
     log::info!("Phase 3: Resetting chip into DEV state...");
@@ -219,6 +224,7 @@ fn main() -> Result<()> {
         opts.timeout,
     )
     .context("Failed waiting for SW to initiate transition from DEV to RMA")?;
+    std::thread::sleep(Duration::from_millis(50));
 
     // Phase 5: Reset into RMA state (count = 3). Since RMA transition wipes flash,
     // re-bootstrap the firmware image over SPI and wait for SW test PASS.
