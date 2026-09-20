@@ -84,14 +84,22 @@ static uint32_t pad_attr_mask_get(void) {
              "This test is only supported for CW310/CW340/QEMU");
   }
 
-  // The only legal attributes on CW310/CW340/QEMU are `invert`,
-  // `virtual_od_en`, and `input_disable`.
+  // The legal attributes on CW310/CW340 (`prim_xilinx_pad_attr`) are `invert`,
+  // `virtual_od_en`, and `input_disable`. QEMU (`prim_generic_pad_attr`) also
+  // supports `pull_en`, `pull_select`, and `drive_strength[0]`.
   uint32_t mask = 0;
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INVERT_0_BIT, true);
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_VIRTUAL_OD_EN_0_BIT,
                               true);
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
                               true);
+  if (kDeviceType == kDeviceSimQemu) {
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT, true);
+    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_SELECT_0_BIT,
+                                true);
+    mask = bitfield_field32_write(
+        mask, PINMUX_MIO_PAD_ATTR_0_DRIVE_STRENGTH_0_FIELD, 1);
+  }
 
   // Save the original attributes for pad 0.
   uint32_t attr0_orig =
