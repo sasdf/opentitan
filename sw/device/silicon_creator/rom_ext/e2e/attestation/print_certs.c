@@ -97,8 +97,7 @@ static status_t print_certs(void) {
   // If this test is being run just after running a provisioning test which
   // wrote the UDS certificate to FACTORY INFO page, read and print the UDS
   // cert. Note that for FPGAs the bitstream must not be cleared after running
-  // the provisioning test. When unprovisioned, flash_ctrl_info_read_zeros_on_read_error
-  // handles the expected flash ECC read error cleanly.
+  // the provisioning test
   TRY(print_cert(buf, &kFlashCtrlInfoPageFactoryCerts));
 #endif  // POST_PROVISIONING_TESTS
 
@@ -114,7 +113,6 @@ static status_t print_certs(void) {
   return OK_STATUS();
 }
 
-#ifdef POST_PROVISIONING_TESTS
 const flash_ctrl_info_page_t *const mldsa_endorsed_cert_pages[4] = {
     &kFlashCtrlInfoPageOwnerReserved0,
     &kFlashCtrlInfoPageOwnerReserved1,
@@ -125,7 +123,6 @@ static uint8_t
     endorsed_uds_mldsa_cert[FLASH_CTRL_PARAM_BYTES_PER_PAGE *
                             ARRAYSIZE(
                                 mldsa_endorsed_cert_pages)] OT_WORD_ALIGNED;
-#endif  // POST_PROVISIONING_TESTS
 
 static status_t verify_handover(void) {
   retention_sram_t *retram = retention_sram_get();
