@@ -111,9 +111,7 @@ static const uint8_t pec_lut[256] = {
 };
 
 static dif_pinmux_t pinmux;
-static dif_rv_plic_t plic = {
-    .base_addr = {.base = (void *)TOP_EARLGREY_RV_PLIC_BASE_ADDR},
-};
+static dif_rv_plic_t plic;
 static dif_i2c_t i2c;
 
 /** The UDID for SMBus ARP purposes. Configured by ujson command. */
@@ -230,9 +228,7 @@ void i2c_isr(dif_i2c_irq_t irq) {
   }
   dif_i2c_irq_enable_snapshot_t enables;
   CHECK_DIF_OK(dif_i2c_irq_disable_all(&i2c, &enables));
-  if (enables != 0) {
-    i2c_irq_enables = enables;
-  }
+  i2c_irq_enables = enables;
 }
 
 /**
