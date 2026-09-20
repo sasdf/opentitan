@@ -118,9 +118,12 @@ opentitan_test(
     ),
     deps = [
         "//hw/ip/adc_ctrl/data:adc_ctrl_c_regs",
+        "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
+        "//hw/top_earlgrey:rv_plic_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:irq",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
         "//sw/device/lib/testing/test_framework:ottf_main",

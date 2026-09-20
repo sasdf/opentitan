@@ -7,8 +7,11 @@
 
 #include "adc_ctrl_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "pwrmgr_regs.h"
+#include "rv_plic_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
+#include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
@@ -17,11 +20,21 @@ OTTF_DEFINE_TEST_CONFIG();
 
 enum {
   kAdcBase = TOP_EARLGREY_ADC_CTRL_AON_BASE_ADDR,
+  kPwrmgrBase = TOP_EARLGREY_PWRMGR_AON_BASE_ADDR,
+  kPlicBase = TOP_EARLGREY_RV_PLIC_BASE_ADDR,
   // In chip_earlgrey_cw340.sv, AST inputs adc_a0_ai and adc_a1_ai are tied to
   // '0, so adc_ana.sv outputs adc_d_ch0_o = 10'h000 and adc_d_ch1_o = 10'h000.
   kExpectedChn0Val = 0x000u,
   kExpectedChn1Val = 0x000u,
 };
+
+static void pwrmgr_cdc_sync(void) {
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET,
+                   1u << PWRMGR_CFG_CDC_SYNC_SYNC_BIT);
+  while ((abs_mmio_read32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET) &
+          (1u << PWRMGR_CFG_CDC_SYNC_SYNC_BIT)) != 0u) {
+  }
+}
 
 static uint32_t make_filter_ctl(uint32_t min_v, uint32_t max_v, bool out_range,
                                 bool en) {
@@ -151,13 +164,76 @@ bool test_main(void) {
   CHECK((abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET) &
          0x7u) == 0x3u);
 
-  // Disable ADC and clean up.
+  // 6. Normal-sleep (MAIN_PD_N = 1) wakeup via ADC_CTRL Filter 0 matching
+  //    (0x000, 0x000).
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
-  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET, 0u);
-  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET, 0u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 1u);
+  busy_spin_micros(50);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 0u);
+  busy_spin_micros(50);
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_1_REG_OFFSET, 0u);
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_1_REG_OFFSET, 0u);
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_2_REG_OFFSET, 0u);
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_2_REG_OFFSET, 0u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_WAKEUP_CTL_REG_OFFSET, 0x1u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_INTR_CTL_REG_OFFSET, 0x1u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_INTR_STATE_REG_OFFSET, 0x1u);
+  // LP_SAMPLE_CTL = 4, WAKEUP_TIME = 100 (~1.7 ms total LP window) so the CPU
+  // enters WFI and pwrmgr transitions to low power before LP sampling finishes.
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET, 4u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 1u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET,
+                   0x1u | (7u << 4u) | (100u << 8u));
+  busy_spin_micros(50);
+
+  // Enable pwrmgr_aon_wakeup in RV_PLIC (with global MIE=0 and MEIE=1 so WFI
+  // resumes inline without jumping to OTTF ISR).
+  const uint32_t kPwrmgrWakeupIrq = kTopEarlgreyPlicIrqIdPwrmgrAonWakeup;
+  abs_mmio_write32(kPlicBase + RV_PLIC_PRIO0_REG_OFFSET + 4u * kPwrmgrWakeupIrq,
+                   1u);
+  uint32_t ie_reg =
+      kPlicBase + RV_PLIC_IE0_0_REG_OFFSET + 4u * (kPwrmgrWakeupIrq / 32u);
+  abs_mmio_write32(ie_reg,
+                   abs_mmio_read32(ie_reg) | (1u << (kPwrmgrWakeupIrq % 32u)));
+  abs_mmio_write32(kPlicBase + RV_PLIC_THRESHOLD0_REG_OFFSET, 0u);
+  irq_global_ctrl(false);
+  irq_external_ctrl(true);
+
+  // Arm pwrmgr for normal sleep (MAIN_PD_N=1, CORE_CLK_EN=1, IO_CLK_EN=1,
+  // USB_CLK_EN_ACTIVE=1, LOW_POWER_HINT=1) with ADC_CTRL wakeup (bit 1).
+  uint32_t ctrl_orig =
+      abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, (1u << 1u));
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET, 0x000001b1u);
+  pwrmgr_cdc_sync();
+
+  // Start ADC conversion and immediately enter WFI to sleep until ADC wakeup.
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0x1u);
+  wait_for_interrupt();
+
+  irq_external_ctrl(false);
+  CHECK((abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET) & 1u) ==
+        1u);
+  CHECK((abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET) &
+         (1u << 1u)) != 0u);
+  CHECK((abs_mmio_read32(kAdcBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET) &
+         0x1u) == 0x1u);
+
+  // Restore pwrmgr and disable ADC.
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET, ctrl_orig);
+  pwrmgr_cdc_sync();
+
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET, 0u);
+  abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET, 0u);
   return true;
 }
