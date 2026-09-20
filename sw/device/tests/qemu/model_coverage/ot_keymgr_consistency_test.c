@@ -180,9 +180,16 @@ bool test_main(void) {
   CHECK((abs_mmio_read32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET) & 0x7u) ==
         0x0u);
 
-  // 6. Trigger OP_DISABLE and verify transition to DISABLED (6), then verify
+  // 6. Trigger non-enumerated OPERATION = 5 (behaves the same as OP_DISABLE per
+  // keymgr_ctrl.sv:154) and verify transition to DISABLED (7), then verify
   // START in DISABLED triggers INVALID_OP error and recov_operation_err alert.
-  CHECK_STATUS_OK(keymgr_testutils_disable(&keymgr));
+  uint32_t non_enum_ctrl = 5u << KEYMGR_CONTROL_SHADOWED_OPERATION_OFFSET;
+  abs_mmio_write32(kBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, non_enum_ctrl);
+  abs_mmio_write32(kBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, non_enum_ctrl);
+  abs_mmio_write32(kBase + KEYMGR_START_REG_OFFSET, 0x1u);
+  st = wait_for_op_done();
+  CHECK(st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_SUCCESS);
+  abs_mmio_write32(kBase + KEYMGR_OP_STATUS_REG_OFFSET, st);
   CHECK(abs_mmio_read32(kBase + KEYMGR_WORKING_STATE_REG_OFFSET) ==
         KEYMGR_WORKING_STATE_STATE_VALUE_DISABLED);
 
