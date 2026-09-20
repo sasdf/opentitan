@@ -14,9 +14,9 @@
 status_t handle_sphincsplus_verify(ujson_t *uj) {
   // Declare SPHINCS+ parameter ujson deserializer types
   cryptotest_sphincsplus_hash_alg_t uj_hash_alg;
-  static cryptotest_sphincsplus_public_key_t uj_public_key;
-  static cryptotest_sphincsplus_message_t uj_message;
-  static cryptotest_sphincsplus_signature_t uj_signature;
+  cryptotest_sphincsplus_public_key_t uj_public_key;
+  cryptotest_sphincsplus_message_t uj_message;
+  cryptotest_sphincsplus_signature_t uj_signature;
 
   // Deserialize ujson byte stream into SPHINCS+ parameters
   TRY(ujson_deserialize_cryptotest_sphincsplus_hash_alg_t(uj, &uj_hash_alg));
