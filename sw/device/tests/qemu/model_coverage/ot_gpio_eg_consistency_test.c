@@ -115,17 +115,27 @@ bool test_main(void) {
                        kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey0In *
                            sizeof(uint32_t),
                    kTopEarlgreyPinmuxInselIor12);
+  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
+                       kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey1In *
+                           sizeof(uint32_t),
+                   kTopEarlgreyPinmuxInselIor10);
 
   // Trigger GPIO update_data_out + update_data_in after clk_aon_i CDC sync.
   busy_spin_micros(100);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) == 0x3u);
+  CHECK((abs_mmio_read32(kSysrstCtrlBase +
+                         SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
+         (1u << 2)) == (1u << 2));
 
-  // Drive sysrst_ctrl bat_disable = 0 -> GPIO[1] reads 0.
+  // Drive sysrst_ctrl bat_disable = 0 -> GPIO[1] and sysrst_ctrl key1_in read 0.
   abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0x0u);
   busy_spin_micros(100);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) == 0x1u);
+  CHECK((abs_mmio_read32(kSysrstCtrlBase +
+                         SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
+         (1u << 2)) == 0u);
 
   return true;
 }
