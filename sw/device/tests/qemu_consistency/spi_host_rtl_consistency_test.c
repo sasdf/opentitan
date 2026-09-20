@@ -449,18 +449,20 @@ static void test_passthrough_bulk_erase_and_fullduplex_dual_cmdinval(
   const uint32_t kSpiDeviceBase = TOP_EARLGREY_SPI_DEVICE_BASE_ADDR;
   const uint32_t kSpiDeviceControlOffset = 0x10u;
 
-  // 1. Enable SPI_HOST0 (SPIEN=1, CLKDIV=0).
+  // 1. Enable SPI_HOST0 (SPIEN=1, OUTPUT_EN=1, CLKDIV=0, CSID=0).
   abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
                    (1u << SPI_HOST_CONTROL_SW_RST_BIT) | 0x7fu);
   abs_mmio_write32(base + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+  abs_mmio_write32(base + SPI_HOST_CSID_REG_OFFSET, 0u);
   abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
-                   (1u << SPI_HOST_CONTROL_SPIEN_BIT) | 0x7fu);
+                   (1u << SPI_HOST_CONTROL_SPIEN_BIT) |
+                       (1u << SPI_HOST_CONTROL_OUTPUT_EN_BIT) | 0x7fu);
 
-  // 2. Enable SPI_DEVICE passthrough mode (MODE = 2) and run a 1-byte TxOnly
-  //    transfer on SPI_HOST0 while passthrough is active.
+  // 2. Enable SPI_DEVICE passthrough mode (CONTROL.MODE = 2 at bits [5:4])
+  //    and run a 1-byte TxOnly transfer on SPI_HOST0 while passthrough is active.
   uint32_t orig_spidev_ctrl =
       abs_mmio_read32(kSpiDeviceBase + kSpiDeviceControlOffset);
-  abs_mmio_write32(kSpiDeviceBase + kSpiDeviceControlOffset, 0x2u);
+  abs_mmio_write32(kSpiDeviceBase + kSpiDeviceControlOffset, 0x2u << 4);
   abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0x06u);
   abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
                    (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
@@ -474,27 +476,20 @@ static void test_passthrough_bulk_erase_and_fullduplex_dual_cmdinval(
   }
   abs_mmio_write32(kSpiDeviceBase + kSpiDeviceControlOffset, orig_spidev_ctrl);
 
-  // 3. Issue SPI Flash WREN (0x06) followed by BULK_ERASE (0xC7) on SPI_HOST0.
-  abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0x06u);
-  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
-                   (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
-                       (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
-  for (int i = 0; i < 1000; ++i) {
-    uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
-    if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
-        !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
-      break;
-    }
-  }
-  abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0xc7u);
-  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
-                   (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
-                       (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
-  for (int i = 0; i < 1000; ++i) {
-    uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
-    if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
-        !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
-      break;
+  // 3. Issue SPI Flash WREN (0x06) + BULK_ERASE (0xC7) and WREN (0x06) +
+  //    BULK_ERASE_60 (0x60) on SPI_HOST0 (CSID=0).
+  const uint8_t kEraseSeq[4] = {0x06u, 0xc7u, 0x06u, 0x60u};
+  for (size_t k = 0; k < ARRAYSIZE(kEraseSeq); ++k) {
+    abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, kEraseSeq[k]);
+    abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
+                     (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
+                         (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
+    for (int i = 0; i < 1000; ++i) {
+      uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+      if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
+          !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
+        break;
+      }
     }
   }
 

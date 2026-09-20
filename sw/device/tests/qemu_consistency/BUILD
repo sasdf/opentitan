@@ -254,10 +254,14 @@ opentitan_test(
 opentitan_test(
     name = "keymgr_rtl_consistency_test",
     srcs = ["keymgr_rtl_consistency_test.c"],
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "dev_key_0"},
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
+    qemu = qemu_params(
+        otp = "//hw/ip/otp_ctrl/data:img_dev",
+    ),
     deps = [
         "//hw/ip/keymgr/data:keymgr_c_regs",
         "//hw/ip/kmac/data:kmac_c_regs",

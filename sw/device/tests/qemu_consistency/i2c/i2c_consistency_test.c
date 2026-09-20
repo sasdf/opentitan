@@ -411,15 +411,16 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
   mmio_region_write32(i2c_base, I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
   mmio_region_write32(i2c_base, I2C_INTR_STATE_REG_OFFSET, 0xffffffffu);
 
-  // Step 1: Repeated START across two addresses without intervening STOP.
+  const uint32_t kDoneMask =
+      (1u << I2C_STATUS_HOSTIDLE_BIT) | (1u << I2C_STATUS_FMTEMPTY_BIT);
+
+  // Step 1a: Repeated START to the same target address (0x55 -> 0x55) without
+  // intervening STOP so s->in_target_transfer remains true across Repeated START.
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
                       (1u << I2C_FDATA_START_BIT) | (0x55u << 1));
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
                       (1u << I2C_FDATA_START_BIT) |
-                          (1u << I2C_FDATA_STOP_BIT) |
-                          (1u << I2C_FDATA_NAKOK_BIT) | (0x56u << 1));
-  const uint32_t kDoneMask =
-      (1u << I2C_STATUS_HOSTIDLE_BIT) | (1u << I2C_STATUS_FMTEMPTY_BIT);
+                          (1u << I2C_FDATA_STOP_BIT) | (0x55u << 1));
   for (int i = 0; i < 5000; ++i) {
     uint32_t st = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
     uint32_t intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
@@ -430,6 +431,29 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
     busy_spin_micros(2);
   }
   uint32_t intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(intr, I2C_INTR_STATE_CMD_COMPLETE_BIT),
+        "Expected CMD_COMPLETE interrupt after same-address repeated-START");
+
+  mmio_region_write32(i2c_base, I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  mmio_region_write32(i2c_base, I2C_INTR_STATE_REG_OFFSET, 0xffffffffu);
+
+  // Step 1b: Repeated START across two addresses (0x55 -> 0x56) without STOP.
+  mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
+                      (1u << I2C_FDATA_START_BIT) | (0x55u << 1));
+  mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
+                      (1u << I2C_FDATA_START_BIT) |
+                          (1u << I2C_FDATA_STOP_BIT) |
+                          (1u << I2C_FDATA_NAKOK_BIT) | (0x56u << 1));
+  for (int i = 0; i < 5000; ++i) {
+    uint32_t st = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
+    intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
+    if ((st & kDoneMask) == kDoneMask &&
+        bitfield_bit32_read(intr, I2C_INTR_STATE_CMD_COMPLETE_BIT)) {
+      break;
+    }
+    busy_spin_micros(2);
+  }
+  intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
   CHECK(bitfield_bit32_read(intr, I2C_INTR_STATE_CMD_COMPLETE_BIT),
         "Expected CMD_COMPLETE interrupt after loopback repeated-START");
 
