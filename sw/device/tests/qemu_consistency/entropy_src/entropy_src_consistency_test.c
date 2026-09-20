@@ -448,5 +448,10 @@ bool test_main(void) {
   CHECK(kLoadStoreFault,
         "Expected Load Access Fault on unmapped offset 0xe4 (addrmiss)");
 
+  kLoadStoreFault = false;
+  abs_mmio_write32(kEsBase + 0xe4u, 0u);
+  CHECK(kLoadStoreFault,
+        "Expected Store Access Fault on unmapped offset 0xe4 (addrmiss)");
+
   return true;
 }
