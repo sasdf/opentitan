@@ -154,9 +154,9 @@ fn attestation_test(opts: &Opts, transport: &TransportWrapper, owner_history: &[
         opts.timeout,
     )?;
 
-    // Note: Finding UDS is allowed to fail on FPGA/QEMU environments.
+    // Note: Finding UDS is allowed to fail on FPGA environments.
     let uds_bin = if opts.post_provisioning_tests {
-        get_base64_blob(&capture[0], r"(?msR)UDS: (.*?)$").ok()
+        Some(get_base64_blob(&capture[0], r"(?msR)UDS: (.*?)$")?)
     } else {
         None
     };
