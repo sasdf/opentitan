@@ -31,7 +31,6 @@ static dif_keymgr_t keymgr;
 
 OTTF_DEFINE_TEST_CONFIG();
 
-#ifndef ECC_P256_DICE_NO_ROM_EXT
 static status_t get_stored_certificate(
     const char *cert_name, size_t name_size,
     const flash_ctrl_info_page_t *info_page,
@@ -87,7 +86,6 @@ static status_t extract_public_key_from_der(const uint8_t *der_bytes,
 
   return NOT_FOUND();
 }
-#endif
 
 static status_t read_attestation_seed_configured(uint32_t *attestation_data) {
   if (kDeviceType != kDeviceSilicon) {

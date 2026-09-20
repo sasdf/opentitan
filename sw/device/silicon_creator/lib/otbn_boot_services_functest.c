@@ -50,7 +50,6 @@ static const sc_keymgr_diversification_t kDiversification = {
     .version = 0,
 };
 
-#ifndef OTBN_BOOT_SERVICES_FUNCTEST_ROM_EXT
 // Test values for attestation key seeds.
 static const uint32_t kSeedValues[3][kAttestationSeedWords] = {
     {0x70717273, 0x74757677, 0x78797a7b, 0x7c7d7e7f, 0x80818283, 0x84858687,
@@ -60,7 +59,6 @@ static const uint32_t kSeedValues[3][kAttestationSeedWords] = {
     {0xd0d1d2d3, 0xd4d5d6d7, 0xd8d9dadb, 0xdcdddedf, 0xe0e1e2e3, 0xe4e5e6e7,
      0xe8e9eaeb, 0xecedeeef, 0xf0b1b2b3, 0xf4f5f6f7},
 };
-#endif
 
 rom_error_t sigverify_test(void) {
   // Hash the test message.
