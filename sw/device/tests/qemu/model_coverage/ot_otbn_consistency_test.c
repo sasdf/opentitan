@@ -23,6 +23,7 @@
 #include <stdint.h>
 
 #include "hw/ip/otbn/data/otbn_regs.h"
+#include "hw/ip/rv_core_ibex/data/rv_core_ibex_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
@@ -36,6 +37,7 @@ OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
 enum {
   kOtbnBase = TOP_EARLGREY_OTBN_BASE_ADDR,
+  kIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
   kCmdExecute = 0xd8u,
   kCmdSecWipeDmem = 0xc3u,
   kCmdSecWipeImem = 0x1eu,
@@ -43,6 +45,18 @@ enum {
   kStatusBusyExecute = 0x01u,
   kStatusLocked = 0xffu,
 };
+
+static volatile bool load_integrity_fault_seen = false;
+
+void ottf_internal_isr(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t err_status =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET);
+  if ((err_status & (1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT)) != 0u) {
+    load_integrity_fault_seen = true;
+  }
+  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET, UINT32_MAX);
+}
 
 #define OTBN_ECALL() (0x00000073u)
 #define OTBN_NOP() (0x00000013u)
@@ -167,13 +181,20 @@ static void test_illegal_bus_access_lock_and_locked_writes(void) {
        ++i) {
   }
 
-  // Trigger ILLEGAL_BUS_ACCESS by writing DMEM while BUSY_EXECUTE.
-  // Because dmem_access_core == 1 while BUSY_EXECUTE, mem_crc_data_in_valid == 0.
-  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x12345678u);
+  // Trigger ILLEGAL_BUS_ACCESS by reading DMEM while BUSY_EXECUTE.
+  // Per otbn.sv:709-711,737-739:
+  // 1) Because dmem_access_core == 1 while BUSY_EXECUTE, mem_crc_data_in_valid == 0
+  //    (LOAD_CHECKSUM does not advance).
+  // 2) On the cycle dmem_dummy_response_q returns rvalid_bus, locking_q is 0 and
+  //    u_dmem_rdata_bus_blanker outputs 39'h0 (7'h00 ECC instead of 7'h39), which
+  //    raises RV_CORE_IBEX_ERR_STATUS.FATAL_INTG_ERR and an internal NMI.
+  load_integrity_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
   otbn_wait_for_not_running();
   for (volatile int i = 0; i < 500; ++i) {
   }
 
+  CHECK(load_integrity_fault_seen);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusLocked);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET) ==
