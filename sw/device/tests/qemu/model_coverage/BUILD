@@ -303,3 +303,29 @@ opentitan_test(
         "//sw/device/silicon_creator/lib/drivers:retention_sram",
     ],
 )
+
+opentitan_test(
+    name = "ot_entropy_src_consistency_test",
+    srcs = ["ot_entropy_src_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(timeout = "short"),
+    qemu = qemu_params(timeout = "short"),
+    deps = [
+        "//hw/ip/csrng/data:csrng_c_regs",
+        "//hw/ip/edn/data:edn_c_regs",
+        "//hw/ip/entropy_src/data:entropy_src_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
