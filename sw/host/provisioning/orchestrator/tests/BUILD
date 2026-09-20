@@ -155,9 +155,10 @@ sh_test(
         } if fpga == "sim_qemu" else {}),
         tags = [
             "changes_otp",
-            "exclusive",
             "manuf",
         ] + [fpga] + ([
+            "exclusive",
+        ] if fpga != "sim_qemu" else []) + ([
             "manual",
         ] if cfg.get("offline", False) else []),
     )
@@ -228,10 +229,11 @@ sh_test(
         } if fpga == "sim_qemu" else {}),
         tags = [
             "changes_otp",
-            "exclusive",
             "manuf",
             "provisioning",
         ] + [fpga] + ([
+            "exclusive",
+        ] if fpga != "sim_qemu" else []) + ([
             "manual",
         ] if cfg.get("offline", False) else []),
     )
