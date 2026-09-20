@@ -15,7 +15,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_verilator": None,
     },
     deps = [
         "//hw/top_earlgrey:alert_handler_c_regs",

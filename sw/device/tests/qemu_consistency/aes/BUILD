@@ -4,7 +4,6 @@
 
 load(
     "//rules/opentitan:defs.bzl",
-    "EARLGREY_TEST_ENVS",
     "opentitan_test",
 )
 
@@ -13,8 +12,9 @@ package(default_visibility = ["//visibility:public"])
 opentitan_test(
     name = "aes_consistency_test",
     srcs = ["aes_consistency_test.c"],
-    exec_env = EARLGREY_TEST_ENVS | {
+    exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     deps = [
         "//hw/ip/aes/data:aes_c_regs",
