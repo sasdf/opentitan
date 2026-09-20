@@ -510,5 +510,25 @@ bool test_main(void) {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
 
+  // 16. Verify INTR_TEST Status-type (fifo_empty, bit 1) vs Event-type
+  // (kmac_done, bit 0) behavior (kmac.sv:660-668).
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0x7u);
+  abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET, 0x3u);
+  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
+                 0x3u,
+             "INTR_TEST=0x3 should set both kmac_done and fifo_empty");
+  // Writing W1C to INTR_STATE clears Event-type kmac_done (bit 0) while
+  // Status-type fifo_empty (bit 1) remains driven by INTR_TEST.
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0x3u);
+  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
+                 0x2u,
+             "INTR_STATE W1C should clear kmac_done(0) but keep fifo_empty(1) "
+             "while INTR_TEST.fifo_empty=1");
+  // Writing INTR_TEST=0 deasserts Status-type fifo_empty (bit 1).
+  abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET, 0x0u);
+  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
+                 0x0u,
+             "INTR_TEST=0x0 should clear Status-type fifo_empty(1)");
+
   return all_ok;
 }
