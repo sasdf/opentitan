@@ -143,11 +143,11 @@ uint32_t pinmux_testutils_get_testable_gpios_mask(void) {
   switch (kDeviceType) {
     case kDeviceSimDV:
     case kDeviceSimVerilator:
-    case kDeviceSimQemu:
       // All GPIOs are testable in DV.
       return 0xffffffff;
     case kDeviceFpgaCw310:
     case kDeviceFpgaCw340:
+    case kDeviceSimQemu:
       // Only IOR6, IOR7, and IOR10 to IOR13 are available for use as GPIOs.
       return 0xfc000000;
     case kDeviceSilicon:

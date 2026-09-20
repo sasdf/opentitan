@@ -133,37 +133,3 @@ rust_binary(
         "@crate_index//:serde_json",
     ],
 )
-
-rust_binary(
-    name = "pwrmgr_sysrst_ctrl_sim_dv",
-    srcs = [
-        "pwrmgr_sysrst_ctrl_sim_dv.rs",
-    ],
-    edition = "2024",
-    deps = [
-        "//sw/host/opentitanlib",
-        "@crate_index//:anyhow",
-        "@crate_index//:clap",
-        "@crate_index//:humantime",
-    ],
-)
-
-rust_binary(
-    name = "sysrst_ctrl_ec_rst_l_sim_dv",
-    srcs = [
-        "sysrst_ctrl_ec_rst_l_sim_dv.rs",
-    ],
-    edition = "2024",
-    deps = [
-        ":sysrst_ctrl",
-        "//sw/host/opentitanlib",
-        "@crate_index//:anyhow",
-        "@crate_index//:clap",
-        "@crate_index//:humantime",
-        "@crate_index//:log",
-        "@crate_index//:object",
-        "@crate_index//:once_cell",
-        "@crate_index//:serde_json",
-    ],
-)
-

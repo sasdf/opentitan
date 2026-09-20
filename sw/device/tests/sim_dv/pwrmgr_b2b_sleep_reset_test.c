@@ -65,10 +65,7 @@ bool test_main(void) {
   // bring state machine back to active state.
   // This can happen when wake up event comes before low power
   // entry event.
-  uint64_t wakeup_threshold =
-      kDeviceType == kDeviceSimVerilator
-          ? 3000
-          : (kDeviceType == kDeviceSimDV ? 300 : 10);
+  uint64_t wakeup_threshold = kDeviceType == kDeviceSimVerilator ? 3000 : 300;
 
   // Initialize pwrmgr
   dif_pwrmgr_t pwrmgr;
@@ -154,8 +151,7 @@ bool test_main(void) {
     CHECK_DIF_OK(dif_sysrst_ctrl_ulp_wakeup_clear_status(&sysrst_ctrl));
   }
 
-  uint32_t num_rounds = kDeviceType == kDeviceSimDV ? kNumRound : 2;
-  if (event_idx < num_rounds) {
+  if (event_idx < kNumRound) {
     LOG_INFO("Test round %d", event_idx);
   } else {
     LOG_INFO("Test finish");

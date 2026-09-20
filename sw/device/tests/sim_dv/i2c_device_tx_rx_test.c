@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sw/device/lib/arch/device.h"
-#include "sw/device/lib/base/math.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_base.h"
 #include "sw/device/lib/dif/dif_i2c.h"
@@ -39,9 +38,9 @@ OTTF_DEFINE_TEST_CONFIG();
  *
  * The I2C Device state machine does depend on the I2C timing configuration
  */
-static volatile const uint8_t kClockPeriodNanos = 41;
-static volatile const uint8_t kI2cRiseFallNanos = 10;
-static volatile const uint32_t kI2cClockPeriodNanos = 1000;
+static volatile const uint8_t kClockPeriodNanos = 0;
+static volatile const uint8_t kI2cRiseFallNanos = 0;
+static volatile const uint32_t kI2cClockPeriodNanos = 0;
 
 /**
  * This symbol is meant to be backdoor loaded by the testbench.
@@ -66,7 +65,7 @@ static volatile const uint8_t kI2cDeviceMask1 = 0x7f;
  * Because the test doesn't manage the FIFO during transaction, there's a limit
  * to the number of bytes we can loopback in the test. I2C_PARAM_FIFO_DEPTH - 4
  */
-static volatile const uint8_t kI2cByteCount = 8;
+static volatile const uint8_t kI2cByteCount = 0;
 
 static volatile bool tx_empty_irq_seen = false;
 static volatile bool cmd_complete_irq_seen = false;
@@ -187,17 +186,11 @@ bool test_main(void) {
 
   // I2C speed parameters.
   dif_i2c_timing_config_t timing_config = {
-      .lowest_target_device_speed = kDeviceType == kDeviceSimDV
-                                        ? kDifI2cSpeedFastPlus
-                                        : kDifI2cSpeedStandard,
-      .clock_period_nanos =
-          kDeviceType == kDeviceSimDV
-              ? kClockPeriodNanos
-              : (uint32_t)udiv64_slow(1000000000, kClockFreqPeripheralHz, NULL),
+      .lowest_target_device_speed = kDifI2cSpeedFastPlus,
+      .clock_period_nanos = kClockPeriodNanos,
       .sda_rise_nanos = kI2cRiseFallNanos,
       .sda_fall_nanos = kI2cRiseFallNanos,
-      .scl_period_nanos =
-          kDeviceType == kDeviceSimDV ? kI2cClockPeriodNanos : 10000};
+      .scl_period_nanos = kI2cClockPeriodNanos};
 
   dif_i2c_config_t config;
   CHECK_DIF_OK(dif_i2c_compute_timing(timing_config, &config));
@@ -206,9 +199,6 @@ bool test_main(void) {
                id1 = {.mask = kI2cDeviceMask1, .address = kI2cDeviceAddress1};
   CHECK_DIF_OK(dif_i2c_set_device_id(&i2c, &id0, &id1));
   CHECK_DIF_OK(dif_i2c_device_set_enabled(&i2c, kDifToggleEnabled));
-  if (kDeviceType != kDeviceSimDV) {
-    CHECK_DIF_OK(dif_i2c_host_set_enabled(&i2c, kDifToggleEnabled));
-  }
 
   // TODO #15081, transaction complete may not be set by i2c device.
   CHECK(!cmd_complete_irq_seen);
@@ -238,12 +228,6 @@ bool test_main(void) {
 
   LOG_INFO("Data written to fifo");
 
-  uint8_t host_data[kI2cByteCount];
-  if (kDeviceType != kDeviceSimDV) {
-    CHECK_STATUS_OK(i2c_testutils_read(&i2c, kI2cDeviceAddress0, kI2cByteCount,
-                                       host_data, /*timeout=*/1000));
-  }
-
   dif_i2c_level_t acq_fifo_lvl;
   do {
     CHECK_DIF_OK(
@@ -258,10 +242,6 @@ bool test_main(void) {
 
   // Read data from i2c device.
   CHECK_STATUS_OK(i2c_testutils_target_write(&i2c, kI2cByteCount));
-  if (kDeviceType != kDeviceSimDV) {
-    CHECK_STATUS_OK(i2c_testutils_write(&i2c, kI2cDeviceAddress0, kI2cByteCount,
-                                        host_data, /*skip_stop=*/false));
-  }
   do {
     CHECK_DIF_OK(
         dif_i2c_get_fifo_levels(&i2c, NULL, NULL, &tx_fifo_lvl, &acq_fifo_lvl));

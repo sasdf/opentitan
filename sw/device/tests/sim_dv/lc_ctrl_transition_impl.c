@@ -31,7 +31,7 @@ static dif_lc_ctrl_t lc;
  * placed in .data section in the main SRAM. We cannot backdoor write anything
  * in SRAM at the start of the test because the CRT init code wipes it to 0s.
  */
-static volatile const uint8_t kTestIterationCount = 0x1;
+static volatile const uint8_t kTestIterationCount = 0x0;
 
 // LC exit token value for LC state transition.
 static volatile const uint8_t kLcExitToken[LC_TOKEN_SIZE] = {

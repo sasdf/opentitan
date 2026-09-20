@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sw/device/lib/arch/device.h"
-#include "sw/device/lib/base/math.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_base.h"
 #include "sw/device/lib/dif/dif_i2c.h"
@@ -35,9 +34,9 @@ OTTF_DEFINE_TEST_CONFIG();
  * The testbench will inform the test the rough speed of the clock
  * used by the I2C modules.
  */
-static volatile const uint8_t kClockPeriodNanos = 41;
-static volatile const uint8_t kI2cRiseFallNanos = 10;
-static volatile const uint32_t kI2cClockPeriodNanos = 1000;
+static volatile const uint8_t kClockPeriodNanos = 0;
+static volatile const uint8_t kI2cRiseFallNanos = 0;
+static volatile const uint32_t kI2cClockPeriodNanos = 0;
 static volatile const uint8_t kI2cCdcInstrumentationEnabled = 0;
 
 /**
@@ -128,7 +127,7 @@ static void en_i2c_irqs(dif_i2c_t *i2c) {
       // explanation kDifI2cIrqSdaUnstable,
       kDifI2cIrqCmdComplete};
 
-  for (uint32_t i = 0; i < ARRAYSIZE(i2c_irqs); ++i) {
+  for (uint32_t i = 0; i <= ARRAYSIZE(i2c_irqs); ++i) {
     CHECK_DIF_OK(dif_i2c_irq_set_enabled(i2c, i2c_irqs[i], kDifToggleEnabled));
   }
 }
@@ -253,10 +252,8 @@ void config_i2c_with_index(void) {
  */
 void issue_test_transactions(bool skip_stop) {
   // Randomize variables.
-  uint8_t byte_count = (uint8_t)rand_testutils_gen32_range(
-      30, kDeviceType == kDeviceSimDV ? 64 : 60);
-  uint8_t device_addr = (uint8_t)rand_testutils_gen32_range(
-      kDeviceType == kDeviceSimDV ? 0 : 1, 16);
+  uint8_t byte_count = (uint8_t)rand_testutils_gen32_range(30, 64);
+  uint8_t device_addr = (uint8_t)rand_testutils_gen32_range(0, 16);
   uint8_t expected_data[byte_count];
   LOG_INFO("Loopback %d bytes with device %d", byte_count, device_addr);
 
@@ -265,17 +262,6 @@ void issue_test_transactions(bool skip_stop) {
   for (uint32_t i = 0; i < byte_count; ++i) {
     expected_data[i] = (uint8_t)rand_testutils_gen32_range(0, 0xff);
   };
-
-  if (kDeviceType != kDeviceSimDV) {
-    dif_i2c_id_t id0 = {.mask = 0x7f, .address = device_addr};
-    CHECK_DIF_OK(dif_i2c_set_device_id(&i2c, &id0, NULL));
-    CHECK_DIF_OK(dif_i2c_device_set_enabled(&i2c, kDifToggleEnabled));
-    CHECK_DIF_OK(dif_i2c_reset_acq_fifo(&i2c));
-    CHECK_DIF_OK(dif_i2c_reset_tx_fifo(&i2c));
-    for (uint32_t i = 0; i < byte_count; ++i) {
-      CHECK_DIF_OK(dif_i2c_transmit_byte(&i2c, expected_data[i]));
-    }
-  }
 
   // Write expected data to i2c device.
   CHECK_STATUS_OK(i2c_testutils_write(&i2c, device_addr, byte_count,
@@ -292,10 +278,6 @@ void issue_test_transactions(bool skip_stop) {
   } while (fmt_fifo_lvl > 0);
   CHECK(fmt_irq_seen);
   fmt_irq_seen = false;
-
-  if (kDeviceType != kDeviceSimDV) {
-    CHECK_DIF_OK(dif_i2c_reset_acq_fifo(&i2c));
-  }
 
   // Read data from i2c device.
   CHECK(!rx_irq_seen);
@@ -335,17 +317,11 @@ bool test_main(void) {
 
   // I2C speed parameters.
   dif_i2c_timing_config_t timing_config = {
-      .lowest_target_device_speed = kDeviceType == kDeviceSimDV
-                                        ? kDifI2cSpeedFastPlus
-                                        : kDifI2cSpeedStandard,
-      .clock_period_nanos =
-          kDeviceType == kDeviceSimDV
-              ? kClockPeriodNanos
-              : (uint32_t)udiv64_slow(1000000000, kClockFreqPeripheralHz, NULL),
+      .lowest_target_device_speed = kDifI2cSpeedFastPlus,
+      .clock_period_nanos = kClockPeriodNanos,
       .sda_rise_nanos = kI2cRiseFallNanos,
       .sda_fall_nanos = kI2cRiseFallNanos,
-      .scl_period_nanos =
-          kDeviceType == kDeviceSimDV ? kI2cClockPeriodNanos : 10000};
+      .scl_period_nanos = kI2cClockPeriodNanos};
 
   dif_i2c_config_t config;
   CHECK_DIF_OK(dif_i2c_compute_timing(timing_config, &config));

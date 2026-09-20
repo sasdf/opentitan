@@ -102,38 +102,6 @@ bool test_main(void) {
   if (!secret1_locked) {
     LOG_INFO("Powered up for the first time, program and lock otp");
 
-    if (kDeviceType != kDeviceSimDV) {
-      uint32_t iso_test_data[ARRAYSIZE(kIsoPartExpData)];
-      for (size_t i = 0; i < ARRAYSIZE(iso_test_data); ++i) {
-        iso_test_data[i] = 0xa5a50000u | (uint32_t)i;
-      }
-      uint32_t exp_data_addr = (uint32_t)&kIsoPartExpData;
-      uint32_t base_page = (exp_data_addr - kFlashStartAddr) / kFlashPageSize;
-      dif_flash_ctrl_region_properties_t rw_page = {
-          .rd_en = kMultiBitBool4True,
-          .prog_en = kMultiBitBool4True,
-          .erase_en = kMultiBitBool4True,
-          .scramble_en = kMultiBitBool4False,
-          .ecc_en = kMultiBitBool4False,
-          .high_endurance_en = kMultiBitBool4False,
-      };
-      uint32_t region_addr = 0;
-      CHECK_STATUS_OK(flash_ctrl_testutils_data_region_setup_properties(
-          &flash_ctrl, base_page, /*data_region=*/kFlashMpRegions - 1,
-          /*region_size=*/1, rw_page, &region_addr));
-      CHECK_STATUS_OK(flash_ctrl_testutils_erase_and_write_page(
-          &flash_ctrl, exp_data_addr, /*partition_id=*/0, iso_test_data,
-          kDifFlashCtrlPartitionTypeData, ARRAYSIZE(iso_test_data)));
-
-      uint32_t info_addr = 0;
-      CHECK_STATUS_OK(flash_ctrl_testutils_info_region_setup_properties(
-          &flash_ctrl, /*page_id=*/3, /*bank=*/0, /*partition_id=*/0, rw_page,
-          &info_addr));
-      CHECK_STATUS_OK(flash_ctrl_testutils_erase_and_write_page(
-          &flash_ctrl, info_addr, /*partition_id=*/0, iso_test_data,
-          kDifFlashCtrlPartitionTypeInfo, ARRAYSIZE(iso_test_data)));
-    }
-
     // Check Isolated partition data is correct prior to enabling scrambling.
     check_iso_data(&flash_ctrl);
 

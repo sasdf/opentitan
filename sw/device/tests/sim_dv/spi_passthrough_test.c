@@ -182,9 +182,8 @@ void handle_write_status(uint32_t status, uint8_t offset, uint8_t opcode) {
   CHECK_DIF_OK(dif_spi_device_read_flash_payload_buffer(
       &spi_device, start_offset, occupancy, &payload));
 
-  status &= ~(0xffu << offset);
+  status &= (0xffu << offset);
   status |= ((uint32_t)(payload) << offset);
-  status |= kSpiFlashStatusBitWip | kSpiFlashStatusBitWel;
   CHECK_DIF_OK(dif_spi_device_set_flash_status_registers(&spi_device, status));
 
   CHECK_STATUS_OK(spi_flash_testutils_issue_write_enable(&spi_host0));
@@ -343,7 +342,6 @@ void spi_device_isr(void) {
  * Runs in interrupt context.
  */
 void ottf_external_isr(uint32_t *exc_info) {
-  (void)exc_info;
   const uint32_t kPlicTarget = kTopEarlgreyPlicTargetIbex0;
   dif_rv_plic_irq_id_t plic_irq_id;
   CHECK_DIF_OK(dif_rv_plic_irq_claim(&rv_plic, kPlicTarget, &plic_irq_id));
@@ -398,7 +396,7 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_spi_host_init(
       mmio_region_from_addr(TOP_EARLGREY_SPI_HOST0_BASE_ADDR), &spi_host0));
   CHECK_DIF_OK(dif_spi_host_init(
-      mmio_region_from_addr(TOP_EARLGREY_SPI_HOST1_BASE_ADDR), &spi_host1));
+      mmio_region_from_addr(TOP_EARLGREY_SPI_HOST0_BASE_ADDR), &spi_host1));
   init_spi_host(&spi_host0, (uint32_t)kClockFreqHiSpeedPeripheralHz);
   init_spi_host(&spi_host1, (uint32_t)kClockFreqPeripheralHz);
 
@@ -406,23 +404,16 @@ bool test_main(void) {
   mmio_region_t spi_device_base_addr =
       mmio_region_from_addr(TOP_EARLGREY_SPI_DEVICE_BASE_ADDR);
   CHECK_DIF_OK(dif_spi_device_init_handle(spi_device_base_addr, &spi_device));
-  uint32_t filtered_commands = kFilteredCommands;
   bool upload_write_commands = (kUploadWriteCommands != 0);
-  if (kDeviceType != kDeviceSimDV) {
-    filtered_commands = (1u << kSpiDeviceReadCommandSlotBase) |
-                        (1u << (kSpiDeviceReadCommandSlotBase + 1)) |
-                        (1u << (kSpiDeviceReadCommandSlotBase + 2));
-    upload_write_commands = true;
-  }
 
   // Print kFilteredCommands and kReadPipelineMode to the log, which
   // allows us to check SW has seen the pipeline configuration
   // expected by the DV code.
-  LOG_INFO("kFilteredCommands = %x", filtered_commands);
+  LOG_INFO("kFilteredCommands = %x", kFilteredCommands);
   LOG_INFO("kReadPipelineMode = %d", kReadPipelineMode);
 
   CHECK_STATUS_OK(spi_device_testutils_configure_passthrough(
-      &spi_device, filtered_commands, upload_write_commands));
+      &spi_device, kFilteredCommands, upload_write_commands));
   CHECK_STATUS_OK(spi_device_testutils_configure_read_pipeline(
       &spi_device, (dif_spi_device_read_pipeline_mode_t)kReadPipelineMode,
       (dif_spi_device_read_pipeline_mode_t)kReadPipelineMode));
@@ -465,7 +456,6 @@ bool test_main(void) {
   // transactions.
   LOG_INFO("Test setup complete.");
 
-  uint32_t processed_commands = 0;
   while (true) {
     bool cmdfifo_not_empty_irq_pending;
     irq_global_ctrl(/*en=*/false);
@@ -477,10 +467,6 @@ bool test_main(void) {
     }
     irq_global_ctrl(/*en=*/true);
     spi_device_process_upload_fifo();
-    processed_commands++;
-    if (kDeviceType != kDeviceSimDV && processed_commands >= 5) {
-      break;
-    }
   }
   return true;
 }

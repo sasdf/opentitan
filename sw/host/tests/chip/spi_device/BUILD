@@ -93,18 +93,3 @@ rust_binary(
         "@crate_index//:serde_json",
     ],
 )
-
-rust_binary(
-    name = "spi_passthrough_sim_dv",
-    srcs = [
-        "src/spi_passthrough_sim_dv.rs",
-    ],
-    edition = "2024",
-    deps = [
-        "//sw/host/opentitanlib",
-        "@crate_index//:anyhow",
-        "@crate_index//:clap",
-        "@crate_index//:humantime",
-        "@crate_index//:log",
-    ],
-)

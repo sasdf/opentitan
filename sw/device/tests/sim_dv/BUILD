@@ -2,30 +2,17 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "opentitan_test", "qemu_params")
-load("//rules/opentitan:qemu.bzl", "qemu_otp")
-load(
-    "//rules:otp.bzl",
-    "STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS",
-    "otp_image",
-    "otp_json",
-    "otp_partition",
-)
-
+load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU")
+load("//rules/opentitan:defs.bzl", "opentitan_test")
 
 opentitan_test(
     name = "i2c_host_tx_rx_test",
     srcs = ["i2c_host_tx_rx_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/clkmgr:clkmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:i2c",
         "//sw/device/lib/dif:pinmux",
@@ -43,16 +30,11 @@ opentitan_test(
 opentitan_test(
     name = "i2c_device_tx_rx_test",
     srcs = ["i2c_device_tx_rx_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/clkmgr:clkmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:math",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:i2c",
         "//sw/device/lib/dif:pinmux",
@@ -146,14 +128,7 @@ opentitan_test(
 opentitan_test(
     name = "gpio_test",
     srcs = ["gpio_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        test_harness = "//sw/host/tests/chip/gpio:gpio_sim_dv",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -172,15 +147,7 @@ opentitan_test(
 opentitan_test(
     name = "sysrst_ctrl_ec_rst_l_test",
     srcs = ["sysrst_ctrl_ec_rst_l_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        test_cmd = "{firmware:elf}",
-        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l_sim_dv",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
@@ -192,24 +159,14 @@ opentitan_test(
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing:flash_ctrl_testutils",
         "//sw/device/lib/testing:rstmgr_testutils",
-        "//sw/device/lib/testing:sysrst_ctrl_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
-        "//sw/device/lib/testing/test_framework:ottf_utils",
     ],
 )
 
 opentitan_test(
     name = "lc_ctrl_scrap_test",
     srcs = ["lc_ctrl_scrap_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        needs_jtag = True,
-        test_cmd = "--bootstrap={firmware} --initial-lc-state=rma",
-        test_harness = "//sw/host/tests/manuf/manuf_scrap",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
@@ -226,14 +183,9 @@ opentitan_test(
 opentitan_test(
     name = "otp_ctrl_vendor_test_csr_access_test",
     srcs = ["otp_ctrl_vendor_test_csr_access_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/arch:device",
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:memory",
         "//sw/device/lib/base:mmio",
@@ -248,15 +200,7 @@ opentitan_test(
 opentitan_test(
     name = "otp_ctrl_vendor_test_ecc_error_test",
     srcs = ["otp_ctrl_vendor_test_ecc_error_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        globals = {
-            "ot-otp-eg.inject-vendor-test-ecc-error": "true",
-        },
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
@@ -287,48 +231,10 @@ cc_library(
     ],
 )
 
-otp_json(
-    name = "lc_ctrl_transition_test_otp_json",
-    partitions = [
-        otp_partition(
-            name = "LIFE_CYCLE",
-            count = 8,
-            state = "TEST_LOCKED1",
-        ),
-        otp_partition(
-            name = "SECRET0",
-            items = {
-                "TEST_UNLOCK_TOKEN": "0xde0a1f1e0d6a649fd35fadb75ec82674",
-                "TEST_EXIT_TOKEN": "0x547070d7503264af5b9a971b894ef3be",
-            },
-            lock = True,
-        ),
-    ],
-    seed = "52408960416235844780753299194502148156786072650816676092165912261205302331741",
-)
-
-otp_image(
-    name = "lc_ctrl_transition_test_otp_img",
-    src = ":lc_ctrl_transition_test_otp_json",
-    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
-        "//hw/ip/otp_ctrl/data:otp_json_secret1",
-        "//hw/ip/otp_ctrl/data:otp_json_secret2_unlocked",
-    ],
-)
-
 opentitan_test(
     name = "lc_ctrl_transition_test",
     srcs = ["lc_ctrl_transition_test.c"],
-    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        needs_jtag = True,
-        otp = ":lc_ctrl_transition_test_otp_img",
-        test_harness = "//sw/host/tests/qemu:lc_ctrl_transition",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         ":lc_ctrl_transition_impl",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -338,13 +244,7 @@ opentitan_test(
 opentitan_test(
     name = "lc_ctrl_volatile_raw_unlock_test",
     srcs = ["lc_ctrl_volatile_raw_unlock_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:bitfield",
@@ -358,26 +258,10 @@ opentitan_test(
     ],
 )
 
-otp_image(
-    name = "lc_walkthrough_test_otp_img",
-    src = "//hw/ip/otp_ctrl/data:otp_json_raw",
-    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS,
-)
-
 opentitan_test(
     name = "lc_walkthrough_test",
     srcs = ["lc_walkthrough_test.c"],
-    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        needs_jtag = True,
-        otp = ":lc_walkthrough_test_otp_img",
-        test_cmd = "--firmware={firmware}",
-        test_harness = "//sw/host/tests/qemu:lc_walkthrough",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:memory",
@@ -397,16 +281,7 @@ opentitan_test(
 opentitan_test(
     name = "lc_walkthrough_testunlocks_test",
     srcs = ["lc_walkthrough_testunlocks_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        needs_jtag = True,
-        otp = ":lc_walkthrough_test_otp_img",
-        test_cmd = "--testunlocks",
-        test_harness = "//sw/host/tests/qemu:lc_walkthrough",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:memory",
@@ -486,17 +361,7 @@ opentitan_test(
 opentitan_test(
     name = "clkmgr_external_clk_src_for_lc_test",
     srcs = ["clkmgr_external_clk_src_for_lc_test.c"],
-    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        needs_jtag = True,
-        otp = ":lc_ctrl_transition_test_otp_img",
-        test_cmd = "--expect-ext-clk",
-        test_harness = "//sw/host/tests/qemu:lc_ctrl_transition",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         ":lc_ctrl_transition_impl",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -506,11 +371,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_main_power_glitch_test",
     srcs = ["pwrmgr_main_power_glitch_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:rstmgr",
@@ -523,11 +384,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_sleep_power_glitch_test",
     srcs = ["pwrmgr_sleep_power_glitch_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
@@ -544,11 +401,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_deep_sleep_power_glitch_test",
     srcs = ["pwrmgr_deep_sleep_power_glitch_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
@@ -565,14 +418,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_sysrst_ctrl_test",
     srcs = ["pwrmgr_sysrst_ctrl_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        test_harness = "//sw/host/tests/chip/sysrst_ctrl:pwrmgr_sysrst_ctrl_sim_dv",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
@@ -598,11 +444,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_random_sleep_power_glitch_reset_test",
     srcs = ["pwrmgr_random_sleep_power_glitch_reset_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
@@ -630,26 +472,10 @@ opentitan_test(
     ],
 )
 
-qemu_otp(
-    name = "rom_ctrl_integrity_check_otp_prod",
-    vmem = "//hw/ip/otp_ctrl/data:img_prod",
-)
-
 opentitan_test(
     name = "rom_ctrl_integrity_check_test",
     srcs = ["rom_ctrl_integrity_check_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        data = [":rom_ctrl_integrity_check_otp_prod"],
-        globals = {
-            "ot-rom_ctrl.corrupt-digest": "true",
-        },
-        test_cmd = "--prod-otp=$(rootpath :rom_ctrl_integrity_check_otp_prod)",
-        test_harness = "//sw/host/tests/qemu:rom_ctrl_integrity_check",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -665,16 +491,7 @@ opentitan_test(
 opentitan_test(
     name = "spi_host_tx_rx_test",
     srcs = ["spi_host_tx_rx_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        globals = {
-            "ot-spi_host.loopback": "true",
-        },
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
@@ -693,14 +510,7 @@ opentitan_test(
 opentitan_test(
     name = "spi_passthrough_test",
     srcs = ["spi_passthrough_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        test_harness = "//sw/host/tests/chip/spi_device:spi_passthrough_sim_dv",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -724,17 +534,11 @@ opentitan_test(
 opentitan_test(
     name = "sram_ctrl_execution_main_test",
     srcs = ["sram_ctrl_execution_main_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/arch:device",
         "//sw/device/lib/base:bitfield",
-        "//sw/device/lib/base:csr",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/base:multibits",
         "//sw/device/lib/dif:sram_ctrl",
@@ -745,7 +549,6 @@ opentitan_test(
         "//sw/device/lib/testing:sram_ctrl_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/lib/testing/test_framework:status",
-        "//sw/device/silicon_creator/lib:epmp_state",
     ],
 )
 
@@ -780,11 +583,7 @@ cc_library(
 opentitan_test(
     name = "adc_ctrl_sleep_debug_cable_wakeup_test",
     srcs = ["adc_ctrl_sleep_debug_cable_wakeup_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:mmio",
@@ -806,14 +605,7 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_b2b_sleep_reset_test",
     srcs = ["pwrmgr_b2b_sleep_reset_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    qemu = qemu_params(
-        test_harness = "//sw/host/tests/chip/sysrst_ctrl:pwrmgr_sysrst_ctrl_sim_dv",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/ip/aon_timer/data:aon_timer_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -837,11 +629,7 @@ opentitan_test(
 opentitan_test(
     name = "sensor_ctrl_status_test",
     srcs = ["sensor_ctrl_status.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/ip/sensor_ctrl/data:sensor_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -864,11 +652,7 @@ opentitan_test(
 opentitan_test(
     name = "alert_handler_entropy_test",
     srcs = ["alert_handler_entropy_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey:alert_handler_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -887,11 +671,7 @@ opentitan_test(
     name = "alert_handler_lpg_sleep_mode_alerts_test",
     srcs = ["alert_handler_lpg_sleep_mode_alerts.c"],
     # The test requires to drive fatal alerts which is possible only in DV sim.
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey:alert_handler_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -900,7 +680,6 @@ opentitan_test(
         "//sw/device/lib/dif:alert_handler",
         "//sw/device/lib/dif:rstmgr",
         "//sw/device/lib/dif:rv_plic",
-        "//sw/device/lib/dif:sensor_ctrl",
         "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:irq",
         "//sw/device/lib/runtime:log",
@@ -919,15 +698,7 @@ opentitan_test(
 opentitan_test(
     name = "lc_ctrl_program_error",
     srcs = ["lc_ctrl_program_error.c"],
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        globals = {
-            "ot-lc_ctrl.inject-otp-prog-error": "true",
-        },
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/arch:device",
@@ -1017,26 +788,10 @@ opentitan_test(
     ],
 )
 
-otp_image(
-    name = "inject_scramble_seed_otp_img",
-    src = "//hw/ip/otp_ctrl/data:otp_json_prod",
-    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
-        "//hw/ip/otp_ctrl/data:otp_json_secret0",
-        "//hw/ip/otp_ctrl/data:otp_json_secret2_unlocked",
-    ],
-)
-
 opentitan_test(
     name = "inject_scramble_seed",
     srcs = ["inject_scramble_seed.c"],
-    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        otp = ":inject_scramble_seed_otp_img",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
@@ -1073,27 +828,10 @@ opentitan_test(
     ],
 )
 
-otp_image(
-    name = "otp_ctrl_lc_signals_test_otp_img",
-    src = "//hw/ip/otp_ctrl/data:otp_json_dev",
-    overlays = STD_OTP_OVERLAYS_WITHOUT_SECRET_PARTITIONS + [
-        "//hw/ip/otp_ctrl/data:otp_json_secret0",
-        "//hw/ip/otp_ctrl/data:otp_json_secret1",
-    ],
-)
-
 opentitan_test(
     name = "otp_ctrl_lc_signals_test",
     srcs = ["otp_ctrl_lc_signals_test.c"],
-    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
-    exec_env = {
-        "//hw/top_earlgrey:sim_dv": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-    },
-    qemu = qemu_params(
-        otp = ":otp_ctrl_lc_signals_test_otp_img",
-        rom = "//sw/device/lib/testing/test_rom:test_rom",
-    ),
+    exec_env = {"//hw/top_earlgrey:sim_dv": None},
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:memory",

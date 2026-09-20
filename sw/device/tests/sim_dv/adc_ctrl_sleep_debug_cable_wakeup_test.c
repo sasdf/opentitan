@@ -25,21 +25,21 @@ enum {
 };
 
 // These constants will be setup from the testbench
-// using sw_symbol_backdoor_overwrite, or use defaults on non-DV platforms.
+// using sw_symbol_backdoor_overwrite.
 
-static volatile const uint8_t kNumLowPowerSamples = 8;
-static volatile const uint8_t kNumNormalPowerSamples = 8;
-static volatile const uint8_t kWakeUpTimeAonCycles = 16;
+static volatile const uint8_t kNumLowPowerSamples;
+static volatile const uint8_t kNumNormalPowerSamples;
+static volatile const uint8_t kWakeUpTimeAonCycles;
 
-static volatile const uint8_t kChannel0MaxLowByte = 255 & 0xff;
-static volatile const uint8_t kChannel0MaxHighByte = (255 >> 8) & 0xff;
-static volatile const uint8_t kChannel0MinLowByte = 128 & 0xff;
-static volatile const uint8_t kChannel0MinHighByte = (128 >> 8) & 0xff;
+static volatile const uint8_t kChannel0MaxLowByte;
+static volatile const uint8_t kChannel0MaxHighByte;
+static volatile const uint8_t kChannel0MinLowByte;
+static volatile const uint8_t kChannel0MinHighByte;
 
-static volatile const uint8_t kChannel1MaxLowByte = 639 & 0xff;
-static volatile const uint8_t kChannel1MaxHighByte = (639 >> 8) & 0xff;
-static volatile const uint8_t kChannel1MinLowByte = 512 & 0xff;
-static volatile const uint8_t kChannel1MinHighByte = (512 >> 8) & 0xff;
+static volatile const uint8_t kChannel1MaxLowByte;
+static volatile const uint8_t kChannel1MaxHighByte;
+static volatile const uint8_t kChannel1MinLowByte;
+static volatile const uint8_t kChannel1MinHighByte;
 
 static void configure_adc_ctrl(const dif_adc_ctrl_t *adc_ctrl) {
   CHECK_DIF_OK(dif_adc_ctrl_set_enabled(adc_ctrl, kDifToggleDisabled));
