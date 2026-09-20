@@ -460,6 +460,16 @@ bool test_main(void) {
         g_expected_fault_count, g_last_mcause);
     failures++;
   }
+  g_expected_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kRstmgrBase + 0x70u, 0u);
+  if (g_expected_fault_count != 1u || g_last_mcause != 7u) {
+    LOG_ERROR(
+        "RTL_MISMATCH: write to addrmiss 0x70 expected mcause=7 (got "
+        "faults=%u mcause=%u)",
+        g_expected_fault_count, g_last_mcause);
+    failures++;
+  }
   uint32_t err_code = abs_mmio_read32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET);
   if (err_code != 0u) {
     LOG_ERROR("RTL_MISMATCH: ERR_CODE expected 0 after wr_err/addrmiss, got 0x%x",
