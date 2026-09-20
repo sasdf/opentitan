@@ -106,6 +106,15 @@ const uint32_t kMaxVerBl0 = 3;
 
 OTTF_DEFINE_TEST_CONFIG();
 
+#ifdef KEYMGR_FUNCTEST_ROM_EXT
+rom_error_t keymgr_owner_key_state_test(void) {
+  RETURN_IF_ERROR(sc_keymgr_state_check(kScKeymgrStateOwnerKey));
+  CHECK(abs_mmio_read32(TOP_EARLGREY_KEYMGR_BASE_ADDR +
+                        KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 1,
+        "Keymgr SW binding should be unlocked in OwnerKey state.");
+  return kErrorOk;
+}
+#else
 static void init_flash(void) {
   dif_flash_ctrl_state_t flash;
 
@@ -255,6 +264,7 @@ rom_error_t keymgr_rom_ext_test(void) {
   sec_mmio_check_counters(/*expected_check_count=*/7);
   return kErrorOk;
 }
+#endif
 
 rom_error_t keymgr_disable_test(void) {
   sc_keymgr_disable();
@@ -265,6 +275,14 @@ rom_error_t keymgr_disable_test(void) {
 
 bool test_main(void) {
   status_t result = OK_STATUS();
+#ifdef KEYMGR_FUNCTEST_ROM_EXT
+  sec_mmio_init();
+  CHECK(kmac_keymgr_configure() == kErrorOk);
+
+  EXECUTE_TEST(result, keymgr_owner_key_state_test);
+  EXECUTE_TEST(result, keymgr_disable_test);
+  return status_ok(result);
+#else
   dif_rstmgr_t rstmgr;
   dif_rstmgr_reset_info_bitfield_t info;
 
@@ -309,4 +327,5 @@ bool test_main(void) {
   }
 
   return false;
+#endif
 }

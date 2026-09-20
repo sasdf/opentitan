@@ -372,7 +372,8 @@ opentitan_test(
 
 opentitan_test(
     name = "keymgr_rom_ext_functest",
-    srcs = ["keymgr_rom_ext_functest.c"],
+    srcs = ["keymgr_functest.c"],
+    defines = ["KEYMGR_FUNCTEST_ROM_EXT"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
@@ -380,11 +381,23 @@ opentitan_test(
     deps = [
         ":keymgr",
         ":kmac",
-        "//hw/ip/keymgr/data:keymgr_c_regs",
+        ":lifecycle",
+        ":retention_sram",
+        "//hw/ip/kmac/data:kmac_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/dif:flash_ctrl",
+        "//sw/device/lib/dif:otp_ctrl",
+        "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/testing:flash_ctrl_testutils",
+        "//sw/device/lib/testing:keymgr_testutils",
+        "//sw/device/lib/testing:otp_ctrl_testutils",
+        "//sw/device/lib/testing:pwrmgr_testutils",
+        "//sw/device/lib/testing:rstmgr_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib:error",
+        "//sw/device/silicon_creator/lib:keymgr_binding",
+        "//sw/device/silicon_creator/lib/base:chip",
         "//sw/device/silicon_creator/lib/base:sec_mmio",
     ],
 )
