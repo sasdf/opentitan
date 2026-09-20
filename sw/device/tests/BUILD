@@ -2083,19 +2083,6 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/flash_ctrl:host_rma_test",
         testopt_bootstrap = "False",
     ),
-    qemu = qemu_params(
-        needs_jtag = True,
-        otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_dev_manuf_personalized",
-        tags = [
-            "broken",
-            "lc_dev",
-        ],
-        test_cmd = " ".join([
-            "--elf=\"{firmware}\"",
-            " \"{firmware}\"",
-        ]),
-        test_harness = "//sw/host/tests/chip/flash_ctrl:host_rma_test",
-    ),
     kind = "ram",
     linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
     deps = [

@@ -97,11 +97,6 @@ void ottf_console_uart_flow_control_enable(ottf_console_t *console) {
   CHECK_DIF_OK(dif_uart_irq_set_enabled(uart, kDifUartIrqRxWatermark,
                                         kDifToggleEnabled));
 
-  if (ottf_plic.base_addr.base == 0) {
-    CHECK_DIF_OK(dif_rv_plic_init(
-        mmio_region_from_addr(TOP_EARLGREY_RV_PLIC_BASE_ADDR), &ottf_plic));
-  }
-
   // Set IRQ priorities to MAX
   CHECK_DIF_OK(dif_rv_plic_irq_set_priority(
       &ottf_plic, get_flow_control_watermark_plic_id(), kDifRvPlicMaxPriority));
