@@ -315,15 +315,24 @@ static void test_wave2_unmapped_and_subword_access(mmio_region_t plic_base) {
         "Expected MSIP0 to remain 1 after rejected byte write to MSIP0+1");
   mmio_region_write32(plic_base, RV_PLIC_MSIP0_REG_OFFSET, 0u);
 
-  // - `IE0_0..IE0_5` have `RV_PLIC_PERMIT = 4'b1111`:
+  // - `IE0_0..IE0_5` and `IP_0..IP_5` have `RV_PLIC_PERMIT = 4'b1111`:
   //   any sub-word write (`sb` even at byte 0) sets `wr_err = 1` and raises
-  //   Store Access Fault (`mcause = 7`) while preserving `IE0_0`.
+  //   Store Access Fault (`mcause = 7`) while preserving register state.
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_IP_0_REG_OFFSET, 0u),
+        "Expected Store Access Fault (mcause=7) on byte write to IP_0+0 (PERMIT=4'b1111)");
   mmio_region_write32(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0x12345678u);
   CHECK(expect_store_fault_8(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0xffu),
         "Expected Store Access Fault (mcause=7) on byte write to IE0_0+0 (PERMIT=4'b1111)");
   CHECK(mmio_region_read32(plic_base, RV_PLIC_IE0_0_REG_OFFSET) == 0x12345678u,
         "Expected IE0_0 to remain 0x12345678 after rejected byte write");
   mmio_region_write32(plic_base, RV_PLIC_IE0_0_REG_OFFSET, 0u);
+
+  // - `THRESHOLD0` and `CC0` also have `RV_PLIC_PERMIT = 4'b0001`:
+  //   byte writes to offset +1 must fault with Store Access Fault (`mcause = 7`).
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_THRESHOLD0_REG_OFFSET + 1u, 0u),
+        "Expected Store Access Fault (mcause=7) on byte write to THRESHOLD0+1");
+  CHECK(expect_store_fault_8(plic_base, RV_PLIC_CC0_REG_OFFSET + 1u, 0u),
+        "Expected Store Access Fault (mcause=7) on byte write to CC0+1");
 }
 
 bool test_main(void) {
