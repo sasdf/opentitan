@@ -235,3 +235,26 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
+opentitan_test(
+    name = "ot_aon_timer_consistency_test",
+    srcs = ["ot_aon_timer_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
+    ),
+    deps = [
+        "//hw/ip/aon_timer/data:aon_timer_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
