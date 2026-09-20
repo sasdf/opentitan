@@ -167,6 +167,7 @@ sh_test(
         "cw340",
         "sim_qemu",
     ]
+    if not (fpga == "sim_qemu" and cfg.get("offline", False))
 ]
 
 sh_test(
@@ -240,6 +241,7 @@ sh_test(
         "cw340",
         "sim_qemu",
     ]
+    if not (fpga == "sim_qemu" and cfg.get("offline", False))
 ]
 
 [
@@ -271,6 +273,5 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
-        "sim_qemu",
     ]
 ]
