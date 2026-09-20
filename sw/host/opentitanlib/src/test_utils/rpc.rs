@@ -42,14 +42,12 @@ where
     fn send_with_crc(&self, device: &T) -> Result<String> {
         let s = serde_json::to_string(self)?;
         log::info!("Sending: {}", s);
+        device.console_write(s.as_bytes())?;
         let actual_crc = OttfCrc {
             crc: Crc::<u32>::new(&CRC_32_ISO_HDLC).checksum(s.as_bytes()),
         };
-        let crc_s = serde_json::to_string(&actual_crc)?;
-        log::info!("Sending: {}", crc_s);
-        let full = s + &crc_s;
-        device.console_write(full.as_bytes())?;
-        Ok(full)
+        let crc_s = actual_crc.send(device)?;
+        Ok(s + &crc_s)
     }
 
     fn send_with_padding(&self, device: &T, max_size: usize) -> Result<String> {
@@ -82,12 +80,12 @@ where
         let crc_pad_str = ' '.to_string().repeat(max_crc_s.len() - crc_s.len());
         crc_s.insert_str(crc_s.len() - 1, &crc_pad_str);
         // Send bytes to the DUT.
-        let full = s + &crc_s;
         if !quiet {
-            log::info!("Sending: {}", full);
+            log::info!("Sending: {}", s.clone() + &crc_s);
         }
-        device.console_write(full.as_bytes())?;
-        Ok(full)
+        device.console_write(s.as_bytes())?;
+        device.console_write(crc_s.as_bytes())?;
+        Ok(s + &crc_s)
     }
 }
 
@@ -109,16 +107,12 @@ where
     where
         Self: Sized,
     {
-        static EXIT_SUCCESS_REGEX: std::sync::LazyLock<Regex> =
-            std::sync::LazyLock::new(|| Regex::new(r"RESP_OK:(.*) CRC:([0-9]+)\n").unwrap());
-        static EXIT_FAILURE_REGEX: std::sync::LazyLock<Regex> =
-            std::sync::LazyLock::new(|| Regex::new(r"RESP_ERR:(.*) CRC:([0-9]+)\n").unwrap());
         let mut console = UartConsole {
             timeout: Some(timeout),
             timestamp: true,
             newline: true,
-            exit_success: Some(EXIT_SUCCESS_REGEX.clone()),
-            exit_failure: Some(EXIT_FAILURE_REGEX.clone()),
+            exit_success: Some(Regex::new(r"RESP_OK:(.*) CRC:([0-9]+)\n")?),
+            exit_failure: Some(Regex::new(r"RESP_ERR:(.*) CRC:([0-9]+)\n")?),
             ..Default::default()
         };
         let mut stdout = std::io::stdout();
