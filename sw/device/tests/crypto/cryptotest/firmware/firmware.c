@@ -45,8 +45,7 @@
 
 OTTF_DEFINE_TEST_CONFIG(.console.type = kOttfConsoleSpiDevice,
                         .console.base_addr = TOP_EARLGREY_SPI_DEVICE_BASE_ADDR,
-                        .console.test_may_clobber = false,
-                        .console.putbuf_buffered = true, );
+                        .console.test_may_clobber = false, );
 
 status_t process_cmd(ujson_t *uj) {
   while (true) {

@@ -200,7 +200,7 @@ static status_t hash_message(otcrypto_const_byte_buf_t *msg_buf,
 }
 
 status_t handle_rsa_encrypt(ujson_t *uj) {
-  static cryptotest_rsa_encrypt_t uj_input;
+  cryptotest_rsa_encrypt_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_encrypt_t(uj, &uj_input));
 
   if (uj_input.padding != kCryptotestRsaPaddingOaep) {
@@ -268,7 +268,7 @@ status_t handle_rsa_encrypt(ujson_t *uj) {
   }
 
   // Return ciphertext and the status back to host.
-  static cryptotest_rsa_encrypt_resp_t uj_output;
+  cryptotest_rsa_encrypt_resp_t uj_output;
   memset(uj_output.ciphertext, 0, RSA_CMD_MAX_MESSAGE_BYTES);
   memcpy(uj_output.ciphertext, ciphertext_buf, n_bytes);
   uj_output.ciphertext_len = n_bytes;
@@ -279,7 +279,7 @@ status_t handle_rsa_encrypt(ujson_t *uj) {
 }
 
 status_t handle_rsa_decrypt(ujson_t *uj) {
-  static cryptotest_rsa_decrypt_t uj_input;
+  cryptotest_rsa_decrypt_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_decrypt_t(uj, &uj_input));
 
   if (uj_input.padding != kCryptotestRsaPaddingOaep) {
@@ -380,7 +380,7 @@ status_t handle_rsa_decrypt(ujson_t *uj) {
   }
 
   // Return plaintext and the status back to host.
-  static cryptotest_rsa_decrypt_resp_t uj_output;
+  cryptotest_rsa_decrypt_resp_t uj_output;
   memset(uj_output.plaintext, 0, RSA_CMD_MAX_MESSAGE_BYTES);
   memcpy(uj_output.plaintext, plaintext_buf, msg_len);
   uj_output.plaintext_len = msg_len;
@@ -391,7 +391,7 @@ status_t handle_rsa_decrypt(ujson_t *uj) {
 }
 
 status_t handle_rsa_sign(ujson_t *uj) {
-  static cryptotest_rsa_sign_t uj_input;
+  cryptotest_rsa_sign_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_sign_t(uj, &uj_input));
 
   if (uj_input.e != kCryptotestRsaSupportedE) {
@@ -481,7 +481,7 @@ status_t handle_rsa_sign(ujson_t *uj) {
   TRY(otcrypto_rsa_sign(&private_key, msg_digest, padding_mode, &sig));
 
   // Return signature back to the host.
-  static cryptotest_rsa_sign_resp_t uj_output;
+  cryptotest_rsa_sign_resp_t uj_output;
   memset(uj_output.signature, 0, RSA_CMD_MAX_MESSAGE_BYTES);
   memcpy(uj_output.signature, sig_buf, n_bytes);
   uj_output.signature_len = n_bytes;
@@ -491,7 +491,7 @@ status_t handle_rsa_sign(ujson_t *uj) {
 }
 
 status_t handle_rsa_verify(ujson_t *uj) {
-  static cryptotest_rsa_verify_t uj_input;
+  cryptotest_rsa_verify_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_verify_t(uj, &uj_input));
 
   if (uj_input.e != kCryptotestRsaSupportedE) {
@@ -560,7 +560,7 @@ status_t handle_rsa_verify(ujson_t *uj) {
       &public_key, msg_digest, padding_mode, &sig, &verification_result);
 
   // Return verification result back to host.
-  static cryptotest_rsa_verify_resp_t uj_output;
+  cryptotest_rsa_verify_resp_t uj_output;
   uj_output.result = true;
 
   if ((status.value != kOtcryptoStatusValueOk) ||
@@ -573,7 +573,7 @@ status_t handle_rsa_verify(ujson_t *uj) {
 }
 
 status_t handle_rsa_keygen_check(ujson_t *uj) {
-  static cryptotest_rsa_keygen_check_t uj_input;
+  cryptotest_rsa_keygen_check_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_keygen_check_t(uj, &uj_input));
 
   otcrypto_rsa_size_t rsa_size;
@@ -691,14 +691,14 @@ status_t handle_rsa_keygen_check(ujson_t *uj) {
     }
   }
 
-  static cryptotest_rsa_keygen_check_resp_t uj_output;
+  cryptotest_rsa_keygen_check_resp_t uj_output;
   uj_output.result = result;
   RESP_OK(ujson_serialize_cryptotest_rsa_keygen_check_resp_t, uj, &uj_output);
   return OK_STATUS();
 }
 
 status_t handle_rsa_keygen(ujson_t *uj) {
-  static cryptotest_rsa_keygen_t uj_input;
+  cryptotest_rsa_keygen_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_keygen_t(uj, &uj_input));
 
   otcrypto_rsa_size_t rsa_size;
@@ -747,7 +747,7 @@ status_t handle_rsa_keygen(ujson_t *uj) {
   }
 
   // Return n, d, and e to the host.
-  static cryptotest_rsa_keygen_resp_t uj_output;
+  cryptotest_rsa_keygen_resp_t uj_output;
   memset(uj_output.n, 0, RSA_CMD_MAX_N_BYTES);
   memcpy(uj_output.n, public_key_data, n_bytes);
   uj_output.n_len = n_bytes;
@@ -761,7 +761,7 @@ status_t handle_rsa_keygen(ujson_t *uj) {
 }
 
 status_t handle_rsa_keygen_acvp(ujson_t *uj) {
-  static cryptotest_rsa_keygen_acvp_t uj_input;
+  cryptotest_rsa_keygen_acvp_t uj_input;
   TRY(ujson_deserialize_cryptotest_rsa_keygen_acvp_t(uj, &uj_input));
 
   otcrypto_rsa_size_t otcrypto_size;
@@ -802,7 +802,7 @@ status_t handle_rsa_keygen_acvp(ujson_t *uj) {
     d_buf[i] = d0_buf[i] ^ d1_buf[i];
   }
 
-  static cryptotest_rsa_keygen_acvp_resp_t uj_output;
+  cryptotest_rsa_keygen_acvp_resp_t uj_output;
   memset(&uj_output, 0, sizeof(uj_output));
   memcpy(uj_output.n, n_buf, n_bytes);
   uj_output.n_len = n_bytes;
