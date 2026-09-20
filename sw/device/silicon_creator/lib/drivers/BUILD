@@ -727,14 +727,17 @@ opentitan_test(
 
 opentitan_test(
     name = "rnd_rom_ext_functest",
-    srcs = ["rnd_rom_ext_functest.c"],
+    srcs = ["rnd_functest.c"],
+    defines = ["RND_FUNCTEST_ROM_EXT"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
     deps = [
+        ":otp",
         ":rnd",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:crc32",
         "//sw/device/lib/dif:entropy_src",
         "//sw/device/lib/testing:entropy_testutils",
         "//sw/device/lib/testing:rand_testutils",

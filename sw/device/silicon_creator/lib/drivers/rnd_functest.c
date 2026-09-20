@@ -233,7 +233,12 @@ bool test_main(void) {
 
   status_t result = OK_STATUS();
   EXECUTE_TEST(result, test_rnd);
+#ifdef RND_FUNCTEST_ROM_EXT
+  configure_random_health_checks();
+  EXECUTE_TEST(result, test_rnd);
+#else
   EXECUTE_TEST(result, test_otp_crc_check);
   EXECUTE_TEST(result, test_rnd_health_config_check);
+#endif
   return status_ok(result);
 }
