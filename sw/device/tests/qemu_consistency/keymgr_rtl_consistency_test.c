@@ -116,6 +116,25 @@ static status_t init_flash_and_otp_with_zero_owner_seed(void) {
     TRY(keymgr_testutils_flash_init(&flash, creator_secret, &kZeroOwnerSecret));
 
     if (!secret2_computed) {
+      // When SECRET2 digest is 0 (unlocked, e.g. in TEST_UNLOCKED0 where
+      // SEED_HW_RD_EN == 0), advancing keymgr from StReset fetches an invalid
+      // root key (secret.valid == false in ot_otp_eg.c) and transitions
+      // WORKING_STATE to INVALID (KEYMGR_ST_WIPE -> KEYMGR_ST_INVALID).
+      TRY(entropy_testutils_auto_mode_init());
+      uint32_t ctrl_adv = bitfield_field32_write(
+          0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
+          KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE);
+      write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
+      abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
+      (void)wait_keymgr_op_done_bounded(5000);
+      uint32_t ws_inval =
+          abs_mmio_read32(kKeymgrBase + KEYMGR_WORKING_STATE_REG_OFFSET);
+      TRY_CHECK(ws_inval == KEYMGR_WORKING_STATE_STATE_VALUE_INVALID,
+                "Expected WORKING_STATE=INVALID(7) when SECRET2 is unlocked, "
+                "got %u",
+                ws_inval);
+      clear_keymgr_status_and_err();
+
       TRY(otp_ctrl_testutils_lock_partition(&otp_ctrl,
                                             kDifOtpCtrlPartitionSecret2, 0));
     }

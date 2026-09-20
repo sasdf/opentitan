@@ -444,6 +444,74 @@ static void test_subword_permit_and_window_errors(uint32_t base) {
                "sw to SPI_HOST+0x38 (addrmiss) must raise Store Access Fault");
 }
 
+static void test_passthrough_bulk_erase_and_fullduplex_dual_cmdinval(
+    uint32_t base) {
+  const uint32_t kSpiDeviceBase = TOP_EARLGREY_SPI_DEVICE_BASE_ADDR;
+  const uint32_t kSpiDeviceControlOffset = 0x10u;
+
+  // 1. Enable SPI_HOST0 (SPIEN=1, CLKDIV=0).
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
+                   (1u << SPI_HOST_CONTROL_SW_RST_BIT) | 0x7fu);
+  abs_mmio_write32(base + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
+                   (1u << SPI_HOST_CONTROL_SPIEN_BIT) | 0x7fu);
+
+  // 2. Enable SPI_DEVICE passthrough mode (MODE = 2) and run a 1-byte TxOnly
+  //    transfer on SPI_HOST0 while passthrough is active.
+  uint32_t orig_spidev_ctrl =
+      abs_mmio_read32(kSpiDeviceBase + kSpiDeviceControlOffset);
+  abs_mmio_write32(kSpiDeviceBase + kSpiDeviceControlOffset, 0x2u);
+  abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0x06u);
+  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
+                   (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
+                       (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
+  for (int i = 0; i < 1000; ++i) {
+    uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+    if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
+        !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
+      break;
+    }
+  }
+  abs_mmio_write32(kSpiDeviceBase + kSpiDeviceControlOffset, orig_spidev_ctrl);
+
+  // 3. Issue SPI Flash WREN (0x06) followed by BULK_ERASE (0xC7) on SPI_HOST0.
+  abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0x06u);
+  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
+                   (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
+                       (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
+  for (int i = 0; i < 1000; ++i) {
+    uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+    if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
+        !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
+      break;
+    }
+  }
+  abs_mmio_write32(base + SPI_HOST_TXDATA_REG_OFFSET, 0xc7u);
+  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
+                   (0u << SPI_HOST_COMMAND_LEN_OFFSET) |
+                       (0x2u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
+  for (int i = 0; i < 1000; ++i) {
+    uint32_t st = abs_mmio_read32(base + SPI_HOST_STATUS_REG_OFFSET);
+    if (bitfield_bit32_read(st, SPI_HOST_STATUS_READY_BIT) &&
+        !bitfield_bit32_read(st, SPI_HOST_STATUS_ACTIVE_BIT)) {
+      break;
+    }
+  }
+
+  // 4. FullDuplex (DIRECTION=3) + Dual Speed (SPEED=1) while SPIEN=1 raises
+  //    ERROR_STATUS.CMDINVAL.
+  abs_mmio_write32(base + SPI_HOST_COMMAND_REG_OFFSET,
+                   (0x1u << SPI_HOST_COMMAND_SPEED_OFFSET) |
+                       (0x3u << SPI_HOST_COMMAND_DIRECTION_OFFSET));
+  uint32_t err = abs_mmio_read32(base + SPI_HOST_ERROR_STATUS_REG_OFFSET);
+  EXPECT_CHECK(bitfield_bit32_read(err, SPI_HOST_ERROR_STATUS_CMDINVAL_BIT),
+               "FullDuplex+Dual command while SPIEN=1 must set CMDINVAL");
+  abs_mmio_write32(base + SPI_HOST_ERROR_STATUS_REG_OFFSET, err);
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET,
+                   (1u << SPI_HOST_CONTROL_SW_RST_BIT) | 0x7fu);
+  abs_mmio_write32(base + SPI_HOST_CONTROL_REG_OFFSET, 0x7fu);
+}
+
 bool test_main(void) {
   CHECK_DIF_OK(dif_alert_handler_init(
       mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
@@ -457,8 +525,10 @@ bool test_main(void) {
   test_wronly_txstall_in_idle_cmdqd_and_active(kSpiHost0Base);
   test_status_read_does_not_cancel_clkdiv_active(kSpiHost0Base);
   test_subword_permit_and_window_errors(kSpiHost0Base);
+  test_passthrough_bulk_erase_and_fullduplex_dual_cmdinval(kSpiHost0Base);
   LOG_INFO("spi_host_rtl_consistency_test finished with %u failure(s).",
            g_failures);
   return g_failures == 0;
 }
+
 
