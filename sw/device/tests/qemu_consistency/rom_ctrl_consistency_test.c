@@ -30,6 +30,7 @@ enum {
 };
 
 static volatile bool store_access_fault_seen = false;
+static volatile bool load_access_fault_seen = false;
 static volatile bool load_integrity_fault_seen = false;
 static volatile uint32_t load_integrity_fault_mtval = 0;
 
@@ -37,6 +38,8 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   uint32_t mcause = ibex_mcause_read();
   if ((ibex_exc_t)(mcause & kIbexExcMax) == kIbexExcStoreAccessFault) {
     store_access_fault_seen = true;
+  } else if ((ibex_exc_t)(mcause & kIbexExcMax) == kIbexExcLoadAccessFault) {
+    load_access_fault_seen = true;
   } else {
     ottf_generic_fault_print(exc_info, "Unexpected Load/Store Fault", mcause);
     abort();
@@ -145,6 +148,22 @@ static void test_csr_semantics_and_digests(void) {
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET, 0x55u);
   CHECK(store_access_fault_seen,
         "Expected StoreAccessFault on 8-bit write to EXP_DIGEST_0 (PERMIT=4'b1111)");
+
+  // Sub-word (size < 4) CSR reads succeed and return the corresponding byte
+  // slices of the 32-bit register value.
+  uint32_t d0 = abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
+  for (uint32_t b = 0; b < 4u; ++b) {
+    uint8_t byte_val =
+        abs_mmio_read8(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET + b);
+    CHECK(byte_val == (uint8_t)((d0 >> (b * 8u)) & 0xffu));
+  }
+
+  // Out-of-bounds CSR read (offset 0x48 >= REGS_COUNT * 4) raises
+  // LoadAccessFault (MEMTX_DECODE_ERROR).
+  load_access_fault_seen = false;
+  (void)abs_mmio_read32(kRomCtrlRegsBase + 0x48u);
+  CHECK(load_access_fault_seen,
+        "Expected LoadAccessFault on out-of-bounds CSR read at offset 0x48");
 }
 
 static void test_alert_test_pulse_and_clear(void) {
@@ -260,6 +279,11 @@ static void test_rom_write_protection(void) {
   shadow_write32(ibex_fatal_hw_en_addr, 0u);
 
   uint32_t top_word_addr = kRomCtrlRomBase + kRomCtrlRomSize - sizeof(uint32_t);
+  store_access_fault_seen = false;
+  abs_mmio_write32(top_word_addr, 0xdeadbeefu);
+  CHECK(store_access_fault_seen,
+        "Expected StoreAccessFault when writing to top ROM digest region");
+
   load_integrity_fault_seen = false;
   load_integrity_fault_mtval = 0u;
   (void)abs_mmio_read32(top_word_addr);
