@@ -303,6 +303,22 @@ bool test_main(void) {
   abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    0x9u);
 
+  // Push 5 full 384-bit seeds (60 words) via FW_OV_WR_DATA in bypass mode
+  // without reading ENTROPY_DATA so final_fifo fills completely and the 5th
+  // seed exercises the final_fifo full / bypass_fifo reset path (line 1177),
+  // while preserving Seed 1 in the output staging buffer.
+  for (uint32_t i = 0; i < 60; ++i) {
+    abs_mmio_write32(kEntropySrcBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET,
+                     0x3000u + i);
+  }
+  for (uint32_t i = 0; i < 12; ++i) {
+    uint32_t w =
+        abs_mmio_read32(kEntropySrcBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
+    CHECK(w == 0x3000u + i,
+          "Expected preserved Seed 1 bypass word 0x%x after overflow, got 0x%x",
+          0x3000u + i, w);
+  }
+
   // FW_OV_ENTROPY_INSERT = 6 in SHA3 mode (ES_TYPE = 9):
   // 1. In FWInsertStart (FW_OV_SHA3_START == 9), sha3_start_o already pulsed in Idle,
   //    so writing 2 words (0x11111111, 0x22222222) absorbs them into u_sha3 and leaves
