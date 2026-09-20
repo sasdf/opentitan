@@ -298,9 +298,66 @@ static void test_subword_16bit_fifo_write_endian_swap(void) {
   }
 }
 
+static void test_msg_length_overflow_and_duplicate_hash_process(void) {
+  LOG_INFO(
+      "Section 5: 64-bit MSG_LENGTH overflow stall & duplicate CMD.HASH_PROCESS");
+
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);
+
+  // Seed 64-bit MSG_LENGTH to 2^64 - 32 bits (0xffffffff_ffffffe0) while idle.
+  abs_mmio_write32(kHmacBase + HMAC_MSG_LENGTH_UPPER_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET, 0xffffffe0u);
+
+  uint32_t cfg = bitfield_bit32_write(0u, HMAC_CFG_SHA_EN_BIT, true);
+  cfg = bitfield_bit32_write(cfg, HMAC_CFG_HMAC_EN_BIT, false);
+  cfg = bitfield_field32_write(cfg, HMAC_CFG_DIGEST_SIZE_FIELD,
+                               HMAC_CFG_DIGEST_SIZE_VALUE_SHA2_256);
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg);
+
+  // Resume via CMD.HASH_CONTINUE so seeded MSG_LENGTH is preserved.
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_CONTINUE_BIT);
+
+  // Push 4 bytes (32 bits) to wrap 64-bit MSG_LENGTH to 0 and latch overflow.
+  abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x61626364u);
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_UPPER_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) == 0u);
+
+  // First CMD.HASH_PROCESS: stalls without asserting hmac_done due to overflow.
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_PROCESS_BIT);
+  uint32_t intr = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  CHECK((intr & ((1u << HMAC_INTR_STATE_HMAC_DONE_BIT) |
+                 (1u << HMAC_INTR_STATE_HMAC_ERR_BIT))) == 0u);
+
+  // Second CMD.HASH_PROCESS while hash_process is already active: ignored
+  // without asserting hmac_done or hmac_err.
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_PROCESS_BIT);
+  intr = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  CHECK((intr & ((1u << HMAC_INTR_STATE_HMAC_DONE_BIT) |
+                 (1u << HMAC_INTR_STATE_HMAC_ERR_BIT))) == 0u);
+
+  // While stalled in HASH_PROCESS (cfg_block == 1), writing CFG = 0 is ignored
+  // and STATUS.HMAC_IDLE remains 0.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  uint32_t status = abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(status, HMAC_STATUS_HMAC_IDLE_BIT));
+
+  // Issuing CMD.HASH_STOP clears cfg_block (hmac.sv:359), allowing CFG = 0
+  // (SHA_EN = 0) to reset the SHA2 pad/core FSMs and restore HMAC_IDLE = 1.
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   1u << HMAC_CMD_HASH_STOP_BIT);
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  status = abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(status, HMAC_STATUS_HMAC_IDLE_BIT));
+}
+
 bool test_main(void) {
   test_hash_stop_and_continue();
   test_hash_continue_errors_and_non_idle_restrictions();
   test_subword_16bit_fifo_write_endian_swap();
+  test_msg_length_overflow_and_duplicate_hash_process();
   return true;
 }
