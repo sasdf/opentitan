@@ -746,9 +746,12 @@ opentitan_test(
 
 fips_wrap_opentitan_test(
     name = "pct_functest",
-    timeout = "long",
-    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
-    tags = ["broken"],
+    exec_env = dicts.add(
+        EXT_EXEC_ENV_SILICON_ROM_EXT,
+        {
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+        },
+    ),
 )
 
 opentitan_test(
@@ -1169,8 +1172,12 @@ opentitan_test(
 
 fips_wrap_opentitan_test(
     name = "kats_functest",
-    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
-    tags = ["broken"],
+    exec_env = dicts.add(
+        EXT_EXEC_ENV_SILICON_ROM_EXT,
+        {
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+        },
+    ),
 )
 
 opentitan_test(
