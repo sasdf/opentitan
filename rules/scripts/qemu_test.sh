@@ -90,21 +90,21 @@ cleanup() {
 
     if [ -n "$qemu_pid" ] && kill -0 "$qemu_pid" 2>/dev/null; then
         echo "Stopping QEMU: $qemu_pid"
-        # If 2 seconds pass and QEMU is still alive, force kill it.
-        (
-          sleep 2
-          if kill -0 "$qemu_pid" 2>/dev/null; then
-            echo "Killing QEMU: $qemu_pid"
-            kill -KILL "$qemu_pid" 2>/dev/null
-          fi
-        ) &
-        # Ask QEMU to gracefully terminate (SIGTERM) first
-        kill "$qemu_pid"
-        if [ -n "${OT_QEMU_COVERAGE:-}" ] && [ "${OT_QEMU_COVERAGE}" != "0" ]; then
+        # Give QMP --qemu-quit a brief moment to finish __gcov_exit() before sending SIGTERM
+        for _ in {1..10}; do
+            kill -0 "$qemu_pid" 2>/dev/null || break
+            sleep 0.02
+        done
+        if kill -0 "$qemu_pid" 2>/dev/null; then
+            kill "$qemu_pid" 2>/dev/null
             for _ in {1..40}; do
                 kill -0 "$qemu_pid" 2>/dev/null || break
                 sleep 0.05
             done
+        fi
+        if kill -0 "$qemu_pid" 2>/dev/null; then
+            echo "Killing QEMU: $qemu_pid"
+            kill -KILL "$qemu_pid" 2>/dev/null
         fi
     fi
 
