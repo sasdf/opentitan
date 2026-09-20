@@ -351,5 +351,31 @@ bool test_main(void) {
   EXPECT_EQ(g_fault_count, 2u, "sw to UART1+0x34 (addrmiss) faults");
   EXPECT_EQ(g_last_mcause, 7u, "sw to UART1+0x34 mcause == 7");
 
+  // ---------------------------------------------------------------------------
+  // 11. Status-type INTR_TEST test_q latch behavior (prim_intr_hw IntrT=Status)
+  //     In prim_intr_hw.sv:71-84, writing INTR_TEST latches reg2hw_intr_test_q
+  //     into test_q for status-type interrupts (RX_WATERMARK, TX_WATERMARK,
+  //     TX_EMPTY), asserting INTR_STATE even when event_intr_i is 0, ignoring
+  //     RW1C writes to INTR_STATE, and clearing only when INTR_TEST is written
+  //     with 0.
+  // ---------------------------------------------------------------------------
+  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
+                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(kUart1Base + UART_INTR_TEST_REG_OFFSET,
+                   1u << UART_INTR_COMMON_RX_WATERMARK_BIT);
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+  EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 1u,
+            "INTR_TEST.RX_WATERMARK=1 asserts INTR_STATE.RX_WATERMARK when RX FIFO is empty");
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET,
+                   1u << UART_INTR_COMMON_RX_WATERMARK_BIT);
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+  EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 1u,
+            "RW1C write to INTR_STATE.RX_WATERMARK does not clear status-type test_q");
+  abs_mmio_write32(kUart1Base + UART_INTR_TEST_REG_OFFSET, 0u);
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+  EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 0u,
+            "INTR_TEST=0 clears status-type test_q and deasserts INTR_STATE.RX_WATERMARK");
+
   return g_failures == 0;
 }
