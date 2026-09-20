@@ -181,6 +181,20 @@ bool test_main(void) {
   }
   EXPECT_RTL(any_changed, "CTRL.INIT must wipe/re-initialize SRAM contents");
 
+  // 6a-2. Trigger CTRL.INIT and immediately read from retention SRAM before
+  // polling STATUS.INIT_DONE: TL-UL read stalls until init finishes and
+  // succeeds without bus fault.
+  abs_mmio_write32(ret_buf, kTestPattern[0]);
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   1u << SRAM_CTRL_CTRL_INIT_BIT);
+  uint32_t imm_read_word = abs_mmio_read32(ret_buf);
+  EXPECT_RTL(!kLoadStoreFault && imm_read_word != kTestPattern[0],
+             "Immediate SRAM read during CTRL.INIT must succeed and return "
+             "re-initialized word");
+  status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  EXPECT_RTL(bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT),
+             "STATUS.INIT_DONE must be 1 after immediate SRAM read completes");
+
   // 6b. Writing CTRL.RENEW_SCR_KEY while CTRL.INIT is in progress (init_q == 1)
   // must be ignored (sram_ctrl.sv: key_req gated by !init_q).
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
