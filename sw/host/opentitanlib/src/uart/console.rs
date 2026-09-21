@@ -300,13 +300,8 @@ impl UartConsole {
     where
         T: ConsoleDevice + ?Sized,
     {
-        let mut buf = [0u8; 256];
-        let read_len = if device.supports_nonblocking_read()? {
-            1
-        } else {
-            buf.len()
-        };
-        let len = device.console_read(&mut buf[..read_len], timeout)?;
+        let mut buf = [0u8; 1];
+        let len = device.console_read(&mut buf, timeout)?;
         if len == 0 {
             return Ok(false);
         }

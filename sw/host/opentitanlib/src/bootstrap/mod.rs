@@ -190,16 +190,17 @@ impl<'a> Bootstrap<'a> {
         let result = updater.update(self, transport, payload, progress);
 
         if !self.leave_in_bootstrap && perform_bootstrap_reset {
-            transport.pin_strapping("RESET")?.apply()?;
-            // For the case the ROM continuously monitors the bootstrapping pin, and boots the
-            // newly flashed image as soon as it is de-asserted, we only de-assert after
-            // having put the device under reset, in order to ensure that the caller can
-            // control when the newly flashed image gets to boot the first time.
-            rom_boot_strapping.remove()?;
             if self.leave_in_reset {
                 log::info!("Releasing bootstrap pins, leaving device in reset...");
+                transport.pin_strapping("RESET")?.apply()?;
+                // For the case the ROM continuously monitors the bootstrapping pin, and boots the
+                // newly flashed image as soon as it is de-asserted, we only de-assert after
+                // having put the device under reset, in order to ensure that the caller can
+                // control when the newly flashed image gets to boot the first time.
+                rom_boot_strapping.remove()?;
             } else {
                 log::info!("Releasing bootstrap pins, resetting device...");
+                rom_boot_strapping.remove()?;
                 // Don't clear the UART RX buffer after bootstrap to preserve the bootstrap
                 // output.
                 transport.reset(UartRx::Keep)?;

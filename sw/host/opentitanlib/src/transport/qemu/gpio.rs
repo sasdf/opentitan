@@ -487,6 +487,7 @@ impl GpioPin for QemuGpioPin {
         }
 
         let mut gpio = self.qemu_gpio.borrow_mut();
+        std::thread::sleep(Duration::from_micros(100));
         gpio.sync_with_qemu()?;
 
         Ok(gpio.pin_level(self.idx, self.pull_mode.get()))

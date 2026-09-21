@@ -144,14 +144,6 @@ impl OpenOcd {
                     Default::default(),
                 )
             });
-        } else {
-            std::thread::spawn(move || {
-                let mut stdout = stdout;
-                let _ = std::io::copy(&mut stdout, &mut std::io::sink());
-            });
-            std::thread::spawn(move || {
-                let _ = std::io::copy(&mut stderr, &mut std::io::sink());
-            });
         }
 
         let kill_guard = scopeguard::guard(child, |mut child| {
@@ -253,8 +245,6 @@ impl OpenOcd {
 pub struct OpenOcdJtagChain {
     /// OpenOCD server instance.
     openocd: OpenOcd,
-    adapter_command: String,
-    opts: JtagParams,
 }
 
 /// Errors related to the OpenOCD server.
@@ -279,11 +269,7 @@ impl OpenOcdJtagChain {
         openocd.execute("transport select jtag")?;
         openocd.execute("scan_chain")?;
 
-        Ok(OpenOcdJtagChain {
-            openocd,
-            adapter_command: adapter_command.to_string(),
-            opts: opts.clone(),
-        })
+        Ok(OpenOcdJtagChain { openocd })
     }
 }
 
@@ -294,35 +280,18 @@ impl JtagChain for OpenOcdJtagChain {
             JtagTap::RiscvTap => include_str!(env!("openocd_riscv_target_cfg")),
             JtagTap::LcTap => include_str!(env!("openocd_lc_target_cfg")),
         };
-        let mut last_err = None;
-        for attempt in 0..3 {
-            if attempt > 0 {
-                std::thread::sleep(Duration::from_millis(50));
-                if let Ok(new_chain) = Self::new(&self.adapter_command, &self.opts) {
-                    self.openocd = new_chain.openocd;
-                }
-            }
-            if let Err(e) = self.openocd.execute(target) {
-                last_err = Some(e);
-                continue;
-            }
-            match self.openocd.execute("capture init") {
-                Ok(resp) => {
-                    if resp.contains("JTAG scan chain interrogation failed") {
-                        last_err = Some(OpenOcdError::InitializeFailure(resp).into());
-                        continue;
-                    }
-                    return Ok(Box::new(OpenOcdJtagTap {
-                        openocd: self.openocd,
-                        jtag_tap: tap,
-                    }));
-                }
-                Err(e) => {
-                    last_err = Some(e);
-                }
-            }
+        self.openocd.execute(target)?;
+
+        // Capture outputs during initialization to see if error has occured during the process.
+        let resp = self.openocd.execute("capture init")?;
+        if resp.contains("JTAG scan chain interrogation failed") {
+            bail!(OpenOcdError::InitializeFailure(resp));
         }
-        Err(last_err.unwrap())
+
+        Ok(Box::new(OpenOcdJtagTap {
+            openocd: self.openocd,
+            jtag_tap: tap,
+        }))
     }
 
     fn into_raw(self: Box<Self>) -> Result<OpenOcd> {

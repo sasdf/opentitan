@@ -37,6 +37,7 @@ pub struct QemuSpi {
 
     mode: Cell<TransferMode>,
     max_speed: Cell<u32>,
+    last_was_page_program: Cell<bool>,
 }
 
 impl QemuSpi {
@@ -50,8 +51,14 @@ impl QemuSpi {
 
         let mode = Cell::new(TransferMode::Mode0);
         let max_speed = Cell::new(10_000_000);
+        let last_was_page_program = Cell::new(false);
 
-        Ok(QemuSpi { tty, mode, max_speed })
+        Ok(QemuSpi {
+            tty,
+            mode,
+            max_speed,
+            last_was_page_program,
+        })
     }
 
     fn make_header(&self, len: u16, hold_cs: bool) -> [u8; 8] {
@@ -156,6 +163,27 @@ impl Target for QemuSpi {
                         pos += buf.len();
                     }
                 }
+            }
+            match tx_buf.get(8).copied() {
+                Some(0x02) => {
+                    self.last_was_page_program.set(true);
+                }
+                Some(0x05) => {
+                    if (rx_buf.get(1).copied().unwrap_or(0) & 0x01) != 0 {
+                        std::thread::sleep(std::time::Duration::from_micros(100));
+                    } else if self.last_was_page_program.replace(false) {
+                        std::thread::sleep(std::time::Duration::from_millis(2));
+                    }
+                }
+                Some(0x03) => {
+                    if rx_buf.len() == 16 && rx_buf[4..8] != [0xef, 0xbe, 0xa5, 0xa5] {
+                        std::thread::sleep(std::time::Duration::from_micros(100));
+                    }
+                }
+                Some(0x99) => {
+                    std::thread::sleep(std::time::Duration::from_millis(25));
+                }
+                _ => {}
             }
             return Ok(());
         }

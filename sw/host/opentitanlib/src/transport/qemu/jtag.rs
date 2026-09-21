@@ -31,11 +31,12 @@ pub struct QemuJtag {
 
 impl QemuJtag {
     pub fn new(
-        params: JtagParams,
+        mut params: JtagParams,
         rv_dm_sock: PathBuf,
         lc_ctrl_sock: PathBuf,
         gpio: Option<Rc<RefCell<QemuGpio>>>,
     ) -> QemuJtag {
+        params.log_stdio = true;
         QemuJtag {
             params,
             rv_dm_sock,
@@ -52,15 +53,24 @@ impl JtagChain for QemuJtag {
             JtagTap::LcTap => self.lc_ctrl_sock,
         };
 
-        let openocd = OpenOcdJtagChain::new(
-            &format!(
-                "adapter driver remote_bitbang; remote_bitbang port 0; remote_bitbang host {sock}",
-                sock = sock.display(),
-            ),
-            &self.params,
-        )?;
+        let adapter_cmd = format!(
+            "adapter driver remote_bitbang; remote_bitbang port 0; remote_bitbang host {sock}",
+            sock = sock.display(),
+        );
 
-        Box::new(openocd).connect(tap)
+        let mut last_err = None;
+        for attempt in 0..3 {
+            if attempt > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            match OpenOcdJtagChain::new(&adapter_cmd, &self.params)
+                .and_then(|openocd| Box::new(openocd).connect(tap))
+            {
+                Ok(jtag) => return Ok(jtag),
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(last_err.unwrap())
     }
 
     fn into_raw(self: Box<Self>) -> anyhow::Result<OpenOcd> {

@@ -18,7 +18,6 @@ pub struct SpiConsoleDevice<'a> {
     flash: SpiFlash,
     console_next_frame_number: Cell<u32>,
     rx_buf: RefCell<VecDeque<u8>>,
-    tx_buf: RefCell<Vec<u8>>,
     next_read_address: Cell<u32>,
     device_tx_ready_pin: Option<&'a Rc<dyn GpioPin>>,
     ignore_frame_num: bool,
@@ -52,7 +51,6 @@ impl<'a> SpiConsoleDevice<'a> {
             spi,
             flash,
             rx_buf: RefCell::new(VecDeque::new()),
-            tx_buf: RefCell::new(Vec::new()),
             console_next_frame_number: Cell::new(0),
             next_read_address: Cell::new(0),
             device_tx_ready_pin,
@@ -95,9 +93,7 @@ impl<'a> SpiConsoleDevice<'a> {
         if let Some(ready_pin) = self.get_tx_ready_pin()?
             && self.wait_tx_ready_deassert
         {
-            while ready_pin.read()? {
-                std::thread::sleep(Duration::from_micros(100));
-            }
+            while ready_pin.read()? {}
         }
 
         let magic_number: u32 = u32::from_le_bytes(header[0..4].try_into().unwrap());
@@ -105,7 +101,6 @@ impl<'a> SpiConsoleDevice<'a> {
         let data_len_bytes: usize = u32::from_le_bytes(header[8..12].try_into().unwrap()) as usize;
         if magic_number != SpiConsoleDevice::SPI_FRAME_MAGIC_NUMBER
             || (!self.ignore_frame_num && frame_number != self.console_next_frame_number.get())
-            || data_len_bytes == 0
             || data_len_bytes > SpiConsoleDevice::SPI_MAX_DATA_LENGTH
         {
             if self.get_tx_ready_pin()?.is_none() {
@@ -160,12 +155,38 @@ impl<'a> SpiConsoleDevice<'a> {
         }
         Ok(self)
     }
-    pub fn flush_tx_buf(&self) -> Result<()> {
-        let mut tx_buf = self.tx_buf.borrow_mut();
-        if tx_buf.is_empty() {
-            return Ok(());
+}
+
+impl<'a> ConsoleDevice for SpiConsoleDevice<'a> {
+    fn console_read(&self, buf: &mut [u8], _timeout: Duration) -> Result<usize> {
+        if self.rx_buf.borrow().is_empty() {
+            if let Some(ready_pin) = self.get_tx_ready_pin()? {
+                if ready_pin.read()? {
+                    if self.read_from_spi()? == 0 {
+                        // If we are gated by the TX-ready pin, only perform the SPI console read if
+                        // the ready pin is high.
+                        return Ok(0);
+                    }
+                } else {
+                    return Ok(0);
+                }
+            } else if self.read_from_spi()? == 0 {
+                return Ok(0);
+            }
         }
-        let buf_len: usize = tx_buf.len();
+
+        // Copy from the internal data queue to the output buffer.
+        let mut i: usize = 0;
+        while !self.rx_buf.borrow().is_empty() && i < buf.len() {
+            buf[i] = self.rx_buf.borrow_mut().pop_front().unwrap();
+            i += 1;
+        }
+
+        Ok(i)
+    }
+
+    fn console_write(&self, buf: &[u8]) -> Result<()> {
+        let buf_len: usize = buf.len();
         let mut written_data_len: usize = 0;
         while written_data_len < buf_len {
             let mut write_address = SpiConsoleDevice::SPI_TX_LAST_CHUNK_MAGIC_ADDRESS;
@@ -179,81 +200,11 @@ impl<'a> SpiConsoleDevice<'a> {
             self.flash.program(
                 self.spi,
                 write_address,
-                &tx_buf[written_data_len..written_data_len + data_len],
+                &buf[written_data_len..written_data_len + data_len],
             )?;
             written_data_len += data_len;
         }
-        tx_buf.clear();
-        Ok(())
-    }
-}
 
-impl<'a> Drop for SpiConsoleDevice<'a> {
-    fn drop(&mut self) {
-        let _ = self.flush_tx_buf();
-    }
-}
-
-impl<'a> ConsoleDevice for SpiConsoleDevice<'a> {
-    fn console_read(&self, buf: &mut [u8], timeout: Duration) -> Result<usize> {
-        self.flush_tx_buf()?;
-        if self.rx_buf.borrow().is_empty() {
-            if let Some(ready_pin) = self.get_tx_ready_pin()? {
-                if ready_pin.read()? {
-                    if self.read_from_spi()? == 0 {
-                        // If we are gated by the TX-ready pin, only perform the SPI console read if
-                        // the ready pin is high.
-                        if !timeout.is_zero() {
-                            std::thread::sleep(Duration::from_micros(100).min(timeout));
-                        }
-                        return Ok(0);
-                    }
-                } else {
-                    if !timeout.is_zero() {
-                        std::thread::sleep(Duration::from_micros(100).min(timeout));
-                    }
-                    return Ok(0);
-                }
-            } else {
-                let mut got_bytes = 0;
-                for _ in 0..6 {
-                    got_bytes = self.read_from_spi()?;
-                    if got_bytes > 0 || timeout.is_zero() {
-                        break;
-                    }
-                }
-                if got_bytes == 0 {
-                    if !timeout.is_zero() {
-                        std::thread::sleep(Duration::from_micros(50).min(timeout));
-                    }
-                    return Ok(0);
-                }
-            }
-        }
-
-        // Copy from the internal data queue to the output buffer up to a newline.
-        let mut i: usize = 0;
-        let mut rx_buf = self.rx_buf.borrow_mut();
-        while !rx_buf.is_empty() && i < buf.len() {
-            let b = rx_buf.pop_front().unwrap();
-            buf[i] = b;
-            i += 1;
-            if b == b'\n' {
-                break;
-            }
-        }
-
-        Ok(i)
-    }
-
-    fn console_write(&self, buf: &[u8]) -> Result<()> {
-        self.tx_buf.borrow_mut().extend_from_slice(buf);
-        if buf.ends_with(b"}")
-            || buf.contains(&b'\n')
-            || self.tx_buf.borrow().len() >= SpiConsoleDevice::SPI_FLASH_PAYLOAD_BUFFER_SIZE
-        {
-            self.flush_tx_buf()?;
-        }
         Ok(())
     }
 
