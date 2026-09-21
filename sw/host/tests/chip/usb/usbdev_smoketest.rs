@@ -53,35 +53,36 @@ fn usbdev_echo(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) -> Re
             "Bulk read from EP1 returned 0 bytes on QEMU USB device"
         );
         device.write_bulk_timeout(0x01, &buffer[0..total_read], opts.timeout)?;
-    } else {
-        let devices = opts.usb.wait_for_device(opts.timeout)?;
-        if devices.is_empty() {
-            bail!("no USB device found");
-        }
-
-        let ports = serialport::available_ports()?;
-        //  In CI it is possible for several devices to match because we don't use a unique
-        //  VID and PID, and all devices are visible (but not accessible) to every program.
-        //  So with filter all vid:pid matches to try to open them: the ones belonging to
-        //  other containers cannot be opened.
-        let usb_uart = ports
-            .iter()
-            .find_map(|port| {
-                let serialport::SerialPortType::UsbPort(info) = &port.port_type else {
-                    return None;
-                };
-                if info.vid != opts.usb.vid || info.pid != opts.usb.pid {
-                    return None;
-                }
-                SerialPortUart::open(&port.port_name, 115200).ok()
-            })
-            .ok_or(anyhow::anyhow!("Could not open any tty port"))?;
-
-        let mut buffer = [0u8; 256];
-        let len = usb_uart.read(&mut buffer)?;
-
-        usb_uart.write(&buffer[0..len])?;
+        let _ = UartConsole::wait_for(uart, r"PASS!", opts.timeout)?;
+        return Ok(());
     }
+    let devices = opts.usb.wait_for_device(opts.timeout)?;
+    if devices.is_empty() {
+        bail!("no USB device found");
+    }
+
+    let ports = serialport::available_ports()?;
+    //  In CI it is possible for several devices to match because we don't use a unique
+    //  VID and PID, and all devices are visible (but not accessible) to every program.
+    //  So with filter all vid:pid matches to try to open them: the ones belonging to
+    //  other containers cannot be opened.
+    let usb_uart = ports
+        .iter()
+        .find_map(|port| {
+            let serialport::SerialPortType::UsbPort(info) = &port.port_type else {
+                return None;
+            };
+            if info.vid != opts.usb.vid || info.pid != opts.usb.pid {
+                return None;
+            }
+            SerialPortUart::open(&port.port_name, 115200).ok()
+        })
+        .ok_or(anyhow::anyhow!("Could not open any tty port"))?;
+
+    let mut buffer = [0u8; 256];
+    let len = usb_uart.read(&mut buffer)?;
+
+    usb_uart.write(&buffer[0..len])?;
 
     let _ = UartConsole::wait_for(uart, r"PASS!", opts.timeout)?;
     Ok(())

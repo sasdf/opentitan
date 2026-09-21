@@ -100,6 +100,45 @@ filegroup(
     output_group = "sim_qemu_base_elf",
 )
 
+[
+    sh_test(
+        name = "e2e_{}{}_sim_qemu_test".format(prefix, sku),
+        timeout = "long",
+        srcs = [src],
+        data = [
+            ":orchestrator_sim_qemu_zip",
+            ":qemu_earlgrey_cfg",
+            ":qemu_flash_empty",
+            ":qemu_otp_empty",
+            ":qemu_rom",
+            "qemu_setup.sh",
+            "//hw/top_earlgrey/sw/util:qemu_start",
+            "//third_party/qemu:qemu-system-riscv32",
+            "@python3",
+            cfg["orchestrator_cfg"],
+        ] + extra_data,
+        env = {
+            "PYTHON": "$(location @python3//:python3)",
+            "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
+            "FPGA": "sim_qemu",
+            "QEMU_BIN": "$(location //third_party/qemu:qemu-system-riscv32)",
+            "QEMU_START": "$(location //hw/top_earlgrey/sw/util:qemu_start)",
+            "QEMU_CONFIG": "$(location :qemu_earlgrey_cfg)",
+            "QEMU_ROM": "$(location :qemu_rom)",
+            "QEMU_OTP": "$(location :qemu_otp_empty)",
+            "QEMU_FLASH": "$(location :qemu_flash_empty)",
+            "QEMU_ICOUNT": "6",
+        } | extra_env,
+        tags = ["changes_otp", "manuf", "sim_qemu"] + extra_tags,
+    )
+    for sku, cfg in EARLGREY_SKUS.items()
+    if not cfg.get("offline", False)
+    for prefix, src, extra_data, extra_env, extra_tags in [
+        ("multistage_", "e2e_multistage.sh", ["//sw/device/silicon_creator/manuf/base:ft_flash_scramble_{}".format(sku)], {}, []),
+        ("", "e2e.sh", ["//sw/host/provisioning/orchestrator/src:fw_dependencies", "//util/coverage/collect_cc_coverage"], {"COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)", "CC_CODE_COVERAGE_SCRIPT": ""}, ["provisioning"]),
+    ]
+]
+
 sh_test(
     name = "e2e_option_flags_test",
     timeout = "moderate",
@@ -124,41 +163,23 @@ sh_test(
 [
     sh_test(
         name = "e2e_multistage_{}_{}_test".format(sku, fpga),
-        timeout = "long" if fpga == "sim_qemu" else "moderate",
         srcs = ["e2e_multistage.sh"],
         data = [
             ":orchestrator_{}_zip".format(fpga),
             "@python3",
             cfg["orchestrator_cfg"],
             "//sw/device/silicon_creator/manuf/base:ft_flash_scramble_{}".format(sku),
-        ] + ([
-            ":qemu_earlgrey_cfg",
-            ":qemu_flash_empty",
-            ":qemu_otp_empty",
-            ":qemu_rom",
-            "qemu_setup.sh",
-            "//hw/top_earlgrey/sw/util:qemu_start",
-            "//third_party/qemu:qemu-system-riscv32",
-        ] if fpga == "sim_qemu" else []),
+        ],
         env = {
             "PYTHON": "$(location @python3//:python3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "FPGA": "{}".format(fpga),
-        } | ({
-            "QEMU_BIN": "$(location //third_party/qemu:qemu-system-riscv32)",
-            "QEMU_START": "$(location //hw/top_earlgrey/sw/util:qemu_start)",
-            "QEMU_CONFIG": "$(location :qemu_earlgrey_cfg)",
-            "QEMU_ROM": "$(location :qemu_rom)",
-            "QEMU_OTP": "$(location :qemu_otp_empty)",
-            "QEMU_FLASH": "$(location :qemu_flash_empty)",
-            "QEMU_ICOUNT": "6",
-        } if fpga == "sim_qemu" else {}),
+        },
         tags = [
             "changes_otp",
+            "exclusive",
             "manuf",
         ] + [fpga] + ([
-            "exclusive",
-        ] if fpga != "sim_qemu" else []) + ([
             "manual",
         ] if cfg.get("offline", False) else []),
     )
@@ -166,9 +187,7 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
-        "sim_qemu",
     ]
-    if not (fpga == "sim_qemu" and cfg.get("offline", False))
 ]
 
 sh_test(
@@ -195,7 +214,7 @@ sh_test(
 [
     sh_test(
         name = "e2e_{}_{}_test".format(sku, fpga),
-        timeout = "long" if fpga == "sim_qemu" else "moderate",
+        timeout = "moderate",
         srcs = ["e2e.sh"],
         data = [
             ":orchestrator_{}_zip".format(fpga),
@@ -203,37 +222,20 @@ sh_test(
             cfg["orchestrator_cfg"],
             "//sw/host/provisioning/orchestrator/src:fw_dependencies",
             "//util/coverage/collect_cc_coverage",
-        ] + ([
-            ":qemu_earlgrey_cfg",
-            ":qemu_flash_empty",
-            ":qemu_otp_empty",
-            ":qemu_rom",
-            "qemu_setup.sh",
-            "//hw/top_earlgrey/sw/util:qemu_start",
-            "//third_party/qemu:qemu-system-riscv32",
-        ] if fpga == "sim_qemu" else []),
+        ],
         env = {
             "PYTHON": "$(location @python3//:python3)",
             "SKU_CONFIG_PATH": "$(location {})".format(cfg["orchestrator_cfg"]),
             "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
             "CC_CODE_COVERAGE_SCRIPT": "",  # Disable built-in cc coverage
             "FPGA": "{}".format(fpga),
-        } | ({
-            "QEMU_BIN": "$(location //third_party/qemu:qemu-system-riscv32)",
-            "QEMU_START": "$(location //hw/top_earlgrey/sw/util:qemu_start)",
-            "QEMU_CONFIG": "$(location :qemu_earlgrey_cfg)",
-            "QEMU_ROM": "$(location :qemu_rom)",
-            "QEMU_OTP": "$(location :qemu_otp_empty)",
-            "QEMU_FLASH": "$(location :qemu_flash_empty)",
-            "QEMU_ICOUNT": "6",
-        } if fpga == "sim_qemu" else {}),
+        },
         tags = [
             "changes_otp",
+            "exclusive",
             "manuf",
             "provisioning",
         ] + [fpga] + ([
-            "exclusive",
-        ] if fpga != "sim_qemu" else []) + ([
             "manual",
         ] if cfg.get("offline", False) else []),
     )
@@ -241,9 +243,7 @@ sh_test(
     for fpga in [
         "hyper310",
         "cw340",
-        "sim_qemu",
     ]
-    if not (fpga == "sim_qemu" and cfg.get("offline", False))
 ]
 
 [
