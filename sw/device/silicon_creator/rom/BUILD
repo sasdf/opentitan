@@ -570,10 +570,10 @@ genrule(
 opentitan_binary(
     name = "mask_rom_stack_utilization",
     collect_code_coverage = 0,
-    copts = ["-DSTACK_UTILIZATION_CHECK"],
     exec_env = [
         "//hw/top_earlgrey:sim_qemu_base",
     ],
+    extra_bazel_copts = ["-DSTACK_UTILIZATION_CHECK"],
     kind = "rom",
     linker_script = ":linker_script",
     deps = [
@@ -656,7 +656,6 @@ opentitan_test(
         rom = ":mask_rom_stack_utilization",
         stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
         test_cmd = """
-            --exec="transport init"
             --exec="bootstrap --clear-uart=true --leave-in-bootstrap {good_a}"
             --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
             --exec="gpio remove ROM_BOOTSTRAP"
