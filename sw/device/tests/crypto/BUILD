@@ -44,8 +44,6 @@ CRYPTOTEST_FIPS_EXEC_ENVS = dicts.add(
     EXT_EXEC_ENV_SILICON_ROM_EXT,
     {
         "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
 )
 
@@ -721,12 +719,7 @@ opentitan_test(
 
 fips_wrap_opentitan_test(
     name = "pct_functest",
-    exec_env = dicts.add(
-        EXT_EXEC_ENV_SILICON_ROM_EXT,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-        },
-    ),
+    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
 )
 
 opentitan_test(
@@ -1121,7 +1114,13 @@ opentitan_test(
 # Call for example stateful_kats_functest_fips_fpga_cw340_sival_rom_ext, i.e., append fips behind the name and before the exec_env
 fips_wrap_opentitan_test(
     name = "stateful_kats_functest",
-    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
+    exec_env = dicts.add(
+        CRYPTOTEST_FIPS_EXEC_ENVS,
+        {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+        },
+    ),
 )
 
 opentitan_test(
@@ -1147,12 +1146,7 @@ opentitan_test(
 
 fips_wrap_opentitan_test(
     name = "kats_functest",
-    exec_env = dicts.add(
-        EXT_EXEC_ENV_SILICON_ROM_EXT,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-        },
-    ),
+    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
 )
 
 opentitan_test(
@@ -1723,7 +1717,13 @@ opentitan_test(
 # Call for example otcrypto_hash_test_fips_fpga_cw340_sival_rom_ext, i.e., append fips behind the name and before the exec_env
 fips_wrap_opentitan_test(
     name = "otcrypto_hash_test",
-    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
+    exec_env = dicts.add(
+        CRYPTOTEST_FIPS_EXEC_ENVS,
+        {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+        },
+    ),
 )
 
 opentitan_test(
