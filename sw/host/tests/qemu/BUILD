@@ -32,4 +32,3 @@ rust_binary(
         "@crate_index//:humantime",
     ],
 )
-
