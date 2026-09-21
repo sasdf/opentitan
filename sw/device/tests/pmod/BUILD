@@ -155,7 +155,6 @@ opentitan_test(
         globals = {
             "ot-earlgrey-board.spiflash1": "gd25q256",
         },
-        timeout = "moderate",
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
