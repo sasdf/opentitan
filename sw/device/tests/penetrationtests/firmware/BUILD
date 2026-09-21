@@ -16,7 +16,6 @@ load(
     "silicon_params",
     "verilator_params",
 )
-load("//rules/opentitan:defs.bzl", "qemu_params")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -26,7 +25,6 @@ PENTEST_EXEC_ENVS = dicts.add(
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
         "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
     EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
 )
@@ -252,10 +250,6 @@ opentitan_test(
     srcs = [":firmware_fi.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -276,10 +270,6 @@ opentitan_test(
     srcs = [":firmware_fi_ibex.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -300,10 +290,6 @@ opentitan_test(
     srcs = [":firmware_fi_otbn.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -324,10 +310,6 @@ opentitan_test(
     srcs = [":firmware_sca.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -348,10 +330,6 @@ opentitan_test(
     srcs = [":firmware_cryptolib_fi_sym.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -372,10 +350,6 @@ opentitan_test(
     srcs = [":firmware_cryptolib_fi_asym.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -396,10 +370,6 @@ opentitan_test(
     srcs = [":firmware_cryptolib_sca_sym.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -420,10 +390,6 @@ opentitan_test(
     srcs = [":firmware_cryptolib_sca_asym.c"],
     exec_env = PENTEST_EXEC_ENVS,
     fpga = fpga_params(tags = ["skip_in_ci"]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = ["skip_in_ci"],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",
@@ -449,13 +415,6 @@ opentitan_test(
         "manual",
         "skip_in_ci",
     ]),
-    qemu = qemu_params(
-        exit_success = "Running sw/device/tests/penetrationtests/firmware/",
-        tags = [
-            "manual",
-            "skip_in_ci",
-        ],
-    ),
     silicon = silicon_params(
         tags = [
             "manual",

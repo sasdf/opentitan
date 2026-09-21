@@ -59,17 +59,6 @@ fn firmware_update_test(opts: &Opts, transport: &TransportWrapper) -> Result<()>
     // opentitanlib is just too convenient for manipulating our test infrastructure.
     // We trigger rescue and then use `dfu-util` to perform the actual operation.
     rescue.enter(transport, EntryMode::Reset)?;
-    if opts.init.backend_opts.interface == "qemu" {
-        let data = std::fs::read(&opts.firmware)?;
-        rescue.update_firmware(opentitanlib::chip::boot_svc::BootSlot::SlotA, &data)?;
-        rescue.reboot()?;
-        let capture = UartConsole::wait_for(&*uart, r"PASS!$|BFV:([0-9A-Fa-f]{8})", opts.timeout)?;
-        return if capture[0].starts_with("BFV") {
-            Err(anyhow!("Error: {}", capture[0]))
-        } else {
-            Ok(())
-        };
-    }
     // Note: we drop the rescue instance to release our claim on the usb-dfu
     // interface.  This allows `dfu-util` to claim and use the interface.
     drop(rescue);
@@ -108,14 +97,6 @@ fn get_boot_log_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     // opentitanlib is just too convenient for manipulating our test infrastructure.
     // We trigger rescue and then use `dfu-util` to perform the actual operation.
     rescue.enter(transport, EntryMode::Reset)?;
-    if opts.init.backend_opts.interface == "qemu" {
-        let raw = rescue.get_raw(opentitanlib::rescue::RescueMode::BootLog)?;
-        std::fs::write(&path, &raw)?;
-        let data = std::fs::read(&path)?;
-        let blog = BootLog::try_from(data.as_slice())?;
-        log::info!("BootLog = {blog:?}");
-        return Ok(());
-    }
     // Note: we drop the rescue instance to release our claim on the usb-dfu
     // interface.  This allows `dfu-util` to claim and use the interface.
     drop(rescue);

@@ -722,7 +722,6 @@ opentitan_test(
 fips_wrap_opentitan_test(
     name = "pct_functest",
     exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
-    tags = ["broken"],
 )
 
 opentitan_test(
@@ -1144,7 +1143,6 @@ opentitan_test(
 fips_wrap_opentitan_test(
     name = "kats_functest",
     exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
-    tags = ["broken"],
 )
 
 opentitan_test(
