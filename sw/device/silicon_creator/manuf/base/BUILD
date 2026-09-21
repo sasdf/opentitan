@@ -161,7 +161,7 @@ opentitan_test(
         testopt_bootstrap = "False",
     ),
     qemu = qemu_params(
-        timeout = "moderate",
+        timeout = "long",
         binaries = {
             ":sram_cp_provision": "sram_cp_provision",
             ":sram_cp_provision_functest": "sram_cp_provision_functest",
@@ -169,6 +169,8 @@ opentitan_test(
         needs_jtag = True,
         otp = "//hw/ip/otp_ctrl/data:img_raw",
         tags = ["manuf"],
+        # NOTE: QEMU's GPIO interface goes directly to the peripheral and
+        # not via pins. We set the console TX indicator to use GPIO 3.
         test_cmd = """
             --provisioning-sram-elf={sram_cp_provision}
             --test-sram-elf={sram_cp_provision_functest}

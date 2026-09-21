@@ -15,6 +15,7 @@ load(
     "EARLGREY_TEST_ENVS",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 
@@ -71,18 +72,17 @@ opentitan_test(
         dicts.omit(
             EARLGREY_TEST_ENVS,
             # Not intended for ROM_EXT environments.
-            [
-                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
-                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-            ],
+            ["//hw/top_earlgrey:fpga_cw310_sival_rom_ext"],
         ),
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_qemu_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
     fpga = fpga_params(tags = ["coverage"]),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["flaky"],
@@ -518,19 +518,16 @@ opentitan_test(
     srcs = ["otbn_boot_services_functest.c"],
     broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        dicts.omit(
-            EARLGREY_TEST_ENVS,
-            [
-                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-            ],
-        ),
+        EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             # See #21706, expects keymgr state 0 so not working after ROM_EXT.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
     verilator = verilator_params(tags = ["manual"]),

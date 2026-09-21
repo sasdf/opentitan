@@ -331,20 +331,16 @@ opentitan_test(
     srcs = ["keymgr_functest.c"],
     broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        dicts.omit(
-            EARLGREY_TEST_ENVS,
-            [
-                # See #21706, expects keymgr in Reset state so not working after ROM_EXT.
-                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-            ],
-        ),
+        EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:silicon_creator": None,
             # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "long",
     ),
@@ -676,18 +672,14 @@ opentitan_test(
     srcs = ["rnd_functest.c"],
     broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        dicts.omit(
-            EARLGREY_TEST_ENVS,
-            [
-                # See #21706, reads CREATOR_SW_CFG OTP which is locked by ROM_EXT.
-                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-            ],
-        ),
+        EARLGREY_TEST_ENVS,
         {
             # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     deps = [
         ":otp",
         ":rnd",
@@ -1007,13 +999,9 @@ opentitan_test(
     name = "usb_functest",
     srcs = ["usb_functest.c"],
     exec_env = dicts.add(
-        dicts.omit(
-            EARLGREY_TEST_ENVS,
-            [
-                "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
-            ],
-        ),
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken"},
     ),
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
@@ -1021,6 +1009,7 @@ opentitan_test(
     qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}

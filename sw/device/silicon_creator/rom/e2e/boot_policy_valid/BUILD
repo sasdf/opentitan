@@ -37,12 +37,12 @@ package(default_visibility = ["//visibility:public"])
 BOOT_POLICY_VALID_CASES = [
     {
         "desc": "good",
-        "fpga_suffix": "",
+        "suffix": "",
         "qemu_suffix": "",
     },
     {
         "desc": "bad",
-        "fpga_suffix": "_corrupted_fpga_cw310_rom_with_fake_keys_signed_bin",
+        "suffix": "_corrupted_fpga_cw310_rom_with_fake_keys_signed_bin",
         "qemu_suffix": "_corrupted_sim_qemu_rom_with_fake_keys_signed_bin",
     },
 ]
@@ -74,8 +74,8 @@ BOOT_POLICY_VALID_CASES = [
             ),
             binaries = {
                 # PROD keys can sign binaries able to run across all life cycle states.
-                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0{}".format(a["fpga_suffix"]): "slot_a",
-                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0{}".format(b["fpga_suffix"]): "slot_b",
+                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0{}".format(a["suffix"]): "slot_a",
+                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0{}".format(b["suffix"]): "slot_b",
             },
             exit_failure = MSG_PASS if a["desc"] == b["desc"] and a["desc"] == "bad" else DEFAULT_TEST_FAILURE_MSG,
             exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_SIGNATURE)) if a["desc"] == b["desc"] and a["desc"] == "bad" else MSG_PASS,
@@ -88,14 +88,12 @@ BOOT_POLICY_VALID_CASES = [
                 SLOTS["b"],
             ),
             binaries = {
-                # PROD keys can sign binaries able to run across all life cycle states.
                 "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0{}".format(a["qemu_suffix"]): "slot_a",
                 "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0{}".format(b["qemu_suffix"]): "slot_b",
             },
             exit_failure = MSG_PASS if a["desc"] == b["desc"] and a["desc"] == "bad" else DEFAULT_TEST_FAILURE_MSG,
             exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_SIGNATURE)) if a["desc"] == b["desc"] and a["desc"] == "bad" else MSG_PASS,
             otp = ":otp_img_boot_policy_valid_{}".format(lc_state),
-            tags = maybe_skip_in_ci(lc_state_val),
         ),
     )
     for lc_state, lc_state_val in get_lc_items()
