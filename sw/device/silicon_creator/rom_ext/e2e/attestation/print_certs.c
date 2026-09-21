@@ -11,6 +11,7 @@
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/runtime/print.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/base/static_dice_mldsa_cdi.h"
 #include "sw/device/silicon_creator/lib/base/util.h"
@@ -22,6 +23,8 @@
 #include "sw/device/silicon_creator/lib/error.h"
 #include "sw/device/silicon_creator/lib/manifest_def.h"
 #include "sw/device/silicon_creator/manuf/base/perso_tlv_data.h"
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 static char buf[12288];
 
@@ -48,8 +51,8 @@ static void base64_encode(char *dest, const uint8_t *data, int32_t len) {
 static status_t print_cert(char *dest,
                            const flash_ctrl_info_page_t *info_page) {
   uint8_t data[2048];
-  TRY(flash_ctrl_info_read(info_page, 0, sizeof(data) / sizeof(uint32_t),
-                           data));
+  TRY(flash_ctrl_info_read_zeros_on_read_error(
+      info_page, 0, sizeof(data) / sizeof(uint32_t), data));
 
   uint32_t offset = 0;
   size_t len = sizeof(data);
@@ -296,7 +299,7 @@ static status_t verify_handover(void) {
         .erase = kMultiBitBool4True,
     };
     flash_ctrl_info_perms_set(mldsa_endorsed_cert_pages[i], perms);
-    TRY(flash_ctrl_info_read(
+    TRY(flash_ctrl_info_read_zeros_on_read_error(
         mldsa_endorsed_cert_pages[i], /*offset=*/0,
         util_size_to_words(FLASH_CTRL_PARAM_BYTES_PER_PAGE),
         (uint8_t *)endorsed_uds_mldsa_cert +
@@ -326,6 +329,9 @@ static status_t verify_handover(void) {
 }
 
 bool test_main(void) {
+  CHECK_STATUS_OK(
+      ottf_alerts_ignore_alert(kTopEarlgreyAlertIdFlashCtrlRecovErr));
+
   status_t sts = verify_handover();
   if (status_err(sts)) {
     LOG_ERROR("verify_handover failed: %r", sts);
