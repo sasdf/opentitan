@@ -22,16 +22,16 @@ use std::time::Duration;
 use anyhow::{Context, bail};
 
 use crate::backend::qemu::QemuOpts;
-use crate::io::gpio::{GpioBitbanging, GpioError, GpioMonitoring, GpioPin};
+use crate::io::gpio::{GpioBitbanging, GpioMonitoring};
+use crate::io::gpio::{GpioError, GpioPin};
 use crate::io::jtag::{JtagChain, JtagParams};
 use crate::io::uart::Uart;
 use crate::io::usb::UsbContext;
 use crate::transport::Bus;
 use crate::transport::Target;
 use crate::transport::common::uart::SerialPortUart;
-use crate::transport::qemu::gpio::{
-    QemuGpio, QemuGpioBitbanging, QemuGpioMonitoring, QemuGpioPin,
-};
+use crate::transport::qemu::gpio::{QemuGpio, QemuGpioPin};
+use crate::transport::qemu::gpio::{QemuGpioBitbanging, QemuGpioMonitoring};
 use crate::transport::qemu::i2c::QemuI2c;
 use crate::transport::qemu::jtag::QemuJtag;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
@@ -307,7 +307,8 @@ impl Transport for Qemu {
         // We have to unconditionally claim to support GPIO because of the reset
         // pin which actually goes via the monitor. Attempting to use a non-reset
         // GPIO pin in `.gpio_pin` will cause an error if GPIO isn't connected.
-        let mut cap = Capability::GPIO | Capability::GPIO_BITBANGING | Capability::GPIO_MONITORING;
+        let mut cap = Capability::GPIO;
+        cap |= Capability::GPIO_BITBANGING | Capability::GPIO_MONITORING;
 
         if !self.uarts.is_empty() || self.log.is_some() {
             cap |= Capability::UART;
@@ -346,12 +347,12 @@ impl Transport for Qemu {
     }
 
     fn i2c(&self, instance: &str) -> anyhow::Result<Rc<dyn Bus>> {
-        let lookup = if instance == "TPM" || instance == "default" {
+        let instance = if instance == "TPM" || instance == "default" {
             "0"
         } else {
             instance
         };
-        match self.i2cs.get(lookup) {
+        match self.i2cs.get(instance) {
             Some(i2c) => Ok(Rc::clone(i2c)),
             None => Err(TransportError::InvalidInstance(
                 TransportInterfaceType::I2c,

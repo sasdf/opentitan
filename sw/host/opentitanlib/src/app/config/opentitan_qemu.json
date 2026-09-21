@@ -298,25 +298,8 @@
         }
       ]
     },
-    {
-      "name": "RMA_BOOTSTRAP",
-      "pins": [
-        {
-          "name": "SW_STRAP0",
-          "level": false
-        },
-        {
-          "name": "SW_STRAP1",
-          "level": true
-        },
-        {
-          "name": "SW_STRAP2",
-          "level": true
-        }
-      ]
-    },
-    // QEMU does not currently model TAP straps. However, some tests call
-    // into opentitanlib's strap APIs, so we define them here.
+    // QEMU does not currently model TAP straps, the JTAG interfaces are always available.
+    // For now we model both straps as no-ops without any pins.
     {
       "name": "PINMUX_TAP_RISCV",
       "pins": [
@@ -358,6 +341,23 @@
         {
           "name": "TAP_STRAP1",
           "mode": "PushPull",
+          "level": true
+        }
+      ]
+    },
+    {
+      "name": "RMA_BOOTSTRAP",
+      "pins": [
+        {
+          "name": "SW_STRAP0",
+          "level": false
+        },
+        {
+          "name": "SW_STRAP1",
+          "level": true
+        },
+        {
+          "name": "SW_STRAP2",
           "level": true
         }
       ]
