@@ -129,7 +129,7 @@ impl Target for QemuSpi {
             }
         }
 
-        if total_len > 0 && total_len <= MAX_TRANSMISSION_LEN && total_len <= MAX_PACKET_LEN {
+        if (1..=MAX_TRANSMISSION_LEN).contains(&total_len) {
             let mut tx_buf = Vec::with_capacity(8 + total_len);
             tx_buf.extend_from_slice(&self.make_header(total_len as u16, false));
             for transfer in transaction.iter() {
