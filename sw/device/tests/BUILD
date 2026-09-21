@@ -2011,16 +2011,19 @@ opentitan_test(
 opentitan_test(
     name = "flash_ctrl_mem_protection_test",
     srcs = ["flash_ctrl_mem_protection_test.c"],
+    broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
         dicts.omit(
             EARLGREY_TEST_ENVS,
             [
                 # See #21706, ROM_EXT locks MP region 0.
-                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
                 "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
             ],
         ),
         {
+            "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
+            # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
+            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         },
     ),
@@ -2915,11 +2918,14 @@ opentitan_test(
     name = "otbn_mem_scramble_test",
     srcs = ["otbn_mem_scramble_test.c"],
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:silicon_creator": None,
+            "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_verilator": None,
         },
     ),
     verilator = verilator_params(timeout = "long"),
