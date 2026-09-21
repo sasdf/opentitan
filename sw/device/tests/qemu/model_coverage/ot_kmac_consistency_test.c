@@ -66,6 +66,10 @@ static uint32_t read_unmasked_state_word(uint32_t word_idx) {
       abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + word_idx * 4u);
   uint32_t share1 = abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u +
                                     word_idx * 4u);
+  CHECK(share0 != 0u && share1 != 0u,
+        "Expected non-zero masked shares in STATE[%u]: share0=0x%08x "
+        "share1=0x%08x",
+        word_idx, share0, share1);
   return share0 ^ share1;
 }
 

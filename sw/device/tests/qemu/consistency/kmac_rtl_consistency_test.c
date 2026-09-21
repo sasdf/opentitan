@@ -488,14 +488,27 @@ bool test_main(void) {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
 
-  uint32_t state_w0 =
-      abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET) ^
+  uint32_t share0_w0 = abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET);
+  uint32_t share1_w0 =
       abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u);
+  uint32_t state_w0 = share0_w0 ^ share1_w0;
+  EXPECT_RTL(share0_w0 != 0u && share1_w0 != 0u && share0_w0 != state_w0,
+             "KMAC_STATE Share 0 and Share 1 must both be non-zero masked "
+             "shares (EnMasking=1): share0=0x%08x share1=0x%08x",
+             share0_w0, share1_w0);
+  EXPECT_RTL(abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x0c8u) ==
+                     0u &&
+                 abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x1c8u) ==
+                     0u,
+             "KMAC_STATE offsets >= 200B (0x0c8, 0x1c8) must read as 0");
   uint32_t state_reconstructed = 0;
   for (uint32_t i = 0; i < 4u; ++i) {
-    uint8_t b =
-        abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + i) ^
+    uint8_t s0_b = abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + i);
+    uint8_t s1_b =
         abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u + i);
+    EXPECT_RTL(s1_b != 0u,
+               "KMAC_STATE Share 1 byte %u should be non-zero, got 0", i);
+    uint8_t b = s0_b ^ s1_b;
     state_reconstructed |= ((uint32_t)b << (i * 8u));
   }
   EXPECT_RTL(state_w0 == 0xa7ffc6f8u && state_reconstructed == state_w0,
