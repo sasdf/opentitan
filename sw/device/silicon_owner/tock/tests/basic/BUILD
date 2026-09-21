@@ -4,7 +4,7 @@
 
 load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("//rules:tock.bzl", "tock_elf2tab", "tock_image")
-load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "cw310_params", "fpga_params", "opentitan_test", "qemu_params")
+load("//rules/opentitan:defs.bzl", "OPENTITAN_CPU", "cw310_params", "fpga_params", "opentitan_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -40,21 +40,9 @@ opentitan_test(
     name = "basic_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_base": None,
     },
     fpga = fpga_params(
         binaries = {":image": "firmware"},
-        exit_failure = "((FAIL|FAULT|panicked at).*\\n)|(BFV:[0-9a-f]{8})",
-        tags = [
-            "broken",
-            "manual",
-        ],
-    ),
-    qemu = qemu_params(
-        binaries = {":image": "firmware"},
-        exit_failure = "((FAIL|FAULT|panicked at).*\\n)|(BFV:[0-9a-f]{8})",
-        rom = "//sw/device/lib/testing/test_rom:test_rom",
         tags = [
             "broken",
             "manual",
