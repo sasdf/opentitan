@@ -151,7 +151,7 @@ fn run_qemu_usb_streams(
             let n = match device.read_bulk_timeout(
                 s.ep_in,
                 &mut pkt,
-                Duration::from_millis(5),
+                Duration::from_micros(200),
             ) {
                 Ok(n) => n,
                 Err(_) => continue,

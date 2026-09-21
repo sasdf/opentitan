@@ -99,6 +99,46 @@ const USB_CONFIG_DESCRIPTOR: u8 = 2;
 // Location of the bMaxPacketSize field in the device descriptor.
 const USB_DEV_DESC_MAX_PACKET_SIZE_OFFSET: usize = 7;
 
+#[derive(Debug)]
+struct InTransferWaiter {
+    state: std::sync::Mutex<(bool, Option<UsbResult<Vec<u8>>>)>,
+    cvar: std::sync::Condvar,
+}
+
+impl InTransferWaiter {
+    fn new() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            state: std::sync::Mutex::new((false, None)),
+            cvar: std::sync::Condvar::new(),
+        })
+    }
+
+    fn complete(&self, res: UsbResult<Vec<u8>>) -> Option<UsbResult<Vec<u8>>> {
+        let mut guard = self.state.lock().unwrap();
+        if guard.0 {
+            Some(res)
+        } else {
+            guard.1 = Some(res);
+            self.cvar.notify_one();
+            None
+        }
+    }
+
+    fn wait_timeout(&self, timeout: Duration) -> anyhow::Result<UsbResult<Vec<u8>>> {
+        let guard = self.state.lock().unwrap();
+        let (mut guard, _) = self
+            .cvar
+            .wait_timeout_while(guard, timeout, |s| s.1.is_none())
+            .unwrap();
+        if let Some(res) = guard.1.take() {
+            Ok(res)
+        } else {
+            guard.0 = true;
+            Err(mpsc::RecvTimeoutError::Timeout.into())
+        }
+    }
+}
+
 /// Events sent by otlib to the virtual host thread.
 #[derive(Debug)]
 enum HostChannelEvent {
@@ -131,7 +171,7 @@ enum HostChannelEvent {
         generation: u32,
         ep: u8,
         length: usize,
-        answer: mpsc::Sender<UsbResult<Vec<u8>>>,
+        answer: std::sync::Arc<InTransferWaiter>,
     },
     /// Send a bus reset to the device.
     Reset,
@@ -501,16 +541,16 @@ impl UsbDevice for QemuUsbDevice {
             0
         };
         // Status stage.
-        let (send, recv) = mpsc::channel();
+        let waiter = InTransferWaiter::new();
         self.host_channel
             .send(HostChannelEvent::SubmitInTransfer {
                 generation: self.dev_info.generation,
                 ep: 0,
                 length: 0,
-                answer: send,
+                answer: std::sync::Arc::clone(&waiter),
             })
             .context("failed to submit IN transfer for control status stage")?;
-        let _ = recv.recv_timeout(timeout)??;
+        let _ = waiter.wait_timeout(timeout)??;
         Ok(sent_length)
     }
 
@@ -546,16 +586,16 @@ impl UsbDevice for QemuUsbDevice {
             .context("failed to send SETUP packet")?;
         // Optional data stage.
         let recv_size = if length > 0 {
-            let (send, recv) = mpsc::channel();
+            let waiter = InTransferWaiter::new();
             self.host_channel
                 .send(HostChannelEvent::SubmitInTransfer {
                     generation: self.dev_info.generation,
                     ep: 0,
                     length: buf.len(),
-                    answer: send,
+                    answer: std::sync::Arc::clone(&waiter),
                 })
                 .context("failed to submit IN transfer for control data stage")?;
-            let recv_data = recv.recv_timeout(timeout)??;
+            let recv_data = waiter.wait_timeout(timeout)??;
             assert!(recv_data.len() <= buf.len());
             buf[0..recv_data.len()].copy_from_slice(&recv_data);
             recv_data.len()
@@ -575,16 +615,16 @@ impl UsbDevice for QemuUsbDevice {
                 .context("failed to submit OUT transfer for control status stage")?;
             let _ = recv.recv_timeout(timeout)??;
         } else {
-            let (send, recv) = mpsc::channel();
+            let waiter = InTransferWaiter::new();
             self.host_channel
                 .send(HostChannelEvent::SubmitInTransfer {
                     generation: self.dev_info.generation,
                     ep: 0,
                     length: 0,
-                    answer: send,
+                    answer: std::sync::Arc::clone(&waiter),
                 })
                 .context("failed to submit IN transfer for no-data control status stage")?;
-            let _ = recv.recv_timeout(timeout)??;
+            let _ = waiter.wait_timeout(timeout)??;
         }
         Ok(recv_size)
     }
@@ -597,16 +637,16 @@ impl UsbDevice for QemuUsbDevice {
         timeout: Duration,
     ) -> anyhow::Result<usize> {
         let ep = endpoint & !USBDEV_TRANSFER_EP_IN;
-        let (send, recv) = mpsc::channel();
+        let waiter = InTransferWaiter::new();
         self.host_channel
             .send(HostChannelEvent::SubmitInTransfer {
                 generation: self.dev_info.generation,
                 ep,
                 length: data.len(),
-                answer: send,
+                answer: std::sync::Arc::clone(&waiter),
             })
             .context("failed to submit IN transfer for bulk read")?;
-        let recv_data = recv.recv_timeout(timeout)??;
+        let recv_data = waiter.wait_timeout(timeout)??;
         let copy_len = std::cmp::min(data.len(), recv_data.len());
         data[..copy_len].copy_from_slice(&recv_data[..copy_len]);
         Ok(copy_len)
@@ -884,7 +924,7 @@ struct QemuHostThread {
     /// device change.
     pending_dev_changes: Vec<mpsc::Sender<Option<DeviceInfo>>>,
     /// Pending IN transfers.
-    pending_in_transfers: HashMap<PacketId, (u8, mpsc::Sender<UsbResult<Vec<u8>>>)>,
+    pending_in_transfers: HashMap<PacketId, (u8, std::sync::Arc<InTransferWaiter>)>,
     /// Active IN transfer ID per endpoint index.
     active_ep_in: HashMap<u8, PacketId>,
     /// Completed IN transfer buffered when caller timed out before completion arrived.
@@ -1523,8 +1563,8 @@ impl QemuHostThread {
                 QemuUsbdevTransferStatus::Success => Ok(data),
                 _ => Err(anyhow!("Transfer failed: {status:?}").into()),
             };
-            // If receiver timed out and dropped, buffer the result for the next read on this endpoint.
-            if let Err(mpsc::SendError(unsent_res)) = answer.send(res) {
+            // If receiver timed out, buffer the result for the next read on this endpoint.
+            if let Some(unsent_res) = answer.complete(res) {
                 self.completed_ep_in.insert(ep_idx, unsent_res);
             }
         } else if let Some(answer) = self.pending_out_transfers.remove(&id) {
@@ -1636,7 +1676,9 @@ impl QemuHostThread {
                 } => {
                     let ep_idx = ep & 0x7f;
                     if let Some(res) = self.completed_ep_in.remove(&ep_idx) {
-                        let _ = answer.send(res);
+                        if let Some(unsent_res) = answer.complete(res) {
+                            self.completed_ep_in.insert(ep_idx, unsent_res);
+                        }
                     } else if let Some(&pkt_id) = self.active_ep_in.get(&ep_idx) {
                         self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
                     } else {
@@ -1646,8 +1688,7 @@ impl QemuHostThread {
                                 self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
                             }
                             Err(err) => {
-                                // Ignore error if we know the sender has already disconnected.
-                                let _ = answer.send(Err(err));
+                                let _ = answer.complete(Err(err));
                             }
                         }
                     }
