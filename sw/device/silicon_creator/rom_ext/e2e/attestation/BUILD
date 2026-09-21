@@ -90,6 +90,9 @@ VARIANTS = {
     },
 }
 
+VARIANTS["print_certs_post_provisioning"]["tags"].append("skip_in_ci")
+VARIANTS["print_mldsa_certs_post_provisioning"]["tags"].append("skip_in_ci")
+
 [
     opentitan_binary(
         name = name,
