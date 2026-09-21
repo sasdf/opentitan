@@ -2013,20 +2013,16 @@ opentitan_test(
     srcs = ["flash_ctrl_mem_protection_test.c"],
     broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
-        dicts.omit(
-            EARLGREY_TEST_ENVS,
-            [
-                # See #21706, ROM_EXT locks MP region 0.
-                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-            ],
-        ),
+        EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
             # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(timeout = "long"),
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
@@ -2592,12 +2588,12 @@ opentitan_test(
 )
 
 _KMAC_APP_ROM_LIST = [
-    ("//sw/device/lib/testing/test_rom:test_rom_sim_verilator_hashfile", "//sw/device/lib/testing/test_rom:test_rom_sim_verilator_scr_vmem", "sim_verilator"),
-    ("//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_hashfile", "//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_scr_vmem", "fpga_cw310_test_rom"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", None, "fpga_cw310_rom_with_fake_keys"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_scr_vmem", "fpga_cw310_sival"),
-    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_hashfile", "//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_scr_vmem", "fpga_cw340_sival"),
-    ("//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile", "//sw/device/lib/testing/test_rom:test_rom_sim_dv_scr_vmem", "sim_dv"),
+    ("//sw/device/lib/testing/test_rom:test_rom_sim_verilator_hashfile", "sim_verilator"),
+    ("//sw/device/lib/testing/test_rom:test_rom_fpga_cw310_hashfile", "fpga_cw310_test_rom"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "fpga_cw310_rom_with_fake_keys"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw310_hashfile", "fpga_cw310_sival"),
+    ("//sw/device/silicon_creator/rom:mask_rom_fpga_cw340_hashfile", "fpga_cw340_sival"),
+    ("//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile", "sim_dv"),
 ]
 
 [
@@ -2612,7 +2608,7 @@ _KMAC_APP_ROM_LIST = [
             "//hw/top_earlgrey:{}".format(exec_env): None,
         },
         qemu = qemu_params(
-            rom = rom_vmem,
+            rom = None if exec_env == "fpga_cw310_rom_with_fake_keys" else hashfile.replace("_hashfile", "_scr_vmem"),
         ),
         deps = [
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -2622,14 +2618,14 @@ _KMAC_APP_ROM_LIST = [
             "//sw/device/lib/testing/test_framework:ottf_main",
         ],
     )
-    for (hashfile, rom_vmem, exec_env) in _KMAC_APP_ROM_LIST
+    for (hashfile, exec_env) in _KMAC_APP_ROM_LIST
 ]
 
 test_suite(
     name = "kmac_app_rom_test",
     tests = [
         "kmac_app_rom_test_{}".format(exec_env)
-        for (_, _, exec_env) in _KMAC_APP_ROM_LIST
+        for (_, exec_env) in _KMAC_APP_ROM_LIST
     ],
 )
 
@@ -8036,8 +8032,6 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
-            "//hw/top_earlgrey:fpga_cw340_sival": None,
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,

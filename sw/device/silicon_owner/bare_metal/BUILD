@@ -156,7 +156,6 @@ opentitan_test(
     name = "rom_ext_virtual_bare_metal_virtual_boot_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_ext": None,
-        "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
@@ -183,7 +182,6 @@ opentitan_test(
     srcs = ["empty_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_ext": None,
-        "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",

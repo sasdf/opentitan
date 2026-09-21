@@ -228,12 +228,13 @@ cc_library(
 opentitan_test(
     name = "aes_gcm_functest",
     srcs = ["aes_gcm_functest.c"],
-    exec_env = dicts.omit(
+    exec_env = dicts.add(
         CRYPTOTEST_EXEC_ENVS,
-        [
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
-        ],
+        {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
+        },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -301,13 +302,12 @@ opentitan_test(
     name = "ecc_p256_dice_functest",
     srcs = ["ecc_p256_dice_functest.c"],
     exec_env = dicts.add(
-        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        CRYPTOTEST_EXEC_ENVS,
         {
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
     ),
@@ -1114,13 +1114,7 @@ opentitan_test(
 # Call for example stateful_kats_functest_fips_fpga_cw340_sival_rom_ext, i.e., append fips behind the name and before the exec_env
 fips_wrap_opentitan_test(
     name = "stateful_kats_functest",
-    exec_env = dicts.add(
-        CRYPTOTEST_FIPS_EXEC_ENVS,
-        {
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-        },
-    ),
+    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
 )
 
 opentitan_test(
@@ -1717,13 +1711,7 @@ opentitan_test(
 # Call for example otcrypto_hash_test_fips_fpga_cw340_sival_rom_ext, i.e., append fips behind the name and before the exec_env
 fips_wrap_opentitan_test(
     name = "otcrypto_hash_test",
-    exec_env = dicts.add(
-        CRYPTOTEST_FIPS_EXEC_ENVS,
-        {
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-        },
-    ),
+    exec_env = CRYPTOTEST_FIPS_EXEC_ENVS,
 )
 
 opentitan_test(
