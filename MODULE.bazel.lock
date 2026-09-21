@@ -742,7 +742,7 @@
     },
     "//third_party/qemu:extensions.bzl%qemu": {
       "general": {
-        "bzlTransitiveDigest": "sp6UbcE2ta+feItfzWNO8XxnhlPbxRy2mHeY/1kgtLw=",
+        "bzlTransitiveDigest": "3R/J9Bz7H4746DNgjfUXBXWpd06CzXs38VvljOglaZI=",
         "usagesDigest": "le4nFQIsMEytUZA5Dz/GdRTwr0Ri5kyC+VIeW4HnJLI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
