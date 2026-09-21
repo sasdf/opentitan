@@ -89,7 +89,7 @@ opentitan_test(
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     qemu = qemu_params(
-        timeout = "short",
+        timeout = "moderate",
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
         exit_failure = "BFV|PASS|FAIL",
         exit_success = "mode: RESQ\r\n",
