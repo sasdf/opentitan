@@ -34,6 +34,7 @@ static bool is_flash_page_empty(void) {
   uint32_t data[8];
   if (flash_ctrl_info_read(&kFlashCtrlInfoPageDiceCerts, 0,
                            sizeof(data) / sizeof(uint32_t), data) != kErrorOk) {
+    LOG_ERROR("Failed to read flash info page");
     return true;
   }
   for (size_t i = 0; i < ARRAYSIZE(data); ++i) {
