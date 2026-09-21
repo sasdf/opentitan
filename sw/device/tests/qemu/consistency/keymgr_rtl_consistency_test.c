@@ -296,10 +296,15 @@ bool test_main(void) {
       abs_mmio_read32(kKeymgrBase + KEYMGR_SW_SHARE0_OUTPUT_0_REG_OFFSET);
   uint32_t share0_rc =
       abs_mmio_read32(kKeymgrBase + KEYMGR_SW_SHARE0_OUTPUT_0_REG_OFFSET);
-  EXPECT_RTL(share0_vld != 0u && share0_rc == 0u,
-             "SW_SHARE0_OUTPUT_0 expected non-zero then 0 on RC read, got "
-             "0x%08x then 0x%08x",
-             share0_vld, share0_rc);
+  uint32_t share1_vld =
+      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_SHARE1_OUTPUT_0_REG_OFFSET);
+  uint32_t share1_rc =
+      abs_mmio_read32(kKeymgrBase + KEYMGR_SW_SHARE1_OUTPUT_0_REG_OFFSET);
+  EXPECT_RTL(share0_vld != 0u && share0_rc == 0u && share1_vld != 0u &&
+                 share1_rc == 0u && share0_vld != share1_vld,
+             "SW_SHARE0/1_OUTPUT_0 expected non-zero distinct shares then 0 on "
+             "RC read, got s0=0x%08x->0x%08x s1=0x%08x->0x%08x",
+             share0_vld, share0_rc, share1_vld, share1_rc);
   // Read-clear all remaining SW_SHARE0/1_OUTPUT words so all 8 words are 0.
   for (uint32_t i = 0; i < 8; ++i) {
     (void)abs_mmio_read32(kKeymgrBase + KEYMGR_SW_SHARE0_OUTPUT_0_REG_OFFSET +
