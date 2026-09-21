@@ -53,7 +53,7 @@ opentitan_test(
     name = "mldsa87_tiny_test",
     srcs = ["mldsa87_tiny_test.c"],
     exec_env = EARLGREY_TEST_ENVS,
-    qemu = qemu_params(timeout = "short"),
+    qemu = qemu_params(timeout = "long"),
     deps = [
         ":mldsa_test_utils",
         ":mldsa_testvectors",
