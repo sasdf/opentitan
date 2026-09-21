@@ -15,7 +15,6 @@ load(
     "EARLGREY_TEST_ENVS",
     "fpga_params",
     "opentitan_test",
-    "qemu_params",
     "verilator_params",
 )
 
@@ -534,10 +533,8 @@ opentitan_test(
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
-    verilator = verilator_params(
-        timeout = "eternal",
-        tags = ["manual"],
-    ),
+    verilator = verilator_params(tags = ["manual"]),
+    # This target uses OTBN pointers internally, so it cannot work host-side.
     deps = [
         ":otbn_boot_services",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

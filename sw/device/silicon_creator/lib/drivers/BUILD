@@ -329,18 +329,20 @@ cc_test(
 opentitan_test(
     name = "keymgr_functest",
     srcs = ["keymgr_functest.c"],
+    broken = fpga_params(tags = ["broken"]),
     exec_env = dicts.add(
         dicts.omit(
             EARLGREY_TEST_ENVS,
             [
                 # See #21706, expects keymgr in Reset state so not working after ROM_EXT.
-                "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
                 "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
             ],
         ),
         {
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:silicon_creator": None,
+            # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
+            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
         },
     ),
     verilator = verilator_params(
@@ -672,13 +674,19 @@ cc_test(
 opentitan_test(
     name = "rnd_functest",
     srcs = ["rnd_functest.c"],
-    exec_env = dicts.omit(
-        EARLGREY_TEST_ENVS,
-        [
-            # See #21706, reads CREATOR_SW_CFG OTP which is locked by ROM_EXT.
-            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext",
-            "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
-        ],
+    broken = fpga_params(tags = ["broken"]),
+    exec_env = dicts.add(
+        dicts.omit(
+            EARLGREY_TEST_ENVS,
+            [
+                # See #21706, reads CREATOR_SW_CFG OTP which is locked by ROM_EXT.
+                "//hw/top_earlgrey:sim_qemu_sival_rom_ext",
+            ],
+        ),
+        {
+            # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
+            "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+        },
     ),
     deps = [
         ":otp",
