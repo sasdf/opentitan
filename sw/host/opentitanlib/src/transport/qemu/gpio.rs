@@ -251,6 +251,7 @@ impl QemuGpio {
     /// uppercase hex characters forming a value. This is a custom protocol for
     /// OpenTitan's QEMU machine.
     pub fn process_frames(&mut self) -> anyhow::Result<()> {
+        self.stream.get_ref().set_nonblocking(true)?;
         let deadline = Instant::now() + Duration::from_millis(50);
         let mut line = String::new();
         while Instant::now() < deadline {
@@ -262,6 +263,7 @@ impl QemuGpio {
                 }
             }
         }
+        self.stream.get_ref().set_nonblocking(false)?;
 
         Ok(())
     }
@@ -284,7 +286,7 @@ impl QemuGpio {
             };
             if bytes_read == 0 {
                 break;
-            }
+            };
             if let Some((cmd, value)) = line.split_once(":") {
                 let (cmd, value) = (cmd.trim(), value.trim());
                 if let (Some(&cmd_byte), Ok(val)) =
@@ -318,9 +320,7 @@ impl QemuGpio {
 
     /// Send a GPIO command frame to QEMU and wait synchronously for QEMU's input forward ACK (`Y:`).
     pub fn send_frame_wait(&mut self, cmd: char, value: u32) -> anyhow::Result<()> {
-        self.stream.get_ref().set_nonblocking(true)?;
         let _ = self.process_frames();
-        self.stream.get_ref().set_nonblocking(false)?;
         self.stream
             .get_ref()
             .set_read_timeout(Some(Duration::from_millis(200)))?;
