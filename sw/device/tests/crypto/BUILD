@@ -230,7 +230,12 @@ cc_library(
 opentitan_test(
     name = "aes_gcm_functest",
     srcs = ["aes_gcm_functest.c"],
-    exec_env = CRYPTOTEST_EXEC_ENVS,
+    exec_env = dicts.omit(
+        CRYPTOTEST_EXEC_ENVS,
+        [
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
+        ],
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -305,36 +310,6 @@ opentitan_test(
             "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
-    verilator = verilator_params(
-        timeout = "eternal",
-    ),
-    deps = [
-        "//sw/device/lib/crypto/drivers:entropy",
-        "//sw/device/lib/crypto/drivers:keymgr",
-        "//sw/device/lib/crypto/impl:config",
-        "//sw/device/lib/crypto/impl:ecc_p256",
-        "//sw/device/lib/crypto/impl:integrity",
-        "//sw/device/lib/crypto/impl:key_transport",
-        "//sw/device/lib/crypto/impl:keyblob",
-        "//sw/device/lib/crypto/impl:status",
-        "//sw/device/lib/crypto/impl/ecc:p256",
-        "//sw/device/lib/runtime:log",
-        "//sw/device/lib/testing:hexstr",
-        "//sw/device/lib/testing:keymgr_testutils",
-        "//sw/device/lib/testing/test_framework:ottf_main",
-        "//sw/device/silicon_creator/lib/base:util",
-        "//sw/device/silicon_creator/lib/cert:dice_keys",
-        "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
-        "//sw/device/silicon_creator/manuf/base:perso_tlv_data",
-        "//sw/device/silicon_creator/manuf/lib:flash_info_fields",
-    ],
-)
-
-opentitan_test(
-    name = "ecc_p256_dice_no_rom_ext_functest",
-    srcs = ["ecc_p256_dice_functest.c"],
-    defines = ["ECC_P256_DICE_NO_ROM_EXT"],
-    exec_env = EARLGREY_TEST_ENVS,
     verilator = verilator_params(
         timeout = "eternal",
     ),

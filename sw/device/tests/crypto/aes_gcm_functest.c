@@ -391,6 +391,10 @@ static status_t run_bad_args_test(void) {
 static status_t run_sideload_test(void) {
   LOG_INFO("Running AES-GCM Sideload test.");
 
+  dif_keymgr_t keymgr;
+  dif_kmac_t kmac;
+  TRY(keymgr_testutils_initialize(&keymgr, &kmac));
+
   uint32_t div_data[16] = {0};
 
   otcrypto_key_config_t config = {
@@ -461,11 +465,6 @@ OTTF_DEFINE_TEST_CONFIG();
 
 bool test_main(void) {
   status_t result = OK_STATUS();
-
-  dif_keymgr_t keymgr;
-  dif_kmac_t kmac;
-  CHECK_STATUS_OK(keymgr_testutils_initialize(&keymgr, &kmac));
-
   otcrypto_state_t state = {0};
 
   CHECK_STATUS_OK(otcrypto_init(kOtcryptoKeySecurityLevelLow, &state));

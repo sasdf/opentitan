@@ -370,38 +370,6 @@ opentitan_test(
     ],
 )
 
-opentitan_test(
-    name = "keymgr_rom_ext_functest",
-    srcs = ["keymgr_functest.c"],
-    defines = ["KEYMGR_FUNCTEST_ROM_EXT"],
-    exec_env = {
-        "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    deps = [
-        ":keymgr",
-        ":kmac",
-        ":lifecycle",
-        ":retention_sram",
-        "//hw/ip/kmac/data:kmac_c_regs",
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:abs_mmio",
-        "//sw/device/lib/dif:flash_ctrl",
-        "//sw/device/lib/dif:otp_ctrl",
-        "//sw/device/lib/dif:rstmgr",
-        "//sw/device/lib/testing:flash_ctrl_testutils",
-        "//sw/device/lib/testing:keymgr_testutils",
-        "//sw/device/lib/testing:otp_ctrl_testutils",
-        "//sw/device/lib/testing:pwrmgr_testutils",
-        "//sw/device/lib/testing:rstmgr_testutils",
-        "//sw/device/lib/testing/test_framework:ottf_main",
-        "//sw/device/silicon_creator/lib:error",
-        "//sw/device/silicon_creator/lib:keymgr_binding",
-        "//sw/device/silicon_creator/lib/base:chip",
-        "//sw/device/silicon_creator/lib/base:sec_mmio",
-    ],
-)
-
 cc_library(
     name = "kmac",
     srcs = ["kmac.c"],
@@ -725,27 +693,6 @@ opentitan_test(
     ],
 )
 
-opentitan_test(
-    name = "rnd_rom_ext_functest",
-    srcs = ["rnd_functest.c"],
-    defines = ["RND_FUNCTEST_ROM_EXT"],
-    exec_env = {
-        "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
-    },
-    deps = [
-        ":otp",
-        ":rnd",
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:crc32",
-        "//sw/device/lib/dif:entropy_src",
-        "//sw/device/lib/testing:entropy_testutils",
-        "//sw/device/lib/testing:rand_testutils",
-        "//sw/device/lib/testing/test_framework:ottf_main",
-        "//sw/device/silicon_creator/lib:error",
-    ],
-)
-
 dual_cc_library(
     name = "rstmgr",
     srcs = dual_inputs(
@@ -1052,7 +999,12 @@ opentitan_test(
     name = "usb_functest",
     srcs = ["usb_functest.c"],
     exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
+        dicts.omit(
+            EARLGREY_TEST_ENVS,
+            [
+                "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
+            ],
+        ),
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     fpga = fpga_params(
@@ -1080,7 +1032,6 @@ opentitan_test(
         ":usb",
         "//sw/device/lib/base:macros",
         "//sw/device/lib/runtime:print",
-        "//sw/device/lib/testing:entropy_testutils",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )

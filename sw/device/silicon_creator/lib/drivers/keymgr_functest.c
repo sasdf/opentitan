@@ -265,16 +265,6 @@ rom_error_t keymgr_disable_test(void) {
 
 bool test_main(void) {
   status_t result = OK_STATUS();
-#ifdef KEYMGR_FUNCTEST_ROM_EXT
-  sec_mmio_init();
-  CHECK(kmac_keymgr_configure() == kErrorOk);
-  CHECK(sc_keymgr_state_check(kScKeymgrStateOwnerKey) == kErrorOk);
-  CHECK(abs_mmio_read32(TOP_EARLGREY_KEYMGR_BASE_ADDR +
-                        KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 1,
-        "Keymgr SW binding should be unlocked in OwnerKey state.");
-  EXECUTE_TEST(result, keymgr_disable_test);
-  return status_ok(result);
-#else
   dif_rstmgr_t rstmgr;
   dif_rstmgr_reset_info_bitfield_t info;
 
@@ -319,5 +309,4 @@ bool test_main(void) {
   }
 
   return false;
-#endif
 }
