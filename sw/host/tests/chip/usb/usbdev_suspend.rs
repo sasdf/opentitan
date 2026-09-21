@@ -430,7 +430,6 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     opts.init.init_logging();
     let transport = opts.init.init_target()?;
-    let _usb_context = transport.usb();
 
     // Wait until test is running.
     let uart = transport.uart("console")?;

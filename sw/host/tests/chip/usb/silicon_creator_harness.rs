@@ -925,10 +925,6 @@ fn main() -> Result<()> {
     opts.init.init_logging();
     let transport = opts.init.init_target()?;
 
-    if opts.init.backend_opts.interface == "qemu" {
-        let _ = transport.usb();
-    }
-
     // Wait until test is running.
     let uart = transport.uart("console")?;
     UartConsole::wait_for(&*uart, r"usb ready", opts.timeout)?;

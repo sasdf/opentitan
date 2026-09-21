@@ -55,7 +55,6 @@ fn sleep_pin_retention_test(opts: &Opts, transport: &TransportWrapper) -> Result
     log::info!("Doing {:?} rounds of testing", num_rounds);
 
     for _ in 0..num_rounds {
-        UartConsole::wait_for(&*uart, r"Current Test Round: +([0-9]+)", opts.timeout)?;
         transport.gpio_pin(WAKEUP_PIN)?.write(false)?; // Don't wake up on the positive edge yet.
         transport.gpio_pin(SYNC_PIN)?.write(false)?; // Not done with this round yet.
 

@@ -92,10 +92,6 @@ fn main() -> Result<()> {
     opts.init.init_logging();
     let transport = opts.init.init_target()?;
 
-    if opts.init.backend_opts.interface == "qemu" {
-        let _ = transport.usb();
-    }
-
     let uart = transport.uart("console")?;
     let _ = UartConsole::wait_for(&*uart, r"Running [^\r\n]*", opts.timeout)?;
 
