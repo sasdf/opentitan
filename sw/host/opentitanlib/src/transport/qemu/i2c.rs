@@ -23,7 +23,7 @@ impl QemuI2c {
     pub fn new<P: AsRef<Path>>(pty: P) -> anyhow::Result<QemuI2c> {
         let pty = pty.as_ref().to_str().context("path not UTF-8")?;
         let pty = serialport::new(pty, 115200)
-            .timeout(std::time::Duration::from_secs(1))
+            .timeout(std::time::Duration::from_secs(30))
             .open_native()
             .context("failed to open I2C PTY")?;
         let pty = RefCell::new(pty);
