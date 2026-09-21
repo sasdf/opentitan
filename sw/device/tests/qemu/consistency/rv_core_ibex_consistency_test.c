@@ -487,5 +487,21 @@ bool test_main(void) {
   CSR_WRITE(CSR_REG_MINSTRET, saved_minstret);
   CSR_WRITE(CSR_REG_MCOUNTINHIBIT, saved_mcountinhibit);
 
+  // 9. Verify Debug Trigger Context CSRs (`scontext` 0x5a8 and `mscontext`
+  // 0x7aa, `ibex_cs_registers.sv:523-530` with `DbgTriggerEn = 1`):
+  // Both CSRs are accessible in M-mode without raising an illegal instruction
+  // exception, ignore writes, and read back as 0.
+  uint32_t faults_before_ctx = fault_count;
+  uint32_t scontext_val = 0xffffffffu;
+  uint32_t mscontext_val = 0xffffffffu;
+  CSR_WRITE(0x5a8, 0xdeadbeefu);
+  CSR_READ(0x5a8, &scontext_val);
+  CSR_WRITE(0x7aa, 0xdeadbeefu);
+  CSR_READ(0x7aa, &mscontext_val);
+  CHECK(fault_count == faults_before_ctx);
+  CHECK(scontext_val == 0u);
+  CHECK(mscontext_val == 0u);
+
   return true;
 }
+
