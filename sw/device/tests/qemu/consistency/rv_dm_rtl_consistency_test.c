@@ -198,6 +198,9 @@ bool test_main(void) {
       CHECK(try_read32(kRvDmMemBase + 0x360u, &val) && val == 0x00000000u);
 
       CHECK(try_read32(kRvDmMemBase + 0x400u, &val) && val == 0x00000000u);
+      CHECK(try_write32(kRvDmMemBase + 0x400u, 0x12345678u));
+      CHECK(try_read32(kRvDmMemBase + 0x7fcu, &val) && val == 0x00000000u);
+      CHECK(try_write32(kRvDmMemBase + 0x7fcu, 0x12345678u));
       CHECK(try_read32(kRvDmMemBase + 0x7fcu, &val) && val == 0x00000000u);
 
       // 3e. Verify Data0 (0x380) and Data1 (0x384) accept writes without bus
