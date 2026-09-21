@@ -75,23 +75,15 @@ typedef struct test {
 #define START_PAGE_ADDR \
   TOP_EARLGREY_FLASH_CTRL_MEM_BASE_ADDR + FLASH_CTRL_PARAM_BYTES_PER_BANK
 
-#ifdef TEST_ROM_EXT
-#define FIRST_REGION_INDEX 2
-#define TEST_PAGE_BASE 42
-#else
-#define FIRST_REGION_INDEX 0
-#define TEST_PAGE_BASE 10
-#endif
-
 static const test_t kRegion[] = {
-    {.region_index = FIRST_REGION_INDEX,
+    {.region_index = 0,
      .randomdata = {0x77777770, 0x66666660},
-     .page_start = TEST_PAGE_BASE + 2,
+     .page_start = 12,
      .write_permission = {false, false},
      .read_permission = {true, true},
      .data_region =
          {
-             .base = BANK1_START_PAGE + TEST_PAGE_BASE + 2,
+             .base = BANK1_START_PAGE + 12,
              .size = 2,
              .properties =
                  {
@@ -105,12 +97,12 @@ static const test_t kRegion[] = {
          }},
     {.region_index = 3,
      .randomdata = {0x88888880, 0x77777770, 0x66666660, 0x55555550},
-     .page_start = TEST_PAGE_BASE + 1,
+     .page_start = 11,
      .write_permission = {true, true, true, true},
      .read_permission = {false, false, false, false},
      .data_region =
          {
-             .base = BANK1_START_PAGE + TEST_PAGE_BASE + 1,
+             .base = BANK1_START_PAGE + 11,
              .size = 4,
              .properties =
                  {
@@ -125,12 +117,12 @@ static const test_t kRegion[] = {
     {.region_index = 7,
      .randomdata = {0xaaaaaaa0, 0xbbbbbbb0, 0xccccccc0, 0xddddddd0, 0xeeeeeee0,
                     0x99999990},
-     .page_start = TEST_PAGE_BASE,
+     .page_start = 10,
      .write_permission = {true, true, true, true, true, true},
      .read_permission = {true, true, true, true, true, true},
      .data_region =
          {
-             .base = BANK1_START_PAGE + TEST_PAGE_BASE,
+             .base = BANK1_START_PAGE + 10,
              .size = 6,
              .properties =
                  {
