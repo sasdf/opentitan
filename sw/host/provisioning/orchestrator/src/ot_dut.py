@@ -105,17 +105,7 @@ class OtDut():
 
         openocd_bin = resolve_runfile(_OPENOCD_BIN)
         openocd_cfg = resolve_runfile(_OPENOCD_ADAPTER_CONFIG)
-        if self.fpga == "sim_qemu":
-            qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
-            host_flags = f"""
-                --interface=qemu \
-                --qemu-monitor-socket={qemu_monitor} \
-                --openocd={openocd_bin} \
-            """
-            device_elf = device_elf.format(
-                base_dir=self._base_dev_dir(),
-                target="sim_qemu_rom_with_fake_keys")
-        elif self.fpga:
+        if self.fpga:
             # Set host flags and device binary for FPGA DUT.
             interface = self.fpga if self.fpga == "hyper310" else "hyper340"
             host_flags = host_flags.format(target=interface,
@@ -128,6 +118,16 @@ class OtDut():
             device_elf = device_elf.format(
                 base_dir=self._base_dev_dir(),
                 target=f"fpga_{self.fpga}_rom_with_fake_keys")
+            if self.fpga == "sim_qemu":
+                qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
+                host_flags = f"""
+                    --interface=qemu \
+                    --qemu-monitor-socket={qemu_monitor} \
+                    --openocd={openocd_bin} \
+                """
+                device_elf = _CP_DEVICE_ELF.format(
+                    base_dir=self._base_dev_dir(),
+                    target="sim_qemu_rom_with_fake_keys")
         else:
             # Set host flags and device binary for Silicon DUT.
             host_flags = host_flags.format(target="teacup",
@@ -212,29 +212,7 @@ class OtDut():
         # have different file naming patterns than production SKUs.
         scrambling_bin = self.sku_config.scrambling_bin
         fw_bundle_bin = _FT_FW_BUNDLE_BIN
-        if self.fpga == "sim_qemu":
-            qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
-            host_flags = f"""
-                --interface=qemu \
-                --qemu-monitor-socket={qemu_monitor} \
-                --openocd={openocd_bin} \
-            """
-            target_str = "sim_qemu_rom_with_fake_keys"
-            individ_elf = individ_elf.format(
-                base_dir=self._base_dev_dir(),
-                sku=self.sku_config.name,
-                ate_suffix=ate_suffix,
-                target=target_str)
-            if scrambling_bin:
-                scrambling_bin = scrambling_bin.format(
-                    base_dir=self._base_dev_dir(),
-                    sku=self.sku_config.name,
-                    target=target_str)
-            fw_bundle_bin = fw_bundle_bin.format(
-                base_dir=self._base_dev_dir(),
-                sku=self.sku_config.name,
-                target=target_str)
-        elif self.fpga:
+        if self.fpga:
             # Set host flags and device binaries for FPGA DUT.
             # No need to load another bitstream, we will take over where CP
             # stage above left off.
@@ -256,6 +234,28 @@ class OtDut():
                 base_dir=self._base_dev_dir(),
                 sku=self.sku_config.name,
                 target=f"fpga_{self.fpga}_rom_with_fake_keys")
+            if self.fpga == "sim_qemu":
+                qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
+                host_flags = f"""
+                    --interface=qemu \
+                    --qemu-monitor-socket={qemu_monitor} \
+                    --openocd={openocd_bin} \
+                """
+                target_str = "sim_qemu_rom_with_fake_keys"
+                individ_elf = _FT_INDIVID_DEVICE_ELF.format(
+                    base_dir=self._base_dev_dir(),
+                    sku=self.sku_config.name,
+                    ate_suffix=ate_suffix,
+                    target=target_str)
+                if self.sku_config.scrambling_bin:
+                    scrambling_bin = self.sku_config.scrambling_bin.format(
+                        base_dir=self._base_dev_dir(),
+                        sku=self.sku_config.name,
+                        target=target_str)
+                fw_bundle_bin = _FT_FW_BUNDLE_BIN.format(
+                    base_dir=self._base_dev_dir(),
+                    sku=self.sku_config.name,
+                    target=target_str)
         else:
             # Set host flags and device binaries for Silicon DUT.
             host_flags = host_flags.format(target="teacup",

@@ -158,9 +158,7 @@ static status_t configure_led_i2c_controller(void) {
 
 static status_t configure_screen_spi_controller(void) {
   dif_spi_host_config_t config = {
-      .spi_clock = (kClockFreqPeripheralHz / 2 < 10000000)
-                       ? (uint32_t)(kClockFreqPeripheralHz / 2)
-                       : 10000000,
+      .spi_clock = 10000000,
       .peripheral_clock_freq_hz = (uint32_t)kClockFreqPeripheralHz,
       .chip_select =
           {
@@ -174,6 +172,9 @@ static status_t configure_screen_spi_controller(void) {
       .tx_watermark = 0,
       .rx_watermark = 0,
   };
+  if (kClockFreqPeripheralHz / 2 < config.spi_clock) {
+    config.spi_clock = (uint32_t)(kClockFreqPeripheralHz / 2);
+  }
   TRY(dif_gpio_write(&gpio, screen.data_command_gpio, false));
   TRY(dif_gpio_output_set_enabled(&gpio, screen.data_command_gpio,
                                   kDifToggleEnabled));

@@ -112,7 +112,7 @@ def main(args_in):
     parser.add_argument(
         "--fpga",
         choices=["hyper310", "cw340", "sim_qemu"],
-        help="Run flow on FPGA or QEMU simulation (instead of silicon).",
+        help="Run flow on FPGA (instead of silicon).",
     )
     parser.add_argument(
         "--fpga-dont-clear-bitstream",
