@@ -105,6 +105,8 @@ class OtDut():
 
         openocd_bin = resolve_runfile(_OPENOCD_BIN)
         openocd_cfg = resolve_runfile(_OPENOCD_ADAPTER_CONFIG)
+        if self.fpga == "sim_qemu":
+            self.fpga_dont_clear_bitstream = True
         if self.fpga:
             # Set host flags and device binary for FPGA DUT.
             interface = self.fpga if self.fpga == "hyper310" else "hyper340"
