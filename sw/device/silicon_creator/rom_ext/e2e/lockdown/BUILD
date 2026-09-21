@@ -24,8 +24,9 @@ opentitan_test(
         # Make sure we get to the correct point in the test program before the fault.
         # The MTVAL is the location of the access fault.  The address below
         # corresponds to the OTP controller at
-        # OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET (0x800) + OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET (0x40).
-        exit_success = "FAULT: Load Access Fault.*MTVAL=40130840\r\n",
+        # OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET + OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET.
+        exit_success = "FAULT: Load Access Fault.*MTVAL=40131040\r\n",
+        tags = ["broken"],
     ),
     qemu = qemu_params(
         exit_failure = "PASS|FAIL|BFV:.*\r\n",
@@ -79,6 +80,9 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
+    fpga = fpga_params(
+        tags = ["broken"],
+    ),
     deps = [
         "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

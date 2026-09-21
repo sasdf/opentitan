@@ -224,7 +224,7 @@ genrule(
             },
             exit_failure = _RESCUE_ROMEXT_RESULTS[name == rxslot]["failure"],
             exit_success = _RESCUE_ROMEXT_RESULTS[name == rxslot]["success"].format(slot = name),
-            image_name = "rescue_rom_ext_{}.img".format(name),
+            image_name = "/tmp/rescue_rom_ext_{}.img".format(name),
             rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
             rom_ext_offset = _POSITIONS[rxslot]["rom_ext_offset"],
             slot = position["slot"],

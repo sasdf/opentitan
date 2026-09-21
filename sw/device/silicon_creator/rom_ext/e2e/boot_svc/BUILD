@@ -122,6 +122,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        # Not supported in QEMU whilst low power is not modelled
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
@@ -156,6 +157,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        # Not supported in QEMU whilst low power is not modelled
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
