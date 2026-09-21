@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::Context;
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use std::time::Duration;
 
@@ -29,33 +30,35 @@ struct Opts {
     usb: UsbOpts,
 }
 
-fn usbdev_echo(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) -> Result<()> {
+fn usbdev_echo_qemu(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) -> Result<()> {
     log::info!("waiting for device...");
-    if opts.init.backend_opts.interface == "qemu" {
-        let usb_ctx = transport.usb().context("Cannot get USB context")?;
-        let device =
-            usb_ctx.device_by_id_with_timeout(opts.usb.vid, opts.usb.pid, None, opts.timeout)?;
-        let mut buffer = [0u8; 256];
-        let mut total_read = 0;
-        let deadline = std::time::Instant::now() + opts.timeout;
-        while total_read < 6 && std::time::Instant::now() < deadline {
-            match device.read_bulk_timeout(
-                0x81,
-                &mut buffer[total_read..],
-                Duration::from_millis(500),
-            ) {
-                Ok(n) if n > 0 => total_read += n,
-                _ => {}
-            }
+    let usb_ctx = transport.usb().context("Cannot get USB context")?;
+    let device =
+        usb_ctx.device_by_id_with_timeout(opts.usb.vid, opts.usb.pid, None, opts.timeout)?;
+    let mut buffer = [0u8; 256];
+    let mut total_read = 0;
+    let deadline = std::time::Instant::now() + opts.timeout;
+    while total_read < 6 && std::time::Instant::now() < deadline {
+        match device.read_bulk_timeout(
+            0x81,
+            &mut buffer[total_read..],
+            Duration::from_millis(500),
+        ) {
+            Ok(n) if n > 0 => total_read += n,
+            _ => {}
         }
-        ensure!(
-            total_read > 0,
-            "Bulk read from EP1 returned 0 bytes on QEMU USB device"
-        );
-        device.write_bulk_timeout(0x01, &buffer[0..total_read], opts.timeout)?;
-        let _ = UartConsole::wait_for(uart, r"PASS!", opts.timeout)?;
-        return Ok(());
     }
+    ensure!(
+        total_read > 0,
+        "Bulk read from EP1 returned 0 bytes on QEMU USB device"
+    );
+    device.write_bulk_timeout(0x01, &buffer[0..total_read], opts.timeout)?;
+    let _ = UartConsole::wait_for(uart, r"PASS!", opts.timeout)?;
+    Ok(())
+}
+
+fn usbdev_echo(opts: &Opts, uart: &dyn Uart) -> Result<()> {
+    log::info!("waiting for device...");
     let devices = opts.usb.wait_for_device(opts.timeout)?;
     if devices.is_empty() {
         bail!("no USB device found");
@@ -108,7 +111,11 @@ fn main() -> Result<()> {
         );
     }
 
-    execute_test!(usbdev_echo, &opts, &transport, &*uart);
+    if opts.init.backend_opts.interface == "qemu" {
+        execute_test!(usbdev_echo_qemu, &opts, &transport, &*uart);
+        return Ok(());
+    }
+    execute_test!(usbdev_echo, &opts, &*uart);
 
     Ok(())
 }

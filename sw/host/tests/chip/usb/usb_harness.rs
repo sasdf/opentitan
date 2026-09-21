@@ -259,7 +259,7 @@ fn main() -> Result<()> {
 
     // Certain backends such as QEMU will not enumerate USB device until
     // we request the USB context.
-    let usb_context = transport.usb().context("Cannot get USB context")?;
+    let _usb_context = transport.usb().context("Cannot get USB context")?;
 
     // Wait until test is running.
     let uart = transport.uart("console")?;
@@ -282,7 +282,7 @@ fn main() -> Result<()> {
         let qemu_dev = if opts.no_wait_for_usb_device {
             None
         } else {
-            Some(usb_context.device_by_id_with_timeout(
+            Some(_usb_context.device_by_id_with_timeout(
                 opts.usb.vid,
                 opts.usb.pid,
                 None,

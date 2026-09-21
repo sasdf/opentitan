@@ -323,13 +323,14 @@ class OtDut():
             if self.log_ujson_payloads:
                 cmd += " --log-ujson-payloads"
 
-            if self.sku_config.dice_mldsa_certs_from_device or self.fpga == "sim_qemu":
-                cmd += " --timeout=120s"
             if self.sku_config.dice_mldsa_certs_from_device:
+                cmd += " --timeout=120s"
                 cmd += "".join(" --dice-mldsa-certs-from-device={}".format(cert_name)
                                for cert_name in self.sku_config.dice_mldsa_certs_from_device)
                 cmd += "".join(" --dice-mldsa-certs-to-device={}".format(cert_name)
                                for cert_name in self.sku_config.dice_mldsa_certs_to_device)
+            elif self.fpga == "sim_qemu":
+                cmd += " --timeout=120s"
 
             # Get user confirmation before running command.
             logging.info(f"Running command: {cmd}")
