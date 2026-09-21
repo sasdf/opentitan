@@ -61,7 +61,15 @@ impl QemuSpi {
         })
     }
 
-    fn make_header(&self, len: u16, hold_cs: bool) -> [u8; 8] {
+    /// Send a SPI transfer header to QEMU.
+    ///
+    /// Takes the length of the transfer and whether the CS should be held
+    /// asserted afterwards or released.
+    ///
+    /// The header is a custom format for our SPI device in QEMU.
+    fn write_header(&self, len: u16, hold_cs: bool) -> anyhow::Result<()> {
+        let mut tty = self.tty.borrow_mut();
+
         let spi_mode = match self.mode.get() {
             TransferMode::Mode0 => 0,
             TransferMode::Mode1 => HEADER_CPOL_BIT,
@@ -74,30 +82,19 @@ impl QemuSpi {
             true => HEADER_HOLD_CS_BIT,
         };
 
-        let len_bytes = len.to_le_bytes();
-        [
-            b'/',
-            b'C',
-            b'S',
-            0,
-            spi_mode | hold_cs,
-            0,
-            len_bytes[0],
-            len_bytes[1],
-        ]
-    }
+        // Assert chip select:
+        write!(tty, "/CS")?;
+        // Protocol version (zero):
+        tty.write_all(&[0])?;
+        // Flags:
+        tty.write_all(&[spi_mode | hold_cs])?;
+        // Ignored byte:
+        tty.write_all(&[0])?;
+        // Payload length:
+        tty.write_all(&len.to_le_bytes())?;
 
-    /// Send a SPI transfer header to QEMU.
-    ///
-    /// Takes the length of the transfer and whether the CS should be held
-    /// asserted afterwards or released.
-    ///
-    /// The header is a custom format for our SPI device in QEMU.
-    fn write_header(&self, len: u16, hold_cs: bool) -> anyhow::Result<()> {
-        let hdr = self.make_header(len, hold_cs);
-        let mut tty = self.tty.borrow_mut();
-        tty.write_all(&hdr)?;
         tty.flush()?;
+
         Ok(())
     }
 
@@ -137,8 +134,15 @@ impl Target for QemuSpi {
         }
 
         if (1..=MAX_TRANSMISSION_LEN).contains(&total_len) {
+            let spi_mode = match self.mode.get() {
+                TransferMode::Mode0 => 0,
+                TransferMode::Mode1 => HEADER_CPOL_BIT,
+                TransferMode::Mode2 => HEADER_CPHA_BIT,
+                TransferMode::Mode3 => HEADER_CPOL_BIT | HEADER_CPHA_BIT,
+            };
+            let len_bytes = (total_len as u16).to_le_bytes();
             let mut tx_buf = Vec::with_capacity(8 + total_len);
-            tx_buf.extend_from_slice(&self.make_header(total_len as u16, false));
+            tx_buf.extend_from_slice(&[b'/', b'C', b'S', 0, spi_mode, 0, len_bytes[0], len_bytes[1]]);
             for transfer in transaction.iter() {
                 match transfer {
                     Transfer::Read(buf) => tx_buf.resize(tx_buf.len() + buf.len(), 0),
