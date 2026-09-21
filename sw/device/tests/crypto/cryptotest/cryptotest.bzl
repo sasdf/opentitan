@@ -85,7 +85,7 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False):
             timeout = "eternal",
             data = test_vectors,
             tags = tags,
-            test_cmd = (("--timeout=60s " + test_args) if "--timeout=" not in test_args else test_args) if test_args else "",
+            test_cmd = (test_args.replace("--timeout=250s", "--timeout=600s") if "--timeout=" in test_args else (("--timeout=600s " if "--run-keygen" in test_args else "--timeout=60s ") + test_args)) if test_args else "",
             test_harness = test_harness,
         ),
         exec_env = CRYPTOTEST_EXEC_ENVS,

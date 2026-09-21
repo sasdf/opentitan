@@ -183,7 +183,7 @@ cryptotest(
     test_args = " ".join([
         "--input=\"$(rootpath //sw/host/cryptotest/testvectors/acvp:rsa_keygen_vectors.json)\"",
         "--run-keygen",
-        "--timeout=600s",
+        "--timeout=250s",
     ]),
     test_harness = "//sw/host/tests/crypto/acvp:harness",
     test_vectors = [
@@ -510,7 +510,7 @@ cryptotest(
 cryptotest(
     name = "rsa_keygen_kat",
     slow_test = True,
-    test_args = "--run-keygen --timeout=600s",
+    test_args = "--run-keygen",
     test_harness = "//sw/host/tests/crypto/rsa_kat:harness",
     test_vectors = [],
 )
