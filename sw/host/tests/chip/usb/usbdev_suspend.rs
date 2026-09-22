@@ -92,7 +92,103 @@ const TIME_SUSPENDING: u64 = 4;
 const TIME_RESUMING: u64 = 20;
 const TIME_RESETTING: u64 = 10;
 
-fn suspend(hub: &UsbHub, port: u8, check_status: bool) -> Result<()> {
+enum SuspendHub<'a> {
+    Physical(UsbHub),
+    Qemu {
+        dev: std::cell::RefCell<Box<dyn opentitanlib::io::usb::UsbDevice>>,
+        last_phase: std::cell::Cell<Option<SuspendPhase>>,
+        opts: &'a Opts,
+        transport: &'a TransportWrapper,
+        uart: &'a dyn Uart,
+    },
+}
+
+impl<'a> SuspendHub<'a> {
+    fn prepare_phase(&self, phase: &SuspendPhase) -> Result<()> {
+        if let Self::Qemu {
+            dev,
+            last_phase,
+            opts,
+            transport,
+            ..
+        } = self
+        {
+            if matches!(
+                last_phase.replace(Some(phase.clone())),
+                Some(
+                    SuspendPhase::SleepReset
+                        | SuspendPhase::SleepDisconnect
+                        | SuspendPhase::DeepReset
+                        | SuspendPhase::DeepDisconnect
+                )
+            ) {
+                *dev.borrow_mut() = transport.usb()?.device_by_id_with_timeout(
+                    opts.usb.vid,
+                    opts.usb.pid,
+                    None,
+                    opts.timeout,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn wait_for_sleep(&self, phase: &SuspendPhase) -> bool {
+        if let Self::Qemu { uart, .. } = self {
+            if *phase != SuspendPhase::Suspend {
+                let _ = UartConsole::wait_for(
+                    *uart,
+                    r"(Issuing WFI to enter sleep|(PASS|FAIL)!)",
+                    Duration::from_secs(5),
+                );
+                delay_millis(20);
+            }
+            return true;
+        }
+        false
+    }
+
+    fn op(&self, op: UsbHubOp, port: u8, timeout: Duration, check_status: bool) -> Result<()> {
+        match self {
+            Self::Physical(hub) => hub.op(op, port, timeout, check_status),
+            Self::Qemu { dev, .. } => match op {
+                UsbHubOp::Suspend => dev.borrow_mut().suspend(),
+                UsbHubOp::Resume => dev.borrow_mut().resume(),
+                _ => Ok(()),
+            },
+        }
+    }
+}
+
+fn wait_for_device_and_get_parent<'a>(
+    opts: &'a Opts,
+    transport: &'a TransportWrapper,
+    uart: &'a dyn Uart,
+) -> Result<(SuspendHub<'a>, u8)> {
+    if opts.init.backend_opts.interface == "qemu" {
+        let dev = transport.usb()?.device_by_id_with_timeout(
+            opts.usb.vid,
+            opts.usb.pid,
+            None,
+            opts.timeout,
+        )?;
+        Ok((
+            SuspendHub::Qemu {
+                dev: std::cell::RefCell::new(dev),
+                last_phase: std::cell::Cell::new(None),
+                opts,
+                transport,
+                uart,
+            },
+            0,
+        ))
+    } else {
+        let (hub, port) = opts.usb.wait_for_device_and_get_parent(opts.timeout)?;
+        Ok((SuspendHub::Physical(hub), port))
+    }
+}
+
+fn suspend(hub: &SuspendHub, port: u8, check_status: bool) -> Result<()> {
     log::info!("suspending port {}", port);
     hub.op(
         UsbHubOp::Suspend,
@@ -106,7 +202,7 @@ fn suspend(hub: &UsbHub, port: u8, check_status: bool) -> Result<()> {
     Ok(())
 }
 
-fn resume(hub: &UsbHub, port: u8, check_status: bool) -> Result<()> {
+fn resume(hub: &SuspendHub, port: u8, check_status: bool) -> Result<()> {
     log::info!("resuming device on port {}", port);
     hub.op(
         UsbHubOp::Resume,
@@ -128,7 +224,14 @@ fn find_device(hub: &UsbHub, port: u8) -> Result<rusb::Device<rusb::Context>> {
     get_device_by_port_numbers(&ports)
 }
 
-fn reset(hub: &UsbHub, port: u8) -> Result<()> {
+fn reset(hub: &SuspendHub, port: u8) -> Result<()> {
+    let SuspendHub::Physical(hub) = hub else {
+        if let SuspendHub::Qemu { dev, .. } = hub {
+            dev.borrow_mut().reset()?;
+            delay_millis(TIME_RESETTING);
+        }
+        return Ok(());
+    };
     log::info!("resetting device on port {}", port);
     let device = find_device(hub, port)?;
     // Resetting the device is a tricky: if we send a hub operation, the kernel will
@@ -165,166 +268,19 @@ fn disconnect(usb: &UsbOpts, transport: &TransportWrapper) -> Result<()> {
     Ok(())
 }
 
-fn usbdev_suspend_qemu(
-    opts: &Opts,
-    transport: &TransportWrapper,
-    uart: &dyn Uart,
-) -> Result<(), anyhow::Error> {
-    let time_suspended_short: u64 = 3;
-    let time_suspended_long: u64 = 50;
-    let time_disconnected: u64 = 20;
-
-    opts.usb.apply_strappings(transport, true)?;
-    if opts.usb.vbus_control_available() {
-        opts.usb.enable_vbus(transport, true)?;
-    }
-    if opts.usb.vbus_sense_available() {
-        ensure!(
-            opts.usb.vbus_present(transport)?,
-            "OT USB does not appear to be connected to a host (VBUS not detected)"
-        );
-    }
-
-    let mut qemu_dev = transport.usb()?.device_by_id_with_timeout(
-        opts.usb.vid,
-        opts.usb.pid,
-        None,
-        opts.timeout,
-    )?;
-    let init_phase = opts.init_phase.clone();
-    let fin_phase = opts.fin_phase.clone();
-    log::info!("Phase sequence - {init_phase} to {fin_phase} inclusive");
-
-    for iter in 1..=opts.num_iters {
-        log::info!("Iteration {} of {}", iter, opts.num_iters);
-        let mut phase = init_phase.clone();
-        loop {
-            log::info!("Test phase {phase}");
-            UartConsole::wait_for(uart, r"Phase awaiting stimulus \([^)]*\)", opts.timeout)?;
-
-            if phase != SuspendPhase::Shutdown {
-                let _ = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.logging_duration);
-                qemu_dev.suspend()?;
-                delay_millis(TIME_SUSPENDING);
-                if phase == SuspendPhase::Suspend {
-                    delay_millis(time_suspended_short);
-                } else {
-                    delay_millis(time_suspended_long);
-                    let _ = UartConsole::wait_for(
-                        uart,
-                        r"(Issuing WFI to enter sleep|(PASS|FAIL)!)",
-                        Duration::from_secs(5),
-                    );
-                    delay_millis(20);
-                }
-            }
-
-            let needs_reenum = phase != fin_phase || iter < opts.num_iters;
-            let mut next_phase = fin_phase.clone();
-            match phase {
-                SuspendPhase::Suspend => {
-                    qemu_dev.resume()?;
-                    delay_millis(TIME_RESUMING);
-                    delay_millis(10);
-                    next_phase = SuspendPhase::SleepResume;
-                }
-                SuspendPhase::SleepResume => {
-                    qemu_dev.resume()?;
-                    delay_millis(TIME_RESUMING);
-                    next_phase = SuspendPhase::SleepReset;
-                }
-                SuspendPhase::SleepReset => {
-                    qemu_dev.reset()?;
-                    delay_millis(TIME_RESETTING);
-                    if needs_reenum {
-                        qemu_dev = transport.usb()?.device_by_id_with_timeout(
-                            opts.usb.vid,
-                            opts.usb.pid,
-                            None,
-                            opts.timeout,
-                        )?;
-                    }
-                    next_phase = SuspendPhase::SleepDisconnect;
-                }
-                SuspendPhase::SleepDisconnect => {
-                    disconnect(&opts.usb, transport)?;
-                    delay_millis(time_disconnected);
-                    connect(&opts.usb, transport)?;
-                    if needs_reenum {
-                        qemu_dev = transport.usb()?.device_by_id_with_timeout(
-                            opts.usb.vid,
-                            opts.usb.pid,
-                            None,
-                            opts.timeout,
-                        )?;
-                    }
-                    next_phase = SuspendPhase::DeepResume;
-                }
-                SuspendPhase::DeepResume => {
-                    qemu_dev.resume()?;
-                    delay_millis(TIME_RESUMING);
-                    next_phase = SuspendPhase::DeepReset;
-                }
-                SuspendPhase::DeepReset => {
-                    qemu_dev.reset()?;
-                    delay_millis(TIME_RESETTING);
-                    if needs_reenum {
-                        qemu_dev = transport.usb()?.device_by_id_with_timeout(
-                            opts.usb.vid,
-                            opts.usb.pid,
-                            None,
-                            opts.timeout,
-                        )?;
-                    }
-                    next_phase = SuspendPhase::DeepDisconnect;
-                }
-                SuspendPhase::DeepDisconnect => {
-                    disconnect(&opts.usb, transport)?;
-                    delay_millis(time_disconnected);
-                    connect(&opts.usb, transport)?;
-                    if needs_reenum {
-                        qemu_dev = transport.usb()?.device_by_id_with_timeout(
-                            opts.usb.vid,
-                            opts.usb.pid,
-                            None,
-                            opts.timeout,
-                        )?;
-                    }
-                    next_phase = SuspendPhase::Shutdown;
-                }
-                SuspendPhase::Shutdown => {}
-            }
-            if phase == fin_phase {
-                break;
-            }
-            phase = next_phase;
-        }
-    }
-
-    log::info!("Awaiting verdict from device software");
-    let vec = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.timeout)?;
-    match vec[0].as_str() {
-        "PASS!" => Ok(()),
-        _ => Err(anyhow!("Failure result from device software")),
-    }
-}
-
 // Implements the host-side component of usbdev_suspend_<>_test
 fn usbdev_suspend(
     opts: &Opts,
     transport: &TransportWrapper,
     uart: &dyn Uart,
 ) -> Result<(), anyhow::Error> {
-    if opts.init.backend_opts.interface == "qemu" {
-        return usbdev_suspend_qemu(opts, transport, uart);
-    }
     // - These impact successful operation of the device-side software; vary them appreciably
     //   and test failures may occur through device-side timeout or the device not being ready.
     let time_suspended_short: u64 = 3;
     let time_suspended_long: u64 = 50;
 
     // - Fairly arbitrary, may be modified quite freely.
-    let time_disconnected: u64 = 1000;
+    let time_disconnected: u64 = if opts.init.backend_opts.interface == "qemu" { 20 } else { 1000 };
 
     opts.usb.apply_strappings(transport, true)?;
     // Enable VBUS sense on the board if necessary.
@@ -340,7 +296,7 @@ fn usbdev_suspend(
     }
 
     // Wait for device to appear.
-    let (hub, port) = opts.usb.wait_for_device_and_get_parent(opts.timeout)?;
+    let (hub, port) = wait_for_device_and_get_parent(opts, transport, uart)?;
 
     // Collect test phases.
     let init_phase = opts.init_phase.clone();
@@ -356,6 +312,7 @@ fn usbdev_suspend(
         let mut phase = init_phase.clone();
         loop {
             log::info!("Test phase {phase}");
+            hub.prepare_phase(&phase)?;
 
             // Synchronize with the device-side code; it shall always emit this message at the point
             // of being ready to receive the stimulus within a given test phase, because we have
@@ -383,7 +340,9 @@ fn usbdev_suspend(
                 // If logging is enabled, a lot more messages will be printed, for example when going to
                 // sleep. In order to keep the host and device log roughly in-order, give a chance to the device
                 // to print messages before moving-on.
-                let _ = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.logging_duration);
+                if !hub.wait_for_sleep(&phase) {
+                    let _ = UartConsole::wait_for(uart, r"(PASS|FAIL)!", opts.logging_duration);
+                }
             }
 
             // Next test phase; initialize to final phase (safer default than the current phase).
