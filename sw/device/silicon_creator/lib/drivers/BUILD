@@ -999,10 +999,15 @@ opentitan_test(
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken"},
     ),
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
+    ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}

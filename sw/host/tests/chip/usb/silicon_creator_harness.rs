@@ -8,13 +8,166 @@ use rand::prelude::*;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use opentitanlib::app::TransportWrapper;
 use opentitanlib::crypto::sha256::Sha256Digest;
 use opentitanlib::execute_test;
+use opentitanlib::io::usb::UsbDevice as OtUsbDevice;
 use opentitanlib::test_utils::init::InitializeTest;
 use opentitanlib::uart::console::UartConsole;
 
 use rusb::{Direction, Error, Recipient, RequestType};
 use usb::{UsbDeviceHandle, UsbOpts, port_path_string};
+
+enum HarnessUsbDevice {
+    Rusb(UsbDeviceHandle),
+    Ot(Box<dyn OtUsbDevice>),
+}
+
+impl HarnessUsbDevice {
+    fn read_control(
+        &self,
+        request_type: u8,
+        request: u8,
+        value: u16,
+        index: u16,
+        buf: &mut [u8],
+        timeout: Duration,
+    ) -> Result<usize> {
+        match self {
+            Self::Rusb(d) => {
+                Ok(d.read_control(request_type, request, value, index, buf, timeout)?)
+            }
+            Self::Ot(d) => {
+                d.read_control_timeout(request_type, request, value, index, buf, timeout)
+            }
+        }
+    }
+
+    fn write_control(
+        &self,
+        request_type: u8,
+        request: u8,
+        value: u16,
+        index: u16,
+        buf: &[u8],
+        timeout: Duration,
+    ) -> Result<usize> {
+        match self {
+            Self::Rusb(d) => {
+                Ok(d.write_control(request_type, request, value, index, buf, timeout)?)
+            }
+            Self::Ot(d) => {
+                d.write_control_timeout(request_type, request, value, index, buf, timeout)
+            }
+        }
+    }
+
+    fn read_bulk(&self, ep: u8, buf: &mut [u8], timeout: Duration) -> Result<usize> {
+        match self {
+            Self::Rusb(d) => Ok(d.read_bulk(ep, buf, timeout)?),
+            Self::Ot(d) => d.read_bulk_timeout(ep, buf, timeout),
+        }
+    }
+
+    fn write_bulk(&self, ep: u8, buf: &[u8], timeout: Duration) -> Result<usize> {
+        match self {
+            Self::Rusb(d) => Ok(d.write_bulk(ep, buf, timeout)?),
+            Self::Ot(d) => d.write_bulk_timeout(ep, buf, timeout),
+        }
+    }
+
+    fn claim_interface(&self, iface: u8) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.claim_interface(iface)?),
+            Self::Ot(d) => d.claim_interface(iface),
+        }
+    }
+
+    fn release_interface(&self, iface: u8) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.release_interface(iface)?),
+            Self::Ot(d) => d.release_interface(iface),
+        }
+    }
+
+    fn reset(&self) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.reset()?),
+            Self::Ot(d) => d.reset(),
+        }
+    }
+
+    fn unconfigure(&self) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.unconfigure()?),
+            Self::Ot(d) => d.set_active_configuration(0),
+        }
+    }
+
+    fn set_active_configuration(&self, config: u8) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.set_active_configuration(config)?),
+            Self::Ot(d) => d.set_active_configuration(config),
+        }
+    }
+
+    fn set_alternate_setting(&self, iface: u8, setting: u8) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.set_alternate_setting(iface, setting)?),
+            Self::Ot(d) => d.set_alternate_setting(iface, setting),
+        }
+    }
+
+    fn clear_halt(&self, ep: u8) -> Result<()> {
+        match self {
+            Self::Rusb(d) => Ok(d.clear_halt(ep)?),
+            Self::Ot(d) => {
+                d.write_control_timeout(
+                    rusb::request_type(Direction::Out, RequestType::Standard, Recipient::Endpoint),
+                    rusb::constants::LIBUSB_REQUEST_CLEAR_FEATURE,
+                    USB_FEATURE_ENDPOINT_HALT,
+                    ep as u16,
+                    &[],
+                    TIMEOUT,
+                )?;
+                Ok(())
+            }
+        }
+    }
+
+    fn read_string_descriptor_ascii(&self, idx: u8) -> Result<String> {
+        match self {
+            Self::Rusb(d) => Ok(d.read_string_descriptor_ascii(idx)?),
+            Self::Ot(d) => d.read_string_descriptor_ascii(idx),
+        }
+    }
+}
+
+fn is_pipe_error<T>(res: &Result<T>) -> bool {
+    match res {
+        Ok(_) => false,
+        Err(err) => {
+            if let Some(rusb_err) = err.downcast_ref::<Error>() {
+                matches!(rusb_err, Error::Pipe)
+            } else {
+                format!("{err:?}").contains("Stalled")
+            }
+        }
+    }
+}
+
+fn is_overflow_error<T>(res: &Result<T>) -> bool {
+    match res {
+        Ok(_) => false,
+        Err(err) => {
+            if let Some(rusb_err) = err.downcast_ref::<Error>() {
+                matches!(rusb_err, Error::Overflow)
+            } else {
+                format!("{err:?}").contains("Error")
+            }
+        }
+    }
+}
 
 #[derive(Debug, Parser)]
 struct Opts {
@@ -47,8 +200,14 @@ struct Opts {
     exec_arg: Vec<std::ffi::OsString>,
 }
 
-fn wait_for_device(opts: &Opts) -> Result<UsbDeviceHandle> {
+fn wait_for_device(opts: &Opts, transport: &TransportWrapper) -> Result<HarnessUsbDevice> {
     log::info!("waiting for device...");
+    if opts.init.backend_opts.interface == "qemu" {
+        let usb_ctx = transport.usb()?;
+        let dev =
+            usb_ctx.device_by_id_with_timeout(opts.usb.vid, opts.usb.pid, None, opts.timeout)?;
+        return Ok(HarnessUsbDevice::Ot(dev));
+    }
     let mut devices = opts.usb.wait_for_device(opts.timeout)?;
     if devices.is_empty() {
         bail!("no USB device found");
@@ -71,7 +230,7 @@ fn wait_for_device(opts: &Opts) -> Result<UsbDeviceHandle> {
         device.device().address(),
         port_path_string(&device.device())?
     );
-    Ok(device)
+    Ok(HarnessUsbDevice::Rusb(device))
 }
 
 #[repr(u8)]
@@ -100,17 +259,17 @@ const EP_IN_02: u8 = 0x82;
 const EP_OUT_0F: u8 = 0x0F;
 
 impl TestReq {
-    fn randomize(dev: &UsbDeviceHandle) -> Result<()> {
+    fn randomize(dev: &HarnessUsbDevice) -> Result<()> {
         dev.read_control(RQTYPE, TestReq::Randomize as u8, 0, 0, &mut [], TIMEOUT)?;
         Ok(())
     }
 
-    fn digest(dev: &UsbDeviceHandle, length: u16, data: &mut [u8]) -> Result<()> {
+    fn digest(dev: &HarnessUsbDevice, length: u16, data: &mut [u8]) -> Result<()> {
         dev.read_control(RQTYPE, TestReq::Digest as u8, length, 0, data, TIMEOUT)?;
         Ok(())
     }
 
-    fn bulk_in(dev: &UsbDeviceHandle, length: u16, ep: u8) -> Result<()> {
+    fn bulk_in(dev: &HarnessUsbDevice, length: u16, ep: u8) -> Result<()> {
         dev.read_control(
             RQTYPE,
             TestReq::BulkIn as u8,
@@ -122,7 +281,7 @@ impl TestReq {
         Ok(())
     }
 
-    fn bulk_out(dev: &UsbDeviceHandle, length: u16, ep: u8) -> Result<()> {
+    fn bulk_out(dev: &HarnessUsbDevice, length: u16, ep: u8) -> Result<()> {
         dev.read_control(
             RQTYPE,
             TestReq::BulkOut as u8,
@@ -134,17 +293,17 @@ impl TestReq {
         Ok(())
     }
 
-    fn exit(dev: &UsbDeviceHandle) -> Result<()> {
+    fn exit(dev: &HarnessUsbDevice) -> Result<()> {
         dev.read_control(RQTYPE, TestReq::Exit as u8, 0, 0, &mut [], TIMEOUT)?;
         Ok(())
     }
 
-    fn uart_echo(dev: &UsbDeviceHandle, id: u16) -> Result<()> {
+    fn uart_echo(dev: &HarnessUsbDevice, id: u16) -> Result<()> {
         dev.read_control(RQTYPE, TestReq::UartEcho as u8, id, 0, &mut [], TIMEOUT)?;
         Ok(())
     }
 
-    fn ep_config(dev: &UsbDeviceHandle, ep: u8, use_handler: bool) -> Result<()> {
+    fn ep_config(dev: &HarnessUsbDevice, ep: u8, use_handler: bool) -> Result<()> {
         dev.read_control(
             RQTYPE,
             TestReq::EpConfig as u8,
@@ -165,7 +324,7 @@ fn ep_name(ep: u8) -> String {
     }
 }
 
-fn receive_random_buffer(dev: &UsbDeviceHandle, short_len: Option<usize>) -> Result<()> {
+fn receive_random_buffer(dev: &HarnessUsbDevice, short_len: Option<usize>) -> Result<()> {
     let mut buffer = vec![0u8; 65536];
     // Determine if the test requests a shorter length than the full buffer length.
     // We pass this (possibly short) length in the `value` field of the control transactions
@@ -198,7 +357,7 @@ fn receive_random_buffer(dev: &UsbDeviceHandle, short_len: Option<usize>) -> Res
     Ok(())
 }
 
-fn send_random_buffer(dev: &UsbDeviceHandle, short_len: Option<usize>) -> Result<()> {
+fn send_random_buffer(dev: &HarnessUsbDevice, short_len: Option<usize>) -> Result<()> {
     let mut buffer = vec![0u8; 65536];
     // Determine if the test requests a shorter length than the full buffer length.
     // We pass this (possibly short) length in the `value` field of the control transactions
@@ -234,89 +393,163 @@ fn send_random_buffer(dev: &UsbDeviceHandle, short_len: Option<usize>) -> Result
     Ok(())
 }
 
-fn test_device_descriptor(dev: &UsbDeviceHandle) -> Result<()> {
-    let desc = dev.device().device_descriptor()?;
-    assert_eq!(desc.vendor_id(), 0x18d1);
-    assert_eq!(desc.product_id(), 0x503a);
-    assert_eq!(desc.num_configurations(), 1);
-    assert_eq!(desc.manufacturer_string_index(), Some(1));
-    assert_eq!(desc.product_string_index(), Some(2));
-    assert_eq!(desc.serial_number_string_index(), Some(3));
+fn test_device_descriptor(dev: &HarnessUsbDevice) -> Result<()> {
+    match dev {
+        HarnessUsbDevice::Rusb(dev) => {
+            let desc = dev.device().device_descriptor()?;
+            assert_eq!(desc.vendor_id(), 0x18d1);
+            assert_eq!(desc.product_id(), 0x503a);
+            assert_eq!(desc.num_configurations(), 1);
+            assert_eq!(desc.manufacturer_string_index(), Some(1));
+            assert_eq!(desc.product_string_index(), Some(2));
+            assert_eq!(desc.serial_number_string_index(), Some(3));
+        }
+        HarnessUsbDevice::Ot(dev) => {
+            let dev_desc = dev.device_descriptor();
+            let desc = dev_desc.descriptor()?;
+            assert_eq!(desc.vendor_id.get(), 0x18d1);
+            assert_eq!(desc.product_id.get(), 0x503a);
+            assert_eq!(desc.num_config, 1);
+            assert_eq!(desc.manuf_idx, 1);
+            assert_eq!(desc.product_idx, 2);
+            assert_eq!(desc.serial_idx, 3);
+        }
+    }
     Ok(())
 }
 
-fn test_config_descriptor(dev: &UsbDeviceHandle) -> Result<()> {
-    let desc = dev.device().config_descriptor(0)?;
-    assert_eq!(desc.num_interfaces(), 1);
-    assert_eq!(desc.total_length(), 32);
-    assert_eq!(desc.number(), 1);
-    assert!(desc.self_powered());
-    assert_eq!(desc.max_power(), 100); // 50 * 2mA = 100mA
+fn test_config_descriptor(dev: &HarnessUsbDevice) -> Result<()> {
+    match dev {
+        HarnessUsbDevice::Rusb(dev) => {
+            let desc = dev.device().config_descriptor(0)?;
+            assert_eq!(desc.num_interfaces(), 1);
+            assert_eq!(desc.total_length(), 32);
+            assert_eq!(desc.number(), 1);
+            assert!(desc.self_powered());
+            assert_eq!(desc.max_power(), 100); // 50 * 2mA = 100mA
 
-    let iface = desc.interfaces().next().unwrap();
-    let iface_desc = iface.descriptors().next().unwrap();
-    assert_eq!(iface_desc.interface_number(), 1);
-    assert_eq!(iface_desc.num_endpoints(), 2);
-    assert_eq!(iface_desc.class_code(), 0xFF);
-    assert_eq!(iface_desc.sub_class_code(), 0xFF);
-    assert_eq!(iface_desc.protocol_code(), 1);
+            let iface = desc.interfaces().next().unwrap();
+            let iface_desc = iface.descriptors().next().unwrap();
+            assert_eq!(iface_desc.interface_number(), 1);
+            assert_eq!(iface_desc.num_endpoints(), 2);
+            assert_eq!(iface_desc.class_code(), 0xFF);
+            assert_eq!(iface_desc.sub_class_code(), 0xFF);
+            assert_eq!(iface_desc.protocol_code(), 1);
 
-    let mut eps = iface_desc.endpoint_descriptors();
-    let ep1 = eps.next().unwrap();
-    assert_eq!(ep1.address(), EP_OUT_01);
-    assert_eq!(ep1.max_packet_size(), 64);
+            let mut eps = iface_desc.endpoint_descriptors();
+            let ep1 = eps.next().unwrap();
+            assert_eq!(ep1.address(), EP_OUT_01);
+            assert_eq!(ep1.max_packet_size(), 64);
 
-    let ep2 = eps.next().unwrap();
-    assert_eq!(ep2.address(), EP_IN_02);
-    assert_eq!(ep2.max_packet_size(), 64);
+            let ep2 = eps.next().unwrap();
+            assert_eq!(ep2.address(), EP_IN_02);
+            assert_eq!(ep2.max_packet_size(), 64);
+        }
+        HarnessUsbDevice::Ot(dev) => {
+            let cfg = dev.active_configuration()?;
+            let desc = cfg.descriptor()?;
+            assert_eq!(desc.num_intf, 1);
+            assert_eq!(desc.tot_length.get(), 32);
+            assert_eq!(desc.config_val, 1);
+            assert!(desc.attr & 0x40 != 0);
+            assert_eq!(desc.max_power, 50); // 50 * 2mA = 100mA
+
+            let iface = cfg.interface_alt_settings().next().unwrap();
+            let iface_desc = iface.descriptor()?;
+            assert_eq!(iface_desc.intf_num, 1);
+            assert_eq!(iface_desc.num_ep, 2);
+            assert_eq!(iface_desc.class, 0xFF);
+            assert_eq!(iface_desc.subclass, 0xFF);
+            assert_eq!(iface_desc.protocol, 1);
+
+            let mut eps = iface.endpoints();
+            let ep1_obj = eps.next().unwrap();
+            let ep1 = ep1_obj.descriptor()?;
+            assert_eq!(ep1.addr, EP_OUT_01);
+            assert_eq!(ep1.max_pkt_size.get(), 64);
+
+            let ep2_obj = eps.next().unwrap();
+            let ep2 = ep2_obj.descriptor()?;
+            assert_eq!(ep2.addr, EP_IN_02);
+            assert_eq!(ep2.max_pkt_size.get(), 64);
+        }
+    }
 
     Ok(())
 }
 
-fn test_string_descriptors(dev: &UsbDeviceHandle) -> Result<()> {
-    let languages = dev.read_languages(TIMEOUT)?;
-    log::info!("Supported languages: {:?}", languages);
-    assert!(!languages.is_empty());
-    let lang = languages[0];
+fn test_string_descriptors(dev: &HarnessUsbDevice) -> Result<()> {
+    match dev {
+        HarnessUsbDevice::Rusb(dev) => {
+            let languages = dev.read_languages(TIMEOUT)?;
+            log::info!("Supported languages: {:?}", languages);
+            assert!(!languages.is_empty());
+            let lang = languages[0];
 
-    let desc = dev.device().device_descriptor()?;
+            let desc = dev.device().device_descriptor()?;
 
-    let manufacturer = dev.read_manufacturer_string_ascii(&desc)?;
-    log::info!("Manufacturer: {}", manufacturer);
-    assert_eq!(manufacturer, "Google");
+            let manufacturer = dev.read_manufacturer_string_ascii(&desc)?;
+            log::info!("Manufacturer: {}", manufacturer);
+            assert_eq!(manufacturer, "Google");
 
-    let product = dev.read_product_string_ascii(&desc)?;
-    log::info!("Product: {}", product);
-    assert_eq!(product, "OpenTitan");
+            let product = dev.read_product_string_ascii(&desc)?;
+            log::info!("Product: {}", product);
+            assert_eq!(product, "OpenTitan");
 
-    let serial = dev.read_serial_number_string_ascii(&desc)?;
-    log::info!("Serial: {}", serial);
-    assert!(!serial.is_empty(), "expected non-empty serial number");
+            let serial = dev.read_serial_number_string_ascii(&desc)?;
+            log::info!("Serial: {}", serial);
+            assert!(!serial.is_empty(), "expected non-empty serial number");
 
-    // Test with language
-    let manufacturer_lang = dev.read_manufacturer_string(lang, &desc, TIMEOUT)?;
-    assert_eq!(manufacturer_lang, manufacturer);
+            // Test with language
+            let manufacturer_lang = dev.read_manufacturer_string(lang, &desc, TIMEOUT)?;
+            assert_eq!(manufacturer_lang, manufacturer);
 
-    let product_lang = dev.read_product_string(lang, &desc, TIMEOUT)?;
-    assert_eq!(product_lang, product);
+            let product_lang = dev.read_product_string(lang, &desc, TIMEOUT)?;
+            assert_eq!(product_lang, product);
 
-    let serial_lang = dev.read_serial_number_string(lang, &desc, TIMEOUT)?;
-    assert_eq!(serial_lang, serial);
+            let serial_lang = dev.read_serial_number_string(lang, &desc, TIMEOUT)?;
+            assert_eq!(serial_lang, serial);
+        }
+        HarnessUsbDevice::Ot(dev) => {
+            let mut lang_buf = [0u8; 256];
+            let len = dev.read_control_timeout(
+                rusb::request_type(Direction::In, RequestType::Standard, Recipient::Device),
+                rusb::constants::LIBUSB_REQUEST_GET_DESCRIPTOR,
+                (rusb::constants::LIBUSB_DT_STRING as u16) << 8,
+                0,
+                &mut lang_buf,
+                TIMEOUT,
+            )?;
+            assert!(len >= 4 && lang_buf[1] == 3);
+
+            let manufacturer = dev.read_string_descriptor_ascii(1)?;
+            log::info!("Manufacturer: {}", manufacturer);
+            assert_eq!(manufacturer, "Google");
+
+            let product = dev.read_string_descriptor_ascii(2)?;
+            log::info!("Product: {}", product);
+            assert_eq!(product, "OpenTitan");
+
+            let serial = dev.read_string_descriptor_ascii(3)?;
+            log::info!("Serial: {}", serial);
+            assert!(!serial.is_empty(), "expected non-empty serial number");
+        }
+    }
 
     Ok(())
 }
 
-fn test_string_descriptor_invalid(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_string_descriptor_invalid(dev: &HarnessUsbDevice) -> Result<()> {
     let res = dev.read_string_descriptor_ascii(0x42);
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error when requesting invalid string descriptor, got {:?}",
         res
     );
     Ok(())
 }
 
-fn test_get_status(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_get_status(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0u8; 2];
 
     log::info!("Testing GetStatus (Device)");
@@ -365,7 +598,7 @@ fn test_get_status(dev: &UsbDeviceHandle) -> Result<()> {
         TIMEOUT,
     );
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error when requesting status for unsupported recipient, got {:?}",
         res
     );
@@ -380,7 +613,7 @@ fn test_get_status(dev: &UsbDeviceHandle) -> Result<()> {
         TIMEOUT,
     );
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error when requesting status for unsupported recipient (Interface), got {:?}",
         res
     );
@@ -388,7 +621,7 @@ fn test_get_status(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_set_configuration(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_set_configuration(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0u8; 1];
     log::info!("Testing SetConfiguration (unconfigured)");
     dev.release_interface(1)?;
@@ -435,7 +668,7 @@ fn test_set_configuration(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_set_interface(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_set_interface(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0x42u8; 1];
     let iface = 1u8;
     let alt_setting = 0u8;
@@ -460,7 +693,7 @@ fn test_set_interface(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_feature_halt(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_feature_halt(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0u8; 2];
 
     for ep in [EP_OUT_01, EP_IN_02] {
@@ -517,7 +750,7 @@ fn test_feature_halt(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_set_feature_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_set_feature_unsupported(dev: &HarnessUsbDevice) -> Result<()> {
     let res = dev.write_control(
         rusb::request_type(Direction::Out, RequestType::Standard, Recipient::Device),
         rusb::constants::LIBUSB_REQUEST_SET_FEATURE,
@@ -527,14 +760,14 @@ fn test_set_feature_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
         TIMEOUT,
     );
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error when setting unsupported feature, got {:?}",
         res
     );
     Ok(())
 }
 
-fn test_clear_feature_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_clear_feature_unsupported(dev: &HarnessUsbDevice) -> Result<()> {
     let res = dev.write_control(
         rusb::request_type(Direction::Out, RequestType::Standard, Recipient::Device),
         rusb::constants::LIBUSB_REQUEST_CLEAR_FEATURE,
@@ -544,14 +777,14 @@ fn test_clear_feature_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
         TIMEOUT,
     );
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error when clearing unsupported feature, got {:?}",
         res
     );
     Ok(())
 }
 
-fn test_synch_frame(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_synch_frame(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0u8; 2];
     dev.read_control(
         rusb::request_type(Direction::In, RequestType::Standard, Recipient::Endpoint),
@@ -564,7 +797,7 @@ fn test_synch_frame(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_std_cmd_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_std_cmd_unsupported(dev: &HarnessUsbDevice) -> Result<()> {
     let mut buffer = [0u8; 256];
     let res = dev.read_control(
         rusb::request_type(Direction::In, RequestType::Standard, Recipient::Device),
@@ -575,24 +808,24 @@ fn test_std_cmd_unsupported(dev: &UsbDeviceHandle) -> Result<()> {
         TIMEOUT,
     );
     assert!(
-        matches!(res, Err(Error::Pipe)),
+        is_pipe_error(&res),
         "expected Pipe error for unsupported standard request, got {:?}",
         res
     );
     Ok(())
 }
 
-fn test_ep_config_invalid_ep(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_ep_config_invalid_ep(dev: &HarnessUsbDevice) -> Result<()> {
     TestReq::ep_config(dev, EP_OUT_0F, false)?;
     Ok(())
 }
 
-fn test_bulk_out_invalid_ep(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_bulk_out_invalid_ep(dev: &HarnessUsbDevice) -> Result<()> {
     TestReq::bulk_out(dev, 0, EP_OUT_0F)?;
     Ok(())
 }
 
-fn test_zlp_transfer(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_zlp_transfer(dev: &HarnessUsbDevice) -> Result<()> {
     let buffer = [0xAA, 0xBB, 0xCC, 0xDD];
     dev.write_control(
         rusb::request_type(Direction::Out, RequestType::Vendor, Recipient::Device),
@@ -605,7 +838,7 @@ fn test_zlp_transfer(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_out_null_handler(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_out_null_handler(dev: &HarnessUsbDevice) -> Result<()> {
     let ep = EP_OUT_01;
     let buffer = [0x11, 0x22, 0x33, 0x44];
     log::info!("Re-initialize with NULL handler");
@@ -621,7 +854,7 @@ fn test_out_null_handler(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_in_null_handler(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_in_null_handler(dev: &HarnessUsbDevice) -> Result<()> {
     let ep = EP_IN_02;
     log::info!("Re-initialize with NULL handler");
     TestReq::ep_config(dev, ep, false)?;
@@ -636,7 +869,7 @@ fn test_in_null_handler(dev: &UsbDeviceHandle) -> Result<()> {
     Ok(())
 }
 
-fn test_in_overflow(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_in_overflow(dev: &HarnessUsbDevice) -> Result<()> {
     // Tell DUT to send 64 bytes on EP2.
     TestReq::bulk_in(dev, 63, EP_IN_02)?;
 
@@ -644,14 +877,17 @@ fn test_in_overflow(dev: &UsbDeviceHandle) -> Result<()> {
     let res = dev.read_bulk(EP_IN_02, &mut buffer, TIMEOUT);
     log::info!("Expected Overflow error: {:?}", res);
     assert!(
-        matches!(res, Err(Error::Overflow)),
+        is_overflow_error(&res),
         "expected Overflow error, got {:?}",
         res
     );
     Ok(())
 }
 
-fn test_out_overflow(dev: &UsbDeviceHandle, uart: &dyn opentitanlib::io::uart::Uart) -> Result<()> {
+fn test_out_overflow(
+    dev: &HarnessUsbDevice,
+    uart: &dyn opentitanlib::io::uart::Uart,
+) -> Result<()> {
     let ep = EP_OUT_01;
     let buffer = vec![0u8; 64];
     // Tell DUT to expect 8 bytes on EP1
@@ -662,14 +898,14 @@ fn test_out_overflow(dev: &UsbDeviceHandle, uart: &dyn opentitanlib::io::uart::U
     Ok(())
 }
 
-fn test_usb_reset(dev: &UsbDeviceHandle, uart: &dyn opentitanlib::io::uart::Uart) -> Result<()> {
+fn test_usb_reset(dev: &HarnessUsbDevice, uart: &dyn opentitanlib::io::uart::Uart) -> Result<()> {
     dev.reset()?;
     UartConsole::wait_for(uart, r"USB Reset on EP0x00", TIMEOUT)?;
     Ok(())
 }
 
 fn test_reset_during_in(
-    dev: &UsbDeviceHandle,
+    dev: &HarnessUsbDevice,
     uart: &dyn opentitanlib::io::uart::Uart,
 ) -> Result<()> {
     // Start a large IN transfer on EP2
@@ -680,13 +916,13 @@ fn test_reset_during_in(
     Ok(())
 }
 
-fn test_exit(dev: &UsbDeviceHandle) -> Result<()> {
+fn test_exit(dev: &HarnessUsbDevice) -> Result<()> {
     TestReq::exit(dev)?;
     Ok(())
 }
 
 fn sync_uart(
-    dev: &UsbDeviceHandle,
+    dev: &HarnessUsbDevice,
     uart: &dyn opentitanlib::io::uart::Uart,
     id: u16,
 ) -> Result<()> {
@@ -716,11 +952,11 @@ fn main() -> Result<()> {
         );
     }
 
-    let device = wait_for_device(&opts)?;
+    let device = wait_for_device(&opts, &transport)?;
     device.claim_interface(1)?;
 
     let mut sync_id = 0u16;
-    let next_sync = |dev: &UsbDeviceHandle, id: &mut u16| -> Result<()> {
+    let next_sync = |dev: &HarnessUsbDevice, id: &mut u16| -> Result<()> {
         *id += 1;
         sync_uart(dev, &*uart, *id)
     };
