@@ -10,6 +10,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
@@ -55,6 +56,7 @@ opentitan_binary(
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310_rom_ext",
         "//hw/top_earlgrey:fpga_cw340_rom_ext",
+        "//hw/top_earlgrey:sim_qemu_rom_ext",
     ],
     manifest = ":manifest_allow_isfb_erase",
     deps = [
@@ -74,6 +76,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Check that bank=0 page=5 is configured for RD/WR, but not ERase.
@@ -82,6 +85,10 @@ opentitan_test(
         testopt_clear_after_test = "True",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        exit_success = "info region bank=0 part=0 page=5 RD-WR-uu-uu-uu-uu LK",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_isfb",
+    ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -99,6 +106,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Even though the isfb_erase extension is present and set to true,
@@ -111,6 +119,10 @@ opentitan_test(
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     manifest = ":manifest_bad_erase_contraint",
+    qemu = qemu_params(
+        exit_success = "info region bank=0 part=0 page=5 RD-WR-uu-uu-uu-uu LK",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_isfb",
+    ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -218,6 +230,7 @@ _ISFB_CONTRAINT_TESTS = {
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             timeout = "moderate",
@@ -241,6 +254,22 @@ _ISFB_CONTRAINT_TESTS = {
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
         manifest = param["manifest"],
+        qemu = qemu_params(
+            binaries = {
+                ":isfb_page_init": "isfb_page_init",
+            },
+            exit_failure = param["failure"],
+            exit_success = param["success"],
+            rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_isfb",
+            test_cmd = """
+                --exec="image assemble --output=init.bin --mirror=false --size=524288 {rom_ext}@{rom_ext_slot_a} {isfb_page_init}@{owner_slot_a}"
+                --exec="bootstrap --clear-uart=true init.bin"
+                --exec="console --non-interactive --exit-success='PASS!' --timeout=10s"
+                --exec="bootstrap --clear-uart=true {firmware}"
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}' --timeout=10s"
+                no-op
+            """,
+        ),
         deps = [
             "//sw/device/lib/base:status",
             "//sw/device/lib/testing/test_framework:ottf_main",
@@ -259,6 +288,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         timeout = "long",
@@ -270,6 +300,11 @@ opentitan_test(
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     manifest = ":manifest_isfb_product_expr",
+    qemu = qemu_params(
+        exit_failure = DEFAULT_TEST_FAILURE_MSG,
+        exit_success = DEFAULT_TEST_SUCCESS_MSG,
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_isfb_error",
+    ),
     deps = [
         "//sw/device/lib/base:status",
         "//sw/device/lib/testing/test_framework:ottf_main",

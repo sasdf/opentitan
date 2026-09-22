@@ -16,6 +16,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:otp.bzl",
@@ -57,6 +58,7 @@ ALERT_LC_STATES = get_lc_items(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
@@ -65,6 +67,9 @@ ALERT_LC_STATES = get_lc_items(
         local_defines = [
             "OTP_ALERT_DIGEST=OTP_CTRL_PARAM_OWNER_SW_CFG_ROM_ALERT_DIGEST_{}_OFFSET".format(lc_state.upper()),
         ],
+        qemu = qemu_params(
+            otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
+        ),
         deps = [
             "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
             "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
@@ -175,10 +180,14 @@ otp_alert_digest(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = ":otp_img_shutdown_alert_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            otp = ":otp_img_shutdown_alert_{}".format(lc_state),
         ),
         deps = [
             "//hw/ip/uart/data:uart_c_regs",

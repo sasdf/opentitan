@@ -125,6 +125,7 @@ _VARIATION_INTEROP_TEST_CASES = [
             },
             otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
             test_cmd = """
+                --bootstrap={firmware}
                 --second-bootstrap={second}
             """,
             test_harness = "//sw/host/tests/rom_ext/e2e_variation_interop",
@@ -141,6 +142,7 @@ _VARIATION_INTEROP_TEST_CASES = [
                 --second-bootstrap={second}
             """,
             test_harness = "//sw/host/tests/rom_ext/e2e_variation_interop",
+            testopt_bootstrap = "False",
         ),
     )
     for tc in _VARIATION_INTEROP_TEST_CASES

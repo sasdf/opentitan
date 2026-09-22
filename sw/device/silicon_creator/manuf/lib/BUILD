@@ -235,6 +235,7 @@ opentitan_test(
             --bootstrap={firmware}
         """,
         test_harness = "//sw/host/tests/manuf/individualize_sw_cfg_functest",
+        testopt_bootstrap = "False",
     ),
     deps = [
         ":flash_info_fields",

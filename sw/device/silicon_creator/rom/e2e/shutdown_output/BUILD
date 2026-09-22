@@ -9,6 +9,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load(
@@ -71,6 +72,7 @@ manifest(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             binaries = {"//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware"},
@@ -83,6 +85,16 @@ manifest(
             tags = maybe_skip_in_ci(lc_state_val),
         ),
         manifest = ":manifest_bad_identifier",
+        qemu = qemu_params(
+            binaries = {"//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware"},
+            exit_failure = MSG_PASS,
+            exit_success = MSG_TEMPLATE_BFV_LCV.format(
+                hex_digits(CONST.BFV.BOOT_POLICY.BAD_IDENTIFIER),
+                hex_digits(lc_state_val),
+            ),
+            otp = ":otp_img_shutdown_output_{}".format(lc_state),
+            tags = maybe_skip_in_ci(lc_state_val),
+        ),
     )
     for lc_state, lc_state_val in get_lc_items()
 ]

@@ -31,6 +31,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/rom/e2e:defs.bzl",
@@ -241,6 +242,7 @@ BOOT_POLICY_BAD_MANIFEST_CASES = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             assemble = "{firmware}@{offset}",
@@ -257,6 +259,17 @@ BOOT_POLICY_BAD_MANIFEST_CASES = [
         manifest = ":{}_{}".format(
             t["name"],
             slot,
+        ),
+        qemu = qemu_params(
+            assemble = "{firmware}@{offset}",
+            exit_failure = t["exit_failure"],
+            exit_success = t["exit_success"],
+            offset = SLOTS[slot],
+            otp = ":otp_img_boot_policy_bad_manifest_{}_sec_ver_{}".format(
+                lc_state,
+                t.get("sec_ver", 0),
+            ),
+            tags = maybe_skip_in_ci(lc_state_val),
         ),
         deps = [
             "//sw/device/lib/testing/test_framework:ottf_main",

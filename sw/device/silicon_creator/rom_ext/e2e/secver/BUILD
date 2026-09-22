@@ -7,6 +7,7 @@ load("//rules:cross_platform.bzl", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
 load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_binary", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "qemu_params")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
     "ROM_EXT_VARIATIONS",
@@ -80,6 +81,7 @@ _TEST_ROM_EXTS = {
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310",
             "//hw/top_earlgrey:fpga_cw340",
+            "//hw/top_earlgrey:sim_qemu_base",
         ],
         extra_bazel_features = [
             "minsize",
@@ -107,6 +109,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         timeout = "moderate",
@@ -148,6 +151,44 @@ opentitan_test(
         testopt_clear_after_test = "True",
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        timeout = "moderate",
+        assemble = "{rom_ext}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}",
+        binaries = {
+            ":boot_test": "boot_test",
+            ":rom_ext_1": "rom_ext1",
+            ":rom_ext_2": "rom_ext2",
+            ":rom_ext_3": "rom_ext3",
+        },
+        exit_success = "BFV:{}".format(hex_digits(CONST.BFV.BOOT_POLICY.ROLLBACK)),
+        rom_ext = ":rom_ext_0",
+        test_cmd = """
+            # First, assemble the additional images we'll need for this test.
+            --exec="image assemble -s 524288 --mirror=false -o fw1.bin {rom_ext1}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+            --exec="image assemble -s 524288 --mirror=false -o fw2.bin {rom_ext2}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+            --exec="image assemble -s 524288 --mirror=false -o fw3.bin {rom_ext3}@{rom_ext_slot_a} {boot_test}@{owner_slot_a}"
+
+            # Check the initial version 0 has been bootstrapped into SlotA
+            --exec="console --non-interactive --exit-success='rom_ext_min_sec_ver = 0'"
+
+            # Rescue and update to SlotB.  We expect to update the secver.
+            --exec="rescue firmware --raw --slot=SlotB fw1.bin"
+            --exec="console --non-interactive --exit-success='rom_ext_min_sec_ver = 1'"
+
+            # Rescue and update to SlotA.  We expect NOT to update the secver.
+            --exec="rescue firmware --raw --slot=SlotA fw2.bin"
+            --exec="console --non-interactive --exit-success='rom_ext_min_sec_ver = 1'"
+
+            # Rescue and update to SlotB.  We expect to update the secver.
+            --exec="rescue firmware --raw --slot=SlotB fw3.bin"
+            --exec="console --non-interactive --exit-success='rom_ext_min_sec_ver = 3'"
+
+            # Finally, bootstrap back to version 0, which we expect NOT to work.
+            --exec="bootstrap --clear-uart=true {firmware}"
+            --exec="console --non-interactive --exit-success='{exit_success}' --timeout=10s"
+            no-op
+        """,
+    ),
 )
 
 opentitan_binary(
@@ -157,6 +198,7 @@ opentitan_binary(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     deps = [
         "//sw/device/lib/base:status",

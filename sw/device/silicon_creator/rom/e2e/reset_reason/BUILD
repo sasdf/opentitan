@@ -8,6 +8,7 @@ load(
     "DEFAULT_TEST_SUCCESS_MSG",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -48,8 +49,12 @@ opentitan_test(
     srcs = ["reset_reasons_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        otp = ":otp_img_reset_reason",
+    ),
+    qemu = qemu_params(
         otp = ":otp_img_reset_reason",
     ),
     deps = [
@@ -140,12 +145,18 @@ RESET_CORRUPTION_SCENARIOS = [
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             exit_failure = t["exit_failure"],
             exit_success = t["exit_success"],
             otp = ":otp_img_reset_reason_{}".format(t["name"]),
             testopt_bootstrap = t["testopt_bootstrap"],
+        ),
+        qemu = qemu_params(
+            exit_failure = t["exit_failure"],
+            exit_success = t["exit_success"],
+            otp = ":otp_img_reset_reason_{}".format(t["name"]),
         ),
         deps = [
             "//sw/device/lib/testing/test_framework:ottf_main",

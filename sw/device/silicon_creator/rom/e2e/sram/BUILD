@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -57,8 +58,12 @@ _TESTS = {
         srcs = ["sram_readback_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            otp = param["otp"],
+        ),
+        qemu = qemu_params(
             otp = param["otp"],
         ),
         deps = [
