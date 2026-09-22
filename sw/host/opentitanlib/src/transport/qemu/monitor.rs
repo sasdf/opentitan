@@ -314,7 +314,11 @@ impl TryFrom<ChardevJson> for Chardev {
         let kind = if let Some(path) = json.filename.strip_prefix("pty:") {
             let path = PathBuf::from(path);
             ChardevKind::Pty { path }
-        } else if let Some(sock) = json.filename.strip_prefix("disconnected:unix:") {
+        } else if let Some(sock) = json
+            .filename
+            .strip_prefix("disconnected:unix:")
+            .or_else(|| json.filename.strip_prefix("unix:"))
+        {
             let path = sock
                 .split(',')
                 .next()
