@@ -46,16 +46,17 @@ for this_arg in "${test_args[@]}"; do
 done
 
 # For provided OTP and flash files, create mutable copies as Bazel will provide
-# read-only files by default
+# read-only files by default (note: `[ ! -w ]` is false for root/UID 0 even on
+# 0555 files, so always copy when a file is provided).
 mutable_otp="otp_img.mut.raw"
-if [ ! -w "$QEMU_OTP" ]; then
-    cp "$QEMU_OTP" "$mutable_otp" && chmod +w "$mutable_otp"
+if [ -n "$QEMU_OTP" ]; then
+    cp -f "$QEMU_OTP" "$mutable_otp" && chmod +w "$mutable_otp"
     export QEMU_OTP="$mutable_otp"
 fi
 
 mutable_flash="flash_img.mut.bin"
-if [ -n "$QEMU_FLASH" ] && [ ! -w "$QEMU_FLASH" ]; then
-    cp "$QEMU_FLASH" "$mutable_flash" && chmod +w "$mutable_flash"
+if [ -n "$QEMU_FLASH" ]; then
+    cp -f "$QEMU_FLASH" "$mutable_flash" && chmod +w "$mutable_flash"
     export QEMU_FLASH="$mutable_flash"
 fi
 

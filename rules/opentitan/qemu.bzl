@@ -76,7 +76,7 @@ def qemu_params(
 def gen_cfg(ctx, **kwargs):
     """Generate a QEMU `readconfig` INI file containing OpenTitan RTL secrets"""
     name = get_override(ctx, "label.name", kwargs)
-    cfggen = get_override(ctx, "executable.cfggen", kwargs)
+    cfggen = get_override(ctx, "attr.cfggen", kwargs)
 
     otp_sv = get_override(ctx, "file.otp_sv", kwargs)
     lc_sv = get_override(ctx, "file.lc_sv", kwargs)
@@ -129,7 +129,7 @@ def gen_otp(ctx, **kwargs):
     out = ctx.actions.declare_file(name + ".raw")
 
     vmem = get_override(ctx, "file.vmem", kwargs)
-    otptool = get_override(ctx, "executable.otptool", kwargs)
+    otptool = get_override(ctx, "attr.otptool", kwargs)
 
     ctx.actions.run(
         inputs = [vmem],
@@ -173,9 +173,9 @@ def gen_flash(ctx, **kwargs):
     firmware_bin = get_override(ctx, "file.firmware_bin", kwargs)
     firmware_elf = get_override(ctx, "file.firmware_elf", kwargs)
 
-    check_elfs = get_override(ctx, "file.check_elfs", kwargs)
+    check_elfs = get_override(ctx, "attr.check_elfs", kwargs)
 
-    flashgen = get_override(ctx, "executable.flashgen", kwargs)
+    flashgen = get_override(ctx, "attr.flashgen", kwargs)
 
     flashgen_inputs = []
     flashgen_args = []
@@ -365,6 +365,15 @@ def _test_dispatch(ctx, exec_env, firmware):
         image = firmware.signed_bin or firmware.default
     else:
         image = None
+        for attr, name in ctx.attr.binaries.items():
+            if name == "firmware":
+                if exec_env.provider and exec_env.provider in attr:
+                    image = getattr(attr[exec_env.provider], "signed_bin", None) or attr[exec_env.provider].default
+                elif DefaultInfo in attr:
+                    for f in attr[DefaultInfo].files.to_list():
+                        if f.extension != "dis":
+                            image = f
+                            break
 
     # Replace the firmware param with the newly assembled image.
     if image:
@@ -409,11 +418,16 @@ def _test_dispatch(ctx, exec_env, firmware):
         bootstrap_cmd = "bootstrap --clear-uart=true {firmware}".format(**param)
         param["bootstrap_cmd"] = '--exec="{}"'.format(bootstrap_cmd)
     else:
+        testopt_bootstrap = param.get("testopt_bootstrap", "True").lower() != "false"
+
         # Generate the flash backend image for QEMU emulation
+        flash_bin = image
+        if flash_bin and flash_bin.extension == "elf":
+            flash_bin = firmware.binary if (firmware and hasattr(firmware, "binary") and ctx.attr.kind != "ram") else None
         flash_image = gen_flash(
             ctx,
             flashgen = exec_env.flashgen,
-            firmware_bin = image,
+            firmware_bin = flash_bin if testopt_bootstrap else None,
             # TODO: no support for convenience debug symbols from ELFs for now
             firmware_elf = None,
             # Do not sanity check ELFs, because we do not expect the binary to
@@ -458,6 +472,11 @@ def _test_dispatch(ctx, exec_env, firmware):
     # default `test_cmd`.
     if ctx.attr.test_harness:
         test_cmd = ctx.attr.test_cmd
+    elif ctx.attr.test_cmd:
+        test_cmd = """
+            --exec="transport init"
+            {bootstrap_cmd}
+        """ + ctx.attr.test_cmd
     else:
         test_cmd = exec_env.test_cmd
     test_cmd = test_cmd.format(**param)
