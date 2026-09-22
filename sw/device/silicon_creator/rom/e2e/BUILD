@@ -30,6 +30,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 
@@ -70,10 +71,14 @@ opentitan_test(
     srcs = [":empty_test"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         otp = ":otp_img_default",
         tags = maybe_skip_in_ci(CONST.LCV.RMA),
+    ),
+    qemu = qemu_params(
+        otp = ":otp_img_default",
     ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
