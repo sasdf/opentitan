@@ -501,6 +501,7 @@ opentitan_test(
     name = "alert_handler_lpg_sleep_mode_pings_test",
     srcs = ["alert_handler_lpg_sleep_mode_pings.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         # The test requires the Ibex core to wait long enough
         # before checking for the ping_timeout error.
@@ -516,6 +517,7 @@ opentitan_test(
         {
             # See #23038, this test requires a provisioned flash in sival.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
