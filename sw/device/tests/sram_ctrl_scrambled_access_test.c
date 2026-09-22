@@ -140,6 +140,7 @@ static bool expect_ecc_errors(void) {
     case kDeviceSilicon:
     case kDeviceSimDV:
     case kDeviceSimVerilator:
+    case kDeviceSimQemu:
       return true;
     default:
       CHECK(false, "Device type not handled: %d", kDeviceType);
