@@ -240,6 +240,7 @@ def _sim_qemu(ctx):
         test_dispatch = _test_dispatch,
         transform = _transform,
         qemu = ctx.executable.qemu,
+        qemu_cov = ctx.executable.qemu_cov,
         qemu_start = ctx.executable._qemu_start,
         cfggen = ctx.attr.cfggen,
         otptool = ctx.attr.otptool,
@@ -264,6 +265,12 @@ sim_qemu = rule(
             cfg = "exec",
             allow_files = True,
             default = Label("//third_party/qemu:qemu-system-riscv32"),
+        ),
+        "qemu_cov": attr.label(
+            executable = True,
+            cfg = "exec",
+            allow_files = True,
+            default = Label("//third_party/qemu:qemu-system-riscv32-cov"),
         ),
         "cfggen": attr.label(
             executable = True,
@@ -380,7 +387,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         param["firmware"] = image.short_path
         action_param["firmware"] = image.path
 
-    data_files += [exec_env.qemu, exec_env.qemu_start]
+    data_files += [exec_env.qemu, exec_env.qemu_cov, exec_env.qemu_start]
 
     # Add arguments to pass directly to QEMU.
     test_script_fmt = {}
@@ -489,6 +496,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         "icount": param["icount"],
         "qemu_args": qemu_args,
         "qemu_bin": exec_env.qemu.short_path,
+        "qemu_cov_bin": exec_env.qemu_cov.short_path,
         "qemu_start": exec_env.qemu_start.short_path,
         "rom": param["rom"],
         "test_cmd": test_cmd,

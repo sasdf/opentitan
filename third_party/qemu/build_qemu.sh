@@ -42,7 +42,7 @@ fi
 # Build QEMU
 build_log="$PWD/qemu_build.log"
 echo "Building QEMU (output log in $build_log)..."
-if ! ninja qemu-system-riscv32 &> "$build_log" ; then
+if ! ninja qemu-system-riscv32 qemu-system-riscv32-cov &> "$build_log" ; then
     echo "Failed (see $build_log)"
     exit 1
 fi
