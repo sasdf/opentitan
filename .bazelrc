@@ -166,3 +166,7 @@ build --incompatible_strict_action_env
 # Therefore we need to make /sys writable, otherwise the code will fallback to directly manipulating the hub
 # using control operations which may confuse the kernel and lead to hard to debug problems.
 test --sandbox_writable_path=/sys/
+
+# Optional config to run QEMU tests with the bundled coverage-instrumented QEMU binary
+# (--config=qemu_coverage), emitting per-test .gcda files to TEST_UNDECLARED_OUTPUTS_DIR/gcov.
+test:qemu_coverage --test_env=OT_QEMU_COVERAGE=1

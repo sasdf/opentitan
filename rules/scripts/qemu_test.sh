@@ -11,6 +11,13 @@ set -e
 
 # Retrieve/set various templated values from Bazel
 export QEMU_BIN="__qemu_bin__"
+if [ "${OT_QEMU_COVERAGE:-0}" = "1" ]; then
+    export QEMU_BIN="__qemu_cov_bin__"
+    if [ -n "${TEST_UNDECLARED_OUTPUTS_DIR:-}" ]; then
+        export GCOV_PREFIX="${TEST_UNDECLARED_OUTPUTS_DIR}/gcov"
+        export GCOV_PREFIX_STRIP=99
+    fi
+fi
 export QEMU_CONFIG="__config__"
 export QEMU_ROM="__rom__"
 export QEMU_OTP="__otp__"
@@ -83,16 +90,22 @@ cleanup() {
 
     if [ -n "$qemu_pid" ] && kill -0 "$qemu_pid" 2>/dev/null; then
         echo "Stopping QEMU: $qemu_pid"
-        # If 2 seconds pass and QEMU is still alive, force kill it.
-        (
-          sleep 2
-          if kill -0 "$qemu_pid" 2>/dev/null; then
+        # Give QMP --qemu-quit a brief moment to finish __gcov_exit() before sending SIGTERM
+        for _ in {1..10}; do
+            kill -0 "$qemu_pid" 2>/dev/null || break
+            sleep 0.02
+        done
+        if kill -0 "$qemu_pid" 2>/dev/null; then
+            kill "$qemu_pid" 2>/dev/null
+            for _ in {1..40}; do
+                kill -0 "$qemu_pid" 2>/dev/null || break
+                sleep 0.05
+            done
+        fi
+        if kill -0 "$qemu_pid" 2>/dev/null; then
             echo "Killing QEMU: $qemu_pid"
             kill -KILL "$qemu_pid" 2>/dev/null
-          fi
-        ) &
-        # Ask QEMU to gracefully terminate (SIGTERM) first
-        kill "$qemu_pid"
+        fi
     fi
 
     # Clean up created log, PID and SPI Flash files
