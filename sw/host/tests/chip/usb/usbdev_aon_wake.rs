@@ -54,7 +54,9 @@ fn usbdev_aon_wake(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) -
     }
 
     // Wait for device to appear.
-    let (hub, port) = opts.usb.wait_for_device_and_get_parent(opts.timeout)?;
+    let (hub, port) = opts
+        .usb
+        .wait_for_device_and_get_parent(transport, opts.timeout)?;
 
     // Next, we suspend the device by directly accessing the parent hub.
     let _ = UartConsole::wait_for(uart, r"configured, waiting for suspend", opts.timeout)?;

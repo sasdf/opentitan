@@ -178,9 +178,18 @@ impl UsbOpts {
     }
 
     // Wait for a device to appear and then return the parent device and port number.
-    pub fn wait_for_device_and_get_parent(&self, timeout: Duration) -> Result<(UsbHub, u8)> {
+    pub fn wait_for_device_and_get_parent(
+        &self,
+        transport: &TransportWrapper,
+        timeout: Duration,
+    ) -> Result<(UsbHub, u8)> {
         // Wait for USB device to appear.
         log::info!("waiting for device...");
+        if let Ok(usb_ctx) = transport.usb() {
+            let usb_dev = usb_ctx.device_by_id_with_timeout(self.vid, self.pid, None, timeout)?;
+            let port = *usb_dev.port_numbers()?.last().unwrap_or(&1);
+            return Ok((UsbHub::from_parent_device(&*usb_dev)?, port));
+        }
         let devices = self.wait_for_device(timeout)?;
         if devices.is_empty() {
             bail!("no USB device found");
