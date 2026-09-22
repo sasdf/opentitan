@@ -756,3 +756,108 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
+opentitan_test(
+    name = "aes_consistency_test",
+    srcs = ["aes_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/aes/data:aes_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
+    name = "entropy_src_consistency_test",
+    srcs = ["entropy_src_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/entropy_src/data:entropy_src_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
+    name = "otp_ctrl_consistency_test",
+    srcs = ["otp_ctrl_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
+        "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
+    name = "i2c_consistency_test",
+    srcs = ["i2c_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/i2c/data:i2c_c_regs",
+        "//hw/top_earlgrey:alert_handler_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/dif:pinmux",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+
+opentitan_test(
+    name = "rv_plic_consistency_test",
+    srcs = ["rv_plic_consistency_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top_earlgrey:alert_handler_c_regs",
+        "//hw/top_earlgrey:rv_plic_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/dif:rv_plic",
+        "//sw/device/lib/dif:uart",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
