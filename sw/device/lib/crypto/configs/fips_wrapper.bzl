@@ -62,12 +62,15 @@ fips_transition_test = rule(
 )
 
 # Generates a wrapper for an opentitan_test to run with the --config=crypto_fips_all flag
-def fips_wrap_opentitan_test(name, exec_env):
+def fips_wrap_opentitan_test(name, exec_env, tags = [], **kwargs):
     for env_label in exec_env.keys():
         env_suffix = env_label.split(":")[-1]
+        env_tags = tags + (["qemu"] if "sim_qemu" in env_suffix else [])
 
         # The new name of the test is {name}_fips_{exec_env}
         fips_transition_test(
             name = "{}_fips_{}".format(name, env_suffix),
             actual_test = ":{}_{}".format(name, env_suffix),
+            tags = env_tags,
+            **kwargs
         )
