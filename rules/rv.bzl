@@ -20,12 +20,16 @@ PER_DEVICE_DEPS = {
 
 def _opentitan_transition_impl(settings, attr):
     features = settings["//command_line_option:features"] + attr.extra_bazel_features
+    copts = list(settings["//command_line_option:copt"])
+    for c in attr.extra_bazel_copts:
+        if c not in copts:
+            copts.append(c)
     coverage = settings["//command_line_option:collect_code_coverage"]
     if attr.collect_code_coverage != -1:
         coverage = bool(attr.collect_code_coverage)
     return {
         "//command_line_option:platforms": attr.platform,
-        "//command_line_option:copt": settings["//command_line_option:copt"],
+        "//command_line_option:copt": copts,
         "//command_line_option:features": features,
         "//command_line_option:collect_code_coverage": coverage,
         "//hw/bitstream/universal:rom": "//hw/bitstream/universal:none",
@@ -67,6 +71,8 @@ def rv_rule(**kwargs):
         attrs["platform"] = attr.string(default = OPENTITAN_PLATFORM)
     if "extra_bazel_features" not in attrs:
         attrs["extra_bazel_features"] = attr.string_list(default = [])
+    if "extra_bazel_copts" not in attrs:
+        attrs["extra_bazel_copts"] = attr.string_list(default = [])
     if "collect_code_coverage" not in attrs:
         attrs["collect_code_coverage"] = attr.int(
             default = -1,

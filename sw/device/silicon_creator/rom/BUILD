@@ -14,6 +14,7 @@ load(
     "opentitan_binary",
     "opentitan_manual_test",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/coverage:asm.bzl", "asm_library_with_coverage")
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
@@ -303,6 +304,7 @@ opentitan_test(
     # Verilator or CW310 params).
     exec_env = {
         "//hw/top_earlgrey:sim_verilator": None,
+        "//hw/top_earlgrey:sim_qemu_base": None,
     },
     kind = "rom",
     linker_script = ":linker_script",
@@ -565,6 +567,21 @@ genrule(
     """,
 )
 
+opentitan_binary(
+    name = "mask_rom_stack_utilization",
+    collect_code_coverage = 0,
+    exec_env = [
+        "//hw/top_earlgrey:sim_qemu_base",
+    ],
+    extra_bazel_copts = ["-DSTACK_UTILIZATION_CHECK"],
+    kind = "rom",
+    linker_script = ":linker_script",
+    deps = [
+        ":mask_rom_lib",
+        ":rom_isrs",
+    ],
+)
+
 opentitan_test(
     name = "stack_utilization_test",
     cw310 = fpga_params(
@@ -627,5 +644,43 @@ opentitan_test(
     ),
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
+    qemu = qemu_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_sim_qemu_rom_with_fake_keys_signed_bin": "good_a",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0_sim_qemu_rom_with_fake_keys_signed_bin": "good_b",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_sim_qemu_rom_with_fake_keys_signed_bin": "bad_a",
+            ":empty_flash": "empty",
+        },
+        rom = ":mask_rom_stack_utilization",
+        stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
+        test_cmd = """
+            --exec="bootstrap --clear-uart=true --leave-in-bootstrap {good_a}"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
+            --exec="gpio remove ROM_BOOTSTRAP"
+            --exec="gpio apply RESET"
+            --exec="gpio remove RESET"
+            --exec="console --non-interactive --exit-success='PASS.*\r\n' --exit-failure='{exit_failure}'"
+            --exec="bootstrap --mirror=false --clear-uart=true --leave-in-bootstrap {good_b}@{rom_ext_slot_b}"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
+            --exec="gpio remove ROM_BOOTSTRAP"
+            --exec="gpio apply RESET"
+            --exec="gpio remove RESET"
+            --exec="console --non-interactive --exit-success='PASS.*\r\n' --exit-failure='{exit_failure}'"
+            --exec="bootstrap --clear-uart=true --leave-in-bootstrap {bad_a}"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
+            --exec="gpio remove ROM_BOOTSTRAP"
+            --exec="gpio apply RESET"
+            --exec="gpio remove RESET"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='PASS|FAIL'"
+            --exec="bootstrap --clear-uart=true --leave-in-bootstrap {empty}"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='{exit_failure}'"
+            --exec="gpio remove ROM_BOOTSTRAP"
+            --exec="gpio apply RESET"
+            --exec="gpio remove RESET"
+            --exec="console --non-interactive --exit-success='{stack_usage}' --exit-failure='PASS|FAIL'"
+            no-op
+        """,
+    ),
 )
