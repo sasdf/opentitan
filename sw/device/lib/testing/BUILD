@@ -511,7 +511,7 @@ cc_library(
     srcs = ["sysrst_ctrl_testutils.c"],
     hdrs = ["sysrst_ctrl_testutils.h"],
     target_compatible_with = [OPENTITAN_CPU],
-    visibility = ["//sw/device/tests:__pkg__"],
+    visibility = ["//sw/device/tests:__subpackages__"],
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/dif:pinmux",
