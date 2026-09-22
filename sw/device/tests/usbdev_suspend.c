@@ -512,6 +512,7 @@ static inline bool physical_timings(void) {
     case kDeviceFpgaCw310:
     case kDeviceFpgaCw340:
     case kDeviceSilicon:
+    case kDeviceSimQemu:
       break;
     default:
       return false;
@@ -1808,6 +1809,7 @@ bool usbdev_suspend_test(usbdev_suspend_phase_t init_phase,
       break;
 
     case kDeviceSilicon:
+    case kDeviceSimQemu:
       // Silicon targets are presently tested with the use of the HyperDebug
       // board for control over the VBUS connection.
       // Suspend, Resume and Reset operations all rely upon control of the
