@@ -172,6 +172,9 @@ static status_t configure_screen_spi_controller(void) {
       .tx_watermark = 0,
       .rx_watermark = 0,
   };
+  if (kClockFreqPeripheralHz / 2 < config.spi_clock) {
+    config.spi_clock = (uint32_t)(kClockFreqPeripheralHz / 2);
+  }
   TRY(dif_gpio_write(&gpio, screen.data_command_gpio, false));
   TRY(dif_gpio_output_set_enabled(&gpio, screen.data_command_gpio,
                                   kDifToggleEnabled));
