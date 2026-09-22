@@ -6473,10 +6473,15 @@ opentitan_test(
         "i2c_target_smbus_arp_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
         tags = ["coverage_broken"],  # RAM exhausted in coverage mode.
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
     ),
