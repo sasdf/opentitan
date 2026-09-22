@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -11,6 +10,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "spi_device_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -75,8 +75,8 @@ bool test_main(void) {
                              SPI_DEVICE_CONTROL_MODE_VALUE_FLASHMODE));
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_READ_THRESHOLD_REG_OFFSET,
                    0xffffffffu);
-  CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_READ_THRESHOLD_REG_OFFSET) ==
-            0x3ffu,
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_READ_THRESHOLD_REG_OFFSET) == 0x3ffu,
         "READ_THRESHOLD 10-bit mask mismatch");
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_READ_THRESHOLD_REG_OFFSET, 0u);
 
@@ -106,18 +106,17 @@ bool test_main(void) {
   st = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_STATUS_REG_OFFSET);
   CHECK(st == kExpectedIdleStatus,
         "Expected CSB=1 and TPM_CSB=1 (0x60) in STATUS, got 0x%x", st);
-  CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_INTR_STATE_REG_OFFSET) ==
-            0u,
-        "Expected INTR_STATE == 0");
+  CHECK(
+      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0u,
+      "Expected INTR_STATE == 0");
 
   // Sequence B: Read STATUS, then read LAST_READ_ADDR.
   st = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_STATUS_REG_OFFSET);
   CHECK(st == kExpectedIdleStatus,
         "Expected CSB=1 and TPM_CSB=1 (0x60) in STATUS, got 0x%x", st);
-  CHECK(
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_LAST_READ_ADDR_REG_OFFSET) ==
-          0u,
-      "Expected LAST_READ_ADDR == 0");
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_LAST_READ_ADDR_REG_OFFSET) == 0u,
+        "Expected LAST_READ_ADDR == 0");
 
   // Sequence C: Read STATUS, then read UPLOAD_STATUS.
   st = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_STATUS_REG_OFFSET);
@@ -131,21 +130,19 @@ bool test_main(void) {
   // 3. Empty UPLOAD_CMDFIFO / UPLOAD_ADDRFIFO reads, W/O reads, and R/O writes
   //    (ot_spi_device.c Chunks 31, 32, 33, 43, 45)
   // ---------------------------------------------------------------------------
-  CHECK(
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_UPLOAD_CMDFIFO_REG_OFFSET) ==
-          0u,
-      "Empty UPLOAD_CMDFIFO read must return 0");
-  CHECK(
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_UPLOAD_ADDRFIFO_REG_OFFSET) ==
-          0u,
-      "Empty UPLOAD_ADDRFIFO read must return 0");
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_UPLOAD_CMDFIFO_REG_OFFSET) == 0u,
+        "Empty UPLOAD_CMDFIFO read must return 0");
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_UPLOAD_ADDRFIFO_REG_OFFSET) == 0u,
+        "Empty UPLOAD_ADDRFIFO read must return 0");
 
   // W/O registers (INTR_TEST, ALERT_TEST, TPM_READ_FIFO) read back as 0.
   CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_INTR_TEST_REG_OFFSET) == 0u,
         "W/O INTR_TEST must read as 0");
-  CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_ALERT_TEST_REG_OFFSET) ==
-            0u,
-        "W/O ALERT_TEST must read as 0");
+  CHECK(
+      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_ALERT_TEST_REG_OFFSET) == 0u,
+      "W/O ALERT_TEST must read as 0");
   CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_READ_FIFO_REG_OFFSET) ==
             0u,
         "W/O TPM_READ_FIFO must read as 0");
@@ -167,14 +164,12 @@ bool test_main(void) {
             kExpectedIdleStatus,
         "R/O STATUS write must be ignored");
   abs_mmio_write32(kPinmuxTpmCsbInselAddr, kTopEarlgreyPinmuxInselConstantZero);
-  CHECK(
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_LAST_READ_ADDR_REG_OFFSET) ==
-          0u,
-      "R/O LAST_READ_ADDR write must be ignored");
-  CHECK(
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_UPLOAD_CMDFIFO_REG_OFFSET) ==
-          0u,
-      "R/O UPLOAD_CMDFIFO write must be ignored");
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_LAST_READ_ADDR_REG_OFFSET) == 0u,
+        "R/O LAST_READ_ADDR write must be ignored");
+  CHECK(abs_mmio_read32(kSpiDeviceBase +
+                        SPI_DEVICE_UPLOAD_CMDFIFO_REG_OFFSET) == 0u,
+        "R/O UPLOAD_CMDFIFO write must be ignored");
   CHECK(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_CAP_REG_OFFSET) ==
             tpm_cap_orig,
         "R/O TPM_CAP write must be ignored");

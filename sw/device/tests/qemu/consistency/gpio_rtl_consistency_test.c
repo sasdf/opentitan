@@ -64,11 +64,11 @@ bool test_main(void) {
   // 1. Verify GPIO.ALERT_TEST is a one-shot 1-cycle pulse (`alert_test.q &
   // alert_test.qe` in gpio.sv:149-152) rather than latching s->alert high.
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
   CHECK_DIF_OK(dif_alert_handler_configure_alert(
-      &alert_handler, kTopEarlgreyAlertIdGpioFatalFault,
-      kDifAlertHandlerClassD, kDifToggleEnabled, kDifToggleDisabled));
+      &alert_handler, kTopEarlgreyAlertIdGpioFatalFault, kDifAlertHandlerClassD,
+      kDifToggleEnabled, kDifToggleDisabled));
   CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
       &alert_handler, kTopEarlgreyAlertIdGpioFatalFault));
 
@@ -98,9 +98,9 @@ bool test_main(void) {
   // re-asserts `INTR_STATE` (`gpio.sv:139-145`).
   dif_pinmux_t pinmux;
   CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio0,
-      kTopEarlgreyPinmuxInselConstantZero));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio0,
+                                       kTopEarlgreyPinmuxInselConstantZero));
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
   abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_LVLLOW_REG_OFFSET, 1u);
   busy_spin_micros(10);
@@ -132,12 +132,12 @@ bool test_main(void) {
   // GPIO[3]`) loopback into `GPIO.DATA_IN`.
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIoa2,
                                         kTopEarlgreyPinmuxOutselConstantOne));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio2,
-      kTopEarlgreyPinmuxInselIoa2));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio3,
-      kTopEarlgreyPinmuxInselIoa2));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio2,
+                                       kTopEarlgreyPinmuxInselIoa2));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio3,
+                                       kTopEarlgreyPinmuxInselIoa2));
   busy_spin_micros(10);
   uint32_t data_const_one =
       (abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 0x3u;
@@ -188,13 +188,13 @@ bool test_main(void) {
 
   // 4b: When `PERIPH_INSEL[2] = ConstantZero` (`insel = 0`), `mio_mux[0]` in
   // `pinmux.sv:470` selects `1'b0` directly inside pinmux without passing
-  // through `Ioa2`'s pad wrapper (`mio_attr[Ioa2].invert`), so `GPIO.DATA_IN[2]`
-  // MUST read 0 even while `MIO_OUTSEL[Ioa2] = GpioGpio2` and
+  // through `Ioa2`'s pad wrapper (`mio_attr[Ioa2].invert`), so
+  // `GPIO.DATA_IN[2]` MUST read 0 even while `MIO_OUTSEL[Ioa2] = GpioGpio2` and
   // `MIO_PAD_ATTR[Ioa2].INVERT = 1`.
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio2,
-      kTopEarlgreyPinmuxInselConstantZero));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio2,
+                                       kTopEarlgreyPinmuxInselConstantZero));
   busy_spin_micros(10);
   uint32_t data_const0_with_pad_inv =
       (abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u;
@@ -209,9 +209,9 @@ bool test_main(void) {
   // 5. Verify MIO_PAD_ATTR.INPUT_DISABLE (bit 7 = 0x80) WARL readback and pad
   // input disable behavior (`ie = 0 -> in_raw_o = 0` in
   // `prim_xilinx_ultrascale_pad_wrapper.sv:49, 94` even while pad drives 1).
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio2,
-      kTopEarlgreyPinmuxInselIoa2));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio2,
+                                       kTopEarlgreyPinmuxInselIoa2));
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 1u << 2);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 1u << 2);
   abs_mmio_write32(kPinmuxBase + ioa2_attr_off,
@@ -224,10 +224,11 @@ bool test_main(void) {
              "[5a] MIO_PAD_ATTR[Ioa2] write INPUT_DISABLE (0x80) read back "
              "0x%08x, expected 0x00000080",
              attr_rb);
-  EXPECT_RTL(data_in_dis == 0u,
-             "[5b] GPIO.DATA_IN[2] = %u when MIO_PAD_ATTR[Ioa2].INPUT_DISABLE=1 "
-             "(driving 1), expected 0",
-             data_in_dis);
+  EXPECT_RTL(
+      data_in_dis == 0u,
+      "[5b] GPIO.DATA_IN[2] = %u when MIO_PAD_ATTR[Ioa2].INPUT_DISABLE=1 "
+      "(driving 1), expected 0",
+      data_in_dis);
   if (attr_rb == (1u << PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT) &&
       data_in_dis == 0u) {
     LOG_INFO(
@@ -246,9 +247,10 @@ bool test_main(void) {
       abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET);
   uint32_t m_upper =
       abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET);
-  EXPECT_RTL(dir_out == 0x5a3456a5u,
-             "[6a] DIRECT_OUT after masked writes = 0x%08x, expected 0x5a3456a5",
-             dir_out);
+  EXPECT_RTL(
+      dir_out == 0x5a3456a5u,
+      "[6a] DIRECT_OUT after masked writes = 0x%08x, expected 0x5a3456a5",
+      dir_out);
   EXPECT_RTL(m_lower == 0x000056a5u && m_upper == 0x00005a34u,
              "[6b] MASKED_OUT_{LOWER,UPPER} readback = (0x%08x, 0x%08x), "
              "expected (0x000056a5, 0x00005a34) with mask[31:16]=0",
@@ -271,9 +273,10 @@ bool test_main(void) {
   abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u << 2);
   uint32_t intr_rise_cleared =
       (abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) >> 2) & 1u;
-  EXPECT_RTL(intr_rise == 1u && intr_rise_cleared == 0u,
-             "[7] Edge interrupt INTR_STATE[2] rise=%u cleared=%u, expected 1,0",
-             intr_rise, intr_rise_cleared);
+  EXPECT_RTL(
+      intr_rise == 1u && intr_rise_cleared == 0u,
+      "[7] Edge interrupt INTR_STATE[2] rise=%u cleared=%u, expected 1,0",
+      intr_rise, intr_rise_cleared);
 
   // 8. Wave 5: GPIO_PERMIT sub-word write wr_err and addrmiss checks.
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0xa5a55a5au);
@@ -301,9 +304,10 @@ bool test_main(void) {
   g_expect_access_fault = true;
   abs_mmio_write8(kGpioBase + GPIO_ALERT_TEST_REG_OFFSET + 1u, 0u);
   g_expect_access_fault = false;
-  EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u,
-             "[8c] 8-bit write to ALERT_TEST+1 (PERMIT=4'b0001, reg_be=4'b0010) "
-             "must raise Store Access Fault (mcause=7)");
+  EXPECT_RTL(
+      g_access_fault_count == 1u && g_last_mcause == 7u,
+      "[8c] 8-bit write to ALERT_TEST+1 (PERMIT=4'b0001, reg_be=4'b0010) "
+      "must raise Store Access Fault (mcause=7)");
 
   g_access_fault_count = 0;
   g_last_mcause = 0;

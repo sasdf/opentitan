@@ -37,7 +37,8 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 
 bool test_main(void) {
   // 1. Sub-word (size < 4) CSR reads from DIGEST_0 and EXP_DIGEST_0.
-  uint32_t d0 = abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
+  uint32_t d0 =
+      abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
   uint32_t e0 =
       abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET);
   CHECK(d0 == e0);

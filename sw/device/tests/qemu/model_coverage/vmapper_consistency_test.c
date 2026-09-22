@@ -30,8 +30,7 @@ alignas(4096) static volatile uint32_t
 
 bool test_main(void) {
   dif_rv_core_ibex_t ibex;
-  CHECK_DIF_OK(
-      dif_rv_core_ibex_init(mmio_region_from_addr(kIbexBase), &ibex));
+  CHECK_DIF_OK(dif_rv_core_ibex_init(mmio_region_from_addr(kIbexBase), &ibex));
 
   uint32_t dbus_regwen_0 =
       abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_REGWEN_0_REG_OFFSET);
@@ -86,7 +85,8 @@ bool test_main(void) {
   // Configure Slot 0 (higher priority, prio = 0) at the SAME base address
   // [sram_virt_win, sram_virt_win + 1023] -> sram_buf_a (size = 1024 < 4096).
   // Because start0 == start1 and end0 < end1, Slot 0 overrides [0..1023] and
-  // shifts Slot 1's active window to [1024..4095] -> sram_buf_b + 1024 (case b1).
+  // shifts Slot 1's active window to [1024..4095] -> sram_buf_b + 1024 (case
+  // b1).
   dif_rv_core_ibex_addr_translation_mapping_t map_slot0_prefix = {
       .matching_addr = (uintptr_t)&sram_virt_win[0],
       .remap_addr = (uintptr_t)sram_buf_a,

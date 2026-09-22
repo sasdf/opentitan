@@ -94,7 +94,8 @@ static uint32_t pad_attr_mask_get(void) {
   mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_INPUT_DISABLE_0_BIT,
                               true);
   if (kDeviceType == kDeviceSimQemu) {
-    mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT, true);
+    mask =
+        bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_EN_0_BIT, true);
     mask = bitfield_bit32_write(mask, PINMUX_MIO_PAD_ATTR_0_PULL_SELECT_0_BIT,
                                 true);
     mask = bitfield_field32_write(

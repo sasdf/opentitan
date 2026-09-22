@@ -118,8 +118,8 @@ opentitan_test(
     ),
     deps = [
         "//hw/ip/adc_ctrl/data:adc_ctrl_c_regs",
-        "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey:rv_plic_c_regs",
+        "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/runtime:hart",
@@ -735,6 +735,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "ot_otp_engine_consistency_test",
     srcs = ["ot_otp_engine_consistency_test.c"],
@@ -757,6 +758,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "ot_hmac_consistency_test",
     srcs = ["ot_hmac_consistency_test.c"],
@@ -780,6 +782,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "ot_flash_consistency_test",
     srcs = ["ot_flash_consistency_test.c"],
@@ -963,4 +966,3 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
-

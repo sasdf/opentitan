@@ -5,10 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "edn_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "kmac_regs.h"
-#include "rv_core_ibex_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -16,6 +12,11 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "edn_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "kmac_regs.h"
+#include "rv_core_ibex_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
@@ -124,11 +125,11 @@ bool test_main(void) {
 
   // 2. Invalid MODE=1 and KSTRENGTH=5 with EN_UNSUPPORTED_MODESTRENGTH=0.
   uint32_t cfg_bad_mode = 0;
-  cfg_bad_mode = bitfield_field32_write(cfg_bad_mode,
-                                        KMAC_CFG_SHADOWED_MODE_FIELD, 1u);
-  cfg_bad_mode = bitfield_field32_write(
-      cfg_bad_mode, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
-      KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  cfg_bad_mode =
+      bitfield_field32_write(cfg_bad_mode, KMAC_CFG_SHADOWED_MODE_FIELD, 1u);
+  cfg_bad_mode =
+      bitfield_field32_write(cfg_bad_mode, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                             KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
   write_cfg_shadowed(cfg_bad_mode);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
@@ -142,9 +143,9 @@ bool test_main(void) {
                    1u << KMAC_CMD_ERR_PROCESSED_BIT);
 
   uint32_t cfg_bad_strength = 0;
-  cfg_bad_strength = bitfield_field32_write(
-      cfg_bad_strength, KMAC_CFG_SHADOWED_MODE_FIELD,
-      KMAC_CFG_SHADOWED_MODE_VALUE_SHA3);
+  cfg_bad_strength =
+      bitfield_field32_write(cfg_bad_strength, KMAC_CFG_SHADOWED_MODE_FIELD,
+                             KMAC_CFG_SHADOWED_MODE_VALUE_SHA3);
   cfg_bad_strength = bitfield_field32_write(
       cfg_bad_strength, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD, 5u);
   write_cfg_shadowed(cfg_bad_strength);
@@ -199,12 +200,11 @@ bool test_main(void) {
   // (PREFIX_0 = 0x00010001). Verify hardware still absorbs StPrefix and uses
   // funcpad=0x04.
   uint32_t cfg_cshake = 0;
-  cfg_cshake = bitfield_field32_write(
-      cfg_cshake, KMAC_CFG_SHADOWED_MODE_FIELD,
-      KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
-  cfg_cshake = bitfield_field32_write(
-      cfg_cshake, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
-      KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  cfg_cshake = bitfield_field32_write(cfg_cshake, KMAC_CFG_SHADOWED_MODE_FIELD,
+                                      KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
+  cfg_cshake =
+      bitfield_field32_write(cfg_cshake, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                             KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
   write_cfg_shadowed(cfg_cshake);
   abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x00010001u);
   for (uint32_t i = 1; i < 11u; ++i) {
@@ -231,8 +231,7 @@ bool test_main(void) {
   // StProcessing -> StAbsorbed (kmac_entropy.sv:702-703, ot_kmac.c:564), and
   // verify CMD.ERR_PROCESSED resets StRandErr -> StRandReset so SwMode can be
   // latched next (kmac_entropy.sv:710).
-  uint32_t saved_edn0_ctrl =
-      abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET);
+  uint32_t saved_edn0_ctrl = abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
   abs_mmio_write32(kKmacBase + KMAC_ENTROPY_PERIOD_REG_OFFSET,
                    2000u << KMAC_ENTROPY_PERIOD_WAIT_TIMER_OFFSET);
@@ -243,14 +242,14 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   uint32_t cfg_edn_timeout = 0;
-  cfg_edn_timeout = bitfield_bit32_write(
-      cfg_edn_timeout, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
-  cfg_edn_timeout = bitfield_field32_write(
-      cfg_edn_timeout, KMAC_CFG_SHADOWED_MODE_FIELD,
-      KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
-  cfg_edn_timeout = bitfield_field32_write(
-      cfg_edn_timeout, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
-      KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  cfg_edn_timeout = bitfield_bit32_write(cfg_edn_timeout,
+                                         KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
+  cfg_edn_timeout =
+      bitfield_field32_write(cfg_edn_timeout, KMAC_CFG_SHADOWED_MODE_FIELD,
+                             KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
+  cfg_edn_timeout =
+      bitfield_field32_write(cfg_edn_timeout, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                             KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
   cfg_edn_timeout = bitfield_field32_write(
       cfg_edn_timeout, KMAC_CFG_SHADOWED_ENTROPY_MODE_FIELD,
       KMAC_CFG_SHADOWED_ENTROPY_MODE_VALUE_EDN_MODE);
@@ -305,12 +304,12 @@ bool test_main(void) {
   uint32_t cfg_sw_entropy = 0;
   cfg_sw_entropy =
       bitfield_bit32_write(cfg_sw_entropy, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
-  cfg_sw_entropy = bitfield_field32_write(
-      cfg_sw_entropy, KMAC_CFG_SHADOWED_MODE_FIELD,
-      KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
-  cfg_sw_entropy = bitfield_field32_write(
-      cfg_sw_entropy, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
-      KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
+  cfg_sw_entropy =
+      bitfield_field32_write(cfg_sw_entropy, KMAC_CFG_SHADOWED_MODE_FIELD,
+                             KMAC_CFG_SHADOWED_MODE_VALUE_CSHAKE);
+  cfg_sw_entropy =
+      bitfield_field32_write(cfg_sw_entropy, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
+                             KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
   cfg_sw_entropy = bitfield_field32_write(
       cfg_sw_entropy, KMAC_CFG_SHADOWED_ENTROPY_MODE_FIELD,
       KMAC_CFG_SHADOWED_ENTROPY_MODE_VALUE_SW_MODE);
@@ -334,11 +333,11 @@ bool test_main(void) {
         "ENTROPY_SEED, got 0x%08x",
         proc_status);
 
-  // Issue CMD.START while in KMAC_ST_PROCESSING -> ErrSwCmdSequence (0x0804021d).
+  // Issue CMD.START while in KMAC_ST_PROCESSING -> ErrSwCmdSequence
+  // (0x0804021d).
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
-  uint32_t err_in_proc =
-      abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t err_in_proc = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   CHECK(err_in_proc == 0x0804021du,
         "Expected ERR_CODE 0x0804021d for CMD.START in PROCESSING, got 0x%08x",
         err_in_proc);
@@ -346,8 +345,7 @@ bool test_main(void) {
   // Write 5 words to ENTROPY_SEED; verify KMAC remains stalled in PROCESSING
   // because BiviumStateWidth=177 / PartialSeedWidth=32 requires 6 words.
   for (uint32_t i = 0; i < 5u; ++i) {
-    abs_mmio_write32(kKmacBase + KMAC_ENTROPY_SEED_REG_OFFSET,
-                     0x12345678u + i);
+    abs_mmio_write32(kKmacBase + KMAC_ENTROPY_SEED_REG_OFFSET, 0x12345678u + i);
   }
   uint32_t status_after_5_seeds =
       abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
@@ -370,13 +368,11 @@ bool test_main(void) {
   // Verify exact golden digests across CW340 FPGA and QEMU.
   CHECK(mode1_w0 == 0x0146d2c5u && mode1_w1 == 0x3c23f786u,
         "MODE=1 L256 digest mismatch: got 0x%08x 0x%08x", mode1_w0, mode1_w1);
-  CHECK(cshake_empty_ns_w0 == 0xbb97943eu &&
-            cshake_empty_ns_w1 == 0xb3e58d57u,
+  CHECK(cshake_empty_ns_w0 == 0xbb97943eu && cshake_empty_ns_w1 == 0xb3e58d57u,
         "CShake empty N/S digest mismatch: got 0x%08x 0x%08x",
         cshake_empty_ns_w0, cshake_empty_ns_w1);
   CHECK(keylen5_w0 == 0x85cc0469u && keylen5_w1 == 0x707e1850u,
-        "KEY_LEN=5 digest mismatch: got 0x%08x 0x%08x", keylen5_w0,
-        keylen5_w1);
+        "KEY_LEN=5 digest mismatch: got 0x%08x 0x%08x", keylen5_w0, keylen5_w1);
 
   return true;
 }

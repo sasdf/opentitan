@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/csr.h"
@@ -12,6 +11,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "kmac_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -31,12 +31,12 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   fault_count++;
 }
 
-#define EXPECT_RTL(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) {                              \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
-      all_ok = false;                           \
-    }                                           \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 static void write_cfg_shadowed(uint32_t val) {
@@ -62,9 +62,9 @@ bool test_main(void) {
   // Expected ERR_CODE = 0x0804002e (QEMU shifts err_swsequence to bit 11 ->
   // 0x0800082e).
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0xffffffffu);
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_PROCESS));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
   uint32_t err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   EXPECT_RTL(err_code == 0x0804002eu,
              "ERR_CODE for CmdProcess in StIdle expected 0x0804002e, got "
@@ -72,9 +72,8 @@ bool test_main(void) {
              err_code);
 
   // Acknowledge error via CMD.err_processed and clear INTR_STATE.
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0xffffffffu);
 
   // 2. Configure KMAC-128 in cSHAKE mode with software entropy.
@@ -95,13 +94,11 @@ bool test_main(void) {
   }
 
   // Clear ENTROPY_REFRESH_HASH_CNT via CMD.hash_cnt_clr.
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_HASH_CNT_CLR_BIT, true));
-  EXPECT_RTL(
-      abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET) ==
-          0u,
-      "ENTROPY_REFRESH_HASH_CNT should be 0 after HASH_CNT_CLR");
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_HASH_CNT_CLR_BIT, true));
+  EXPECT_RTL(abs_mmio_read32(kKmacBase +
+                             KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET) == 0u,
+             "ENTROPY_REFRESH_HASH_CNT should be 0 after HASH_CNT_CLR");
 
   // Program 128-bit key (KEY_SHARE0 ^ KEY_SHARE1 = 0x40..0x4f).
   const uint32_t kKeyShare0[4] = {0x43424140u, 0x47464544u, 0x4b4a4948u,
@@ -148,8 +145,7 @@ bool test_main(void) {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_FIFO_EMPTY_BIT));
 
-  uint32_t intr_state =
-      abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
+  uint32_t intr_state = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
   EXPECT_RTL(
       bitfield_bit32_read(intr_state, KMAC_INTR_COMMON_FIFO_EMPTY_BIT) == false,
       "INTR_STATE.fifo_empty should remain 0 when MSG_FIFO was never full "
@@ -157,24 +153,24 @@ bool test_main(void) {
       intr_state);
 
   // 4. Issue CmdProcess and wait for StSqueeze.
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_PROCESS));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
   do {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
 
-  // 5. Verify ENTROPY_REFRESH_HASH_CNT incremented to 1, and that CMD.entropy_req
-  // clears ENTROPY_REFRESH_HASH_CNT (`hash_cnt_clr = hash_cnt_clr_i ||
-  // threshold_hit || entropy_refresh_req_i` in kmac_entropy.sv:311).
+  // 5. Verify ENTROPY_REFRESH_HASH_CNT incremented to 1, and that
+  // CMD.entropy_req clears ENTROPY_REFRESH_HASH_CNT (`hash_cnt_clr =
+  // hash_cnt_clr_i || threshold_hit || entropy_refresh_req_i` in
+  // kmac_entropy.sv:311).
   uint32_t hash_cnt =
       abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET);
   EXPECT_RTL(hash_cnt == 1u,
              "ENTROPY_REFRESH_HASH_CNT expected 1 after KMAC op, got %u",
              hash_cnt);
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_ENTROPY_REQ_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_ENTROPY_REQ_BIT, true));
   hash_cnt =
       abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET);
   EXPECT_RTL(
@@ -217,9 +213,9 @@ bool test_main(void) {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT));
   abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x03020100u);
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_PROCESS));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
   do {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
@@ -242,9 +238,9 @@ bool test_main(void) {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT));
   abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x03020100u);
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_field32_write(0, KMAC_CMD_CMD_FIELD, KMAC_CMD_CMD_VALUE_PROCESS));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_field32_write(0, KMAC_CMD_CMD_FIELD,
+                                          KMAC_CMD_CMD_VALUE_PROCESS));
   do {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_SQUEEZE_BIT));
@@ -278,9 +274,8 @@ bool test_main(void) {
   // 8. Wave 2 Check B: ERR_CODE is a RO prim_subreg gated only by
   // hw2reg.err_code.de = event_error (kmac.sv:684, kmac_reg_top.sv:2564-2587).
   // Writing CMD.err_processed = 1 does NOT clear ERR_CODE to 0.
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0xffffffffu);
   err_code = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   EXPECT_RTL(err_code == 0x0200be14u,
@@ -341,9 +336,8 @@ bool test_main(void) {
 
   // Write CMD.err_processed = 1: KMAC must remain in StAbsorb (not abort to
   // StIdle).
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_ERR_PROCESSED_BIT, true));
   status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   EXPECT_RTL(bitfield_bit32_read(status, KMAC_STATUS_SHA3_ABSORB_BIT) &&
                  !bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT),
@@ -395,12 +389,11 @@ bool test_main(void) {
   // KMAC_EN=1 (in_keyblock_i in kmac_entropy.sv:308-314), not when KMAC_EN=0
   // (SHA3/cSHAKE), and resets to 0 when reaching
   // ENTROPY_REFRESH_THRESHOLD_SHADOWED (kmac_entropy.sv:311, 337).
-  abs_mmio_write32(
-      kKmacBase + KMAC_CMD_REG_OFFSET,
-      bitfield_bit32_write(0, KMAC_CMD_HASH_CNT_CLR_BIT, true));
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   bitfield_bit32_write(0, KMAC_CMD_HASH_CNT_CLR_BIT, true));
   uint32_t sha3_cfg = 0;
-  sha3_cfg = bitfield_bit32_write(sha3_cfg, KMAC_CFG_SHADOWED_KMAC_EN_BIT,
-                                  false);
+  sha3_cfg =
+      bitfield_bit32_write(sha3_cfg, KMAC_CFG_SHADOWED_KMAC_EN_BIT, false);
   sha3_cfg = bitfield_field32_write(sha3_cfg, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
                                     KMAC_CFG_SHADOWED_KSTRENGTH_VALUE_L256);
   sha3_cfg = bitfield_field32_write(sha3_cfg, KMAC_CFG_SHADOWED_MODE_FIELD,
@@ -424,10 +417,9 @@ bool test_main(void) {
   do {
     status = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, KMAC_STATUS_SHA3_IDLE_BIT));
-  EXPECT_RTL(
-      abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET) ==
-          0u,
-      "ENTROPY_REFRESH_HASH_CNT must remain 0 after SHA3 (KMAC_EN=0)");
+  EXPECT_RTL(abs_mmio_read32(kKmacBase +
+                             KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET) == 0u,
+             "ENTROPY_REFRESH_HASH_CNT must remain 0 after SHA3 (KMAC_EN=0)");
 
   // 14. Wave 5 Check: KMAC_PERMIT sub-word read/write and addrmiss checks.
   // 14a. Sub-word read (lb) on KMAC_STATUS (0x1c) succeeds without fault.
@@ -442,17 +434,17 @@ bool test_main(void) {
   // whereas sb at byte 1 faults with mcause=7.
   faults_before = fault_count;
   abs_mmio_write8(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET, 0x3u);
-  EXPECT_RTL(fault_count == faults_before &&
-                 abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) ==
-                     0x3u,
-             "sb at byte 0 of KMAC_INTR_ENABLE (PERMIT=0x1) should succeed");
+  EXPECT_RTL(
+      fault_count == faults_before &&
+          abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) == 0x3u,
+      "sb at byte 0 of KMAC_INTR_ENABLE (PERMIT=0x1) should succeed");
   faults_before = fault_count;
   last_mcause = 0;
   abs_mmio_write8(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET + 1u, 0x0u);
-  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 7u &&
-                 abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) ==
-                     0x3u,
-             "sb at byte 1 of KMAC_INTR_ENABLE (PERMIT=0x1) expected fault(7)");
+  EXPECT_RTL(
+      fault_count == faults_before + 1u && last_mcause == 7u &&
+          abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET) == 0x3u,
+      "sb at byte 1 of KMAC_INTR_ENABLE (PERMIT=0x1) expected fault(7)");
   abs_mmio_write32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET, 0u);
 
   // 14c. KMAC_PREFIX_0 has KMAC_PERMIT = 0xf: sb at byte 0 faults with mcause=7
@@ -461,19 +453,18 @@ bool test_main(void) {
   faults_before = fault_count;
   last_mcause = 0;
   abs_mmio_write8(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x99u);
-  EXPECT_RTL(fault_count == faults_before + 1u && last_mcause == 7u &&
-                 abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET) ==
-                     0x11223344u,
-             "sb to KMAC_PREFIX_0 (PERMIT=0xf) expected fault(7) & unchanged");
+  EXPECT_RTL(
+      fault_count == faults_before + 1u && last_mcause == 7u &&
+          abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET) == 0x11223344u,
+      "sb to KMAC_PREFIX_0 (PERMIT=0xf) expected fault(7) & unchanged");
 
   // 15. Wave 7 Check: KMAC_STATE sub-word read (`lb`) with STATE_ENDIANNESS=1.
   // In kmac_staterd.sv:90, conv_endian32() swaps the 32-bit word tlram_rdata
   // ({s[0], s[1], s[2], s[3]} = 0xa7ffc6f8 for SHA3-256("")), so lb at byte
   // offsets 0..3 (share0 ^ share1) returns 0xf8, 0xc6, 0xff, 0xa7.
   uint32_t endian_cfg = sha3_cfg;
-  endian_cfg =
-      bitfield_bit32_write(endian_cfg, KMAC_CFG_SHADOWED_STATE_ENDIANNESS_BIT,
-                           true);
+  endian_cfg = bitfield_bit32_write(
+      endian_cfg, KMAC_CFG_SHADOWED_STATE_ENDIANNESS_BIT, true);
   write_cfg_shadowed(endian_cfg);
   abs_mmio_write32(
       kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -496,11 +487,10 @@ bool test_main(void) {
              "KMAC_STATE Share 0 and Share 1 must both be non-zero masked "
              "shares (EnMasking=1): share0=0x%08x share1=0x%08x",
              share0_w0, share1_w0);
-  EXPECT_RTL(abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x0c8u) ==
-                     0u &&
-                 abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x1c8u) ==
-                     0u,
-             "KMAC_STATE offsets >= 200B (0x0c8, 0x1c8) must read as 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x0c8u) == 0u &&
+          abs_mmio_read32(kKmacBase + KMAC_STATE_REG_OFFSET + 0x1c8u) == 0u,
+      "KMAC_STATE offsets >= 200B (0x0c8, 0x1c8) must read as 0");
   uint32_t state_reconstructed = 0;
   for (uint32_t i = 0; i < 4u; ++i) {
     uint8_t s0_b = abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + i);
@@ -527,21 +517,21 @@ bool test_main(void) {
   // (kmac_done, bit 0) behavior (kmac.sv:660-668).
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0x7u);
   abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET, 0x3u);
-  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
-                 0x3u,
-             "INTR_TEST=0x3 should set both kmac_done and fifo_empty");
+  EXPECT_RTL(
+      (abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) == 0x3u,
+      "INTR_TEST=0x3 should set both kmac_done and fifo_empty");
   // Writing W1C to INTR_STATE clears Event-type kmac_done (bit 0) while
   // Status-type fifo_empty (bit 1) remains driven by INTR_TEST.
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0x3u);
-  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
-                 0x2u,
-             "INTR_STATE W1C should clear kmac_done(0) but keep fifo_empty(1) "
-             "while INTR_TEST.fifo_empty=1");
+  EXPECT_RTL(
+      (abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) == 0x2u,
+      "INTR_STATE W1C should clear kmac_done(0) but keep fifo_empty(1) "
+      "while INTR_TEST.fifo_empty=1");
   // Writing INTR_TEST=0 deasserts Status-type fifo_empty (bit 1).
   abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET, 0x0u);
-  EXPECT_RTL((abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) ==
-                 0x0u,
-             "INTR_TEST=0x0 should clear Status-type fifo_empty(1)");
+  EXPECT_RTL(
+      (abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) & 0x3u) == 0x0u,
+      "INTR_TEST=0x0 should clear Status-type fifo_empty(1)");
 
   return all_ok;
 }

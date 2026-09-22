@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/dif/dif_pinmux.h"
@@ -12,6 +11,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "gpio_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "pwm_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
@@ -23,12 +23,12 @@ enum {
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
 };
 
-#define EXPECT_RTL(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) {                              \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
-      all_ok = false;                           \
-    }                                           \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 static volatile uint32_t kFaultCount = 0;
@@ -52,9 +52,9 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_CFG_REG_OFFSET) == 0x38008000u,
              "CFG reset value mismatch (got 0x%08x)",
              abs_mmio_read32(kPwmBase + PWM_CFG_REG_OFFSET));
-  EXPECT_RTL(abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) ==
-                 0x7fff7fffu,
-             "DUTY_CYCLE_0 reset value mismatch");
+  EXPECT_RTL(
+      abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) == 0x7fff7fffu,
+      "DUTY_CYCLE_0 reset value mismatch");
 
   // 2. Verify register bitmasks on PWM_EN, INVERT, and PWM_PARAM_0..5.
   // In pwm.hjson / pwm_reg_top.sv, PWM_PARAM[i] only populates bits [31:30]
@@ -93,13 +93,12 @@ bool test_main(void) {
   // 0x7fff, duty_cycle_masked = 0x7fff & 0x8000 = 0, so pwm_o must remain 0
   // even when CNTR_EN=1 and PWM_EN=1!
   dif_pinmux_t pinmux;
-  CHECK_DIF_OK(
-      dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
-  CHECK_DIF_OK(dif_pinmux_output_select(
-      &pinmux, kTopEarlgreyPinmuxMioOutIoa2, kTopEarlgreyPinmuxOutselPwmAonPwm0));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio0,
-      kTopEarlgreyPinmuxInselIoa2));
+  CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
+  CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIoa2,
+                                        kTopEarlgreyPinmuxOutselPwmAonPwm0));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio0,
+                                       kTopEarlgreyPinmuxInselIoa2));
 
   // With PWM_EN=0 and INVERT=1, cio_pwm_o[0] must be 1.
   abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 1u);
@@ -130,8 +129,8 @@ bool test_main(void) {
   // 4. Verify ALERT_TEST is a 1-cycle pulse (`alert_test.q & alert_test.qe` in
   // pwm.sv:45-48) rather than latching high forever.
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
   CHECK_DIF_OK(dif_alert_handler_configure_alert(
       &alert_handler, kTopEarlgreyAlertIdPwmAonFatalFault,
       kDifAlertHandlerClassD, kDifToggleEnabled, kDifToggleDisabled));
@@ -158,15 +157,19 @@ bool test_main(void) {
              "ALERT_TEST (WO) readback must be 0");
 
   // 4b. Verify PWM_PERMIT sub-word write checks (pwm_reg_top.sv wr_err):
-  // - Sub-word write to DUTY_CYCLE_0 (PWM_PERMIT = 4'b1111) faults and blocks write.
-  // - Sub-word write to INVERT+1 (PWM_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
-  // - Sub-word write to INVERT+0 (PWM_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  // - Sub-word write to DUTY_CYCLE_0 (PWM_PERMIT = 4'b1111) faults and blocks
+  // write.
+  // - Sub-word write to INVERT+1 (PWM_PERMIT = 4'b0001, reg_be = 4'b0010)
+  // faults.
+  // - Sub-word write to INVERT+0 (PWM_PERMIT = 4'b0001, reg_be = 4'b0001)
+  // succeeds.
   kFaultCount = 0;
   *((volatile uint8_t *)(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET)) = 0x12u;
-  EXPECT_RTL(kFaultCount == 1u &&
-                 abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) ==
-                     0x7fff7fffu,
-             "Sub-word write to DUTY_CYCLE_0 must fault and not modify register");
+  EXPECT_RTL(
+      kFaultCount == 1u &&
+          abs_mmio_read32(kPwmBase + PWM_DUTY_CYCLE_0_REG_OFFSET) ==
+              0x7fff7fffu,
+      "Sub-word write to DUTY_CYCLE_0 must fault and not modify register");
 
   kFaultCount = 0;
   *((volatile uint8_t *)(kPwmBase + PWM_INVERT_REG_OFFSET + 1u)) = 0x01u;
@@ -177,9 +180,10 @@ bool test_main(void) {
   kFaultCount = 0;
   *((volatile uint8_t *)(kPwmBase + PWM_INVERT_REG_OFFSET)) = 0x15u;
   busy_spin_micros(20);
-  EXPECT_RTL(kFaultCount == 0u &&
-                 abs_mmio_read32(kPwmBase + PWM_INVERT_REG_OFFSET) == 0x15u,
-             "Byte-0 sub-word write to INVERT (PWM_PERMIT=4'b0001) must succeed");
+  EXPECT_RTL(
+      kFaultCount == 0u &&
+          abs_mmio_read32(kPwmBase + PWM_INVERT_REG_OFFSET) == 0x15u,
+      "Byte-0 sub-word write to INVERT (PWM_PERMIT=4'b0001) must succeed");
   abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 0u);
   busy_spin_micros(20);
 

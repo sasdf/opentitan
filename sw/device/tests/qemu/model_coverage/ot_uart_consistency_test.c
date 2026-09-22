@@ -21,9 +21,9 @@ bool test_main(void) {
 
   // Reset UART1 control and FIFOs before starting.
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0x0u);
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
 
   // 1. Write-only (WDATA, INTR_TEST, ALERT_TEST) readback returns 0, and
@@ -50,9 +50,9 @@ bool test_main(void) {
 
   // Restore CTRL = 0 (TX = 0, RX = 0) and reset TX/RX FIFOs.
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0x0u);
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
 
   // 3. 32-byte TX FIFO full (TxFifoDepth = 32 in uart_reg_pkg.sv:
@@ -64,9 +64,8 @@ bool test_main(void) {
 
   uint32_t fifo_status =
       abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
-  uint32_t txlvl =
-      (fifo_status >> UART_FIFO_STATUS_TXLVL_OFFSET) &
-      UART_FIFO_STATUS_TXLVL_MASK;
+  uint32_t txlvl = (fifo_status >> UART_FIFO_STATUS_TXLVL_OFFSET) &
+                   UART_FIFO_STATUS_TXLVL_MASK;
   CHECK(txlvl == 32u);
   status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
   CHECK((status & (1u << UART_STATUS_TXFULL_BIT)) != 0u);

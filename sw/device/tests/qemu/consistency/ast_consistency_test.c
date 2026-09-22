@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -11,6 +10,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "ast_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sensor_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -30,7 +30,8 @@ enum {
 };
 
 bool test_main(void) {
-  LOG_INFO("1. Testing AST RO registers (REGA0, REGA1, REGA28) and WO REGAL...");
+  LOG_INFO(
+      "1. Testing AST RO registers (REGA0, REGA1, REGA28) and WO REGAL...");
 
   // In ast_reg_top.sv:
   // - REGA0 (0x00) has SwAccessRO and RESVAL = 0x00.
@@ -60,7 +61,9 @@ bool test_main(void) {
   CHECK(bitfield_bit32_read(sensor_status,
                             SENSOR_CTRL_STATUS_AST_INIT_DONE_BIT) == 1);
 
-  LOG_INFO("2. Testing AST 32-bit RW registers (REGA2..REGA27, REGA29..REGA37, REGB0..REGB4)...");
+  LOG_INFO(
+      "2. Testing AST 32-bit RW registers (REGA2..REGA27, REGA29..REGA37, "
+      "REGB0..REGB4)...");
 
   // Save and test full 32-bit writes on REGA2..REGA37 (skipping RO REGA28).
   for (uint32_t idx = 2; idx <= 37; ++idx) {
@@ -85,7 +88,8 @@ bool test_main(void) {
     abs_mmio_write32(kAstBase + offset, 0x00u);
   }
 
-  LOG_INFO("3. Testing AST_PERMIT sub-word wr_err and addrmiss TL-UL faults...");
+  LOG_INFO(
+      "3. Testing AST_PERMIT sub-word wr_err and addrmiss TL-UL faults...");
   g_fault_seen = false;
   abs_mmio_write8(kAstBase + AST_REGB_0_REG_OFFSET, 0x55u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);

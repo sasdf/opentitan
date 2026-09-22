@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "rv_dm_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/base/multibits.h"
@@ -15,6 +13,9 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "rv_dm_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -87,8 +88,7 @@ bool test_main(void) {
 
   // 2. Determine life cycle state to check RV_DM.MEM gating and memory map.
   dif_lc_ctrl_t lc_ctrl;
-  CHECK_DIF_OK(
-      dif_lc_ctrl_init(mmio_region_from_addr(kLcCtrlBase), &lc_ctrl));
+  CHECK_DIF_OK(dif_lc_ctrl_init(mmio_region_from_addr(kLcCtrlBase), &lc_ctrl));
   dif_lc_ctrl_state_t lc_state;
   CHECK_DIF_OK(dif_lc_ctrl_get_state(&lc_ctrl, &lc_state));
 
@@ -101,13 +101,13 @@ bool test_main(void) {
        lc_state == kDifLcCtrlStateTestUnlocked5 ||
        lc_state == kDifLcCtrlStateTestUnlocked6 ||
        lc_state == kDifLcCtrlStateTestUnlocked7 ||
-       lc_state == kDifLcCtrlStateDev ||
-       lc_state == kDifLcCtrlStateRma);
+       lc_state == kDifLcCtrlStateDev || lc_state == kDifLcCtrlStateRma);
 
-  // 3. Verify LATE_DEBUG_ENABLE_REGWEN (0x04, rw0c) and LATE_DEBUG_ENABLE (0x08),
-  // as well as RV_DM.MEM (0x00010000) gating and dm_mem.sv / debug_rom.sv semantics.
-  uint32_t regwen = abs_mmio_read32(
-      kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET);
+  // 3. Verify LATE_DEBUG_ENABLE_REGWEN (0x04, rw0c) and LATE_DEBUG_ENABLE
+  // (0x08), as well as RV_DM.MEM (0x00010000) gating and dm_mem.sv /
+  // debug_rom.sv semantics.
+  uint32_t regwen = abs_mmio_read32(kRvDmRegsBase +
+                                    RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET);
   CHECK((regwen & ~1u) == 0u);
 
   // 2b. Verify unmapped offset 0x0c in RV_DM.REGS (RegsAw=4, 16-byte aperture)
@@ -120,8 +120,9 @@ bool test_main(void) {
         abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET);
     CHECK(orig_val == kMultiBitBool32False || orig_val == kMultiBitBool32True);
 
-    // Sub-word (8-bit and 16-bit) writes to LATE_DEBUG_ENABLE (RV_DM_REGS_PERMIT[2] = 4'b1111)
-    // must assert wr_err (Store Access Fault) and preserve LATE_DEBUG_ENABLE.
+    // Sub-word (8-bit and 16-bit) writes to LATE_DEBUG_ENABLE
+    // (RV_DM_REGS_PERMIT[2] = 4'b1111) must assert wr_err (Store Access Fault)
+    // and preserve LATE_DEBUG_ENABLE.
     store_fault_seen = false;
     abs_mmio_write8(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET, 0x12u);
     CHECK(store_fault_seen);
@@ -132,8 +133,8 @@ bool test_main(void) {
     CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
           orig_val);
 
-    // Sub-word 8-bit write to LATE_DEBUG_ENABLE_REGWEN (RV_DM_REGS_PERMIT[1] = 4'b0001)
-    // must succeed without bus error.
+    // Sub-word 8-bit write to LATE_DEBUG_ENABLE_REGWEN (RV_DM_REGS_PERMIT[1] =
+    // 4'b0001) must succeed without bus error.
     store_fault_seen = false;
     abs_mmio_write8(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET,
                     0xffu);
@@ -159,7 +160,8 @@ bool test_main(void) {
       // 3a. Verify Debug ROM (0x10800..0x1089c) matches debug_rom.sv:
       // HaltAddress (0x800) = j 0x818 (0x0180006f), 0x804 = nop (0x00000013)
       // ResumeAddress (0x808) = j 0x88c (0x0840006f), 0x80c = nop (0x00000013)
-      // ExceptionAddress (0x810) = j 0x860 (0x0500006f), 0x814 = nop (0x00000013)
+      // ExceptionAddress (0x810) = j 0x860 (0x0500006f), 0x814 = nop
+      // (0x00000013)
       CHECK(try_read32(kRvDmMemBase + 0x800u, &val) && val == 0x0180006fu);
       CHECK(try_read32(kRvDmMemBase + 0x804u, &val) && val == 0x00000013u);
       CHECK(try_read32(kRvDmMemBase + 0x808u, &val) && val == 0x0840006fu);
@@ -175,8 +177,9 @@ bool test_main(void) {
       CHECK(!try_write32(kRvDmMemBase + 0x800u, 0xdeadbeefu));
       CHECK(try_read32(kRvDmMemBase + 0x800u, &val) && val == 0x0180006fu);
 
-      // 3c. Verify default Abstract Command ROM (0x338..0x35c, dm_mem.sv:425-436)
-      // and verify CPU writes to it are ignored without bus error.
+      // 3c. Verify default Abstract Command ROM (0x338..0x35c,
+      // dm_mem.sv:425-436) and verify CPU writes to it are ignored without bus
+      // error.
       CHECK(try_read32(kRvDmMemBase + 0x338u, &val) && val == 0x00000000u);
       CHECK(try_read32(kRvDmMemBase + 0x33cu, &val) && val == 0x00000517u);
       CHECK(try_read32(kRvDmMemBase + 0x340u, &val) && val == 0x00c55513u);
@@ -187,8 +190,8 @@ bool test_main(void) {
       CHECK(try_write32(kRvDmMemBase + 0x33cu, 0xdeadbeefu));
       CHECK(try_read32(kRvDmMemBase + 0x33cu, &val) && val == 0x00000517u);
 
-      // 3d. Verify WhereTo (0x300), ProgBuf (0x360..0x37c), and Flags (0x400..0x7fc)
-      // read 0 and ignore CPU writes without bus error.
+      // 3d. Verify WhereTo (0x300), ProgBuf (0x360..0x37c), and Flags
+      // (0x400..0x7fc) read 0 and ignore CPU writes without bus error.
       CHECK(try_read32(kRvDmMemBase + 0x300u, &val) && val == 0x00000000u);
       CHECK(try_write32(kRvDmMemBase + 0x300u, 0x12345678u));
       CHECK(try_read32(kRvDmMemBase + 0x300u, &val) && val == 0x00000000u);
@@ -204,7 +207,8 @@ bool test_main(void) {
       CHECK(try_read32(kRvDmMemBase + 0x7fcu, &val) && val == 0x00000000u);
 
       // 3e. Verify Data0 (0x380) and Data1 (0x384) accept writes without bus
-      // error, and read back 0 while dmcontrol.dmactive == 0 (dm_csrs.sv:627,647).
+      // error, and read back 0 while dmcontrol.dmactive == 0
+      // (dm_csrs.sv:627,647).
       CHECK(try_write32(kRvDmMemBase + 0x380u, 0xa5a55a5au));
       CHECK(try_write32(kRvDmMemBase + 0x384u, 0x12345678u));
       CHECK(try_read32(kRvDmMemBase + 0x380u, &val) && val == 0x00000000u);
@@ -225,9 +229,10 @@ bool test_main(void) {
 
       // Wave 7: dm_mem.sv:374-402 gen_wr_err enforces FullRegMask (4'b1111)
       // on writes to WhereTo (0x300), AbstractCmd (0x338..0x35f),
-      // ProgBuf (0x360..0x37f), Data0/1 (0x380..0x387), and Flags (0x400..0x7ff),
-      // and HartSelMask/OneBitMask (4'b0001) on Halted/Going/Resuming/Exception
-      // (0x100/0x108/0x110/0x118), while sub-word reads succeed (we_i == 0).
+      // ProgBuf (0x360..0x37f), Data0/1 (0x380..0x387), and Flags
+      // (0x400..0x7ff), and HartSelMask/OneBitMask (4'b0001) on
+      // Halted/Going/Resuming/Exception (0x100/0x108/0x110/0x118), while
+      // sub-word reads succeed (we_i == 0).
       CHECK(!try_write8(kRvDmMemBase + 0x300u, 0x11u));
       CHECK(!try_write16(kRvDmMemBase + 0x338u, 0x2222u));
       CHECK(!try_write8(kRvDmMemBase + 0x360u, 0x33u));

@@ -99,10 +99,10 @@ bool test_main(void) {
 
   // 3. SW_RST_REGWEN_0..7 RW0C locking of SW_RST_CTRL_N_0..7.
   for (uint32_t i = 0; i < kNumSwResets; ++i) {
-    uint32_t regwen_addr =
-        kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET + (i * sizeof(uint32_t));
-    uint32_t ctrl_n_addr =
-        kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET + (i * sizeof(uint32_t));
+    uint32_t regwen_addr = kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET +
+                           (i * sizeof(uint32_t));
+    uint32_t ctrl_n_addr = kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET +
+                           (i * sizeof(uint32_t));
 
     CHECK(abs_mmio_read32(regwen_addr) == 1u);
     CHECK(abs_mmio_read32(ctrl_n_addr) == 1u);
@@ -113,8 +113,8 @@ bool test_main(void) {
     abs_mmio_write32(regwen_addr, 1u);
     CHECK(abs_mmio_read32(regwen_addr) == 0u);
 
-    // Attempt to assert software reset (write 0 to SW_RST_CTRL_N_i) while locked;
-    // verify write is ignored and SW_RST_CTRL_N_i remains 1.
+    // Attempt to assert software reset (write 0 to SW_RST_CTRL_N_i) while
+    // locked; verify write is ignored and SW_RST_CTRL_N_i remains 1.
     abs_mmio_write32(ctrl_n_addr, 0u);
     CHECK(abs_mmio_read32(ctrl_n_addr) == 1u);
   }

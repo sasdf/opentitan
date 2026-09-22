@@ -27,12 +27,12 @@ enum {
   kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
 };
 
-#define EXPECT_RTL(cond, ...)                         \
-  do {                                                \
-    if (!(cond)) {                                    \
-      LOG_INFO("RTL_MISMATCH: " __VA_ARGS__);         \
-      failures++;                                     \
-    }                                                 \
+#define EXPECT_RTL(cond, ...)                 \
+  do {                                        \
+    if (!(cond)) {                            \
+      LOG_INFO("RTL_MISMATCH: " __VA_ARGS__); \
+      failures++;                             \
+    }                                         \
   } while (0)
 
 static volatile uint32_t kFaultCount = 0;
@@ -62,8 +62,8 @@ bool test_main(void) {
 
   // 2. Verify ALERT_TEST triggers a one-shot alert pulse and does not latch.
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
   CHECK_DIF_OK(dif_alert_handler_configure_alert(
       &alert_handler, kTopEarlgreyAlertIdPattgenFatalFault,
       kDifAlertHandlerClassD, kDifToggleEnabled, kDifToggleDisabled));
@@ -106,12 +106,12 @@ bool test_main(void) {
                                         kTopEarlgreyPinmuxOutselPattgenPda0Tx));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIoa3,
                                         kTopEarlgreyPinmuxOutselPattgenPcl0Tx));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio2,
-      kTopEarlgreyPinmuxInselIoa2));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio3,
-      kTopEarlgreyPinmuxInselIoa3));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio2,
+                                       kTopEarlgreyPinmuxInselIoa2));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio3,
+                                       kTopEarlgreyPinmuxInselIoa3));
 
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, 0u);
@@ -124,9 +124,8 @@ bool test_main(void) {
 
   // Set INACTIVE_LEVEL_PCL_CH0 (bit 4) and INACTIVE_LEVEL_PDA_CH0 (bit 5) while
   // disabled.
-  uint32_t ctrl_inactive_hi =
-      (1u << PATTGEN_CTRL_INACTIVE_LEVEL_PCL_CH0_BIT) |
-      (1u << PATTGEN_CTRL_INACTIVE_LEVEL_PDA_CH0_BIT);
+  uint32_t ctrl_inactive_hi = (1u << PATTGEN_CTRL_INACTIVE_LEVEL_PCL_CH0_BIT) |
+                              (1u << PATTGEN_CTRL_INACTIVE_LEVEL_PDA_CH0_BIT);
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, ctrl_inactive_hi);
   busy_spin_micros(10);
   uint32_t gpio_hi =
@@ -233,40 +232,47 @@ bool test_main(void) {
   abs_mmio_write32(kPattgenBase + PATTGEN_INTR_TEST_REG_OFFSET, 0x3u);
   EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_TEST_REG_OFFSET) == 0u,
              "[6b] INTR_TEST (WO) readback must be 0");
-  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_ALERT_TEST_REG_OFFSET) ==
-                 0u,
-             "[6c] ALERT_TEST (WO) readback must be 0");
-  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) ==
-                 0x3u,
-             "[6d] INTR_STATE after INTR_TEST=0x3 must be 0x3");
+  EXPECT_RTL(
+      abs_mmio_read32(kPattgenBase + PATTGEN_ALERT_TEST_REG_OFFSET) == 0u,
+      "[6c] ALERT_TEST (WO) readback must be 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) == 0x3u,
+      "[6d] INTR_STATE after INTR_TEST=0x3 must be 0x3");
   abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
-  EXPECT_RTL(abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) ==
-                 0u,
-             "[6e] INTR_STATE after RW1C write 0x3 must be 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET) == 0u,
+      "[6e] INTR_STATE after RW1C write 0x3 must be 0");
 
   // 7. Verify PATTGEN_PERMIT sub-word write checks (pattgen_reg_top.sv wr_err):
-  // - Sub-word write to DATA_CH0_0 (PATTGEN_PERMIT = 4'b1111) faults and blocks write.
-  // - Sub-word write to CTRL+1 (PATTGEN_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
-  // - Byte-0 sub-word write to CTRL (PATTGEN_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  // - Sub-word write to DATA_CH0_0 (PATTGEN_PERMIT = 4'b1111) faults and blocks
+  // write.
+  // - Sub-word write to CTRL+1 (PATTGEN_PERMIT = 4'b0001, reg_be = 4'b0010)
+  // faults.
+  // - Byte-0 sub-word write to CTRL (PATTGEN_PERMIT = 4'b0001, reg_be =
+  // 4'b0001) succeeds.
   abs_mmio_write32(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET, 0x12345678u);
   kFaultCount = 0;
   *((volatile uint8_t *)(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET)) = 0x99u;
-  EXPECT_RTL(kFaultCount == 1u &&
-                 abs_mmio_read32(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET) ==
-                     0x12345678u,
-             "[7a] Sub-word write to DATA_CH0_0 must fault and not modify register");
+  EXPECT_RTL(
+      kFaultCount == 1u &&
+          abs_mmio_read32(kPattgenBase + PATTGEN_DATA_CH0_0_REG_OFFSET) ==
+              0x12345678u,
+      "[7a] Sub-word write to DATA_CH0_0 must fault and not modify register");
 
   kFaultCount = 0;
   *((volatile uint8_t *)(kPattgenBase + PATTGEN_CTRL_REG_OFFSET + 1u)) = 0x11u;
-  EXPECT_RTL(kFaultCount == 1u &&
-                 abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0u,
-             "[7b] Sub-word write to CTRL+1 must fault and not modify register");
+  EXPECT_RTL(
+      kFaultCount == 1u &&
+          abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0u,
+      "[7b] Sub-word write to CTRL+1 must fault and not modify register");
 
   kFaultCount = 0;
   *((volatile uint8_t *)(kPattgenBase + PATTGEN_CTRL_REG_OFFSET)) = 0x0cu;
-  EXPECT_RTL(kFaultCount == 0u &&
-                 abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0x0cu,
-             "[7c] Byte-0 sub-word write to CTRL (PATTGEN_PERMIT=4'b0001) must succeed");
+  EXPECT_RTL(
+      kFaultCount == 0u &&
+          abs_mmio_read32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET) == 0x0cu,
+      "[7c] Byte-0 sub-word write to CTRL (PATTGEN_PERMIT=4'b0001) must "
+      "succeed");
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, 0u);
 
   return failures == 0;

@@ -5,11 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "aon_timer_regs.h"
-#include "clkmgr_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "pwrmgr_regs.h"
-#include "rstmgr_regs.h"
 #include "sw/device/lib/arch/boot_stage.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/multibits.h"
@@ -20,6 +15,12 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
+
+#include "aon_timer_regs.h"
+#include "clkmgr_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "pwrmgr_regs.h"
+#include "rstmgr_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -150,7 +151,6 @@ bool test_main(void) {
   uint32_t phase = ret_sram->creator.reserved[0];
   uint32_t reset_info = ret_sram->creator.reset_reasons;
 
-
   if (phase == kPhaseDeepSleep) {
     CHECK_STATUS_OK(
         ottf_alerts_ignore_alert(kTopEarlgreyAlertIdClkmgrAonRecovFault));
@@ -188,11 +188,11 @@ bool test_main(void) {
                           CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) == 1u,
           "MEASURE_CTRL_REGWEN must be re-enabled (1) by calib_rdy=MuBi4False "
           "during deep sleep (clkmgr.sv:555-558)");
-    CHECK(abs_mmio_read32(kClkmgrBase +
-                          CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
-              kMultiBitBool4False,
-          "IO_DIV4_MEAS_CTRL_EN must be cleared to MuBi4False by "
-          "calib_rdy=MuBi4False during deep sleep (clkmgr_meas_chk.sv:81-85)");
+    CHECK(
+        abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
+            kMultiBitBool4False,
+        "IO_DIV4_MEAS_CTRL_EN must be cleared to MuBi4False by "
+        "calib_rdy=MuBi4False during deep sleep (clkmgr_meas_chk.sv:81-85)");
     CHECK(abs_mmio_read32(kClkmgrBase +
                           CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
               kCustomIoDiv4Meas,
@@ -248,12 +248,12 @@ bool test_main(void) {
   test_w5_permit_subword_wr_err_and_addrmiss();
 
   // 1. Verify ALERT_TEST single-shot pulse for recov_fault.
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdClkmgrAonRecovFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdClkmgrAonRecovFault));
   abs_mmio_write32(kClkmgrBase + CLKMGR_ALERT_TEST_REG_OFFSET,
                    1u << CLKMGR_ALERT_TEST_RECOV_FAULT_BIT);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdClkmgrAonRecovFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdClkmgrAonRecovFault));
 
   // Ignore further recov_fault alerts during intentional measurement fault
   // injection so continuous clk_aon measurement pulses do not storm the ISR.
@@ -290,14 +290,16 @@ bool test_main(void) {
         "MAIN_MEAS_CTRL_SHADOWED reset mismatch: got 0x%08x, expected "
         "0x0007a9fe",
         main_meas);
-  CHECK(usb_meas == 0x0001ccfa,
-        "USB_MEAS_CTRL_SHADOWED reset mismatch: got 0x%08x, expected 0x0001ccfa",
-        usb_meas);
+  CHECK(
+      usb_meas == 0x0001ccfa,
+      "USB_MEAS_CTRL_SHADOWED reset mismatch: got 0x%08x, expected 0x0001ccfa",
+      usb_meas);
 
-  // 3. Verify bitmasks of MEAS_CTRL_SHADOWED registers via two-step shadow write.
+  // 3. Verify bitmasks of MEAS_CTRL_SHADOWED registers via two-step shadow
+  // write.
   write_shadowed(CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET, 0xffffffff);
-  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
-        0x000fffff);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) == 0x000fffff);
   write_shadowed(CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET, io_meas);
 
   write_shadowed(CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET, 0xffffffff);
@@ -319,9 +321,9 @@ bool test_main(void) {
   write_shadowed(CLKMGR_MAIN_MEAS_CTRL_SHADOWED_REG_OFFSET, main_meas);
 
   write_shadowed(CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET, 0xffffffff);
-  CHECK(abs_mmio_read32(kClkmgrBase +
-                        CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
-        0x0003ffff);
+  CHECK(
+      abs_mmio_read32(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+      0x0003ffff);
   write_shadowed(CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET, usb_meas);
 
   // 3b. Verify shadow phase clear on read and SHADOW_UPDATE_ERR on mismatched
@@ -377,26 +379,27 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) == 0x99);
 
   // 6. Verify measurement error detection with mubi4_test_true_loose (e.g. 0x0)
-  // and continuous RECOV_ERR_CODE re-assertion while measurement remains enabled.
+  // and continuous RECOV_ERR_CODE re-assertion while measurement remains
+  // enabled.
   write_shadowed(CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET, 0x0000050a);
   abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET, 0x0);
   busy_spin_micros(30);
 
   uint32_t recov_err =
       abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET);
-  CHECK((recov_err & (1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT)) !=
-            0,
-        "Expected IO_DIV4_MEASURE_ERR to assert when MEAS_CTRL_EN=0x0, got "
-        "0x%08x",
-        recov_err);
+  CHECK(
+      (recov_err & (1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT)) != 0,
+      "Expected IO_DIV4_MEASURE_ERR to assert when MEAS_CTRL_EN=0x0, got "
+      "0x%08x",
+      recov_err);
 
   abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET,
                    1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT);
   busy_spin_micros(30);
   recov_err = abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET);
-  CHECK((recov_err & (1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT)) !=
-            0,
-        "Expected IO_DIV4_MEASURE_ERR to re-assert while MEAS_CTRL_EN is active");
+  CHECK(
+      (recov_err & (1u << CLKMGR_RECOV_ERR_CODE_IO_DIV4_MEASURE_ERR_BIT)) != 0,
+      "Expected IO_DIV4_MEASURE_ERR to re-assert while MEAS_CTRL_EN is active");
 
   // Disable IO_DIV4_MEAS_CTRL_EN (0x9) and set a custom in-range threshold
   // (kCustomIoDiv4Meas), then clear RECOV_ERR_CODE and re-enable

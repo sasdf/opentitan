@@ -414,12 +414,7 @@ impl Transport for Qemu {
             .clone()
             .context("LC_CTRL JTAG socket not connected")?;
 
-        let jtag = QemuJtag::new(
-            opts.clone(),
-            rv_dm_sock,
-            lc_ctrl_sock,
-            self.gpio.clone(),
-        );
+        let jtag = QemuJtag::new(opts.clone(), rv_dm_sock, lc_ctrl_sock, self.gpio.clone());
 
         Ok(Box::new(jtag))
     }

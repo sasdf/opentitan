@@ -38,10 +38,6 @@ package(default_visibility = ["//visibility:public"])
             otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
             tags = maybe_skip_in_ci(lc_state_val),
         ),
-        qemu = qemu_params(
-            otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
-            tags = maybe_skip_in_ci(lc_state_val),
-        ),
         local_defines = [
             "EXPECT_DEBUG={}".format(1 if lc_state_val in [
                 CONST.LCV.TEST_UNLOCKED0,
@@ -50,6 +46,10 @@ package(default_visibility = ["//visibility:public"])
             ] else 0),
         ],
         manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+        qemu = qemu_params(
+            otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,
+            tags = maybe_skip_in_ci(lc_state_val),
+        ),
         verilator = verilator_params(
             timeout = "eternal",
             otp = "//hw/ip/otp_ctrl/data:img_" + lc_state,

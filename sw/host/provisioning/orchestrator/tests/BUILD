@@ -106,12 +106,12 @@ filegroup(
         timeout = "long",
         srcs = [src],
         data = [
+            "qemu_setup.sh",
             ":orchestrator_sim_qemu_zip",
             ":qemu_earlgrey_cfg",
             ":qemu_flash_empty",
             ":qemu_otp_empty",
             ":qemu_rom",
-            "qemu_setup.sh",
             "//hw/top_earlgrey/sw/util:qemu_start",
             "//third_party/qemu:qemu-system-riscv32",
             "@python3",
@@ -129,13 +129,35 @@ filegroup(
             "QEMU_FLASH": "$(location :qemu_flash_empty)",
             "QEMU_ICOUNT": "6",
         } | extra_env,
-        tags = ["changes_otp", "manuf", "sim_qemu"] + extra_tags,
+        tags = [
+            "changes_otp",
+            "manuf",
+            "sim_qemu",
+        ] + extra_tags,
     )
     for sku, cfg in EARLGREY_SKUS.items()
     if not cfg.get("offline", False)
     for prefix, src, extra_data, extra_env, extra_tags in [
-        ("multistage_", "e2e_multistage.sh", ["//sw/device/silicon_creator/manuf/base:ft_flash_scramble_{}".format(sku)], {}, []),
-        ("", "e2e.sh", ["//sw/host/provisioning/orchestrator/src:fw_dependencies", "//util/coverage/collect_cc_coverage"], {"COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)", "CC_CODE_COVERAGE_SCRIPT": ""}, ["provisioning"]),
+        (
+            "multistage_",
+            "e2e_multistage.sh",
+            ["//sw/device/silicon_creator/manuf/base:ft_flash_scramble_{}".format(sku)],
+            {},
+            [],
+        ),
+        (
+            "",
+            "e2e.sh",
+            [
+                "//sw/host/provisioning/orchestrator/src:fw_dependencies",
+                "//util/coverage/collect_cc_coverage",
+            ],
+            {
+                "COLLECT_CC_COVERAGE": "$(location //util/coverage/collect_cc_coverage)",
+                "CC_CODE_COVERAGE_SCRIPT": "",
+            },
+            ["provisioning"],
+        ),
     ]
 ]
 

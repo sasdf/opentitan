@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "sensor_ctrl_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "sensor_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -56,9 +57,8 @@ bool test_main(void) {
 
   // 4. Verify MANUAL_PAD_ATTR_0 read/write and MANUAL_PAD_ATTR_REGWEN_0 RW0C
   // lock.
-  CHECK(abs_mmio_read32(kBase +
-                        SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) ==
-        0x1u);
+  CHECK(abs_mmio_read32(
+            kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) == 0x1u);
   abs_mmio_write32(kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_0_REG_OFFSET, 0x8cu);
   CHECK(abs_mmio_read32(kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_0_REG_OFFSET) ==
         0x8cu);
@@ -68,14 +68,12 @@ bool test_main(void) {
 
   abs_mmio_write32(kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET,
                    0x0u);
-  CHECK(abs_mmio_read32(kBase +
-                        SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) ==
-        0x0u);
+  CHECK(abs_mmio_read32(
+            kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) == 0x0u);
   abs_mmio_write32(kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET,
                    0x1u);
-  CHECK(abs_mmio_read32(kBase +
-                        SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) ==
-        0x0u);
+  CHECK(abs_mmio_read32(
+            kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_REGWEN_0_REG_OFFSET) == 0x0u);
 
   // Writes to locked MANUAL_PAD_ATTR_0 must be ignored.
   abs_mmio_write32(kBase + SENSOR_CTRL_MANUAL_PAD_ATTR_0_REG_OFFSET, 0x8cu);

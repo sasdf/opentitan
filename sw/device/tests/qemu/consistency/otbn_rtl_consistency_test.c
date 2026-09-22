@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -10,6 +9,7 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "otbn_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
@@ -39,60 +39,52 @@ enum {
     }                                          \
   } while (0)
 
-// Base & Bignum OTBN instruction encoders matching hw/ip/otbn/rtl/otbn_decoder.sv
+// Base & Bignum OTBN instruction encoders matching
+// hw/ip/otbn/rtl/otbn_decoder.sv
 #define OTBN_ECALL() (0x00000073u)
 #define OTBN_NOP() (0x00000013u)
-#define OTBN_ADDI(rd, rs1, imm12)                                \
-  ((((uint32_t)(imm12) & 0xfffu) << 20) |                        \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x0u << 12) |            \
-   (((uint32_t)(rd) & 0x1fu) << 7) | 0x13u)
-#define OTBN_ADD(rd, rs1, rs2)                                   \
-  ((((uint32_t)(rs2) & 0x1fu) << 20) |                           \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x0u << 12) |            \
-   (((uint32_t)(rd) & 0x1fu) << 7) | 0x33u)
-#define OTBN_SW(rs2, rs1, imm12)                                 \
-  (((((uint32_t)(imm12) >> 5) & 0x7fu) << 25) |                  \
-   (((uint32_t)(rs2) & 0x1fu) << 20) |                           \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x2u << 12) |            \
-   (((uint32_t)(imm12) & 0x1fu) << 7) | 0x23u)
-#define OTBN_JAL_PLUS4(rd) (0x0040006fu | (((uint32_t)(rd) & 0x1fu) << 7))
-#define OTBN_BNE_PLUS4(rs1, rs2)                                 \
-  ((((uint32_t)(rs2) & 0x1fu) << 20) |                           \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x1u << 12) |            \
-   (0x4u << 7) | 0x63u)
-#define OTBN_LOOPI(iters, bodysize_minus_1)                      \
-  ((((uint32_t)(bodysize_minus_1) & 0xfffu) << 20) |             \
-   ((((uint32_t)(iters) >> 5) & 0x1fu) << 15) | (0x1u << 12) |   \
-   (((uint32_t)(iters) & 0x1fu) << 7) | 0x7bu)
-#define OTBN_BN_XOR(wrd, wrs1, wrs2)                             \
-  ((((uint32_t)(wrs2) & 0x1fu) << 20) |                          \
-   (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x6u << 12) |           \
-   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x7bu)
-#define OTBN_BN_ADDI(wrd, wrs1, imm10)                           \
-  ((((uint32_t)(imm10) & 0x3ffu) << 20) |                        \
-   (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x4u << 12) |           \
-   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x2bu)
-#define OTBN_BN_ADDM(wrd, wrs1, wrs2)                            \
-  ((((uint32_t)(wrs2) & 0x1fu) << 20) |                          \
-   (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x5u << 12) |           \
-   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x2bu)
-#define OTBN_CSRRW(rd, csr, rs1)                                 \
-  ((((uint32_t)(csr) & 0xfffu) << 20) |                          \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x1u << 12) |            \
-   (((uint32_t)(rd) & 0x1fu) << 7) | 0x73u)
-#define OTBN_CSRRS(rd, csr, rs1)                                 \
-  ((((uint32_t)(csr) & 0xfffu) << 20) |                          \
-   (((uint32_t)(rs1) & 0x1fu) << 15) | (0x2u << 12) |            \
-   (((uint32_t)(rd) & 0x1fu) << 7) | 0x73u)
-#define OTBN_BN_WSRR(wrd, wsr)                                   \
-  ((((uint32_t)(wsr) & 0xffu) << 20) | (0x7u << 12) |            \
-   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x0bu)
-#define OTBN_BN_WSRW(wsr, wrs1)                                  \
-  ((1u << 31) | (((uint32_t)(wsr) & 0xffu) << 20) |              \
-   (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x7u << 12) | 0x0bu)
-#define OTBN_BN_SID_ZERO_OFF(grs2, grs1)                         \
-  ((((uint32_t)(grs2) & 0x1fu) << 20) |                          \
-   (((uint32_t)(grs1) & 0x1fu) << 15) | (0x5u << 12) | 0x0bu)
+#define OTBN_ADDI(rd, rs1, imm12)                                         \
+  ((((uint32_t)(imm12)&0xfffu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x0u << 12) | (((uint32_t)(rd)&0x1fu) << 7) | 0x13u)
+#define OTBN_ADD(rd, rs1, rs2)                                         \
+  ((((uint32_t)(rs2)&0x1fu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x0u << 12) | (((uint32_t)(rd)&0x1fu) << 7) | 0x33u)
+#define OTBN_SW(rs2, rs1, imm12)                                       \
+  (((((uint32_t)(imm12) >> 5) & 0x7fu) << 25) |                        \
+   (((uint32_t)(rs2)&0x1fu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x2u << 12) | (((uint32_t)(imm12)&0x1fu) << 7) | 0x23u)
+#define OTBN_JAL_PLUS4(rd) (0x0040006fu | (((uint32_t)(rd)&0x1fu) << 7))
+#define OTBN_BNE_PLUS4(rs1, rs2)                                       \
+  ((((uint32_t)(rs2)&0x1fu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x1u << 12) | (0x4u << 7) | 0x63u)
+#define OTBN_LOOPI(iters, bodysize_minus_1)                    \
+  ((((uint32_t)(bodysize_minus_1)&0xfffu) << 20) |             \
+   ((((uint32_t)(iters) >> 5) & 0x1fu) << 15) | (0x1u << 12) | \
+   (((uint32_t)(iters)&0x1fu) << 7) | 0x7bu)
+#define OTBN_BN_XOR(wrd, wrs1, wrs2)                                     \
+  ((((uint32_t)(wrs2)&0x1fu) << 20) | (((uint32_t)(wrs1)&0x1fu) << 15) | \
+   (0x6u << 12) | (((uint32_t)(wrd)&0x1fu) << 7) | 0x7bu)
+#define OTBN_BN_ADDI(wrd, wrs1, imm10)                                     \
+  ((((uint32_t)(imm10)&0x3ffu) << 20) | (((uint32_t)(wrs1)&0x1fu) << 15) | \
+   (0x4u << 12) | (((uint32_t)(wrd)&0x1fu) << 7) | 0x2bu)
+#define OTBN_BN_ADDM(wrd, wrs1, wrs2)                                    \
+  ((((uint32_t)(wrs2)&0x1fu) << 20) | (((uint32_t)(wrs1)&0x1fu) << 15) | \
+   (0x5u << 12) | (((uint32_t)(wrd)&0x1fu) << 7) | 0x2bu)
+#define OTBN_CSRRW(rd, csr, rs1)                                        \
+  ((((uint32_t)(csr)&0xfffu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x1u << 12) | (((uint32_t)(rd)&0x1fu) << 7) | 0x73u)
+#define OTBN_CSRRS(rd, csr, rs1)                                        \
+  ((((uint32_t)(csr)&0xfffu) << 20) | (((uint32_t)(rs1)&0x1fu) << 15) | \
+   (0x2u << 12) | (((uint32_t)(rd)&0x1fu) << 7) | 0x73u)
+#define OTBN_BN_WSRR(wrd, wsr)                      \
+  ((((uint32_t)(wsr)&0xffu) << 20) | (0x7u << 12) | \
+   (((uint32_t)(wrd)&0x1fu) << 7) | 0x0bu)
+#define OTBN_BN_WSRW(wsr, wrs1)                   \
+  ((1u << 31) | (((uint32_t)(wsr)&0xffu) << 20) | \
+   (((uint32_t)(wrs1)&0x1fu) << 15) | (0x7u << 12) | 0x0bu)
+#define OTBN_BN_SID_ZERO_OFF(grs2, grs1)                                 \
+  ((((uint32_t)(grs2)&0x1fu) << 20) | (((uint32_t)(grs1)&0x1fu) << 15) | \
+   (0x5u << 12) | 0x0bu)
 
 static void otbn_wait_for_not_running(void) {
   while (true) {
@@ -186,10 +178,11 @@ bool test_main(void) {
   // x2 = 28, ERR_BITS == 0).
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0u);
   const uint32_t prog_x1_dual_read[] = {
-      OTBN_JAL_PLUS4(1),   // PC=0: pushes 4 onto x1 call stack, jumps to PC=4
-      OTBN_ADDI(1, 1, 10), // PC=4: pops 4 and pushes 14 onto x1 call stack
-      OTBN_ADD(2, 1, 1),   // PC=8: reads x1 on both ports (14 + 14 = 28), pops once
-      OTBN_SW(2, 0, 0),    // DMEM[0] = x2
+      OTBN_JAL_PLUS4(1),    // PC=0: pushes 4 onto x1 call stack, jumps to PC=4
+      OTBN_ADDI(1, 1, 10),  // PC=4: pops 4 and pushes 14 onto x1 call stack
+      OTBN_ADD(2, 1,
+               1),  // PC=8: reads x1 on both ports (14 + 14 = 28), pops once
+      OTBN_SW(2, 0, 0),  // DMEM[0] = x2
       OTBN_ECALL(),
   };
   otbn_run_program(prog_x1_dual_read, ARRAYSIZE(prog_x1_dual_read));
@@ -201,9 +194,10 @@ bool test_main(void) {
              "(got x2=%u, ERR_BITS=0x%08x)",
              x2_val, err_bits);
 
-  // 5a. LOOPI at the end instruction of an outer loop (otbn_loop_controller.sv:162).
-  // Outer `loopi 2, 0` has body size 1 (end instruction at PC=4). Placing
-  // `loopi 1, 0` at PC=4 must trigger `loop_at_end_err` (ERR_BITS.LOOP).
+  // 5a. LOOPI at the end instruction of an outer loop
+  // (otbn_loop_controller.sv:162). Outer `loopi 2, 0` has body size 1 (end
+  // instruction at PC=4). Placing `loopi 1, 0` at PC=4 must trigger
+  // `loop_at_end_err` (ERR_BITS.LOOP).
   const uint32_t prog_loopi_at_end[] = {
       OTBN_LOOPI(2, 0),  // PC=0: loop 2 times, body size = 1 insn (end = PC=4)
       OTBN_LOOPI(1, 0),  // PC=4: LOOPI at outer loop end -> ERR_BITS.LOOP
@@ -222,8 +216,8 @@ bool test_main(void) {
   // `loopi 2, 0` has end instruction at PC=4. Placing `jal x0, +4` at PC=4
   // must trigger `loop_branch_err` (ERR_BITS.LOOP).
   const uint32_t prog_jump_at_end[] = {
-      OTBN_LOOPI(2, 0),    // PC=0: loop 2 times, body size = 1 insn (end = PC=4)
-      OTBN_JAL_PLUS4(0),   // PC=4: JAL at loop end -> ERR_BITS.LOOP
+      OTBN_LOOPI(2, 0),   // PC=0: loop 2 times, body size = 1 insn (end = PC=4)
+      OTBN_JAL_PLUS4(0),  // PC=4: JAL at loop end -> ERR_BITS.LOOP
       OTBN_ECALL(),
   };
   otbn_run_program(prog_jump_at_end, ARRAYSIZE(prog_jump_at_end));
@@ -242,18 +236,18 @@ bool test_main(void) {
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 4, 0u);
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 8, 0u);
   const uint32_t prog_csr_flags[] = {
-      OTBN_ADDI(2, 0, 0xab),        // x2 = 0xab (FG1=0xa, FG0=0xb)
-      OTBN_CSRRW(0, 0x7c8, 2),      // CSR FLAGS (0x7c8) = 0xab
-      OTBN_CSRRS(3, 0x7c0, 0),      // x3 = CSR FG0 (0x7c0) -> 0xb
-      OTBN_CSRRS(4, 0x7c1, 0),      // x4 = CSR FG1 (0x7c1) -> 0xa
-      OTBN_CSRRS(5, 0x7c8, 0),      // x5 = CSR FLAGS (0x7c8) -> 0xab
-      OTBN_SW(3, 0, 0),             // DMEM[0] = FG0
-      OTBN_SW(4, 0, 4),             // DMEM[4] = FG1
-      OTBN_SW(5, 0, 8),             // DMEM[8] = FLAGS
-      OTBN_CSRRW(0, 0x7d0, 2),      // CSR MOD0 (0x7d0) = 0xab
-      OTBN_BN_XOR(0, 0, 0),         // w0 = 0
-      OTBN_BN_ADDI(1, 0, 0x55),     // w1 = 0x55
-      OTBN_BN_WSRW(3, 1),           // WSR ACC (0x3) = 0x55
+      OTBN_ADDI(2, 0, 0xab),     // x2 = 0xab (FG1=0xa, FG0=0xb)
+      OTBN_CSRRW(0, 0x7c8, 2),   // CSR FLAGS (0x7c8) = 0xab
+      OTBN_CSRRS(3, 0x7c0, 0),   // x3 = CSR FG0 (0x7c0) -> 0xb
+      OTBN_CSRRS(4, 0x7c1, 0),   // x4 = CSR FG1 (0x7c1) -> 0xa
+      OTBN_CSRRS(5, 0x7c8, 0),   // x5 = CSR FLAGS (0x7c8) -> 0xab
+      OTBN_SW(3, 0, 0),          // DMEM[0] = FG0
+      OTBN_SW(4, 0, 4),          // DMEM[4] = FG1
+      OTBN_SW(5, 0, 8),          // DMEM[8] = FLAGS
+      OTBN_CSRRW(0, 0x7d0, 2),   // CSR MOD0 (0x7d0) = 0xab
+      OTBN_BN_XOR(0, 0, 0),      // w0 = 0
+      OTBN_BN_ADDI(1, 0, 0x55),  // w1 = 0x55
+      OTBN_BN_WSRW(3, 1),        // WSR ACC (0x3) = 0x55
       OTBN_ECALL(),
   };
   otbn_run_program(prog_csr_flags, ARRAYSIZE(prog_csr_flags));
@@ -272,12 +266,12 @@ bool test_main(void) {
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 32, 0xdeadbeefu);
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 36, 0xdeadbeefu);
   const uint32_t prog_check_init_zero[] = {
-      OTBN_BN_WSRR(0, 3),           // w0 = WSR ACC (0x3) -> must be 0
-      OTBN_BN_SID_ZERO_OFF(0, 0),   // DMEM[0..31] = w0 (ACC)
-      OTBN_CSRRS(2, 0x7c8, 0),      // x2 = CSR FLAGS (0x7c8) -> must be 0
-      OTBN_CSRRS(3, 0x7d0, 0),      // x3 = CSR MOD0 (0x7d0) -> must be 0
-      OTBN_SW(2, 0, 32),            // DMEM[32] = FLAGS
-      OTBN_SW(3, 0, 36),            // DMEM[36] = MOD0
+      OTBN_BN_WSRR(0, 3),          // w0 = WSR ACC (0x3) -> must be 0
+      OTBN_BN_SID_ZERO_OFF(0, 0),  // DMEM[0..31] = w0 (ACC)
+      OTBN_CSRRS(2, 0x7c8, 0),     // x2 = CSR FLAGS (0x7c8) -> must be 0
+      OTBN_CSRRS(3, 0x7d0, 0),     // x3 = CSR MOD0 (0x7d0) -> must be 0
+      OTBN_SW(2, 0, 32),           // DMEM[32] = FLAGS
+      OTBN_SW(3, 0, 36),           // DMEM[36] = MOD0
       OTBN_ECALL(),
   };
   otbn_run_program(prog_check_init_zero, ARRAYSIZE(prog_check_init_zero));
@@ -289,14 +283,16 @@ bool test_main(void) {
              "(got ACC[31:0]=0x%08x, FLAGS=0x%08x, MOD0=0x%08x)",
              acc0_init, flags_init, mod0_init);
 
-  // 5e. Wave 5: OTBN_PERMIT sub-word wr_err, addrmiss (0x2c), and IMEM/DMEM ByteAccess=0.
+  // 5e. Wave 5: OTBN_PERMIT sub-word wr_err, addrmiss (0x2c), and IMEM/DMEM
+  // ByteAccess=0.
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0x12345678u);
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0xffu);
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "sb to LOAD_CHECKSUM (PERMIT=0xf) must fault with MCAUSE=7");
-  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0x12345678u,
-             "sb to LOAD_CHECKSUM must not modify register");
+  EXPECT_RTL(
+      abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0x12345678u,
+      "sb to LOAD_CHECKSUM must not modify register");
 
   g_fault_seen = false;
   (void)abs_mmio_read32(kOtbnBase + 0x2cu);
@@ -318,8 +314,9 @@ bool test_main(void) {
   abs_mmio_write8(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x22u);
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "sb to DMEM (ByteAccess=0) must fault with MCAUSE=7");
-  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
-             "sub-word write faults to IMEM/DMEM must not advance LOAD_CHECKSUM");
+  EXPECT_RTL(
+      abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
+      "sub-word write faults to IMEM/DMEM must not advance LOAD_CHECKSUM");
   EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0x89abcdefu,
              "sb to DMEM must not modify word");
 
@@ -333,9 +330,10 @@ bool test_main(void) {
   (void)abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET);
   uint32_t crc_after_imem0_read =
       abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET);
-  EXPECT_RTL(crc_imem0_zero != 0u && crc_after_imem0_read == crc_imem0_zero,
-             "Idle IMEM[0] read must advance LOAD_CHECKSUM to 0x%08x (got 0x%08x)",
-             crc_imem0_zero, crc_after_imem0_read);
+  EXPECT_RTL(
+      crc_imem0_zero != 0u && crc_after_imem0_read == crc_imem0_zero,
+      "Idle IMEM[0] read must advance LOAD_CHECKSUM to 0x%08x (got 0x%08x)",
+      crc_imem0_zero, crc_after_imem0_read);
 
   // 6. Host IMEM read during BUSY_EXECUTE triggers ILLEGAL_BUS_ACCESS, locks
   // OTBN (STATUS == 0xff), latches FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS, and

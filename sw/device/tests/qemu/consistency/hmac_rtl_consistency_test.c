@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/dif/dif_hmac.h"
@@ -13,6 +12,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hmac_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -42,12 +42,12 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   }
 }
 
-#define EXPECT_RTL(cond, ...)                    \
-  do {                                           \
-    if (!(cond)) {                               \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);   \
-      all_ok = false;                            \
-    }                                            \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 bool test_main(void) {
@@ -61,12 +61,14 @@ bool test_main(void) {
   // 1. CFG invalid digest_size / key_length normalization & reserved bits mask.
   // In RTL (hmac.sv:286-336), writing 0 to digest_size (bits 8:5) maps to
   // SHA2_None (0x8 -> 0x100) and writing 0 to key_length (bits 14:9) maps to
-  // Key_None (0x20 -> 0x4000), producing 0x4100. Reserved bits [31:15] read as 0.
+  // Key_None (0x20 -> 0x4000), producing 0x4100. Reserved bits [31:15] read as
+  // 0.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   uint32_t cfg = abs_mmio_read32(kHmacBase + HMAC_CFG_REG_OFFSET);
-  EXPECT_RTL(cfg == 0x4100u,
-             "CFG(0) expected normalized 0x4100 (SHA2_None|Key_None), got 0x%08x",
-             cfg);
+  EXPECT_RTL(
+      cfg == 0x4100u,
+      "CFG(0) expected normalized 0x4100 (SHA2_None|Key_None), got 0x%08x",
+      cfg);
 
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0xffff8000u);
   cfg = abs_mmio_read32(kHmacBase + HMAC_CFG_REG_OFFSET);
@@ -74,10 +76,10 @@ bool test_main(void) {
              "CFG(0xffff8000) reserved bits should be masked out, got 0x%08x",
              cfg);
 
-
   // 2. WIPE_SECRET readback endianness on DIGEST_0..15.
   // In RTL (prim_sha2.sv:148 & hmac.sv:270), writing WIPE_SECRET = V sets each
-  // 32-bit digest word to V, and reading DIGEST_k returns conv_endian32(V, digest_swap):
+  // 32-bit digest word to V, and reading DIGEST_k returns conv_endian32(V,
+  // digest_swap):
   // - when CFG.digest_swap == 0, DIGEST_k reads as V (0x11223344).
   // - when CFG.digest_swap == 1, DIGEST_k reads as bswap32(V) (0x44332211).
   uint32_t cfg_sha256_disabled =
@@ -88,22 +90,25 @@ bool test_main(void) {
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
   abs_mmio_write32(kHmacBase + HMAC_WIPE_SECRET_REG_OFFSET, 0x11223344u);
   uint32_t d0 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET);
-  EXPECT_RTL(d0 == 0x11223344u,
-             "After WIPE_SECRET=0x11223344 with digest_swap=0, DIGEST_0 expected "
-             "0x11223344, got 0x%08x",
-             d0);
+  EXPECT_RTL(
+      d0 == 0x11223344u,
+      "After WIPE_SECRET=0x11223344 with digest_swap=0, DIGEST_0 expected "
+      "0x11223344, got 0x%08x",
+      d0);
 
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET,
                    cfg_sha256_disabled | (1u << HMAC_CFG_DIGEST_SWAP_BIT));
   d0 = abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET);
-  EXPECT_RTL(d0 == 0x44332211u,
-             "After WIPE_SECRET=0x11223344 with digest_swap=1, DIGEST_0 expected "
-             "0x44332211, got 0x%08x",
-             d0);
+  EXPECT_RTL(
+      d0 == 0x44332211u,
+      "After WIPE_SECRET=0x11223344 with digest_swap=1, DIGEST_0 expected "
+      "0x44332211, got 0x%08x",
+      d0);
 
-  // 3. CFG.sha_en falling edge (1 -> 0) clears DIGEST_0..15 to 0x00000000 (not WIPE_SECRET).
-  // In RTL (prim_sha2.sv:396 & 159-160), `clear_digest = hash_start_i | (~sha_en_i & sha_en_q)`
-  // zeroes `digest_q` to '0 on the 1 -> 0 transition of sha_en.
+  // 3. CFG.sha_en falling edge (1 -> 0) clears DIGEST_0..15 to 0x00000000 (not
+  // WIPE_SECRET). In RTL (prim_sha2.sv:396 & 159-160), `clear_digest =
+  // hash_start_i | (~sha_en_i & sha_en_q)` zeroes `digest_q` to '0 on the 1 ->
+  // 0 transition of sha_en.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET,
                    cfg_sha256_disabled | (1u << HMAC_CFG_SHA_EN_BIT));
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
@@ -113,8 +118,9 @@ bool test_main(void) {
              "WIPE_SECRET), got 0x%08x",
              d0);
 
-  // 4. Context restore (DIGEST_0..7 writes) preserved across CFG (sha_en 0->0 and 0->1)
-  // writes, and ignored when CFG.sha_en == 1 or CFG.digest_size == SHA2_None.
+  // 4. Context restore (DIGEST_0..7 writes) preserved across CFG (sha_en 0->0
+  // and 0->1) writes, and ignored when CFG.sha_en == 1 or CFG.digest_size ==
+  // SHA2_None.
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0xaabbccddu);
   // Writing CFG with sha_en=0 (0 -> 0 transition) must NOT clear DIGEST_0.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
@@ -124,8 +130,8 @@ bool test_main(void) {
              "(expected 0xaabbccdd, got 0x%08x)",
              d0);
 
-  // Enabling sha_en (0 -> 1) preserves DIGEST_0, and SW writes to DIGEST_0 while
-  // sha_en == 1 must be ignored (prim_sha2.sv:161 `else if (!sha_en_i)`).
+  // Enabling sha_en (0 -> 1) preserves DIGEST_0, and SW writes to DIGEST_0
+  // while sha_en == 1 must be ignored (prim_sha2.sv:161 `else if (!sha_en_i)`).
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET,
                    cfg_sha256_disabled | (1u << HMAC_CFG_SHA_EN_BIT));
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0x55667788u);
@@ -135,8 +141,8 @@ bool test_main(void) {
              "(expected 0xaabbccdd, got 0x%08x)",
              d0);
 
-  // Disabling sha_en (1 -> 0) with digest_size = SHA2_None clears DIGEST_0 to 0,
-  // and SW writes to DIGEST_0 while digest_size == SHA2_None must be ignored
+  // Disabling sha_en (1 -> 0) with digest_size = SHA2_None clears DIGEST_0 to
+  // 0, and SW writes to DIGEST_0 while digest_size == SHA2_None must be ignored
   // (hmac.sv:240-253).
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0xdeadbeefu);
@@ -179,9 +185,9 @@ bool test_main(void) {
   // 5b. SHA2_256 computation & DIGEST_0..7 replication into DIGEST_8..15.
   // In RTL (hmac.sv:256-261), when digest_size_started_q == SHA2_256,
   // hw2reg.digest[i+8].d = hw2reg.digest[i].d for i = 0..7.
-  uint32_t cfg_sha256_active =
-      cfg_sha256_disabled | (1u << HMAC_CFG_SHA_EN_BIT) |
-      (1u << HMAC_CFG_DIGEST_SWAP_BIT);
+  uint32_t cfg_sha256_active = cfg_sha256_disabled |
+                               (1u << HMAC_CFG_SHA_EN_BIT) |
+                               (1u << HMAC_CFG_DIGEST_SWAP_BIT);
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_active);
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
                    1u << HMAC_CMD_HASH_START_BIT);
@@ -206,9 +212,10 @@ bool test_main(void) {
              "0x%08x, got 0x%08x)",
              d0, d8);
 
-  // 6. ERR_CODE latch-until-cleared (`err_valid = ~reg2hw.intr_state.hmac_err.q & ...`).
-  // In RTL (hmac.sv:831), once INTR_STATE.hmac_err == 1, subsequent errors do NOT
-  // overwrite ERR_CODE until INTR_STATE.hmac_err is cleared (W1C).
+  // 6. ERR_CODE latch-until-cleared (`err_valid = ~reg2hw.intr_state.hmac_err.q
+  // & ...`). In RTL (hmac.sv:831), once INTR_STATE.hmac_err == 1, subsequent
+  // errors do NOT overwrite ERR_CODE until INTR_STATE.hmac_err is cleared
+  // (W1C).
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);
   // Push message while idle (`!msg_allowed`) -> SwPushMsgWhenDisallowed (0x5).
   abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x12345678u);
@@ -217,17 +224,20 @@ bool test_main(void) {
              "First error expected SwPushMsgWhenDisallowed (0x5), got 0x%08x",
              err_code);
 
-  // Now trigger SwHashStartWhenShaDisabled (0x2) WITHOUT clearing INTR_STATE.hmac_err.
+  // Now trigger SwHashStartWhenShaDisabled (0x2) WITHOUT clearing
+  // INTR_STATE.hmac_err.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
                    1u << HMAC_CMD_HASH_START_BIT);
   err_code = abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET);
-  EXPECT_RTL(err_code == kHmacErrPushMsgWhenDisallowed,
-             "ERR_CODE must remain latched at 0x5 while INTR_STATE.hmac_err==1, "
-             "got 0x%08x",
-             err_code);
+  EXPECT_RTL(
+      err_code == kHmacErrPushMsgWhenDisallowed,
+      "ERR_CODE must remain latched at 0x5 while INTR_STATE.hmac_err==1, "
+      "got 0x%08x",
+      err_code);
 
-  // Clear INTR_STATE.hmac_err (W1C) and trigger SwHashStartWhenShaDisabled (0x2) again.
+  // Clear INTR_STATE.hmac_err (W1C) and trigger SwHashStartWhenShaDisabled
+  // (0x2) again.
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
                    1u << HMAC_INTR_STATE_HMAC_ERR_BIT);
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
@@ -240,8 +250,8 @@ bool test_main(void) {
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
                    1u << HMAC_INTR_STATE_HMAC_ERR_BIT);
 
-  // 7. Writing CMD.hash_stop when idle (including with CFG.digest_size = SHA2_None)
-  // must not crash or clear STATUS.hmac_idle.
+  // 7. Writing CMD.hash_stop when idle (including with CFG.digest_size =
+  // SHA2_None) must not crash or clear STATUS.hmac_idle.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
                    1u << HMAC_CMD_HASH_STOP_BIT);
@@ -278,9 +288,9 @@ bool test_main(void) {
              msg_len_hi, msg_len_lo);
 
   // (c) In RTL (hmac.sv:240-243), when `CFG.digest_size == SHA2_256` and
-  // `CFG.sha_en == 0`, only `reg2hw.digest[0..7].qe` drives `digest_sw_we[0..7]`.
-  // Writes to `DIGEST_8..15` are ignored, and `DIGEST_8..15` continue to mirror
-  // `DIGEST_0..7`.
+  // `CFG.sha_en == 0`, only `reg2hw.digest[0..7].qe` drives
+  // `digest_sw_we[0..7]`. Writes to `DIGEST_8..15` are ignored, and
+  // `DIGEST_8..15` continue to mirror `DIGEST_0..7`.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0x13572468u);
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_8_REG_OFFSET, 0xdeadc0deu);
@@ -306,17 +316,19 @@ bool test_main(void) {
              "(ErrOnRead=1 in u_tlul_adapter)");
   uint32_t intr_after = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
   uint32_t err_after = abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET);
-  EXPECT_RTL((intr_after & (1u << HMAC_INTR_STATE_HMAC_ERR_BIT)) == 0u,
-             "Reading MSG_FIFO must NOT assert INTR_STATE.hmac_err (got 0x%08x)",
-             intr_after);
+  EXPECT_RTL(
+      (intr_after & (1u << HMAC_INTR_STATE_HMAC_ERR_BIT)) == 0u,
+      "Reading MSG_FIFO must NOT assert INTR_STATE.hmac_err (got 0x%08x)",
+      intr_after);
   EXPECT_RTL(err_after == err_before,
              "Reading MSG_FIFO must NOT modify ERR_CODE (expected 0x%08x, got "
              "0x%08x)",
              err_before, err_after);
 
-  // 10. Wave 5: `HMAC_PERMIT` sub-word read/write check (`hmac_reg_pkg.sv:441-501`,
-  // `hmac_reg_top.sv:2007-2070`) and `addrmiss` decode error (`0x0f0..0xfff`):
-  // (a) Sub-word reads (`lbu`/`lhu`) to valid CSRs (`CFG`) succeed (`d_error = 0`).
+  // 10. Wave 5: `HMAC_PERMIT` sub-word read/write check
+  // (`hmac_reg_pkg.sv:441-501`, `hmac_reg_top.sv:2007-2070`) and `addrmiss`
+  // decode error (`0x0f0..0xfff`): (a) Sub-word reads (`lbu`/`lhu`) to valid
+  // CSRs (`CFG`) succeed (`d_error = 0`).
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_disabled);
   load_access_fault_seen = false;
   uint16_t cfg_lo16 = *(volatile uint16_t *)(kHmacBase + HMAC_CFG_REG_OFFSET);
@@ -328,19 +340,19 @@ bool test_main(void) {
              "Fault (fault=%d, lo16=0x%04x, b1=0x%02x)",
              load_access_fault_seen, cfg_lo16, cfg_b1);
 
-  // (b) Permitted sub-word writes (`HMAC_PERMIT[INTR_ENABLE] = 4'b0001` via `sb`,
-  // and `HMAC_PERMIT[CFG] = 4'b0011` via `sh`) succeed (`wr_err = 0`).
+  // (b) Permitted sub-word writes (`HMAC_PERMIT[INTR_ENABLE] = 4'b0001` via
+  // `sb`, and `HMAC_PERMIT[CFG] = 4'b0011` via `sh`) succeed (`wr_err = 0`).
   store_access_fault_seen = false;
   abs_mmio_write8(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET, 0x5u);
   uint32_t ie_val = abs_mmio_read32(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET);
   abs_mmio_write8(kHmacBase + HMAC_INTR_ENABLE_REG_OFFSET, 0x0u);
   *(volatile uint16_t *)(kHmacBase + HMAC_CFG_REG_OFFSET) = 0u;
   uint32_t cfg_after_sh = abs_mmio_read32(kHmacBase + HMAC_CFG_REG_OFFSET);
-  EXPECT_RTL(!store_access_fault_seen && ie_val == 0x5u &&
-                 cfg_after_sh == 0x4100u,
-             "Permitted sub-word writes (sb to INTR_ENABLE, sh to CFG) must "
-             "succeed (fault=%d, ie=0x%x, cfg=0x%04x)",
-             store_access_fault_seen, ie_val, cfg_after_sh);
+  EXPECT_RTL(
+      !store_access_fault_seen && ie_val == 0x5u && cfg_after_sh == 0x4100u,
+      "Permitted sub-word writes (sb to INTR_ENABLE, sh to CFG) must "
+      "succeed (fault=%d, ie=0x%x, cfg=0x%04x)",
+      store_access_fault_seen, ie_val, cfg_after_sh);
 
   // (c) Prohibited sub-word writes (`sb` to `CFG` [`4'b0011`], `sh` to
   // `MSG_LENGTH_LOWER` [`4'b1111`]) assert `wr_err = 1` (Store Access Fault
@@ -353,22 +365,26 @@ bool test_main(void) {
              "8-bit write (sb) to CFG (HMAC_PERMIT=4'b0011) must raise Store "
              "Access Fault and leave CFG unchanged");
   store_access_fault_seen = false;
-  *(volatile uint16_t *)(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) = 0xaaaau;
-  EXPECT_RTL(store_access_fault_seen &&
-                 abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) ==
-                     0x12345678u,
-             "16-bit write (sh) to MSG_LENGTH_LOWER (HMAC_PERMIT=4'b1111) must "
-             "raise Store Access Fault and leave MSG_LENGTH_LOWER unchanged");
+  *(volatile uint16_t *)(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) =
+      0xaaaau;
+  EXPECT_RTL(
+      store_access_fault_seen &&
+          abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) ==
+              0x12345678u,
+      "16-bit write (sh) to MSG_LENGTH_LOWER (HMAC_PERMIT=4'b1111) must "
+      "raise Store Access Fault and leave MSG_LENGTH_LOWER unchanged");
 
-  // (d) Unmapped CSR offset (`addrmiss` at `0x0f0`): raises Load/Store Access Fault.
+  // (d) Unmapped CSR offset (`addrmiss` at `0x0f0`): raises Load/Store Access
+  // Fault.
   load_access_fault_seen = false;
   (void)abs_mmio_read32(kHmacBase + 0x0f0u);
   store_access_fault_seen = false;
   abs_mmio_write32(kHmacBase + 0x0f0u, 0x1u);
-  EXPECT_RTL(load_access_fault_seen && store_access_fault_seen,
-             "Unmapped CSR offset 0x0f0 (addrmiss) must raise Load/Store Access "
-             "Fault (load_fault=%d, store_fault=%d)",
-             load_access_fault_seen, store_access_fault_seen);
+  EXPECT_RTL(
+      load_access_fault_seen && store_access_fault_seen,
+      "Unmapped CSR offset 0x0f0 (addrmiss) must raise Load/Store Access "
+      "Fault (load_fault=%d, store_fault=%d)",
+      load_access_fault_seen, store_access_fault_seen);
 
   // 11. `INTR_TEST` Status (`fifo_empty`) vs Event (`hmac_done`) semantics
   // (`hmac.sv:486-512`, `prim_intr_hw.sv:60-89`):
@@ -377,19 +393,22 @@ bool test_main(void) {
                    (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
                        (1u << HMAC_INTR_STATE_HMAC_DONE_BIT));
   uint32_t istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
-  EXPECT_RTL(istate == ((1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
-                        (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)),
-             "INTR_TEST=0x3 must assert both fifo_empty and hmac_done (got 0x%x)",
-             istate);
-  // W1C on INTR_STATE clears Event (hmac_done) but NOT Status (fifo_empty) while test_q=1
+  EXPECT_RTL(
+      istate == ((1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
+                 (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)),
+      "INTR_TEST=0x3 must assert both fifo_empty and hmac_done (got 0x%x)",
+      istate);
+  // W1C on INTR_STATE clears Event (hmac_done) but NOT Status (fifo_empty)
+  // while test_q=1
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET,
                    (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT) |
                        (1u << HMAC_INTR_STATE_HMAC_DONE_BIT));
   istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
-  EXPECT_RTL(istate == (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT),
-             "W1C to INTR_STATE must clear hmac_done (Event) but NOT fifo_empty "
-             "(Status, RO while test_q=1); got 0x%x",
-             istate);
+  EXPECT_RTL(
+      istate == (1u << HMAC_INTR_STATE_FIFO_EMPTY_BIT),
+      "W1C to INTR_STATE must clear hmac_done (Event) but NOT fifo_empty "
+      "(Status, RO while test_q=1); got 0x%x",
+      istate);
   // Writing INTR_TEST=0 deasserts test_q for Status interrupt fifo_empty
   abs_mmio_write32(kHmacBase + HMAC_INTR_TEST_REG_OFFSET, 0u);
   istate = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
@@ -399,4 +418,3 @@ bool test_main(void) {
 
   return all_ok;
 }
-

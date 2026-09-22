@@ -55,7 +55,8 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 0u);
-  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) ==
+        0u);
 
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 1u);
   busy_spin_micros(60);
@@ -71,8 +72,9 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
   busy_spin_micros(60);
 
-  // 2. Combo EC_RST trigger, zero-write while stretched (ot_sysrst_ctrl.c:636-640),
-  // and zero-stretch release (EC_RST_CTL == 0, ot_sysrst_ctrl.c:456-458).
+  // 2. Combo EC_RST trigger, zero-write while stretched
+  // (ot_sysrst_ctrl.c:636-640), and zero-stretch release (EC_RST_CTL == 0,
+  // ot_sysrst_ctrl.c:456-458).
   uint32_t inv_key0_high =
       raw_key0 ? 0u : (1u << SYSRST_CTRL_KEY_INVERT_CTL_KEY0_IN_BIT);
   uint32_t inv_key0_low =
@@ -101,9 +103,9 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET,
                    inv_key0_low);
   busy_spin_micros(60);
-  CHECK((abs_mmio_read32(kSysrstBase +
-                         SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) &
-         1u) == 1u);
+  CHECK(
+      (abs_mmio_read32(kSysrstBase + SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) &
+       1u) == 1u);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET) == 0u);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET,
@@ -120,10 +122,11 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET,
                    inv_key0_low);
   busy_spin_micros(60);
-  CHECK((abs_mmio_read32(kSysrstBase +
-                         SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) &
-         1u) == 1u);
-  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) == 1u);
+  CHECK(
+      (abs_mmio_read32(kSysrstBase + SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) &
+       1u) == 1u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) ==
+        1u);
 
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET,
                    inv_key0_high);
@@ -134,7 +137,8 @@ bool test_main(void) {
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase +
                         SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) == 0u);
-  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) ==
+        0u);
 
   // Clean up.
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_COM_SEL_CTL_0_REG_OFFSET, 0u);

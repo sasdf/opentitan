@@ -665,13 +665,7 @@ impl GpioBitbanging for QemuGpioBitbanging {
                     gpio.run_bitbang_entry(&pins_str, &pin_indices, period_ns, wbuf, None)?;
                 }
                 BitbangEntry::Both(wbuf, rbuf) => {
-                    gpio.run_bitbang_entry(
-                        &pins_str,
-                        &pin_indices,
-                        period_ns,
-                        wbuf,
-                        Some(*rbuf),
-                    )?;
+                    gpio.run_bitbang_entry(&pins_str, &pin_indices, period_ns, wbuf, Some(*rbuf))?;
                 }
                 BitbangEntry::BothOwned(buf) => {
                     let wbuf = buf.clone();

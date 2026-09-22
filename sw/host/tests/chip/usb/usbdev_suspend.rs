@@ -192,7 +192,9 @@ fn usbdev_suspend(
     }
 
     // Wait for device to appear.
-    let (hub, port) = opts.usb.wait_for_device_and_get_parent(transport, opts.timeout)?;
+    let (hub, port) = opts
+        .usb
+        .wait_for_device_and_get_parent(transport, opts.timeout)?;
 
     // Collect test phases.
     let init_phase = opts.init_phase.clone();

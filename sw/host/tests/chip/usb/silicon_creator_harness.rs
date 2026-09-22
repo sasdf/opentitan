@@ -34,8 +34,12 @@ impl HarnessUsbDevice {
         timeout: Duration,
     ) -> Result<usize> {
         match self {
-            Self::Rusb(d) => Ok(d.read_control(request_type, request, value, index, buf, timeout)?),
-            Self::Ot(d) => d.read_control_timeout(request_type, request, value, index, buf, timeout),
+            Self::Rusb(d) => {
+                Ok(d.read_control(request_type, request, value, index, buf, timeout)?)
+            }
+            Self::Ot(d) => {
+                d.read_control_timeout(request_type, request, value, index, buf, timeout)
+            }
         }
     }
 
@@ -49,8 +53,12 @@ impl HarnessUsbDevice {
         timeout: Duration,
     ) -> Result<usize> {
         match self {
-            Self::Rusb(d) => Ok(d.write_control(request_type, request, value, index, buf, timeout)?),
-            Self::Ot(d) => d.write_control_timeout(request_type, request, value, index, buf, timeout),
+            Self::Rusb(d) => {
+                Ok(d.write_control(request_type, request, value, index, buf, timeout)?)
+            }
+            Self::Ot(d) => {
+                d.write_control_timeout(request_type, request, value, index, buf, timeout)
+            }
         }
     }
 
@@ -876,7 +884,10 @@ fn test_in_overflow(dev: &HarnessUsbDevice) -> Result<()> {
     Ok(())
 }
 
-fn test_out_overflow(dev: &HarnessUsbDevice, uart: &dyn opentitanlib::io::uart::Uart) -> Result<()> {
+fn test_out_overflow(
+    dev: &HarnessUsbDevice,
+    uart: &dyn opentitanlib::io::uart::Uart,
+) -> Result<()> {
     let ep = EP_OUT_01;
     let buffer = vec![0u8; 64];
     // Tell DUT to expect 8 bytes on EP1

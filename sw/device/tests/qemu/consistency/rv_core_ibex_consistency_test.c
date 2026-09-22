@@ -73,9 +73,9 @@ static void configure_ibex_alerts_non_escalating(void) {
   for (uint32_t alert_id = kTopEarlgreyAlertIdRvCoreIbexFatalSwErr;
        alert_id <= kTopEarlgreyAlertIdRvCoreIbexRecovHwErr; ++alert_id) {
     uint32_t reg_offset = alert_id * sizeof(uint32_t);
-    uint32_t regwen = abs_mmio_read32(
-        kAlertHandlerBase + ALERT_HANDLER_ALERT_REGWEN_0_REG_OFFSET +
-        reg_offset);
+    uint32_t regwen =
+        abs_mmio_read32(kAlertHandlerBase +
+                        ALERT_HANDLER_ALERT_REGWEN_0_REG_OFFSET + reg_offset);
     if (regwen & 0x1u) {
       // Route alert to Class A (which OTTF leaves disabled) while keeping
       // ALERT_EN_SHADOWED = 1 so ALERT_CAUSE still latches without triggering
@@ -94,12 +94,11 @@ static void configure_ibex_alerts_non_escalating(void) {
 
 bool test_main(void) {
   dif_rv_core_ibex_t ibex;
-  CHECK_DIF_OK(
-      dif_rv_core_ibex_init(mmio_region_from_addr(kIbexBase), &ibex));
+  CHECK_DIF_OK(dif_rv_core_ibex_init(mmio_region_from_addr(kIbexBase), &ibex));
 
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
 
   configure_ibex_alerts_non_escalating();
 
@@ -137,8 +136,7 @@ bool test_main(void) {
     CHECK_DIF_OK(
         dif_alert_handler_alert_acknowledge(&alert_handler, target_alert));
 
-    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET,
-                     1u << bit);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET, 1u << bit);
     busy_spin_micros(10);
     CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET) ==
           0u);
@@ -318,8 +316,8 @@ bool test_main(void) {
 
   // Lock DBUS Slot 1 via DBUS_REGWEN_1 (RW0C) and verify further writes are
   // ignored.
-  uint32_t saved_matching_1 = abs_mmio_read32(
-      kIbexBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET);
+  uint32_t saved_matching_1 =
+      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET);
   CHECK_DIF_OK(dif_rv_core_ibex_lock_addr_translation(
       &ibex, kDifRvCoreIbexAddrTranslationSlot_1,
       kDifRvCoreIbexAddrTranslationDBus));
@@ -335,8 +333,8 @@ bool test_main(void) {
                    0xdeadbeefu);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) ==
         0u);
-  CHECK(abs_mmio_read32(
-            kIbexBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+  CHECK(abs_mmio_read32(kIbexBase +
+                        RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) ==
         saved_matching_1);
 
   // 6. Wave 2 Deep-Pass Checks:
@@ -364,11 +362,11 @@ bool test_main(void) {
                      0x12345000u);
     abs_mmio_write32(kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET,
                      0x6789a000u);
-    CHECK(abs_mmio_read32(
-              kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+    CHECK(abs_mmio_read32(kIbexBase +
+                          RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
           0x12345000u);
-    CHECK(abs_mmio_read32(
-              kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
+    CHECK(abs_mmio_read32(kIbexBase +
+                          RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
           0x6789a000u);
 
     // Writing 0xfffffffe (bit 0 = 0) clears IBUS_REGWEN_1 (1-bit W0C).
@@ -390,11 +388,11 @@ bool test_main(void) {
                      0xcafebabeu);
     CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET) ==
           0u);
-    CHECK(abs_mmio_read32(
-              kIbexBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+    CHECK(abs_mmio_read32(kIbexBase +
+                          RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
           0x12345000u);
-    CHECK(abs_mmio_read32(
-              kIbexBase + RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
+    CHECK(abs_mmio_read32(kIbexBase +
+                          RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) ==
           0x6789a000u);
   }
 
@@ -419,8 +417,8 @@ bool test_main(void) {
   // - FPGA_INFO (PERMIT = 4'b1111) rejects 1-byte write (reg_be = 4'b0001).
   CHECK(expect_store_fault_8(ibex_mmio, RV_CORE_IBEX_ERR_STATUS_REG_OFFSET,
                              0xffu));
-  CHECK(expect_store_fault_8(
-      ibex_mmio, RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET + 1u, 0x06u));
+  CHECK(expect_store_fault_8(ibex_mmio,
+                             RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET + 1u, 0x06u));
   CHECK(expect_store_fault_8(ibex_mmio, RV_CORE_IBEX_FPGA_INFO_REG_OFFSET,
                              0x55u));
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) == 0u);
@@ -504,4 +502,3 @@ bool test_main(void) {
 
   return true;
 }
-

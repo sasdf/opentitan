@@ -5,12 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "aes_regs.h"
-#include "csrng_regs.h"
-#include "edn_regs.h"
-#include "entropy_src_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "rv_core_ibex_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/multibits.h"
@@ -19,6 +13,13 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "aes_regs.h"
+#include "csrng_regs.h"
+#include "edn_regs.h"
+#include "entropy_src_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "rv_core_ibex_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
@@ -95,8 +96,8 @@ bool test_main(void) {
         status_after_ro_write, status32);
 
   uint32_t trig_read = abs_mmio_read32(kAesBase + AES_TRIGGER_REG_OFFSET);
-  CHECK(trig_read == 0u,
-        "W/O TRIGGER read must return 0, got 0x%08x", trig_read);
+  CHECK(trig_read == 0u, "W/O TRIGGER read must return 0, got 0x%08x",
+        trig_read);
   CHECK(abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) == 0u,
         "Unexpected Ibex bus fault on TRIGGER read");
 
@@ -134,11 +135,11 @@ bool test_main(void) {
   // 4. Key share write ignored when SIDELOAD = 1 (ot_aes.c:1356-1356).
   // Verify that writing two completely different software keys to KEY_SHARE0/1
   // while SIDELOAD = 1 is ignored by hardware and produces identical DATA_OUT.
-  uint32_t ctrl_sideload = make_ctrl_val(
-      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
-      AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
-      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_128, /*sideload=*/true,
-      /*manual=*/true);
+  uint32_t ctrl_sideload =
+      make_ctrl_val(AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+                    AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
+                    AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_128, /*sideload=*/true,
+                    /*manual=*/true);
   write_ctrl_shadowed(ctrl_sideload);
   for (uint32_t i = 0; i < 8u; ++i) {
     abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
@@ -190,11 +191,11 @@ bool test_main(void) {
   // Key = 8e73b0f7 da0e6452 c810f32b 809079e5 62f8ead2 522c6b7b
   // Plaintext = 6bc1bee2 2e409f96 e93d7e11 7393172a
   // Ciphertext = bd334f1d 6e45f25f f712a214 571fa5cc
-  uint32_t ctrl_aes192_auto = make_ctrl_val(
-      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
-      AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
-      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
-      /*manual=*/false);
+  uint32_t ctrl_aes192_auto =
+      make_ctrl_val(AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+                    AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
+                    AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
+                    /*manual=*/false);
   write_ctrl_shadowed(ctrl_aes192_auto);
 
   const uint32_t kKey192[8] = {
@@ -202,10 +203,16 @@ bool test_main(void) {
       0xd2eaf862u, 0x7b6b2c52u, 0x00000000u, 0x00000000u,
   };
   const uint32_t kPlaintext[4] = {
-      0xe2bec16bu, 0x969f402eu, 0x117e3de9u, 0x2a179373u,
+      0xe2bec16bu,
+      0x969f402eu,
+      0x117e3de9u,
+      0x2a179373u,
   };
   const uint32_t kExpectedCiphertext[4] = {
-      0x1d4f33bdu, 0x5ff2456eu, 0x14a212f7u, 0xcca51f57u,
+      0x1d4f33bdu,
+      0x5ff2456eu,
+      0x14a212f7u,
+      0xcca51f57u,
   };
 
   for (uint32_t i = 0; i < 8u; ++i) {
@@ -244,7 +251,8 @@ bool test_main(void) {
         partial_key_status);
 
   // Complete writing the remaining keyshare registers and verify auto-mode
-  // encryption triggers automatically and matches the golden AES-192 ciphertext.
+  // encryption triggers automatically and matches the golden AES-192
+  // ciphertext.
   for (uint32_t i = 1; i < 8u; ++i) {
     abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
                      kKey192[i]);
@@ -264,14 +272,15 @@ bool test_main(void) {
           i, got, kExpectedCiphertext[i]);
   }
 
-  // 6. AES-192 in manual mode (ot_aes.c:357-359 `ot_aes_get_key_mask` case 0x02u).
-  // In MANUAL_OPERATION mode, `ot_aes_update_key` calls `ot_aes_get_key_mask`
-  // which only requires the 6 lower words (192 bits) of KEY_SHARE0 and KEY_SHARE1.
-  uint32_t ctrl_aes192_manual = make_ctrl_val(
-      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
-      AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
-      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
-      /*manual=*/true);
+  // 6. AES-192 in manual mode (ot_aes.c:357-359 `ot_aes_get_key_mask` case
+  // 0x02u). In MANUAL_OPERATION mode, `ot_aes_update_key` calls
+  // `ot_aes_get_key_mask` which only requires the 6 lower words (192 bits) of
+  // KEY_SHARE0 and KEY_SHARE1.
+  uint32_t ctrl_aes192_manual =
+      make_ctrl_val(AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+                    AES_CTRL_SHADOWED_MODE_VALUE_AES_ECB,
+                    AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
+                    /*manual=*/true);
   write_ctrl_shadowed(ctrl_aes192_manual);
 
   for (uint32_t i = 0; i < 6u; ++i) {
@@ -299,15 +308,18 @@ bool test_main(void) {
 
   // 7. Gate KEY_SHARE and IV writes when STATUS.IDLE == 0 during pending
   // PRNG_RESEED (aes_control_fsm.sv:315-343, 472-495; ot_aes.c:1360, 1378).
-  uint32_t ctrl_aes192_cbc = make_ctrl_val(
-      AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
-      AES_CTRL_SHADOWED_MODE_VALUE_AES_CBC,
-      AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
-      /*manual=*/true);
+  uint32_t ctrl_aes192_cbc =
+      make_ctrl_val(AES_CTRL_SHADOWED_OPERATION_VALUE_AES_ENC,
+                    AES_CTRL_SHADOWED_MODE_VALUE_AES_CBC,
+                    AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_192, /*sideload=*/false,
+                    /*manual=*/true);
   write_ctrl_shadowed(ctrl_aes192_cbc);
 
   const uint32_t kKnownIv[4] = {
-      0x10203040u, 0x50607080u, 0x90a0b0c0u, 0xd0e0f001u,
+      0x10203040u,
+      0x50607080u,
+      0x90a0b0c0u,
+      0xd0e0f001u,
   };
   for (uint32_t i = 0; i < 4u; ++i) {
     abs_mmio_write32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u, kKnownIv[i]);

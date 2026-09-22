@@ -17,8 +17,8 @@
 OTTF_DEFINE_TEST_CONFIG();
 
 static void test_csr_masks_and_access(mmio_region_t i2c_base) {
-  // 1. STATUS reset value: FMTEMPTY(bit 2) | HOSTIDLE(bit 3) | TARGETIDLE(bit 4)
-  // | RXEMPTY(bit 5) | TXEMPTY(bit 8) | ACQEMPTY(bit 9) = 0x33c.
+  // 1. STATUS reset value: FMTEMPTY(bit 2) | HOSTIDLE(bit 3) | TARGETIDLE(bit
+  // 4) | RXEMPTY(bit 5) | TXEMPTY(bit 8) | ACQEMPTY(bit 9) = 0x33c.
   uint32_t status = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
   CHECK(status == 0x33cu, "Expected initial I2C STATUS=0x33c, got 0x%x",
         status);
@@ -33,7 +33,8 @@ static void test_csr_masks_and_access(mmio_region_t i2c_base) {
         "Expected TARGET_NACK_COUNT=0 after SW write (SwAccessRC), got 0x%x",
         nack_cnt);
 
-  // 3. HOST_TIMEOUT_CTRL (offset 0x60) is 20 bits wide [19:0] (mask 0x000fffff).
+  // 3. HOST_TIMEOUT_CTRL (offset 0x60) is 20 bits wide [19:0] (mask
+  // 0x000fffff).
   mmio_region_write32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0xffffffffu);
   uint32_t host_to =
       mmio_region_read32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET);
@@ -43,8 +44,8 @@ static void test_csr_masks_and_access(mmio_region_t i2c_base) {
         host_to);
   mmio_region_write32(i2c_base, I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0u);
 
-  // 4. TIMING0..4, TIMEOUT_CTRL, TARGET_ID, HOST_FIFO_CONFIG, TARGET_FIFO_CONFIG
-  // field masks.
+  // 4. TIMING0..4, TIMEOUT_CTRL, TARGET_ID, HOST_FIFO_CONFIG,
+  // TARGET_FIFO_CONFIG field masks.
   mmio_region_write32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0xffffffffu);
   uint32_t h_fifo_cfg =
       mmio_region_read32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET);
@@ -90,7 +91,8 @@ static void test_fifo_preload_when_disabled(mmio_region_t i2c_base) {
       mmio_region_read32(i2c_base, I2C_HOST_FIFO_STATUS_REG_OFFSET);
   uint32_t fmtlvl =
       bitfield_field32_read(h_status, I2C_HOST_FIFO_STATUS_FMTLVL_FIELD);
-  CHECK(fmtlvl == 2u, "Expected FMTLVL=2 after 2 FDATA writes with ENABLEHOST=0, got %u",
+  CHECK(fmtlvl == 2u,
+        "Expected FMTLVL=2 after 2 FDATA writes with ENABLEHOST=0, got %u",
         fmtlvl);
 
   uint32_t status = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
@@ -111,7 +113,8 @@ static void test_fifo_preload_when_disabled(mmio_region_t i2c_base) {
       mmio_region_read32(i2c_base, I2C_TARGET_FIFO_STATUS_REG_OFFSET);
   uint32_t txlvl =
       bitfield_field32_read(t_status, I2C_TARGET_FIFO_STATUS_TXLVL_FIELD);
-  CHECK(txlvl == 2u, "Expected TXLVL=2 after 2 TXDATA writes with ENABLETARGET=0, got %u",
+  CHECK(txlvl == 2u,
+        "Expected TXLVL=2 after 2 TXDATA writes with ENABLETARGET=0, got %u",
         txlvl);
 
   status = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
@@ -129,10 +132,12 @@ static void test_fifo_preload_when_disabled(mmio_region_t i2c_base) {
 
   h_status = mmio_region_read32(i2c_base, I2C_HOST_FIFO_STATUS_REG_OFFSET);
   t_status = mmio_region_read32(i2c_base, I2C_TARGET_FIFO_STATUS_REG_OFFSET);
-  CHECK(bitfield_field32_read(h_status, I2C_HOST_FIFO_STATUS_FMTLVL_FIELD) == 0u,
-        "Expected FMTLVL=0 after FMTRST");
-  CHECK(bitfield_field32_read(t_status, I2C_TARGET_FIFO_STATUS_TXLVL_FIELD) == 0u,
-        "Expected TXLVL=0 after TXRST");
+  CHECK(
+      bitfield_field32_read(h_status, I2C_HOST_FIFO_STATUS_FMTLVL_FIELD) == 0u,
+      "Expected FMTLVL=0 after FMTRST");
+  CHECK(
+      bitfield_field32_read(t_status, I2C_TARGET_FIFO_STATUS_TXLVL_FIELD) == 0u,
+      "Expected TXLVL=0 after TXRST");
 
   mmio_region_write32(i2c_base, I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0u);
   mmio_region_write32(i2c_base, I2C_TARGET_FIFO_CONFIG_REG_OFFSET, 0u);
@@ -208,19 +213,15 @@ static void test_intr_test_status_vs_event(mmio_region_t i2c_base) {
 }
 
 static void precharge_i2c0_pads_high(const dif_pinmux_t *pinmux) {
-  CHECK_DIF_OK(dif_pinmux_output_select(
-      pinmux, kTopEarlgreyPinmuxMioOutIoa7,
-      kTopEarlgreyPinmuxOutselConstantOne));
-  CHECK_DIF_OK(dif_pinmux_output_select(
-      pinmux, kTopEarlgreyPinmuxMioOutIoa8,
-      kTopEarlgreyPinmuxOutselConstantOne));
+  CHECK_DIF_OK(dif_pinmux_output_select(pinmux, kTopEarlgreyPinmuxMioOutIoa7,
+                                        kTopEarlgreyPinmuxOutselConstantOne));
+  CHECK_DIF_OK(dif_pinmux_output_select(pinmux, kTopEarlgreyPinmuxMioOutIoa8,
+                                        kTopEarlgreyPinmuxOutselConstantOne));
   busy_spin_micros(2);
-  CHECK_DIF_OK(dif_pinmux_output_select(
-      pinmux, kTopEarlgreyPinmuxMioOutIoa7,
-      kTopEarlgreyPinmuxOutselI2c0Sda));
-  CHECK_DIF_OK(dif_pinmux_output_select(
-      pinmux, kTopEarlgreyPinmuxMioOutIoa8,
-      kTopEarlgreyPinmuxOutselI2c0Scl));
+  CHECK_DIF_OK(dif_pinmux_output_select(pinmux, kTopEarlgreyPinmuxMioOutIoa7,
+                                        kTopEarlgreyPinmuxOutselI2c0Sda));
+  CHECK_DIF_OK(dif_pinmux_output_select(pinmux, kTopEarlgreyPinmuxMioOutIoa8,
+                                        kTopEarlgreyPinmuxOutselI2c0Scl));
   busy_spin_micros(2);
 }
 
@@ -230,12 +231,12 @@ static void test_val_and_ovrd(mmio_region_t i2c_base) {
       mmio_region_from_addr(TOP_EARLGREY_PINMUX_AON_BASE_ADDR), &pinmux));
 
   // Route I2C0 SDA to IOA7 and SCL to IOA8.
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Sda,
-      kTopEarlgreyPinmuxInselIoa7));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Scl,
-      kTopEarlgreyPinmuxInselIoa8));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Sda,
+                                       kTopEarlgreyPinmuxInselIoa7));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Scl,
+                                       kTopEarlgreyPinmuxInselIoa8));
 
   mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
   precharge_i2c0_pads_high(&pinmux);
@@ -252,8 +253,7 @@ static void test_val_and_ovrd(mmio_region_t i2c_base) {
   busy_spin_micros(5);
   val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
   CHECK(val == 0xffff0000u,
-        "Expected VAL=0xffff0000 when OVRD drives SCL=0, SDA=1, got 0x%x",
-        val);
+        "Expected VAL=0xffff0000 when OVRD drives SCL=0, SDA=1, got 0x%x", val);
 
   // Override SCL=1, SDA=0 (TXOVRDEN=1, SCLVAL=1, SDAVAL=0 -> 0x3).
   mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
@@ -265,8 +265,7 @@ static void test_val_and_ovrd(mmio_region_t i2c_base) {
   busy_spin_micros(5);
   val = mmio_region_read32(i2c_base, I2C_VAL_REG_OFFSET);
   CHECK(val == 0x0000ffffu,
-        "Expected VAL=0x0000ffff when OVRD drives SCL=1, SDA=0, got 0x%x",
-        val);
+        "Expected VAL=0x0000ffff when OVRD drives SCL=1, SDA=0, got 0x%x", val);
 
   // Disable override (OVRD=0) -> bus returns to idle high (0xffffffff).
   mmio_region_write32(i2c_base, I2C_OVRD_REG_OFFSET, 0u);
@@ -371,43 +370,41 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
       mmio_region_from_addr(TOP_EARLGREY_PINMUX_AON_BASE_ADDR), &pinmux));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIor0,
                                         kTopEarlgreyPinmuxOutselI2c0Sda));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Sda,
-      kTopEarlgreyPinmuxInselIor0));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Sda,
+                                       kTopEarlgreyPinmuxInselIor0));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIor1,
                                         kTopEarlgreyPinmuxOutselI2c0Scl));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Scl,
-      kTopEarlgreyPinmuxInselIor1));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Scl,
+                                       kTopEarlgreyPinmuxInselIor1));
 
-  mmio_region_write32(i2c_base, I2C_TIMING0_REG_OFFSET,
-                      (60u << I2C_TIMING0_THIGH_OFFSET) |
-                          (60u << I2C_TIMING0_TLOW_OFFSET));
-  mmio_region_write32(i2c_base, I2C_TIMING1_REG_OFFSET,
-                      (20u << I2C_TIMING1_T_R_OFFSET) |
-                          (4u << I2C_TIMING1_T_F_OFFSET));
+  mmio_region_write32(
+      i2c_base, I2C_TIMING0_REG_OFFSET,
+      (60u << I2C_TIMING0_THIGH_OFFSET) | (60u << I2C_TIMING0_TLOW_OFFSET));
+  mmio_region_write32(
+      i2c_base, I2C_TIMING1_REG_OFFSET,
+      (20u << I2C_TIMING1_T_R_OFFSET) | (4u << I2C_TIMING1_T_F_OFFSET));
   mmio_region_write32(i2c_base, I2C_TIMING2_REG_OFFSET,
                       (60u << I2C_TIMING2_TSU_STA_OFFSET) |
                           (60u << I2C_TIMING2_THD_STA_OFFSET));
   mmio_region_write32(i2c_base, I2C_TIMING3_REG_OFFSET,
                       (10u << I2C_TIMING3_TSU_DAT_OFFSET) |
                           (10u << I2C_TIMING3_THD_DAT_OFFSET));
-  mmio_region_write32(i2c_base, I2C_TIMING4_REG_OFFSET,
-                      (60u << I2C_TIMING4_TSU_STO_OFFSET) |
-                          (60u << I2C_TIMING4_T_BUF_OFFSET));
   mmio_region_write32(
-      i2c_base, I2C_TARGET_ID_REG_OFFSET,
-      (0x7fu << I2C_TARGET_ID_MASK0_OFFSET) |
-          (0x55u << I2C_TARGET_ID_ADDRESS0_OFFSET));
+      i2c_base, I2C_TIMING4_REG_OFFSET,
+      (60u << I2C_TIMING4_TSU_STO_OFFSET) | (60u << I2C_TIMING4_T_BUF_OFFSET));
+  mmio_region_write32(i2c_base, I2C_TARGET_ID_REG_OFFSET,
+                      (0x7fu << I2C_TARGET_ID_MASK0_OFFSET) |
+                          (0x55u << I2C_TARGET_ID_ADDRESS0_OFFSET));
 
-  uint32_t ctrl = (1u << I2C_CTRL_ENABLEHOST_BIT) |
-                  (1u << I2C_CTRL_ENABLETARGET_BIT);
+  uint32_t ctrl =
+      (1u << I2C_CTRL_ENABLEHOST_BIT) | (1u << I2C_CTRL_ENABLETARGET_BIT);
   mmio_region_write32(i2c_base, I2C_CTRL_REG_OFFSET, ctrl);
 
-  uint32_t fifo_rst = (1u << I2C_FIFO_CTRL_RXRST_BIT) |
-                      (1u << I2C_FIFO_CTRL_FMTRST_BIT) |
-                      (1u << I2C_FIFO_CTRL_ACQRST_BIT) |
-                      (1u << I2C_FIFO_CTRL_TXRST_BIT);
+  uint32_t fifo_rst =
+      (1u << I2C_FIFO_CTRL_RXRST_BIT) | (1u << I2C_FIFO_CTRL_FMTRST_BIT) |
+      (1u << I2C_FIFO_CTRL_ACQRST_BIT) | (1u << I2C_FIFO_CTRL_TXRST_BIT);
   mmio_region_write32(i2c_base, I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
   mmio_region_write32(i2c_base, I2C_INTR_STATE_REG_OFFSET, 0xffffffffu);
 
@@ -415,12 +412,13 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
       (1u << I2C_STATUS_HOSTIDLE_BIT) | (1u << I2C_STATUS_FMTEMPTY_BIT);
 
   // Step 1a: Repeated START to the same target address (0x55 -> 0x55) without
-  // intervening STOP so s->in_target_transfer remains true across Repeated START.
+  // intervening STOP so s->in_target_transfer remains true across Repeated
+  // START.
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
                       (1u << I2C_FDATA_START_BIT) | (0x55u << 1));
-  mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
-                      (1u << I2C_FDATA_START_BIT) |
-                          (1u << I2C_FDATA_STOP_BIT) | (0x55u << 1));
+  mmio_region_write32(
+      i2c_base, I2C_FDATA_REG_OFFSET,
+      (1u << I2C_FDATA_START_BIT) | (1u << I2C_FDATA_STOP_BIT) | (0x55u << 1));
   for (int i = 0; i < 5000; ++i) {
     uint32_t st = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
     uint32_t intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
@@ -441,8 +439,7 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
                       (1u << I2C_FDATA_START_BIT) | (0x55u << 1));
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
-                      (1u << I2C_FDATA_START_BIT) |
-                          (1u << I2C_FDATA_STOP_BIT) |
+                      (1u << I2C_FDATA_START_BIT) | (1u << I2C_FDATA_STOP_BIT) |
                           (1u << I2C_FDATA_NAKOK_BIT) | (0x56u << 1));
   for (int i = 0; i < 5000; ++i) {
     uint32_t st = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
@@ -463,9 +460,9 @@ static void test_fifo_ctrl_and_loopback_restart(mmio_region_t i2c_base) {
   mmio_region_write32(i2c_base, I2C_TXDATA_REG_OFFSET, 0xa5u);
   mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
                       (1u << I2C_FDATA_START_BIT) | (0x55u << 1) | 1u);
-  mmio_region_write32(i2c_base, I2C_FDATA_REG_OFFSET,
-                      (1u << I2C_FDATA_READB_BIT) |
-                          (1u << I2C_FDATA_STOP_BIT) | 1u);
+  mmio_region_write32(
+      i2c_base, I2C_FDATA_REG_OFFSET,
+      (1u << I2C_FDATA_READB_BIT) | (1u << I2C_FDATA_STOP_BIT) | 1u);
   for (int i = 0; i < 5000; ++i) {
     uint32_t st = mmio_region_read32(i2c_base, I2C_STATUS_REG_OFFSET);
     intr = mmio_region_read32(i2c_base, I2C_INTR_STATE_REG_OFFSET);
@@ -502,4 +499,3 @@ bool test_main(void) {
   LOG_INFO("i2c_consistency_test passed!");
   return true;
 }
-

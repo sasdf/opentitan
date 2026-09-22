@@ -49,11 +49,11 @@ BOOT_POLICY_BIG_IMAGE_CASES = [
             otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val) + t.get("tags", []),
         ),
+        local_defines = ["ARRAY_SIZE={}".format(t["array_size"])],
         qemu = qemu_params(
             otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
         ),
-        local_defines = ["ARRAY_SIZE={}".format(t["array_size"])],
         deps = [
             "//sw/device/lib/testing/test_framework:check",
             "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",

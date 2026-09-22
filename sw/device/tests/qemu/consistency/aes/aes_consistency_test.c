@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "aes_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -12,6 +10,9 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "aes_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -70,9 +71,10 @@ static void read_all_data_out(void) {
 bool test_main(void) {
   wait_for_idle();
 
-  // 1. Verify CTRL_SHADOWED sparse field sanitization (aes_ctrl_reg_shadowed.sv:75-120):
-  // Writing 0x0 twice maps OPERATION=0->AES_ENC(0x1), MODE=0->AES_NONE(0x20),
-  // KEY_LEN=0->AES_256(0x4), PRNG_RESEED_RATE=0->PER_1(0x1) => 0x00001481.
+  // 1. Verify CTRL_SHADOWED sparse field sanitization
+  // (aes_ctrl_reg_shadowed.sv:75-120): Writing 0x0 twice maps
+  // OPERATION=0->AES_ENC(0x1), MODE=0->AES_NONE(0x20), KEY_LEN=0->AES_256(0x4),
+  // PRNG_RESEED_RATE=0->PER_1(0x1) => 0x00001481.
   write_ctrl_shadowed(0x0u);
   uint32_t ctrl_val = abs_mmio_read32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET);
   CHECK(ctrl_val == 0x00001481u,
@@ -89,8 +91,8 @@ bool test_main(void) {
 
   // 3. Verify STATUS.ALERT_RECOV_CTRL_UPDATE_ERR set on shadow mismatch and
   // cleared on subsequent CTRL_SHADOWED write (aes_core.sv:915-916):
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdAesRecovCtrlUpdateErr));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdAesRecovCtrlUpdateErr));
   abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, 0x00001105u);
   abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, 0x00001109u);
   CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
@@ -113,10 +115,11 @@ bool test_main(void) {
   status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK(
       !bitfield_bit32_read(status, AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT),
-      "Expected STATUS.ALERT_RECOV_CTRL_UPDATE_ERR=0 after CTRL_SHADOWED write");
+      "Expected STATUS.ALERT_RECOV_CTRL_UPDATE_ERR=0 after CTRL_SHADOWED "
+      "write");
 
-  // 4. Verify STATUS.OUTPUT_LOST in manual mode when overwriting unread DATA_OUT,
-  // and clear on CTRL_SHADOWED write (aes_control_fsm.sv:757-763):
+  // 4. Verify STATUS.OUTPUT_LOST in manual mode when overwriting unread
+  // DATA_OUT, and clear on CTRL_SHADOWED write (aes_control_fsm.sv:757-763):
   write_dummy_key(0x12345678u);
   write_dummy_data_in(0x100u);
   abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
@@ -273,18 +276,24 @@ bool test_main(void) {
   // aes_reg_top.sv:1500-1630):
   // - CTRL_SHADOWED (0x74) has PERMIT = 4'b0011:
   //   8-bit (sb) write fails with StoreAccessFault (and does NOT trigger shadow
-  //   update error), while 16-bit (sh) write at offset +0 succeeds without fault.
-  // - KEY_SHARE0_0 (0x04), IV_0 (0x44), DATA_IN_0 (0x54), DATA_OUT_0 (0x64) have
-  //   PERMIT = 4'b1111: 8-bit (sb) and 16-bit (sh) writes fail with StoreAccessFault.
+  //   update error), while 16-bit (sh) write at offset +0 succeeds without
+  //   fault.
+  // - KEY_SHARE0_0 (0x04), IV_0 (0x44), DATA_IN_0 (0x54), DATA_OUT_0 (0x64)
+  // have
+  //   PERMIT = 4'b1111: 8-bit (sb) and 16-bit (sh) writes fail with
+  //   StoreAccessFault.
   // - TRIGGER (0x80) and ALERT_TEST (0x00) have PERMIT = 4'b0001:
   //   8-bit write at offset +0 succeeds, while 8-bit write at offset +1 fails.
   access_fault_seen = false;
   abs_mmio_write8(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, 0x01u);
   CHECK(access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to CTRL_SHADOWED (PERMIT=4'b0011)");
+        "Expected StoreAccessFault on 8-bit write to CTRL_SHADOWED "
+        "(PERMIT=4'b0011)");
   status = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
-  CHECK(!bitfield_bit32_read(status, AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT),
-        "Blocked sub-word write to CTRL_SHADOWED must not set ALERT_RECOV_CTRL_UPDATE_ERR");
+  CHECK(
+      !bitfield_bit32_read(status, AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT),
+      "Blocked sub-word write to CTRL_SHADOWED must not set "
+      "ALERT_RECOV_CTRL_UPDATE_ERR");
 
   access_fault_seen = false;
   *(volatile uint16_t *)(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET) =
@@ -297,7 +306,8 @@ bool test_main(void) {
   access_fault_seen = false;
   *(volatile uint16_t *)(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET) = 0x1234u;
   CHECK(access_fault_seen,
-        "Expected StoreAccessFault on 16-bit write to KEY_SHARE0_0 (PERMIT=4'b1111)");
+        "Expected StoreAccessFault on 16-bit write to KEY_SHARE0_0 "
+        "(PERMIT=4'b1111)");
 
   access_fault_seen = false;
   abs_mmio_write8(kAesBase + AES_IV_0_REG_OFFSET, 0x56u);
@@ -306,18 +316,21 @@ bool test_main(void) {
 
   access_fault_seen = false;
   abs_mmio_write8(kAesBase + AES_DATA_IN_0_REG_OFFSET, 0x78u);
-  CHECK(access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to DATA_IN_0 (PERMIT=4'b1111)");
+  CHECK(
+      access_fault_seen,
+      "Expected StoreAccessFault on 8-bit write to DATA_IN_0 (PERMIT=4'b1111)");
 
   access_fault_seen = false;
   abs_mmio_write8(kAesBase + AES_TRIGGER_REG_OFFSET, 0u);
   CHECK(!access_fault_seen,
-        "Expected no StoreAccessFault on 8-bit write to TRIGGER+0 (PERMIT=4'b0001)");
+        "Expected no StoreAccessFault on 8-bit write to TRIGGER+0 "
+        "(PERMIT=4'b0001)");
 
   access_fault_seen = false;
   abs_mmio_write8(kAesBase + AES_TRIGGER_REG_OFFSET + 1u, 0u);
-  CHECK(access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to TRIGGER+1 (PERMIT=4'b0001)");
+  CHECK(
+      access_fault_seen,
+      "Expected StoreAccessFault on 8-bit write to TRIGGER+1 (PERMIT=4'b0001)");
 
   return true;
 }

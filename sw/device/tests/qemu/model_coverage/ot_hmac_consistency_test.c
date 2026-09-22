@@ -5,29 +5,33 @@
 /**
  * CW340 FPGA & QEMU Consistency Test for `ot_hmac` (`hw/opentitan/ot_hmac.c`).
  *
- * Strictly verifies identical hardware behavior between CW340 FPGA and QEMU for:
+ * Strictly verifies identical hardware behavior between CW340 FPGA and QEMU
+ * for:
  * 1. `CMD.HASH_STOP` & `CMD.HASH_CONTINUE` mid-stream SHA-256 block-boundary
  *    pause, intermediate state save (`DIGEST_0..7`, `MSG_LENGTH_LOWER/UPPER`),
  *    secret wipe (`WIPE_SECRET` & `CFG.SHA_EN` falling edge), context restore,
  *    and `CMD.HASH_CONTINUE` resume to completion.
  * 2. `CMD.HASH_CONTINUE` error conditions (`SwHashStartWhenShaDisabled = 0x2`
  *    when `CFG.SHA_EN == 0`, and `SwHashStartWhenActive = 0x4` when active).
- * 3. Register access restrictions while non-idle (`SwUpdateSecretKeyInProcess = 0x3`
- *    on `KEY_0` write, ignored writes to `DIGEST_0` and `MSG_LENGTH_LOWER/UPPER`),
- *    write-only `KEY_0..7` readback `0`, and read-only `ERR_CODE`/`STATUS` writes.
- * 4. 16-bit sub-word `MSG_FIFO` writes (`uint16_t` MMIO store) with `CFG.ENDIAN_SWAP = 1`.
+ * 3. Register access restrictions while non-idle (`SwUpdateSecretKeyInProcess =
+ * 0x3` on `KEY_0` write, ignored writes to `DIGEST_0` and
+ * `MSG_LENGTH_LOWER/UPPER`), write-only `KEY_0..7` readback `0`, and read-only
+ * `ERR_CODE`/`STATUS` writes.
+ * 4. 16-bit sub-word `MSG_FIFO` writes (`uint16_t` MMIO store) with
+ * `CFG.ENDIAN_SWAP = 1`.
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw/ip/hmac/data/hmac_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/ip/hmac/data/hmac_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -114,8 +118,7 @@ static void test_hash_stop_and_continue(void) {
   // Clear SHA_EN (1 -> 0) and verify DIGEST_0..7 clears to 0.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   for (uint32_t i = 0; i < 8; ++i) {
-    CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET + i * 4u) ==
-          0u);
+    CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET + i * 4u) == 0u);
   }
 
   // Now start the split SHA-256 operation: push block0 (64 bytes = 512 bits)
@@ -186,7 +189,8 @@ static void test_hash_stop_and_continue(void) {
 }
 
 static void test_hash_continue_errors_and_non_idle_restrictions(void) {
-  LOG_INFO("Section 2 & 3: CMD.HASH_CONTINUE errors & non-idle register guards");
+  LOG_INFO(
+      "Section 2 & 3: CMD.HASH_CONTINUE errors & non-idle register guards");
 
   // Configure valid digest_size = SHA2_256 with SHA_EN = 0.
   uint32_t cfg_disabled = bitfield_field32_write(
@@ -194,7 +198,8 @@ static void test_hash_continue_errors_and_non_idle_restrictions(void) {
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_disabled);
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);
 
-  // 2a. Issue CMD.HASH_CONTINUE when SHA_EN == 0 -> SwHashStartWhenShaDisabled (0x2).
+  // 2a. Issue CMD.HASH_CONTINUE when SHA_EN == 0 -> SwHashStartWhenShaDisabled
+  // (0x2).
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
                    1u << HMAC_CMD_HASH_CONTINUE_BIT);
   uint32_t intr = abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
@@ -216,7 +221,8 @@ static void test_hash_continue_errors_and_non_idle_restrictions(void) {
   CHECK((abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET) &
          (1u << HMAC_INTR_STATE_HMAC_ERR_BIT)) == 0u);
 
-  // 3b. Write KEY_0..7 while idle, then read back write-only KEY_0..7 -> must read 0.
+  // 3b. Write KEY_0..7 while idle, then read back write-only KEY_0..7 -> must
+  // read 0.
   for (uint32_t i = 0; i < 8; ++i) {
     abs_mmio_write32(kHmacBase + HMAC_KEY_0_REG_OFFSET + i * 4u,
                      0x11111111u * (i + 1u));
@@ -282,7 +288,8 @@ static void test_subword_16bit_fifo_write_endian_swap(void) {
                    1u << HMAC_CMD_HASH_START_BIT);
 
   // With ENDIAN_SWAP = 1, a 16-bit write of 0x6162 ('a' in MSB, 'b' in LSB)
-  // byte-swaps to push 'a' (0x61) then 'b' (0x62), followed by 8-bit 'c' (0x63).
+  // byte-swaps to push 'a' (0x61) then 'b' (0x62), followed by 8-bit 'c'
+  // (0x63).
   *((volatile uint16_t *)(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET)) = 0x6162u;
   abs_mmio_write8(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x63u);
 
@@ -300,7 +307,8 @@ static void test_subword_16bit_fifo_write_endian_swap(void) {
 
 static void test_msg_length_overflow_and_duplicate_hash_process(void) {
   LOG_INFO(
-      "Section 5: 64-bit MSG_LENGTH overflow stall & duplicate CMD.HASH_PROCESS");
+      "Section 5: 64-bit MSG_LENGTH overflow stall & duplicate "
+      "CMD.HASH_PROCESS");
 
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0x7u);

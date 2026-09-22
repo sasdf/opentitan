@@ -76,10 +76,10 @@ impl JtagChain for QemuJtag {
     fn into_raw(self: Box<Self>) -> anyhow::Result<OpenOcd> {
         let (strap0, strap1) = if let Some(ref gpio) = self.gpio {
             let gpio = gpio.borrow();
-            let s0 = (gpio.host_output_enable & (1 << 30)) != 0
-                && (gpio.host_to_qemu & (1 << 30)) != 0;
-            let s1 = (gpio.host_output_enable & (1 << 27)) != 0
-                && (gpio.host_to_qemu & (1 << 27)) != 0;
+            let s0 =
+                (gpio.host_output_enable & (1 << 30)) != 0 && (gpio.host_to_qemu & (1 << 30)) != 0;
+            let s1 =
+                (gpio.host_output_enable & (1 << 27)) != 0 && (gpio.host_to_qemu & (1 << 27)) != 0;
             (s0, s1)
         } else {
             (false, true)

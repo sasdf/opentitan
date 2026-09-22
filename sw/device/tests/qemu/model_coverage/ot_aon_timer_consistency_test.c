@@ -62,7 +62,8 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kAonBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET) == 0x0u);
 
   // 3. Trigger wdog_timer_bark (bit 1) via INTR_TEST; ROM enables Ibex WDOG NMI
-  // so ottf_external_nmi_handler verifies INTR_STATE bit 1 and clears it via W1C.
+  // so ottf_external_nmi_handler verifies INTR_STATE bit 1 and clears it via
+  // W1C.
   abs_mmio_write32(kAonBase + AON_TIMER_INTR_TEST_REG_OFFSET,
                    1u << AON_TIMER_INTR_TEST_WDOG_TIMER_BARK_BIT);
   CHECK(g_wdog_nmi_count == 1u);

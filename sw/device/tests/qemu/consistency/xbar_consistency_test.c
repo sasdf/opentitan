@@ -36,9 +36,10 @@ static void expect_read_ok(uint32_t addr, const char *desc) {
   uint32_t before = fault_count;
   volatile uint32_t val = *(volatile uint32_t *)addr;
   (void)val;
-  CHECK(fault_count == before,
-        "Expected read at 0x%08x (%s) to succeed without fault, got mcause=0x%x",
-        addr, desc, last_mcause);
+  CHECK(
+      fault_count == before,
+      "Expected read at 0x%08x (%s) to succeed without fault, got mcause=0x%x",
+      addr, desc, last_mcause);
 }
 
 static void expect_read_fault(uint32_t addr, const char *desc) {
@@ -58,9 +59,10 @@ static void expect_read_fault(uint32_t addr, const char *desc) {
 static void test_otp_prim_crossbar_decode(void) {
   // In tl_peri_pkg.sv:
   // - ADDR_SPACE_OTP_CTRL__CORE = 0x40130000, ADDR_MASK = 0x00000fff
-  // - ADDR_SPACE_OTP_CTRL__PRIM = 0x40138000, ADDR_MASK = 0x0000001f (CSR0..CSR7)
-  // In otp_ctrl.sv:778-792, OTP_CTRL__PRIM is gated by tlul_lc_gate with
-  // lc_dft_en[0] (enabled in TEST_UNLOCKED*, DEV, RMA; disabled in PROD/PROD_END).
+  // - ADDR_SPACE_OTP_CTRL__PRIM = 0x40138000, ADDR_MASK = 0x0000001f
+  // (CSR0..CSR7) In otp_ctrl.sv:778-792, OTP_CTRL__PRIM is gated by
+  // tlul_lc_gate with lc_dft_en[0] (enabled in TEST_UNLOCKED*, DEV, RMA;
+  // disabled in PROD/PROD_END).
   const uint32_t otp_prim_base = TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR;
   CHECK(otp_prim_base == 0x40138000u,
         "Expected TOP_EARLGREY_OTP_CTRL_PRIM_BASE_ADDR=0x40138000, got 0x%08x",
@@ -71,15 +73,17 @@ static void test_otp_prim_crossbar_decode(void) {
       mmio_region_from_addr(TOP_EARLGREY_LC_CTRL_BASE_ADDR), &lc_ctrl));
   dif_lc_ctrl_state_t lc_state;
   CHECK_DIF_OK(dif_lc_ctrl_get_state(&lc_ctrl, &lc_state));
-  bool lc_dft_en = (lc_state != kDifLcCtrlStateProd &&
-                    lc_state != kDifLcCtrlStateProdEnd);
+  bool lc_dft_en =
+      (lc_state != kDifLcCtrlStateProd && lc_state != kDifLcCtrlStateProdEnd);
 
   if (lc_dft_en) {
-    // Valid accesses inside OTP_CTRL__PRIM (0x40138000..0x4013801c) when lc_dft_en=On.
+    // Valid accesses inside OTP_CTRL__PRIM (0x40138000..0x4013801c) when
+    // lc_dft_en=On.
     expect_read_ok(otp_prim_base + 0x00u, "OTP_CTRL__PRIM CSR0");
     expect_read_ok(otp_prim_base + 0x1cu, "OTP_CTRL__PRIM CSR7");
   } else {
-    // When lc_dft_en=Off (PROD/PROD_END), tlul_lc_gate rejects OTP_CTRL__PRIM with d_error=1.
+    // When lc_dft_en=Off (PROD/PROD_END), tlul_lc_gate rejects OTP_CTRL__PRIM
+    // with d_error=1.
     expect_read_fault(otp_prim_base + 0x00u,
                       "OTP_CTRL__PRIM CSR0 gated by lc_dft_en=Off");
     expect_read_fault(otp_prim_base + 0x1cu,
@@ -95,8 +99,9 @@ static void test_otp_prim_crossbar_decode(void) {
 }
 
 static void test_peripheral_reg_top_bounds(void) {
-  // 1. PATTGEN (0x400e0000): valid registers 0x00..0x28 (PATTGEN_SIZE_REG_OFFSET).
-  // Offset 0x2c triggers addrmiss=1 -> d_error=1 in pattgen_reg_top.sv.
+  // 1. PATTGEN (0x400e0000): valid registers 0x00..0x28
+  // (PATTGEN_SIZE_REG_OFFSET). Offset 0x2c triggers addrmiss=1 -> d_error=1 in
+  // pattgen_reg_top.sv.
   expect_read_ok(TOP_EARLGREY_PATTGEN_BASE_ADDR + PATTGEN_SIZE_REG_OFFSET,
                  "PATTGEN.SIZE (0x28)");
   expect_read_fault(
@@ -138,8 +143,9 @@ static void test_vmapper_dbus_remap(void) {
   mmio_region_t ibex_base =
       mmio_region_from_addr(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR);
 
-  // 0x42000000..0x42000fff is inside ROM PMP TOR region 11 [0x40000000, 0x42010000)
-  // (LRW) and unmapped in xbar_main when DBUS remap slot 0 is disabled.
+  // 0x42000000..0x42000fff is inside ROM PMP TOR region 11 [0x40000000,
+  // 0x42010000) (LRW) and unmapped in xbar_main when DBUS remap slot 0 is
+  // disabled.
   const uint32_t vaddr_base = 0x42000000u;
   const uint32_t paddr_base = (uint32_t)(uintptr_t)remap_target_buf;
   CHECK((paddr_base & 0xfffu) == 0u,
@@ -152,7 +158,8 @@ static void test_vmapper_dbus_remap(void) {
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_ADDR_EN_0_REG_OFFSET, 0u);
   expect_read_fault(vaddr_base, "Unmapped 0x42000000 with DBUS_ADDR_EN_0=0");
 
-  // Attempt to enable 4 KiB NAPOT remap window: match_addr = vaddr_base | 0x7ff.
+  // Attempt to enable 4 KiB NAPOT remap window: match_addr = vaddr_base |
+  // 0x7ff.
   remap_target_buf[0] = 0xcafebabeu;
   mmio_region_write32(ibex_base, RV_CORE_IBEX_DBUS_ADDR_MATCHING_0_REG_OFFSET,
                       vaddr_base | 0x7ffu);

@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/csr.h"
@@ -12,6 +11,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sysrst_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -42,12 +42,12 @@ void ottf_exception_handler(uint32_t *exc_info) {
   abort();
 }
 
-#define EXPECT_RTL(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) {                              \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
-      all_ok = false;                           \
-    }                                           \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 static void check_rw_mask(uint32_t offset, uint32_t expected_mask,
@@ -123,14 +123,14 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
   busy_spin_micros(30);
 
-  // 2. KEY_INVERT_CTL input inversion occurs upstream of u_prim_flop_2sync_input
-  // (sysrst_ctrl.sv:106-142). Toggling KEY_INVERT_CTL.key0_in must produce
-  // key0_in_L2H and key0_in_H2L transitions in sysrst_ctrl_keyintr.
+  // 2. KEY_INVERT_CTL input inversion occurs upstream of
+  // u_prim_flop_2sync_input (sysrst_ctrl.sv:106-142). Toggling
+  // KEY_INVERT_CTL.key0_in must produce key0_in_L2H and key0_in_H2L transitions
+  // in sysrst_ctrl_keyintr.
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INTR_DEBOUNCE_CTL_REG_OFFSET,
                    0u);
-  uint32_t key0_intr_mask =
-      (1u << SYSRST_CTRL_KEY_INTR_CTL_KEY0_IN_H2L_BIT) |
-      (1u << SYSRST_CTRL_KEY_INTR_CTL_KEY0_IN_L2H_BIT);
+  uint32_t key0_intr_mask = (1u << SYSRST_CTRL_KEY_INTR_CTL_KEY0_IN_H2L_BIT) |
+                            (1u << SYSRST_CTRL_KEY_INTR_CTL_KEY0_IN_L2H_BIT);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INTR_CTL_REG_OFFSET,
                    key0_intr_mask);
   busy_spin_micros(30);
@@ -293,9 +293,9 @@ bool test_main(void) {
 
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET, 0x1234u);
   busy_spin_micros(20);
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET) ==
-                 2000u,
-             "EC_RST_CTL modified while REGWEN == 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET) == 2000u,
+      "EC_RST_CTL modified while REGWEN == 0");
 
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET, 0u);
   busy_spin_micros(20);
@@ -323,36 +323,38 @@ bool test_main(void) {
   // 6. ULP_CTL is NOT gated by REGWEN (sysrst_ctrl.hjson:266-278).
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 1u);
   busy_spin_micros(20);
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET) == 1u,
-             "ULP_CTL must remain writable when REGWEN == 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET) == 1u,
+      "ULP_CTL must remain writable when REGWEN == 0");
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 0u);
   busy_spin_micros(20);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET, 1u);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
   busy_spin_micros(20);
 
-  // 7. Status-type INTR_STATE / INTR_TEST behavior (prim_intr_hw IntrT="Status")
-  // and WO readback for INTR_TEST / ALERT_TEST.
+  // 7. Status-type INTR_STATE / INTR_TEST behavior (prim_intr_hw
+  // IntrT="Status") and WO readback for INTR_TEST / ALERT_TEST.
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET, 1u);
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET) ==
-                 0u,
-             "INTR_TEST (WO) readback must be 0");
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ALERT_TEST_REG_OFFSET) ==
-                 0u,
-             "ALERT_TEST (WO) readback must be 0");
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
-                 1u,
-             "INTR_STATE must assert when INTR_TEST=1");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET) == 0u,
+      "INTR_TEST (WO) readback must be 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
+      "ALERT_TEST (WO) readback must be 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 1u,
+      "INTR_STATE must assert when INTR_TEST=1");
   // Writing 1 to INTR_STATE must NOT clear it (Status-type RO interrupt).
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET, 1u);
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
-                 1u,
-             "INTR_STATE (Status-type RO) must not clear on write 1");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 1u,
+      "INTR_STATE (Status-type RO) must not clear on write 1");
   // Writing 0 to INTR_TEST clears test_q and deasserts INTR_STATE.
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET, 0u);
-  EXPECT_RTL(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) ==
-                 0u,
-             "INTR_STATE must deassert when INTR_TEST=0 and all status registers are 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 0u,
+      "INTR_STATE must deassert when INTR_TEST=0 and all status registers are "
+      "0");
 
   // 8. Wave 5: SYSRST_CTRL_PERMIT sub-word write wr_err and addrmiss checks.
   g_access_fault_count = 0;
@@ -366,7 +368,8 @@ bool test_main(void) {
   g_access_fault_count = 0;
   g_last_mcause = 0;
   g_expect_access_fault = true;
-  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET + 1u, 0xaau);
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET + 1u,
+                  0xaau);
   g_expect_access_fault = false;
   EXPECT_RTL(g_access_fault_count == 1u && g_last_mcause == 7u &&
                  abs_mmio_read32(kSysrstBase +

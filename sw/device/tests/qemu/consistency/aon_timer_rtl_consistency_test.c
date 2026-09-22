@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/dif/dif_alert_handler.h"
@@ -14,6 +13,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "aon_timer_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
@@ -43,12 +43,12 @@ void ottf_internal_isr(uint32_t *exc_info) {
                    1u << kRvCoreIbexNmiStateWdogBit);
 }
 
-#define EXPECT_RTL(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) {                              \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
-      all_ok = false;                           \
-    }                                           \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 bool test_main(void) {
@@ -129,7 +129,8 @@ bool test_main(void) {
              intr_prescale0);
 
   // Toggling WKUP_CTRL.ENABLE (0 -> 1) drops wkup_intr_o to 0 and back to 1,
-  // producing a new rising edge at u_intr_sync while keeping prescale_count_q=0.
+  // producing a new rising edge at u_intr_sync while keeping
+  // prescale_count_q=0.
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
   busy_spin_micros(30);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
@@ -180,11 +181,12 @@ bool test_main(void) {
                    1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
   busy_spin_micros(100);
   wkup_lo = abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET);
-  EXPECT_RTL(wkup_lo == 0u,
-             "prescale_count_q must not reset on WKUP_CTRL disable; re-enabling "
-             "with prescaler=0<prescale_count_q must not tick before 12-bit "
-             "wraparound (expected 0, got %u)",
-             wkup_lo);
+  EXPECT_RTL(
+      wkup_lo == 0u,
+      "prescale_count_q must not reset on WKUP_CTRL disable; re-enabling "
+      "with prescaler=0<prescale_count_q must not tick before 12-bit "
+      "wraparound (expected 0, got %u)",
+      wkup_lo);
   // Reset prescale_count_q back to 0 by setting prescaler=200 and waiting 1.1ms
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
                    ctrl_prescaled);
@@ -210,11 +212,11 @@ bool test_main(void) {
   busy_spin_micros(50);
   uint32_t intr_early =
       abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET);
-  EXPECT_RTL((intr_early &
-              (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) == 0u,
-             "WKUP_TIMER_EXPIRED fired before prescaler period elapsed "
-             "(intr_state=0x%08x)",
-             intr_early);
+  EXPECT_RTL(
+      (intr_early & (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) == 0u,
+      "WKUP_TIMER_EXPIRED fired before prescaler period elapsed "
+      "(intr_state=0x%08x)",
+      intr_early);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
@@ -224,8 +226,8 @@ bool test_main(void) {
   // to ALERT_TEST a second time after clearing ALERT_CAUSE must re-trigger
   // alert_handler.
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
   CHECK_DIF_OK(dif_alert_handler_configure_alert(
       &alert_handler, kTopEarlgreyAlertIdAonTimerAonFatalFault,
       kDifAlertHandlerClassD, kDifToggleEnabled, kDifToggleDisabled));
@@ -296,31 +298,36 @@ bool test_main(void) {
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET, 0u);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET, 0x3u);
 
-  // 7. Wave 5: Verify AON_TIMER_PERMIT sub-word write checks (aon_timer_reg_pkg.sv:191-206).
-  // WKUP_THOLD_LO (0x0c) has AON_TIMER_PERMIT = 4'b1111: an 8-bit write
-  // (reg_be = 4'b0001) must assert wr_err = 1 (mcause = 7) and preserve the register.
-  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0x12345678u);
+  // 7. Wave 5: Verify AON_TIMER_PERMIT sub-word write checks
+  // (aon_timer_reg_pkg.sv:191-206). WKUP_THOLD_LO (0x0c) has AON_TIMER_PERMIT =
+  // 4'b1111: an 8-bit write (reg_be = 4'b0001) must assert wr_err = 1 (mcause =
+  // 7) and preserve the register.
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET,
+                   0x12345678u);
   g_fault_count = 0;
   abs_mmio_write8(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0xaau);
   EXPECT_RTL(g_fault_count == 1u,
-             "Expected 8-bit write to WKUP_THOLD_LO (PERMIT=4'b1111) to fault (faults=%u)",
+             "Expected 8-bit write to WKUP_THOLD_LO (PERMIT=4'b1111) to fault "
+             "(faults=%u)",
              g_fault_count);
-  EXPECT_RTL(abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET) ==
-                 0x12345678u,
+  EXPECT_RTL(abs_mmio_read32(kAonTimerBase +
+                             AON_TIMER_WKUP_THOLD_LO_REG_OFFSET) == 0x12345678u,
              "Sub-word write with wr_err=1 must not modify WKUP_THOLD_LO");
 
-  // WKUP_CTRL (0x04) has AON_TIMER_PERMIT = 4'b0011: an 8-bit write (reg_be = 4'b0001)
-  // must fault with wr_err = 1, whereas a 16-bit write at byte 0 (reg_be = 4'b0011)
-  // is permitted (wr_err = 0).
+  // WKUP_CTRL (0x04) has AON_TIMER_PERMIT = 4'b0011: an 8-bit write (reg_be =
+  // 4'b0001) must fault with wr_err = 1, whereas a 16-bit write at byte 0
+  // (reg_be = 4'b0011) is permitted (wr_err = 0).
   g_fault_count = 0;
   abs_mmio_write8(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 0u);
   EXPECT_RTL(g_fault_count == 1u,
-             "Expected 8-bit write to WKUP_CTRL (PERMIT=4'b0011, reg_be=4'b0001) to fault (faults=%u)",
+             "Expected 8-bit write to WKUP_CTRL (PERMIT=4'b0011, "
+             "reg_be=4'b0001) to fault (faults=%u)",
              g_fault_count);
   g_fault_count = 0;
   *(volatile uint16_t *)(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET) = 0u;
   EXPECT_RTL(g_fault_count == 0u,
-             "16-bit write to WKUP_CTRL (PERMIT=4'b0011, reg_be=4'b0011) must succeed (faults=%u)",
+             "16-bit write to WKUP_CTRL (PERMIT=4'b0011, reg_be=4'b0011) must "
+             "succeed (faults=%u)",
              g_fault_count);
 
   return all_ok;

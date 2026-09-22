@@ -157,6 +157,7 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
                 case["lc_state"].upper(),
             )),
         ),
+        manifest = BOOT_DATA_RECOVERY_MANIFEST,
         qemu = qemu_params(
             exit_failure = msg_template_bfv_all_except(case["expected_bfv"]) if case["expected_bfv"] != None else DEFAULT_TEST_FAILURE_MSG,
             exit_success = MSG_TEMPLATE_BFV.format(hex_digits(case["expected_bfv"])) if case["expected_bfv"] != None else MSG_PASS,
@@ -169,7 +170,6 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
                 case["lc_state"].upper(),
             )),
         ),
-        manifest = BOOT_DATA_RECOVERY_MANIFEST,
         deps = [
             "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
             "//sw/device/lib/testing/test_framework:ottf_main",

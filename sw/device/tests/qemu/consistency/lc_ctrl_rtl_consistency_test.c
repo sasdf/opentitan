@@ -5,9 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "alert_handler_regs.h"
-#include "lc_ctrl_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/runtime/hart.h"
@@ -17,6 +14,10 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "alert_handler_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "lc_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -39,8 +40,8 @@ bool test_main(void) {
 
   // 1. Verify initial STATUS, LC_STATE, LC_TRANSITION_CNT, HW_REVISION0/1.
   uint32_t status = abs_mmio_read32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET);
-  uint32_t expected_status = (1u << LC_CTRL_STATUS_INITIALIZED_BIT) |
-                             (1u << LC_CTRL_STATUS_READY_BIT);
+  uint32_t expected_status =
+      (1u << LC_CTRL_STATUS_INITIALIZED_BIT) | (1u << LC_CTRL_STATUS_READY_BIT);
   if (status != expected_status) {
     LOG_ERROR("RTL_MISMATCH: initial STATUS=0x%08x (expected 0x%08x)", status,
               expected_status);
@@ -90,9 +91,8 @@ bool test_main(void) {
       abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_REGWEN_REG_OFFSET);
   if (claim_regwen != 1u || claim_init != kMultiBitBool8False ||
       trans_regwen_init != 0u) {
-    LOG_ERROR(
-        "RTL_MISMATCH: init claim_regwen=%u claim=0x%02x trans_regwen=%u",
-        claim_regwen, claim_init, trans_regwen_init);
+    LOG_ERROR("RTL_MISMATCH: init claim_regwen=%u claim=0x%02x trans_regwen=%u",
+              claim_regwen, claim_init, trans_regwen_init);
     mismatches++;
   }
 
@@ -198,8 +198,9 @@ bool test_main(void) {
     mismatches++;
   }
 
-  // 6b. Wave 5 checks: unmapped offset 0x8c (addrmiss = 1 -> Load/Store Access Fault)
-  // and LC_CTRL_PERMIT sub-word writes (wr_err = 1 -> Store Access Fault, preserving registers).
+  // 6b. Wave 5 checks: unmapped offset 0x8c (addrmiss = 1 -> Load/Store Access
+  // Fault) and LC_CTRL_PERMIT sub-word writes (wr_err = 1 -> Store Access
+  // Fault, preserving registers).
   g_fault_seen = false;
   (void)abs_mmio_read32(kLcCtrlBase + 0x8cu);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
@@ -221,7 +222,8 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET) ==
         0x12345678u);
 
-  // 8-bit store to CLAIM_TRANSITION_IF (LC_CTRL_PERMIT[3] = 4'b0001) must succeed.
+  // 8-bit store to CLAIM_TRANSITION_IF (LC_CTRL_PERMIT[3] = 4'b0001) must
+  // succeed.
   g_fault_seen = false;
   abs_mmio_write8(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET,
                   kMultiBitBool8True);
@@ -232,7 +234,8 @@ bool test_main(void) {
   // to TRANSITION_CTRL must read back 0.
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET,
                    1u << LC_CTRL_TRANSITION_CTRL_VOLATILE_RAW_UNLOCK_BIT);
-  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET) ==
+        0u);
 
   // Restore clean state before locking CLAIM_TRANSITION_IF_REGWEN.
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET, 0u);
@@ -244,8 +247,8 @@ bool test_main(void) {
                    0u);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET,
                    kMultiBitBool8False);
-  if (abs_mmio_read32(
-          kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET) != 0u ||
+  if (abs_mmio_read32(kLcCtrlBase +
+                      LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET) != 0u ||
       abs_mmio_read32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET) !=
           kMultiBitBool8True) {
     LOG_ERROR(
@@ -254,7 +257,7 @@ bool test_main(void) {
     mismatches++;
   }
 
-  CHECK(mismatches == 0, "lc_ctrl RTL consistency test failed with %u mismatches",
-        mismatches);
+  CHECK(mismatches == 0,
+        "lc_ctrl RTL consistency test failed with %u mismatches", mismatches);
   return true;
 }

@@ -255,6 +255,11 @@ BOOT_POLICY_BAD_MANIFEST_CASES = [
             ),
             tags = maybe_skip_in_ci(lc_state_val),
         ),
+        linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
+        manifest = ":{}_{}".format(
+            t["name"],
+            slot,
+        ),
         qemu = qemu_params(
             assemble = "{firmware}@{offset}",
             exit_failure = t["exit_failure"],
@@ -265,11 +270,6 @@ BOOT_POLICY_BAD_MANIFEST_CASES = [
                 t.get("sec_ver", 0),
             ),
             tags = maybe_skip_in_ci(lc_state_val),
-        ),
-        linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
-        manifest = ":{}_{}".format(
-            t["name"],
-            slot,
         ),
         deps = [
             "//sw/device/lib/testing/test_framework:ottf_main",

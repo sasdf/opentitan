@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "keymgr_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/dif/dif_keymgr.h"
 #include "sw/device/lib/dif/dif_kmac.h"
@@ -15,6 +13,9 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "keymgr_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -28,8 +29,8 @@ static void verify_shadow_mismatch(uint32_t reg_offset, uint32_t v1,
   abs_mmio_write32(kBase + KEYMGR_ERR_CODE_REG_OFFSET, 0xffffffffu);
   CHECK(abs_mmio_read32(kBase + KEYMGR_ERR_CODE_REG_OFFSET) == 0x0u);
 
-  CHECK_STATUS_OK(
-      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdKeymgrRecovOperationErr));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdKeymgrRecovOperationErr));
   abs_mmio_write32(kBase + reg_offset, v1);
   abs_mmio_write32(kBase + reg_offset, v2);
 
@@ -87,15 +88,15 @@ bool test_main(void) {
 
   CHECK(abs_mmio_read32(kBase + KEYMGR_MAX_CREATOR_KEY_VER_REGWEN_REG_OFFSET) ==
         0x0u);
-  uint32_t creator_ver_init = abs_mmio_read32(
-      kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET);
+  uint32_t creator_ver_init =
+      abs_mmio_read32(kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET);
   abs_mmio_write32(kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET,
                    ~creator_ver_init);
   abs_mmio_write32(kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET,
                    ~creator_ver_init);
-  CHECK(abs_mmio_read32(
-            kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET) ==
-        creator_ver_init);
+  CHECK(
+      abs_mmio_read32(kBase + KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET) ==
+      creator_ver_init);
   CHECK(abs_mmio_read32(kBase + KEYMGR_ERR_CODE_REG_OFFSET) == 0x0u);
 
   // Verify RESEED_INTERVAL_REGWEN RW0C locking.
@@ -128,8 +129,8 @@ bool test_main(void) {
         KEYMGR_WORKING_STATE_STATE_VALUE_INIT);
 
   // 4. Trigger invalid operation (OP_GENERATE_SW_OUTPUT) in INIT state.
-  CHECK_STATUS_OK(
-      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdKeymgrRecovOperationErr));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdKeymgrRecovOperationErr));
   uint32_t gen_sw_ctrl =
       KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_GENERATE_SW_OUTPUT
       << KEYMGR_CONTROL_SHADOWED_OPERATION_OFFSET;
@@ -193,8 +194,8 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kBase + KEYMGR_WORKING_STATE_REG_OFFSET) ==
         KEYMGR_WORKING_STATE_STATE_VALUE_DISABLED);
 
-  CHECK_STATUS_OK(
-      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdKeymgrRecovOperationErr));
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
+      kTopEarlgreyAlertIdKeymgrRecovOperationErr));
   abs_mmio_write32(kBase + KEYMGR_START_REG_OFFSET, 0x1u);
   st = wait_for_op_done();
   CHECK(st == KEYMGR_OP_STATUS_STATUS_VALUE_DONE_ERROR);

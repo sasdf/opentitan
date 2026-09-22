@@ -117,41 +117,48 @@ static void test_csr_semantics_and_digests(void) {
   CHECK(any_nonzero && any_non_ones,
         "ROM digest must be neither all-zeros nor all-ones");
 
-  // 4. Verify ROM_CTRL_REGS_PERMIT sub-word write wr_err (rom_ctrl_reg_pkg.sv:115-134,
-  // rom_ctrl_regs_reg_top.sv:713-733):
+  // 4. Verify ROM_CTRL_REGS_PERMIT sub-word write wr_err
+  // (rom_ctrl_reg_pkg.sv:115-134, rom_ctrl_regs_reg_top.sv:713-733):
   // - ALERT_TEST (0x00) and FATAL_ALERT_CAUSE (0x04) have PERMIT = 4'b0001:
   //   8-bit write at offset +0 (reg_be = 4'b0001) succeeds without fault, while
   //   8-bit write at offset +1 (reg_be = 4'b0010) fails with StoreAccessFault.
-  // - DIGEST_0..7 (0x08..0x24) and EXP_DIGEST_0..7 (0x28..0x44) have PERMIT = 4'b1111:
-  //   8-bit (sb) and 16-bit (sh) writes fail with StoreAccessFault (wr_err = 1).
+  // - DIGEST_0..7 (0x08..0x24) and EXP_DIGEST_0..7 (0x28..0x44) have PERMIT =
+  // 4'b1111:
+  //   8-bit (sb) and 16-bit (sh) writes fail with StoreAccessFault (wr_err =
+  //   1).
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET, 0u);
   CHECK(!store_access_fault_seen,
         "Expected no StoreAccessFault on 8-bit write to ALERT_TEST+0");
 
   store_access_fault_seen = false;
-  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET, 0x3u);
+  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET,
+                  0x3u);
   CHECK(!store_access_fault_seen,
         "Expected no StoreAccessFault on 8-bit write to FATAL_ALERT_CAUSE+0");
 
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_ALERT_TEST_REG_OFFSET + 1u, 1u);
   CHECK(store_access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to ALERT_TEST+1 (PERMIT=4'b0001)");
+        "Expected StoreAccessFault on 8-bit write to ALERT_TEST+1 "
+        "(PERMIT=4'b0001)");
 
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET, 0xaau);
-  CHECK(store_access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to DIGEST_0 (PERMIT=4'b1111)");
+  CHECK(
+      store_access_fault_seen,
+      "Expected StoreAccessFault on 8-bit write to DIGEST_0 (PERMIT=4'b1111)");
 
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET, 0x55u);
   CHECK(store_access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to EXP_DIGEST_0 (PERMIT=4'b1111)");
+        "Expected StoreAccessFault on 8-bit write to EXP_DIGEST_0 "
+        "(PERMIT=4'b1111)");
 
   // Sub-word (size < 4) CSR reads succeed and return the corresponding byte
   // slices of the 32-bit register value.
-  uint32_t d0 = abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
+  uint32_t d0 =
+      abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
   for (uint32_t b = 0; b < 4u; ++b) {
     uint8_t byte_val =
         abs_mmio_read8(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET + b);
@@ -179,7 +186,8 @@ static void test_alert_test_pulse_and_clear(void) {
 
   // Route rom_ctrl fatal alert (ID 60) to Class A (which is disabled in OTTF)
   // while keeping ALERT_EN_SHADOWED[60] = 1 so ALERT_CAUSE[60] records alerts.
-  shadow_write32(class_addr, ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSA);
+  shadow_write32(class_addr,
+                 ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSA);
   shadow_write32(en_addr, 1u);
   abs_mmio_write32(cause_addr, 1u);
   CHECK(abs_mmio_read32(cause_addr) == 0u,
@@ -201,8 +209,9 @@ static void test_alert_test_pulse_and_clear(void) {
   // Clear ALERT_CAUSE[60] (rw1c). Because ALERT_TEST is a pulse (not latched),
   // ALERT_CAUSE[60] must remain 0 after clearing.
   abs_mmio_write32(cause_addr, 1u);
-  CHECK(abs_mmio_read32(cause_addr) == 0u,
-        "ALERT_CAUSE[60] remained 1 after rw1c clear (ALERT_TEST was latched!)");
+  CHECK(
+      abs_mmio_read32(cause_addr) == 0u,
+      "ALERT_CAUSE[60] remained 1 after rw1c clear (ALERT_TEST was latched!)");
 
   // Trigger ALERT_TEST = 0xffffffff (masked to bit 0 = 1) a second time
   // without writing 0 first -> must fire again.
@@ -215,7 +224,8 @@ static void test_alert_test_pulse_and_clear(void) {
   abs_mmio_write32(cause_addr, 1u);
   CHECK(abs_mmio_read32(cause_addr) == 0u,
         "Expected ALERT_CAUSE[60] == 0 after final clear");
-  shadow_write32(class_addr, ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSD);
+  shadow_write32(class_addr,
+                 ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSD);
 }
 
 static void test_rom_write_protection(void) {
@@ -272,7 +282,8 @@ static void test_rom_write_protection(void) {
   // unscrambling (clr_rdata_o), every word in 0x0000ffe0..0x0000fffc has an
   // invalid Hsiao (39,32) ECC checksum. Reading any of the top 8 words over
   // the bus raises an Ibex Load Integrity NMI (MCAUSE=0xffffffe0,
-  // MTVAL=top_word_addr) and sets RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR (bit 8).
+  // MTVAL=top_word_addr) and sets RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR (bit
+  // 8).
   uint32_t ibex_fatal_hw_en_addr =
       kAlertHandlerBase + ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
       kIbexFatalHwErrAlertId * sizeof(uint32_t);
@@ -288,7 +299,8 @@ static void test_rom_write_protection(void) {
   load_integrity_fault_mtval = 0u;
   (void)abs_mmio_read32(top_word_addr);
   busy_spin_micros(5);
-  if (!load_integrity_fault_seen || load_integrity_fault_mtval != top_word_addr) {
+  if (!load_integrity_fault_seen ||
+      load_integrity_fault_mtval != top_word_addr) {
     LOG_ERROR(
         "RTL_MISMATCH: reading top 8 EXP_DIGEST ROM word 0x%08x did not raise "
         "Load Integrity NMI (seen=%d, mtval=0x%08x)",

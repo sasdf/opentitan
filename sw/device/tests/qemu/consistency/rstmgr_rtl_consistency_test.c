@@ -43,7 +43,6 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   g_expected_fault_count++;
 }
 
-
 bool test_main(void) {
   uint32_t failures = 0;
   retention_sram_t *ret_sram = retention_sram_get();
@@ -134,9 +133,9 @@ bool test_main(void) {
     }
 
     // Clear ALERT_CAUSE_23 in alert_handler. Because ALERT_TEST is a 1-cycle
-    // pulse (prim_subreg_ext q & qe), ALERT_CAUSE_23 must stay 0 after clearing,
-    // AND a second write of 1 to ALERT_TEST (without writing 0 in between) must
-    // fire a new alert pulse setting ALERT_CAUSE_23 = 1 again.
+    // pulse (prim_subreg_ext q & qe), ALERT_CAUSE_23 must stay 0 after
+    // clearing, AND a second write of 1 to ALERT_TEST (without writing 0 in
+    // between) must fire a new alert pulse setting ALERT_CAUSE_23 = 1 again.
     abs_mmio_write32(kCause23Addr, 1u);
     uint32_t cause23_cleared = abs_mmio_read32(kCause23Addr);
     if (cause23_cleared != 0u) {
@@ -234,8 +233,9 @@ bool test_main(void) {
                      1u << USBDEV_WAKE_CONTROL_WAKE_ACK_BIT);
     busy_spin_micros(30);
 
-    // 4. Test RESET_REQ non-MuBi4True write and immediate MuBi4True -> MuBi4False
-    // cancellation before AON clock sync (~5 us period on 200 kHz clk_aon).
+    // 4. Test RESET_REQ non-MuBi4True write and immediate MuBi4True ->
+    // MuBi4False cancellation before AON clock sync (~5 us period on 200 kHz
+    // clk_aon).
     abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET, 0x5u);
     uint32_t req_invalid =
         abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET);
@@ -374,14 +374,15 @@ bool test_main(void) {
     failures++;
   }
 
-  // Wave 2 check: In rstmgr_crash_info.sv, SlotCntWidth = $clog2(CrashStoreSlot).
-  // Unlike ALERT_INFO (CrashStoreSlot=9 -> SlotCntWidth=$clog2(9)=4, so
-  // slots[15:9] are 0), CPU_INFO has CrashStoreSlot=8 -> SlotCntWidth=$clog2(8)=3!
-  // Line 44: `assign slot_o = slots[slot_sel_i[SlotCntWidth-1:0]];`
-  // Line 50: `assign unused_idx = slot_sel_i[IdxWidth-1:SlotCntWidth];`
-  // Therefore, for CPU_INFO, bit 3 of INDEX is tied off as unused, and
-  // INDEX=8..15 aliases slots[0..7] (INDEX & 7)! Slot 4 is current_pc (always
-  // non-zero in flash), so INDEX=12 (4 | 8) must equal INDEX=4.
+  // Wave 2 check: In rstmgr_crash_info.sv, SlotCntWidth =
+  // $clog2(CrashStoreSlot). Unlike ALERT_INFO (CrashStoreSlot=9 ->
+  // SlotCntWidth=$clog2(9)=4, so slots[15:9] are 0), CPU_INFO has
+  // CrashStoreSlot=8 -> SlotCntWidth=$clog2(8)=3! Line 44: `assign slot_o =
+  // slots[slot_sel_i[SlotCntWidth-1:0]];` Line 50: `assign unused_idx =
+  // slot_sel_i[IdxWidth-1:SlotCntWidth];` Therefore, for CPU_INFO, bit 3 of
+  // INDEX is tied off as unused, and INDEX=8..15 aliases slots[0..7] (INDEX &
+  // 7)! Slot 4 is current_pc (always non-zero in flash), so INDEX=12 (4 | 8)
+  // must equal INDEX=4.
   abs_mmio_write32(kRstmgrBase + RSTMGR_CPU_INFO_CTRL_REG_OFFSET,
                    4u << RSTMGR_CPU_INFO_CTRL_INDEX_OFFSET);
   uint32_t cpu_slot4 =
@@ -472,8 +473,9 @@ bool test_main(void) {
   }
   uint32_t err_code = abs_mmio_read32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET);
   if (err_code != 0u) {
-    LOG_ERROR("RTL_MISMATCH: ERR_CODE expected 0 after wr_err/addrmiss, got 0x%x",
-              err_code);
+    LOG_ERROR(
+        "RTL_MISMATCH: ERR_CODE expected 0 after wr_err/addrmiss, got 0x%x",
+        err_code);
     failures++;
   }
 
@@ -481,4 +483,3 @@ bool test_main(void) {
         failures);
   return true;
 }
-

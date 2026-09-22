@@ -426,6 +426,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         param["bootstrap_cmd"] = '--exec="{}"'.format(bootstrap_cmd)
     else:
         testopt_bootstrap = param.get("testopt_bootstrap", "True").lower() != "false"
+
         # Generate the flash backend image for QEMU emulation
         flash_bin = image
         if flash_bin and flash_bin.extension == "elf":

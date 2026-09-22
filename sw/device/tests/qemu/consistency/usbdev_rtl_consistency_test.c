@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/dif/dif_aon_timer.h"
@@ -18,6 +17,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "usbdev_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -34,12 +34,12 @@ enum {
   kUnclockedBufWriteAddr = kUsbdevBase + USBDEV_BUFFER_REG_OFFSET + 8u,
 };
 
-#define EXPECT_RTL(cond, ...)             \
-  do {                                    \
-    if (!(cond)) {                        \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
       LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
-      all_ok = false;                     \
-    }                                     \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 static volatile bool g_fault_seen = false;
@@ -73,11 +73,9 @@ static void arm_unclocked_usbdev_watchdog(dif_rstmgr_t *rstmgr,
 bool test_main(void) {
   bool all_ok = true;
   dif_rstmgr_t rstmgr;
-  CHECK_DIF_OK(
-      dif_rstmgr_init(mmio_region_from_addr(kRstmgrBase), &rstmgr));
+  CHECK_DIF_OK(dif_rstmgr_init(mmio_region_from_addr(kRstmgrBase), &rstmgr));
   dif_pwrmgr_t pwrmgr;
-  CHECK_DIF_OK(
-      dif_pwrmgr_init(mmio_region_from_addr(kPwrmgrBase), &pwrmgr));
+  CHECK_DIF_OK(dif_pwrmgr_init(mmio_region_from_addr(kPwrmgrBase), &pwrmgr));
   dif_aon_timer_t aon_timer;
   CHECK_DIF_OK(
       dif_aon_timer_init(mmio_region_from_addr(kAonTimerBase), &aon_timer));
@@ -123,21 +121,20 @@ bool test_main(void) {
   }
 
   dif_pinmux_t pinmux;
-  CHECK_DIF_OK(
-      dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
+  CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
 
   // Tie USBDEV sense input to ConstantZero via PINMUX and issue a peripheral
   // software reset to USBDEV to ensure clean post-reset CSR state.
   CHECK_DIF_OK(dif_pinmux_input_select(
       &pinmux, kTopEarlgreyPinmuxPeripheralInUsbdevSense,
       kTopEarlgreyPinmuxInselConstantZero));
-  CHECK_DIF_OK(dif_rstmgr_software_reset(&rstmgr,
-                                         kTopEarlgreyResetManagerSwResetsUsb,
-                                         kDifRstmgrSoftwareReset));
+  CHECK_DIF_OK(dif_rstmgr_software_reset(
+      &rstmgr, kTopEarlgreyResetManagerSwResetsUsb, kDifRstmgrSoftwareReset));
 
   // 1. PHY_CONFIG reset value & valid field mask (0xe7).
   // In RTL (usbdev.hjson), eop_single_bit (bit 2) has resval = 1 (0x4).
-  uint32_t phy_cfg = abs_mmio_read32(kUsbdevBase + USBDEV_PHY_CONFIG_REG_OFFSET);
+  uint32_t phy_cfg =
+      abs_mmio_read32(kUsbdevBase + USBDEV_PHY_CONFIG_REG_OFFSET);
   EXPECT_RTL((phy_cfg & (1u << USBDEV_PHY_CONFIG_EOP_SINGLE_BIT_BIT)) != 0,
              "PHY_CONFIG.eop_single_bit reset value expected 1, got 0x%08x",
              phy_cfg);
@@ -177,26 +174,24 @@ bool test_main(void) {
   for (uint32_t i = 0; i < 4; ++i) {
     abs_mmio_write32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET, i + 1);
   }
-  EXPECT_RTL(abs_mmio_read32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET) ==
-                 0u,
-             "AVSETUPBUFFER is WO and must read back as 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET) == 0u,
+      "AVSETUPBUFFER is WO and must read back as 0");
   uint32_t intr_state =
       abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
-  EXPECT_RTL(
-      bitfield_bit32_read(intr_state, USBDEV_INTR_COMMON_AV_OVERFLOW_BIT) ==
-          false,
-      "AV_OVERFLOW should not be set at depth 4 (intr_state=0x%08x)",
-      intr_state);
+  EXPECT_RTL(bitfield_bit32_read(intr_state,
+                                 USBDEV_INTR_COMMON_AV_OVERFLOW_BIT) == false,
+             "AV_OVERFLOW should not be set at depth 4 (intr_state=0x%08x)",
+             intr_state);
 
   // 5th push to AVSETUPBUFFER overflows the 4-entry FIFO.
   abs_mmio_write32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET, 5u);
   intr_state = abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
-  EXPECT_RTL(
-      bitfield_bit32_read(intr_state, USBDEV_INTR_COMMON_AV_OVERFLOW_BIT) ==
-          true,
-      "AV_OVERFLOW must be set after pushing to full AVSETUPBUFFER "
-      "(intr_state=0x%08x)",
-      intr_state);
+  EXPECT_RTL(bitfield_bit32_read(intr_state,
+                                 USBDEV_INTR_COMMON_AV_OVERFLOW_BIT) == true,
+             "AV_OVERFLOW must be set after pushing to full AVSETUPBUFFER "
+             "(intr_state=0x%08x)",
+             intr_state);
 
   // Clear AV_OVERFLOW and reset FIFOs via FIFO_CTRL.
   abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET,
@@ -264,11 +259,10 @@ bool test_main(void) {
   abs_mmio_write32(kUsbdevBase + USBDEV_SET_NAK_OUT_REG_OFFSET, 0xffffffffu);
   uint32_t set_nak_out =
       abs_mmio_read32(kUsbdevBase + USBDEV_SET_NAK_OUT_REG_OFFSET);
-  EXPECT_RTL(
-      set_nak_out == 0x00000fffu,
-      "SET_NAK_OUT reserved bits should read as 0 (expected 0xfff, got "
-      "0x%08x)",
-      set_nak_out);
+  EXPECT_RTL(set_nak_out == 0x00000fffu,
+             "SET_NAK_OUT reserved bits should read as 0 (expected 0xfff, got "
+             "0x%08x)",
+             set_nak_out);
 
   // 8. Wave 2: Hold D+ pullup via PHY_PINS_DRIVE (EN=1, DP_PULLUP_EN_O=1) so
   // the unattached USB pads are in J state (see_se0=0, link_reset=0).
@@ -294,14 +288,15 @@ bool test_main(void) {
                    1u << USBDEV_PHY_CONFIG_EOP_SINGLE_BIT_BIT);
   busy_spin_micros(5);
 
-  // 9. Wave 2: PINMUX MioInUsbdevSense (`kTopEarlgreyPinmuxPeripheralInUsbdevSense`)
-  // drives `cio_usbdev_sense_p2d` (`USBSTAT.sense`, `PHY_PINS_SENSE.pwr_sense`),
-  // sets `INTR_STATE.powered`, transitions `USBSTAT.link_state` to `Powered` (1)
-  // when `USBCTRL.enable == 1`, and `USBCTRL.resume_link_active` transitions
-  // `USBSTAT.link_state` to `ActiveNoSOF` (5) (`usbdev_linkstate.sv:140-163`).
-  // Furthermore, when VBUS disconnects while `USBCTRL.enable == 1`,
-  // `USBCTRL.device_address` and `AVSETUPBUFFER`/`AVOUTBUFFER` FIFOs are NOT
-  // cleared (`usbdev_usbif.sv:155`, `usbdev.sv:257-325`).
+  // 9. Wave 2: PINMUX MioInUsbdevSense
+  // (`kTopEarlgreyPinmuxPeripheralInUsbdevSense`) drives `cio_usbdev_sense_p2d`
+  // (`USBSTAT.sense`, `PHY_PINS_SENSE.pwr_sense`), sets `INTR_STATE.powered`,
+  // transitions `USBSTAT.link_state` to `Powered` (1) when `USBCTRL.enable ==
+  // 1`, and `USBCTRL.resume_link_active` transitions `USBSTAT.link_state` to
+  // `ActiveNoSOF` (5) (`usbdev_linkstate.sv:140-163`). Furthermore, when VBUS
+  // disconnects while `USBCTRL.enable == 1`, `USBCTRL.device_address` and
+  // `AVSETUPBUFFER`/`AVOUTBUFFER` FIFOs are NOT cleared (`usbdev_usbif.sv:155`,
+  // `usbdev.sv:257-325`).
   abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET, 0xffffffffu);
   abs_mmio_write32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET, 3u);
   abs_mmio_write32(kUsbdevBase + USBDEV_AVOUTBUFFER_REG_OFFSET, 7u);
@@ -316,18 +311,18 @@ bool test_main(void) {
   EXPECT_RTL(bitfield_bit32_read(usbstat, USBDEV_USBSTAT_SENSE_BIT) == true &&
                  bitfield_bit32_read(
                      pins_sense, USBDEV_PHY_PINS_SENSE_PWR_SENSE_BIT) == true &&
-                 bitfield_bit32_read(
-                     intr_state, USBDEV_INTR_COMMON_POWERED_BIT) == true,
+                 bitfield_bit32_read(intr_state,
+                                     USBDEV_INTR_COMMON_POWERED_BIT) == true,
              "PINMUX ConstantOne on UsbdevSense must set USBSTAT.sense=1, "
              "PHY_PINS_SENSE.pwr_sense=1, INTR_STATE.powered=1 "
              "(usbstat=0x%08x, pins_sense=0x%08x, intr_state=0x%08x)",
              usbstat, pins_sense, intr_state);
 
-  // Enable USBCTRL with device_address = 0x2a -> LINK_STATE becomes Powered (1).
-  uint32_t ctrl_val =
-      bitfield_bit32_write(0u, USBDEV_USBCTRL_ENABLE_BIT, true);
-  ctrl_val = bitfield_field32_write(
-      ctrl_val, USBDEV_USBCTRL_DEVICE_ADDRESS_FIELD, 0x2au);
+  // Enable USBCTRL with device_address = 0x2a -> LINK_STATE becomes Powered
+  // (1).
+  uint32_t ctrl_val = bitfield_bit32_write(0u, USBDEV_USBCTRL_ENABLE_BIT, true);
+  ctrl_val = bitfield_field32_write(ctrl_val,
+                                    USBDEV_USBCTRL_DEVICE_ADDRESS_FIELD, 0x2au);
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, ctrl_val);
   busy_spin_micros(2);
 
@@ -340,10 +335,9 @@ bool test_main(void) {
 
   // Write RESUME_LINK_ACTIVE=1 while in LinkPowered -> transitions to
   // LinkActiveNoSOF (5) and sets INTR_STATE.link_resume.
-  abs_mmio_write32(
-      kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET,
-      bitfield_bit32_write(ctrl_val, USBDEV_USBCTRL_RESUME_LINK_ACTIVE_BIT,
-                           true));
+  abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET,
+                   bitfield_bit32_write(
+                       ctrl_val, USBDEV_USBCTRL_RESUME_LINK_ACTIVE_BIT, true));
   busy_spin_micros(2);
 
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
@@ -368,20 +362,20 @@ bool test_main(void) {
 
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
   usbctrl = abs_mmio_read32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET);
-  EXPECT_RTL(
-      bitfield_field32_read(usbstat, USBDEV_USBSTAT_LINK_STATE_FIELD) ==
-              USBDEV_USBSTAT_LINK_STATE_VALUE_DISCONNECTED &&
-          bitfield_field32_read(usbctrl, USBDEV_USBCTRL_DEVICE_ADDRESS_FIELD) ==
-              0x2au &&
-          bitfield_field32_read(usbstat, USBDEV_USBSTAT_AV_SETUP_DEPTH_FIELD) ==
-              1u &&
-          bitfield_field32_read(usbstat, USBDEV_USBSTAT_AV_OUT_DEPTH_FIELD) ==
-              1u,
-      "VBUS loss with USBCTRL.enable=1 must not clear DEVICE_ADDRESS or "
-      "AVSETUP/AVOUT FIFOs (usbstat=0x%08x, usbctrl=0x%08x)",
-      usbstat, usbctrl);
+  EXPECT_RTL(bitfield_field32_read(usbstat, USBDEV_USBSTAT_LINK_STATE_FIELD) ==
+                     USBDEV_USBSTAT_LINK_STATE_VALUE_DISCONNECTED &&
+                 bitfield_field32_read(
+                     usbctrl, USBDEV_USBCTRL_DEVICE_ADDRESS_FIELD) == 0x2au &&
+                 bitfield_field32_read(
+                     usbstat, USBDEV_USBSTAT_AV_SETUP_DEPTH_FIELD) == 1u &&
+                 bitfield_field32_read(usbstat,
+                                       USBDEV_USBSTAT_AV_OUT_DEPTH_FIELD) == 1u,
+             "VBUS loss with USBCTRL.enable=1 must not clear DEVICE_ADDRESS or "
+             "AVSETUP/AVOUT FIFOs (usbstat=0x%08x, usbctrl=0x%08x)",
+             usbstat, usbctrl);
 
-  // 10. Wave 5: USBDEV_PERMIT sub-word wr_err, addrmiss (0xac), and buffer SRAM ByteAccess=0.
+  // 10. Wave 5: USBDEV_PERMIT sub-word wr_err, addrmiss (0xac), and buffer SRAM
+  // ByteAccess=0.
   abs_mmio_write32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0u);
   g_fault_seen = false;
   abs_mmio_write8(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0x5u);
@@ -405,8 +399,9 @@ bool test_main(void) {
   abs_mmio_write8(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET, 0xffu);
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "sb to USBDEV_BUFFER (ByteAccess=0) must fault with MCAUSE=7");
-  EXPECT_RTL(abs_mmio_read32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET) == 0x11223344u,
-             "sb to USBDEV_BUFFER must not modify word");
+  EXPECT_RTL(
+      abs_mmio_read32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET) == 0x11223344u,
+      "sb to USBDEV_BUFFER must not modify word");
 
   // 11. Status-type interrupts (PKT_RECEIVED, PKT_SENT, AV_OUT_EMPTY, RX_FULL,
   // AV_SETUP_EMPTY) in INTR_STATE reflect (live_status | INTR_TEST).
@@ -420,16 +415,14 @@ bool test_main(void) {
       (1u << USBDEV_INTR_COMMON_AV_OUT_EMPTY_BIT) |
       (1u << USBDEV_INTR_COMMON_RX_FULL_BIT) |
       (1u << USBDEV_INTR_COMMON_AV_SETUP_EMPTY_BIT);
-  EXPECT_RTL(
-      (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
-       kStatusIntrMask) == 0u,
-      "Status-type INTR_STATE bits must be 0 when USBCTRL.enable=0 and "
-      "INTR_TEST=0");
+  EXPECT_RTL((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+              kStatusIntrMask) == 0u,
+             "Status-type INTR_STATE bits must be 0 when USBCTRL.enable=0 and "
+             "INTR_TEST=0");
   abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, kStatusIntrMask);
-  EXPECT_RTL(
-      (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
-       kStatusIntrMask) == kStatusIntrMask,
-      "INTR_TEST must assert all 5 status-type INTR_STATE bits");
+  EXPECT_RTL((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+              kStatusIntrMask) == kStatusIntrMask,
+             "INTR_TEST must assert all 5 status-type INTR_STATE bits");
   abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0u);
   EXPECT_RTL(
       (abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &

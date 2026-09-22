@@ -45,18 +45,17 @@ bool test_main(void) {
   // PattgenPda0Tx -> MioOutIob0 -> InselIob0 -> GpioGpio0 (bit 0)
   // PattgenPcl0Tx -> MioOutIob1 -> InselIob1 -> GpioGpio1 (bit 1)
   dif_pinmux_t pinmux;
-  CHECK_DIF_OK(
-      dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
+  CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIob0,
                                         kTopEarlgreyPinmuxOutselPattgenPda0Tx));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio0,
-      kTopEarlgreyPinmuxInselIob0));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio0,
+                                       kTopEarlgreyPinmuxInselIob0));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIob1,
                                         kTopEarlgreyPinmuxOutselPattgenPcl0Tx));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInGpioGpio1,
-      kTopEarlgreyPinmuxInselIob1));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio1,
+                                       kTopEarlgreyPinmuxInselIob1));
 
   // Ensure GPIO0 and GPIO1 output enables are disabled so Pattgen drives the
   // pads cleanly.

@@ -5,13 +5,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "gpio_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "pinmux_regs.h"
 #include "sysrst_ctrl_regs.h"
 
@@ -28,7 +28,8 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_TEST_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_ALERT_TEST_REG_OFFSET) == 0u);
 
-  // 2. Masked & Direct OE read/write consistency (L702-705, L712-717, L813-821).
+  // 2. Masked & Direct OE read/write consistency (L702-705, L712-717,
+  // L813-821).
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_LOWER_REG_OFFSET) == 0u);
@@ -79,11 +80,13 @@ bool test_main(void) {
   const uint32_t kPadPattgen = kTopEarlgreyPinmuxMioOutIor11;
   const uint32_t kPadPwm = kTopEarlgreyPinmuxMioOutIor12;
 
-  // Configure sysrst_ctrl bat_disable (bit 0) override to drive 1 on kPadSysrst.
+  // Configure sysrst_ctrl bat_disable (bit 0) override to drive 1 on
+  // kPadSysrst.
   abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_ALLOWED_CTL_REG_OFFSET,
                    0xffffu);
   abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET, 0x1u);
-  abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0x1u);
+  abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET,
+                   0x1u);
   abs_mmio_write32(kPinmuxBase + PINMUX_MIO_OUTSEL_0_REG_OFFSET +
                        kPadSysrst * sizeof(uint32_t),
                    kTopEarlgreyPinmuxOutselSysrstCtrlAonBatDisable);
@@ -98,9 +101,9 @@ bool test_main(void) {
   abs_mmio_write32(kPinmuxBase + PINMUX_MIO_OUTSEL_0_REG_OFFSET +
                        kPadPattgen * sizeof(uint32_t),
                    kTopEarlgreyPinmuxOutselPattgenPda0Tx);
-  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_OUTSEL_0_REG_OFFSET +
-                       kPadPwm * sizeof(uint32_t),
-                   kTopEarlgreyPinmuxOutselPwmAonPwm0);
+  abs_mmio_write32(
+      kPinmuxBase + PINMUX_MIO_OUTSEL_0_REG_OFFSET + kPadPwm * sizeof(uint32_t),
+      kTopEarlgreyPinmuxOutselPwmAonPwm0);
   abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
                        2u * sizeof(uint32_t),
                    kTopEarlgreyPinmuxInselIor11);
@@ -111,31 +114,33 @@ bool test_main(void) {
                        kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonAcPresent *
                            sizeof(uint32_t),
                    kTopEarlgreyPinmuxInselIor11);
-  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
-                       kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey0In *
-                           sizeof(uint32_t),
-                   kTopEarlgreyPinmuxInselIor12);
-  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
-                       kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey1In *
-                           sizeof(uint32_t),
-                   kTopEarlgreyPinmuxInselIor10);
+  abs_mmio_write32(
+      kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
+          kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey0In * sizeof(uint32_t),
+      kTopEarlgreyPinmuxInselIor12);
+  abs_mmio_write32(
+      kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET +
+          kTopEarlgreyPinmuxPeripheralInSysrstCtrlAonKey1In * sizeof(uint32_t),
+      kTopEarlgreyPinmuxInselIor10);
 
   // Trigger GPIO update_data_out + update_data_in after clk_aon_i CDC sync.
   busy_spin_micros(100);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) == 0x3u);
-  CHECK((abs_mmio_read32(kSysrstCtrlBase +
-                         SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
-         (1u << 2)) == (1u << 2));
+  CHECK(
+      (abs_mmio_read32(kSysrstCtrlBase + SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
+       (1u << 2)) == (1u << 2));
 
-  // Drive sysrst_ctrl bat_disable = 0 -> GPIO[1] and sysrst_ctrl key1_in read 0.
-  abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0x0u);
+  // Drive sysrst_ctrl bat_disable = 0 -> GPIO[1] and sysrst_ctrl key1_in read
+  // 0.
+  abs_mmio_write32(kSysrstCtrlBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET,
+                   0x0u);
   busy_spin_micros(100);
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) == 0x1u);
-  CHECK((abs_mmio_read32(kSysrstCtrlBase +
-                         SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
-         (1u << 2)) == 0u);
+  CHECK(
+      (abs_mmio_read32(kSysrstCtrlBase + SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET) &
+       (1u << 2)) == 0u);
 
   return true;
 }

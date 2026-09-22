@@ -80,8 +80,8 @@ bool test_main(void) {
   // 3. DAI Digest on LIFE_CYCLE partition (0x7a8) is rejected with AccessError.
   check_dai_access_error_and_recover(kLifeCycleAddr, kOtpDaiCmdDigest);
 
-  // 4. DAI Digest on SW-digest partition VENDOR_TEST (0x000, hw_digest == false)
-  // is rejected with AccessError.
+  // 4. DAI Digest on SW-digest partition VENDOR_TEST (0x000, hw_digest ==
+  // false) is rejected with AccessError.
   check_dai_access_error_and_recover(kVendorTestAddr, kOtpDaiCmdDigest);
 
   // 5. DAI Write and DAI Digest on already-locked HW-digest partition HW_CFG0

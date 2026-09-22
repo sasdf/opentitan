@@ -5,13 +5,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "alert_handler_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "alert_handler_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "uart_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -92,9 +93,9 @@ bool test_main(void) {
   write_shadowed(kAlertBase + ALERT_HANDLER_CLASSB_CLR_SHADOWED_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSB_STATE_REG_OFFSET) ==
         0x0u);
-  abs_mmio_write32(kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
-                   intr_en_orig &
-                       ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSB_BIT));
+  abs_mmio_write32(
+      kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
+      intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSB_BIT));
 
   // 3. Accumulation Threshold Trigger (accu_trig) During STATE_TIMEOUT Cancels
   //    Timeout & Enters STATE_PHASE0 + CTRL.LOCK = 1 Auto-Clears

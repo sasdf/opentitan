@@ -78,7 +78,6 @@ opentitan_test(
     ],
 )
 
-
 opentitan_test(
     name = "csrng_consistency_test",
     srcs = ["csrng_consistency_test.c"],
@@ -215,6 +214,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "sysrst_ctrl_rtl_consistency_test",
     srcs = ["sysrst_ctrl_rtl_consistency_test.c"],
@@ -256,6 +256,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "keymgr_rtl_consistency_test",
     srcs = ["keymgr_rtl_consistency_test.c"],
@@ -304,9 +305,9 @@ opentitan_test(
     deps = [
         "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/dif:alert_handler",
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:alert_handler",
         "//sw/device/lib/runtime:hart",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
@@ -375,6 +376,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "gpio_rtl_consistency_test",
     srcs = ["gpio_rtl_consistency_test.c"],
@@ -415,6 +417,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
+
 opentitan_test(
     name = "clkmgr_rtl_consistency_test",
     srcs = ["clkmgr_rtl_consistency_test.c"],
@@ -423,6 +426,7 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     deps = [
+        "//hw/ip/aon_timer/data:aon_timer_c_regs",
         "//hw/top_earlgrey/ip_autogen/clkmgr:clkmgr_c_regs",
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
@@ -437,7 +441,6 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/drivers:retention_sram",
-        "//hw/ip/aon_timer/data:aon_timer_c_regs",
     ],
 )
 

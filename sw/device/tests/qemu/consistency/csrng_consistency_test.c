@@ -91,7 +91,8 @@ bool test_main(void) {
       abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(recov_sts ==
             (1u << CSRNG_RECOV_ALERT_STS_FIPS_FORCE_ENABLE_FIELD_ALERT_BIT),
-        "Expected RECOV_ALERT_STS == 0x%x (FIPS_FORCE_ENABLE_FIELD_ALERT), got 0x%x",
+        "Expected RECOV_ALERT_STS == 0x%x (FIPS_FORCE_ENABLE_FIELD_ALERT), got "
+        "0x%x",
         (1u << CSRNG_RECOV_ALERT_STS_FIPS_FORCE_ENABLE_FIELD_ALERT_BIT),
         recov_sts);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
@@ -108,11 +109,10 @@ bool test_main(void) {
       (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_bad_read_int_mubi);
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
-  CHECK(recov_sts ==
-            (1u << CSRNG_RECOV_ALERT_STS_READ_INT_STATE_FIELD_ALERT_BIT),
-        "Expected RECOV_ALERT_STS == 0x%x (READ_INT_STATE_FIELD_ALERT), got 0x%x",
-        (1u << CSRNG_RECOV_ALERT_STS_READ_INT_STATE_FIELD_ALERT_BIT),
-        recov_sts);
+  CHECK(
+      recov_sts == (1u << CSRNG_RECOV_ALERT_STS_READ_INT_STATE_FIELD_ALERT_BIT),
+      "Expected RECOV_ALERT_STS == 0x%x (READ_INT_STATE_FIELD_ALERT), got 0x%x",
+      (1u << CSRNG_RECOV_ALERT_STS_READ_INT_STATE_FIELD_ALERT_BIT), recov_sts);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
   CHECK_STATUS_OK(
@@ -121,10 +121,10 @@ bool test_main(void) {
   // 3. Verify out-of-sequence RESEED command on uninstantiated SW instance
   // raises RECOV_ALERT_STS.CMD_STAGE_INVALID_CMD_SEQ_ALERT (bit 14), sets
   // SW_CMD_STS.CMD_ACK=1 and SW_CMD_STS.CMD_STS=3 (INVALID_CMD_SEQ), and
-  // does NOT enter CSRNG_ERROR (MAIN_SM_STATE remains 0x4e Idle, ERR_CODE == 0).
+  // does NOT enter CSRNG_ERROR (MAIN_SM_STATE remains 0x4e Idle, ERR_CODE ==
+  // 0).
   dif_csrng_t csrng;
-  CHECK_DIF_OK(
-      dif_csrng_init(mmio_region_from_addr(kCsrngBase), &csrng));
+  CHECK_DIF_OK(dif_csrng_init(mmio_region_from_addr(kCsrngBase), &csrng));
   CHECK_DIF_OK(dif_csrng_uninstantiate(&csrng));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
 
@@ -143,15 +143,18 @@ bool test_main(void) {
 
   uint32_t cmd_sts =
       bitfield_field32_read(sw_cmd_sts, CSRNG_SW_CMD_STS_CMD_STS_FIELD);
-  CHECK(cmd_sts == CSRNG_SW_CMD_STS_CMD_STS_VALUE_INVALID_CMD_SEQ,
-        "Expected SW_CMD_STS.CMD_STS == %u (INVALID_CMD_SEQ), got %u (raw 0x%x)",
-        CSRNG_SW_CMD_STS_CMD_STS_VALUE_INVALID_CMD_SEQ, cmd_sts, sw_cmd_sts);
+  CHECK(
+      cmd_sts == CSRNG_SW_CMD_STS_CMD_STS_VALUE_INVALID_CMD_SEQ,
+      "Expected SW_CMD_STS.CMD_STS == %u (INVALID_CMD_SEQ), got %u (raw 0x%x)",
+      CSRNG_SW_CMD_STS_CMD_STS_VALUE_INVALID_CMD_SEQ, cmd_sts, sw_cmd_sts);
 
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
-  CHECK(bitfield_bit32_read(
-            recov_sts, CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT),
-        "Expected CMD_STAGE_INVALID_CMD_SEQ_ALERT set in RECOV_ALERT_STS, got 0x%x",
-        recov_sts);
+  CHECK(
+      bitfield_bit32_read(
+          recov_sts, CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT),
+      "Expected CMD_STAGE_INVALID_CMD_SEQ_ALERT set in RECOV_ALERT_STS, got "
+      "0x%x",
+      recov_sts);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
@@ -159,8 +162,8 @@ bool test_main(void) {
   uint32_t err_code = abs_mmio_read32(kCsrngBase + CSRNG_ERR_CODE_REG_OFFSET);
   uint32_t sm_state =
       abs_mmio_read32(kCsrngBase + CSRNG_MAIN_SM_STATE_REG_OFFSET);
-  CHECK(err_code == 0u, "Expected ERR_CODE == 0 after INVALID_CMD_SEQ, got 0x%x",
-        err_code);
+  CHECK(err_code == 0u,
+        "Expected ERR_CODE == 0 after INVALID_CMD_SEQ, got 0x%x", err_code);
   CHECK(sm_state == 0x4eu,
         "Expected MAIN_SM_STATE == 0x4e (Idle) after INVALID_CMD_SEQ, got 0x%x",
         sm_state);
@@ -173,16 +176,18 @@ bool test_main(void) {
                         0xca79b0b0, 0xdda33b5c, 0xa468649e, 0xdf5d73fa},
       .seed_material_len = 12,
   };
-  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
-                                     &kSeed));
+  CHECK_DIF_OK(
+      dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable, &kSeed));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
   CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
   uint32_t genbits_vld = 0;
   do {
     genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
-  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  } while (
+      !bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
   CHECK(!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_FIPS_BIT),
-        "Expected GENBITS_FIPS == 0 when CTRL.FIPS_FORCE_ENABLE is False, got 0x%x",
+        "Expected GENBITS_FIPS == 0 when CTRL.FIPS_FORCE_ENABLE is False, got "
+        "0x%x",
         genbits_vld);
   for (int i = 0; i < 4; ++i) {
     (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
@@ -231,13 +236,14 @@ bool test_main(void) {
                         0xa5a5a5a5, 0x5a5a5a5a, 0xdeadbeef, 0xcafebabe},
       .seed_material_len = 12,
   };
-  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
-                                     &kSeed2));
+  CHECK_DIF_OK(
+      dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable, &kSeed2));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
   CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
   do {
     genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
-  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  } while (
+      !bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
 
   uint32_t ctrl_sw_app_off =
       (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
@@ -272,13 +278,14 @@ bool test_main(void) {
       (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_disabled);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_off);
-  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
-                                     &kSeed2));
+  CHECK_DIF_OK(
+      dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable, &kSeed2));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
   CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
   do {
     genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
-  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  } while (
+      !bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(recov_sts,
                              CSRNG_RECOV_ALERT_STS_CS_BUS_CMP_ALERT_BIT),
@@ -293,15 +300,16 @@ bool test_main(void) {
   // generating 1 block triggers RECOV_ALERT_STS.CS_BUS_CMP_ALERT (bit 12).
   CHECK_DIF_OK(dif_csrng_uninstantiate(&csrng));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
-  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
-                                     &kSeed2));
+  CHECK_DIF_OK(
+      dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable, &kSeed2));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
   CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
   do {
     genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
-  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  } while (
+      !bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(recov_sts,
                             CSRNG_RECOV_ALERT_STS_CS_BUS_CMP_ALERT_BIT),
@@ -335,7 +343,8 @@ bool test_main(void) {
                             CSRNG_RECOV_ALERT_STS_ENABLE_FIELD_ALERT_BIT),
         "Expected ENABLE_FIELD_ALERT when CTRL.ENABLE is 0x0, got 0x%x",
         recov_sts);
-  // Writing 0 (rw0c) while CTRL still holds invalid mubi4 0x0 must preserve bit 0!
+  // Writing 0 (rw0c) while CTRL still holds invalid mubi4 0x0 must preserve bit
+  // 0!
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(recov_sts,
@@ -350,15 +359,17 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
 
   // Re-instantiate with identical seed kSeed2 and generate 1 block: since
-  // disabling CSRNG cleared cs_rdata_capt_vld_q, CS_BUS_CMP_ALERT must remain 0.
+  // disabling CSRNG cleared cs_rdata_capt_vld_q, CS_BUS_CMP_ALERT must remain
+  // 0.
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
-  CHECK_DIF_OK(dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable,
-                                     &kSeed2));
+  CHECK_DIF_OK(
+      dif_csrng_instantiate(&csrng, kDifCsrngEntropySrcToggleDisable, &kSeed2));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
   CHECK_DIF_OK(dif_csrng_generate_start(&csrng, 4));
   do {
     genbits_vld = abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET);
-  } while (!bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
+  } while (
+      !bitfield_bit32_read(genbits_vld, CSRNG_GENBITS_VLD_GENBITS_VLD_BIT));
   recov_sts = abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(recov_sts == 0u,
         "Expected RECOV_ALERT_STS == 0 after CTRL.ENABLE disable cleared "
@@ -401,11 +412,15 @@ bool test_main(void) {
   // 10b. Sub-word write permit checks (CSRNG_PERMIT / wr_err):
   // - CTRL (PERMIT = 4'b0011) rejects 1-byte write (reg_be = 4'b0001) without
   //   modifying CTRL.
-  // - RESEED_INTERVAL (PERMIT = 4'b1111) rejects 1-byte write (reg_be = 4'b0001).
-  // - REGWEN (PERMIT = 4'b0001) rejects byte write to offset +1 (reg_be = 4'b0010).
+  // - RESEED_INTERVAL (PERMIT = 4'b1111) rejects 1-byte write (reg_be =
+  // 4'b0001).
+  // - REGWEN (PERMIT = 4'b0001) rejects byte write to offset +1 (reg_be =
+  // 4'b0010).
   CHECK(expect_store_fault_8(csrng_mmio, CSRNG_CTRL_REG_OFFSET, 0x99u));
-  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_CTRL_REG_OFFSET) == ctrl_read_int_on);
-  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_RESEED_INTERVAL_REG_OFFSET, 0x12u));
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_CTRL_REG_OFFSET) ==
+        ctrl_read_int_on);
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_RESEED_INTERVAL_REG_OFFSET,
+                             0x12u));
   CHECK(expect_store_fault_8(csrng_mmio, CSRNG_REGWEN_REG_OFFSET + 1u, 0x00u));
 
   return true;

@@ -37,7 +37,8 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 bool test_main(void) {
   CHECK_STATUS_OK(entropy_testutils_stop_all());
 
-  // Verify MODULE_ENABLE is False, MAIN_SM_STATE is Idle (0xf5), and REGWEN is 1.
+  // Verify MODULE_ENABLE is False, MAIN_SM_STATE is Idle (0xf5), and REGWEN
+  // is 1.
   uint32_t regwen = abs_mmio_read32(kEsBase + ENTROPY_SRC_REGWEN_REG_OFFSET);
   CHECK(regwen == 1u, "Expected REGWEN == 1 when disabled, got 0x%x", regwen);
   uint32_t sm_state =
@@ -45,8 +46,9 @@ bool test_main(void) {
   CHECK(sm_state == 0xf5u, "Expected MAIN_SM_STATE == 0xf5 (Idle), got 0x%x",
         sm_state);
 
-  // 1. Verify FW_OV_WR_FIFO_FULL == 0 when fw_ov_mode_entropy_insert is disabled
-  // (entropy_src_core.sv:1042: fw_ov_wr_fifo_full = fw_ov_mode_entropy_insert && ...).
+  // 1. Verify FW_OV_WR_FIFO_FULL == 0 when fw_ov_mode_entropy_insert is
+  // disabled (entropy_src_core.sv:1042: fw_ov_wr_fifo_full =
+  // fw_ov_mode_entropy_insert && ...).
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_CONTROL_REG_OFFSET, 0x99u);
   uint32_t wr_fifo_full =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_FW_OV_WR_FIFO_FULL_REG_OFFSET);
@@ -60,20 +62,22 @@ bool test_main(void) {
                    kMultiBitBool4True);
   uint32_t sha3_start =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET);
-  CHECK(sha3_start == kMultiBitBool4True,
-        "Expected FW_OV_SHA3_START == 0x6 when written while disabled, got 0x%x",
-        sha3_start);
+  CHECK(
+      sha3_start == kMultiBitBool4True,
+      "Expected FW_OV_SHA3_START == 0x6 when written while disabled, got 0x%x",
+      sha3_start);
 
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET, 0x5u);
   uint32_t recov_sts =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
-  CHECK(bitfield_bit32_read(
-            recov_sts,
-            ENTROPY_SRC_RECOV_ALERT_STS_FW_OV_SHA3_START_FIELD_ALERT_BIT),
-        "Expected FW_OV_SHA3_START_FIELD_ALERT set in RECOV_ALERT_STS, got 0x%x",
-        recov_sts);
+  CHECK(
+      bitfield_bit32_read(
+          recov_sts,
+          ENTROPY_SRC_RECOV_ALERT_STS_FW_OV_SHA3_START_FIELD_ALERT_BIT),
+      "Expected FW_OV_SHA3_START_FIELD_ALERT set in RECOV_ALERT_STS, got 0x%x",
+      recov_sts);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    kMultiBitBool4False);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -102,8 +106,8 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
 
   uint32_t conf_bad_rng_fips =
-      (conf_default & ~(ENTROPY_SRC_CONF_RNG_FIPS_MASK
-                        << ENTROPY_SRC_CONF_RNG_FIPS_OFFSET)) |
+      (conf_default &
+       ~(ENTROPY_SRC_CONF_RNG_FIPS_MASK << ENTROPY_SRC_CONF_RNG_FIPS_OFFSET)) |
       (0x5u << ENTROPY_SRC_CONF_RNG_FIPS_OFFSET);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEntropySrcRecovAlert));
@@ -150,9 +154,10 @@ bool test_main(void) {
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET, 0x5u);
   regwen = abs_mmio_read32(kEsBase + ENTROPY_SRC_REGWEN_REG_OFFSET);
-  CHECK(regwen == 1u,
-        "Expected REGWEN == 1 when MODULE_ENABLE is 0x5 (loose false), got 0x%x",
-        regwen);
+  CHECK(
+      regwen == 1u,
+      "Expected REGWEN == 1 when MODULE_ENABLE is 0x5 (loose false), got 0x%x",
+      regwen);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    kMultiBitBool4False);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -278,7 +283,8 @@ bool test_main(void) {
   }
   abs_mmio_write32(kEsBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET, 0xfu);
 
-  // Start SHA3 message insertion for Seed 1, push 2 words, and stop conditioner.
+  // Start SHA3 message insertion for Seed 1, push 2 words, and stop
+  // conditioner.
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    kMultiBitBool4True);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_WR_DATA_REG_OFFSET, 0x11223344u);
@@ -407,16 +413,17 @@ bool test_main(void) {
   intr_state = abs_mmio_read32(kEsBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                    kMultiBitBool4False);
-  CHECK(bitfield_bit32_read(err_code,
-                            ENTROPY_SRC_ERR_CODE_SFIFO_ESFINAL_ERR_BIT) &&
-            bitfield_bit32_read(err_code,
-                                ENTROPY_SRC_ERR_CODE_FIFO_READ_ERR_BIT),
-        "Expected SFIFO_ESFINAL_ERR and FIFO_READ_ERR set on 12th empty read, "
-        "got 0x%x",
-        err_code);
-  CHECK(bitfield_bit32_read(intr_state, ENTROPY_SRC_INTR_STATE_ES_FATAL_ERR_BIT),
-        "Expected INTR_STATE.ES_FATAL_ERR set on 12th empty read, got 0x%x",
-        intr_state);
+  CHECK(
+      bitfield_bit32_read(err_code,
+                          ENTROPY_SRC_ERR_CODE_SFIFO_ESFINAL_ERR_BIT) &&
+          bitfield_bit32_read(err_code, ENTROPY_SRC_ERR_CODE_FIFO_READ_ERR_BIT),
+      "Expected SFIFO_ESFINAL_ERR and FIFO_READ_ERR set on 12th empty read, "
+      "got 0x%x",
+      err_code);
+  CHECK(
+      bitfield_bit32_read(intr_state, ENTROPY_SRC_INTR_STATE_ES_FATAL_ERR_BIT),
+      "Expected INTR_STATE.ES_FATAL_ERR set on 12th empty read, got 0x%x",
+      intr_state);
 
   // 12. Wave 5: Verify ENTROPY_SRC_PERMIT sub-word write error (wr_err) and
   // addrmiss decode error (entropy_src_reg_pkg.sv:980-1038,

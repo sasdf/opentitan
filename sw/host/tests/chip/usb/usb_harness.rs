@@ -73,7 +73,7 @@ fn wait_for_device(opts: &Opts) -> Result<UsbDeviceHandle> {
 }
 
 fn lfsr_advance(lfsr: u8) -> u8 {
-    (lfsr << 1) ^ ((((lfsr >> 1) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 7)) & 1))
+    (lfsr << 1) ^ (((lfsr >> 1) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 7)) & 1)
 }
 
 struct QemuStreamState {
@@ -127,8 +127,14 @@ fn run_qemu_usb_streams(
         }
     }
 
-    ensure!(!streams.is_empty(), "No USB stream interfaces found on QEMU device");
-    log::info!("Running QEMU USB stream loop for {} stream(s)", streams.len());
+    ensure!(
+        !streams.is_empty(),
+        "No USB stream interfaces found on QEMU device"
+    );
+    log::info!(
+        "Running QEMU USB stream loop for {} stream(s)",
+        streams.len()
+    );
 
     let deadline = std::time::Instant::now() + timeout;
     loop {
@@ -148,11 +154,7 @@ fn run_qemu_usb_streams(
                 continue;
             }
             let mut pkt = [0u8; 64];
-            let n = match device.read_bulk_timeout(
-                s.ep_in,
-                &mut pkt,
-                Duration::from_micros(200),
-            ) {
+            let n = match device.read_bulk_timeout(s.ep_in, &mut pkt, Duration::from_micros(200)) {
                 Ok(n) => n,
                 Err(_) => continue,
             };

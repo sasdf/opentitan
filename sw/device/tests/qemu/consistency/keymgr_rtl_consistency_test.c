@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/dif/dif_flash_ctrl.h"
@@ -27,6 +26,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "keymgr_regs.h"
 #include "kmac_regs.h"
 
@@ -124,7 +124,8 @@ static status_t init_flash_and_otp_with_zero_owner_seed(void) {
       uint32_t ctrl_adv = bitfield_field32_write(
           0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
           KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE);
-      write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_adv);
+      write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET,
+                     ctrl_adv);
       abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
       (void)wait_keymgr_op_done_bounded(5000);
       uint32_t ws_inval =
@@ -156,9 +157,9 @@ static bool test_kmac_sideload_key_valid(dif_kmac_t *kmac) {
   };
   CHECK_STATUS_OK(kmac_testutils_config(kmac, /*sideload=*/true));
   uint32_t out_buf[8] = {0};
-  status_t res = kmac_testutils_kmac(kmac, kDifKmacModeKmacLen256, &kDummySwKey,
-                                     "", 0, "abcd", 4, ARRAYSIZE(out_buf),
-                                     out_buf, NULL);
+  status_t res =
+      kmac_testutils_kmac(kmac, kDifKmacModeKmacLen256, &kDummySwKey, "", 0,
+                          "abcd", 4, ARRAYSIZE(out_buf), out_buf, NULL);
   // Wait for KMAC SHA3 core to return to IDLE after error or completion.
   for (int i = 0; i < 100; ++i) {
     uint32_t st = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
@@ -194,19 +195,18 @@ bool test_main(void) {
   uint32_t ctrl_gen_sw = bitfield_field32_write(
       0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
       KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_GENERATE_SW_OUTPUT);
-  uint32_t ctrl_adv = bitfield_field32_write(
-      0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
-      KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE);
+  uint32_t ctrl_adv =
+      bitfield_field32_write(0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
+                             KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE);
   uint32_t op_st = 0;
   uint32_t err_code = 0;
 
   if (ws == KEYMGR_WORKING_STATE_STATE_VALUE_RESET) {
     // Lock SW_BINDING_REGWEN in Reset (ROM also locks this).
     abs_mmio_write32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0u);
-    EXPECT_RTL(
-        abs_mmio_read32(kKeymgrBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) ==
-            0u,
-        "SW_BINDING_REGWEN should be 0 in Reset after write 0");
+    EXPECT_RTL(abs_mmio_read32(kKeymgrBase +
+                               KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 0u,
+               "SW_BINDING_REGWEN should be 0 in Reset after write 0");
 
     // Trigger invalid op (GENERATE_SW_OUTPUT) in Reset.
     write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET,
@@ -278,9 +278,9 @@ bool test_main(void) {
   uint32_t max_ver_reg_offset =
       (ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_KEY)
           ? KEYMGR_MAX_OWNER_KEY_VER_SHADOWED_REG_OFFSET
-          : (ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY)
-                ? KEYMGR_MAX_OWNER_INT_KEY_VER_SHADOWED_REG_OFFSET
-                : KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET;
+      : (ws == KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY)
+          ? KEYMGR_MAX_OWNER_INT_KEY_VER_SHADOWED_REG_OFFSET
+          : KEYMGR_MAX_CREATOR_KEY_VER_SHADOWED_REG_OFFSET;
   uint32_t max_creator_ver = abs_mmio_read32(kKeymgrBase + max_ver_reg_offset);
   abs_mmio_write32(kKeymgrBase + KEYMGR_KEY_VERSION_REG_OFFSET,
                    max_creator_ver);
@@ -479,9 +479,9 @@ bool test_main(void) {
   // disabled = 1 and finishes with OP_STATUS = DONE_ERROR (3),
   // ERR_CODE.INVALID_OP = 1, START = 0, CFG_REGWEN = 1 (does NOT hang in WIP).
   // ---------------------------------------------------------------------------
-  uint32_t ctrl_dis = bitfield_field32_write(
-      0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
-      KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_DISABLE);
+  uint32_t ctrl_dis =
+      bitfield_field32_write(0, KEYMGR_CONTROL_SHADOWED_OPERATION_FIELD,
+                             KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_DISABLE);
   write_shadowed(kKeymgrBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, ctrl_dis);
   abs_mmio_write32(kKeymgrBase + KEYMGR_START_REG_OFFSET, 1u);
   op_st = wait_keymgr_op_done_bounded(5000);
@@ -536,28 +536,30 @@ bool test_main(void) {
              "got faults=%u mcause=%u",
              g_fault_count, g_last_mcause);
 
-  // 7c. INTR_ENABLE has KEYMGR_PERMIT = 0x1 (4'b0001): sb at byte 0 (reg_be=0x1)
-  // is permitted, whereas sb at byte 1 (reg_be=0x2) MUST fault with mcause=7.
+  // 7c. INTR_ENABLE has KEYMGR_PERMIT = 0x1 (4'b0001): sb at byte 0
+  // (reg_be=0x1) is permitted, whereas sb at byte 1 (reg_be=0x2) MUST fault
+  // with mcause=7.
   g_fault_count = 0;
   abs_mmio_write8(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET, 0x1u);
-  EXPECT_RTL(g_fault_count == 0u &&
-                 abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) ==
-                     0x1u,
-             "sb at byte 0 of INTR_ENABLE (PERMIT=0x1) should succeed, got "
-             "faults=%u val=0x%x",
-             g_fault_count,
-             abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
+  EXPECT_RTL(
+      g_fault_count == 0u &&
+          abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) == 0x1u,
+      "sb at byte 0 of INTR_ENABLE (PERMIT=0x1) should succeed, got "
+      "faults=%u val=0x%x",
+      g_fault_count,
+      abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
   abs_mmio_write8(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET + 1u, 0x0u);
-  EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 7u &&
-                 abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) ==
-                     0x1u,
-             "sb at byte 1 of INTR_ENABLE (PERMIT=0x1) expected fault(mcause=7)"
-             " & unchanged 0x1, got faults=%u mcause=%u val=0x%x",
-             g_fault_count, g_last_mcause,
-             abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
+  EXPECT_RTL(
+      g_fault_count == 1u && g_last_mcause == 7u &&
+          abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET) == 0x1u,
+      "sb at byte 1 of INTR_ENABLE (PERMIT=0x1) expected fault(mcause=7)"
+      " & unchanged 0x1, got faults=%u mcause=%u val=0x%x",
+      g_fault_count, g_last_mcause,
+      abs_mmio_read32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET));
   abs_mmio_write32(kKeymgrBase + KEYMGR_INTR_ENABLE_REG_OFFSET, 0x0u);
 
-  // 7d. Out-of-bounds offset 0xfc (past DEBUG at 0xf8) MUST fault on read/write.
+  // 7d. Out-of-bounds offset 0xfc (past DEBUG at 0xf8) MUST fault on
+  // read/write.
   g_fault_count = 0;
   (void)abs_mmio_read32(kKeymgrBase + 0xfcu);
   EXPECT_RTL(g_fault_count == 1u && g_last_mcause == 5u,

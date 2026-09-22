@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "spi_host_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -12,6 +10,9 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "spi_host_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -134,9 +135,9 @@ bool test_main(void) {
   // write COMMAND: SW_RST keeps FIFOs/FSM reset (CMDQD == 0) while latching
   // ERROR_STATUS.CSIDINVAL.
   abs_mmio_write32(kBase + SPI_HOST_CSID_REG_OFFSET, 1u);
-  abs_mmio_write32(kBase + SPI_HOST_CONTROL_REG_OFFSET,
-                   kCtrlSpien | kCtrlSwRst | kCtrlOutputEn |
-                       kCtrlDefaultWatermarks);
+  abs_mmio_write32(
+      kBase + SPI_HOST_CONTROL_REG_OFFSET,
+      kCtrlSpien | kCtrlSwRst | kCtrlOutputEn | kCtrlDefaultWatermarks);
   abs_mmio_write32(kBase + SPI_HOST_COMMAND_REG_OFFSET, kCmdDirRxOnly | 3u);
 
   status = abs_mmio_read32(kBase + SPI_HOST_STATUS_REG_OFFSET);

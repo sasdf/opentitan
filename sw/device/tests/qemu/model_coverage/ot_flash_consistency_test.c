@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/mmio.h"
@@ -14,6 +13,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "flash_ctrl_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -24,9 +24,7 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   g_fault_count++;
 }
 
-void ottf_load_integrity_error_handler(uint32_t *exc_info) {
-  (void)exc_info;
-}
+void ottf_load_integrity_error_handler(uint32_t *exc_info) { (void)exc_info; }
 
 enum {
   kFlashCoreBase = TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR,
@@ -57,8 +55,7 @@ static void write_mp_bank_cfg_shadowed(uint32_t val) {
 }
 
 static void verify_info_page_erase_prog_read(uint32_t byte_addr,
-                                             uint32_t info_sel,
-                                             uint32_t word0,
+                                             uint32_t info_sel, uint32_t word0,
                                              uint32_t word1) {
   // 1. Page Erase on INFO partition (PARTITION_SEL = 1, INFO_SEL = info_sel).
   clear_flash_status();
@@ -67,9 +64,8 @@ static void verify_info_page_erase_prog_read(uint32_t byte_addr,
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
   erase_ctrl = bitfield_field32_write(erase_ctrl, FLASH_CTRL_CONTROL_OP_FIELD,
                                       FLASH_CTRL_CONTROL_OP_VALUE_ERASE);
-  erase_ctrl =
-      bitfield_bit32_write(erase_ctrl, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT,
-                           true);
+  erase_ctrl = bitfield_bit32_write(erase_ctrl,
+                                    FLASH_CTRL_CONTROL_PARTITION_SEL_BIT, true);
   erase_ctrl = bitfield_field32_write(
       erase_ctrl, FLASH_CTRL_CONTROL_INFO_SEL_FIELD, info_sel);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, erase_ctrl);
@@ -85,12 +81,12 @@ static void verify_info_page_erase_prog_read(uint32_t byte_addr,
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
   prog_ctrl = bitfield_field32_write(prog_ctrl, FLASH_CTRL_CONTROL_OP_FIELD,
                                      FLASH_CTRL_CONTROL_OP_VALUE_PROG);
-  prog_ctrl =
-      bitfield_bit32_write(prog_ctrl, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT,
-                           true);
+  prog_ctrl = bitfield_bit32_write(prog_ctrl,
+                                   FLASH_CTRL_CONTROL_PARTITION_SEL_BIT, true);
   prog_ctrl = bitfield_field32_write(
       prog_ctrl, FLASH_CTRL_CONTROL_INFO_SEL_FIELD, info_sel);
-  prog_ctrl = bitfield_field32_write(prog_ctrl, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
+  prog_ctrl =
+      bitfield_field32_write(prog_ctrl, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, prog_ctrl);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET, word0);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET, word1);
@@ -137,8 +133,8 @@ bool test_main(void) {
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_STATUS_REG_OFFSET);
   uint8_t status_b0 =
       mmio_region_read8(core_region, FLASH_CTRL_STATUS_REG_OFFSET);
-  uint16_t status_h0 = *(volatile const uint16_t *)(kFlashCoreBase +
-                                                    FLASH_CTRL_STATUS_REG_OFFSET);
+  uint16_t status_h0 = *(
+      volatile const uint16_t *)(kFlashCoreBase + FLASH_CTRL_STATUS_REG_OFFSET);
   CHECK(status_b0 == (uint8_t)(status32 & 0xffu),
         "8-bit STATUS read mismatch: got 0x%x, expected 0x%x", status_b0,
         status32 & 0xffu);
@@ -165,10 +161,9 @@ bool test_main(void) {
                    0u);
 
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PHY_ALERT_CFG_REG_OFFSET, 0x1u);
-  CHECK(
-      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_PHY_ALERT_CFG_REG_OFFSET) ==
-          0x1u,
-      "PHY_ALERT_CFG readback mismatch");
+  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_PHY_ALERT_CFG_REG_OFFSET) ==
+            0x1u,
+        "PHY_ALERT_CFG readback mismatch");
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PHY_ALERT_CFG_REG_OFFSET, 0u);
 
   // ---------------------------------------------------------------------------
@@ -184,8 +179,7 @@ bool test_main(void) {
                              kMultiBitBool4True) |
       bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_CFG_7_ERASE_EN_7_FIELD,
                              kMultiBitBool4True) |
-      bitfield_field32_write(0u,
-                             FLASH_CTRL_MP_REGION_CFG_7_SCRAMBLE_EN_7_FIELD,
+      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_CFG_7_SCRAMBLE_EN_7_FIELD,
                              kMultiBitBool4False) |
       bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_CFG_7_ECC_EN_7_FIELD,
                              kMultiBitBool4False) |
@@ -257,15 +251,15 @@ bool test_main(void) {
 
   uint32_t curr_lvl =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CURR_FIFO_LVL_REG_OFFSET);
-  CHECK(bitfield_field32_read(curr_lvl, FLASH_CTRL_CURR_FIFO_LVL_RD_FIELD) ==
-            2u,
-        "Expected CURR_FIFO_LVL.RD == 2 before FIFO_RST, got 0x%x", curr_lvl);
+  CHECK(
+      bitfield_field32_read(curr_lvl, FLASH_CTRL_CURR_FIFO_LVL_RD_FIELD) == 2u,
+      "Expected CURR_FIFO_LVL.RD == 2 before FIFO_RST, got 0x%x", curr_lvl);
 
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_RST_REG_OFFSET, 1u);
   curr_lvl =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CURR_FIFO_LVL_REG_OFFSET);
-  CHECK(curr_lvl == 0u, "Expected CURR_FIFO_LVL == 0 while FIFO_RST == 1, got 0x%x",
-        curr_lvl);
+  CHECK(curr_lvl == 0u,
+        "Expected CURR_FIFO_LVL == 0 while FIFO_RST == 1, got 0x%x", curr_lvl);
 
   // While FIFO_RST == 1, execute an OP_READ and verify it completes with DONE
   // while RD_FIFO remains empty (CURR_FIFO_LVL.RD == 0, STATUS.RD_EMPTY == 1).
@@ -276,9 +270,10 @@ bool test_main(void) {
         "OP_READ while FIFO_RST == 1 failed");
   curr_lvl =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CURR_FIFO_LVL_REG_OFFSET);
-  CHECK(curr_lvl == 0u,
-        "Expected CURR_FIFO_LVL == 0 after OP_READ with FIFO_RST == 1, got 0x%x",
-        curr_lvl);
+  CHECK(
+      curr_lvl == 0u,
+      "Expected CURR_FIFO_LVL == 0 after OP_READ with FIFO_RST == 1, got 0x%x",
+      curr_lvl);
   CHECK(bitfield_bit32_read(
             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_STATUS_REG_OFFSET),
             FLASH_CTRL_STATUS_RD_EMPTY_BIT),
@@ -301,12 +296,11 @@ bool test_main(void) {
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
   uint32_t bk_erase_ctrl =
       bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true);
-  bk_erase_ctrl = bitfield_field32_write(
-      bk_erase_ctrl, FLASH_CTRL_CONTROL_OP_FIELD,
-      FLASH_CTRL_CONTROL_OP_VALUE_ERASE);
   bk_erase_ctrl =
-      bitfield_bit32_write(bk_erase_ctrl, FLASH_CTRL_CONTROL_ERASE_SEL_BIT,
-                           true);
+      bitfield_field32_write(bk_erase_ctrl, FLASH_CTRL_CONTROL_OP_FIELD,
+                             FLASH_CTRL_CONTROL_OP_VALUE_ERASE);
+  bk_erase_ctrl = bitfield_bit32_write(bk_erase_ctrl,
+                                       FLASH_CTRL_CONTROL_ERASE_SEL_BIT, true);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
                    bk_erase_ctrl);
   uint32_t bk_status = wait_op_done();
@@ -322,23 +316,23 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
   // Enable Bank 1 bank erase and start Bank 1 data bank erase (takes ~1ms).
-  write_mp_bank_cfg_shadowed(
-      1u << FLASH_CTRL_MP_BANK_CFG_SHADOWED_ERASE_EN_1_BIT);
+  write_mp_bank_cfg_shadowed(1u
+                             << FLASH_CTRL_MP_BANK_CFG_SHADOWED_ERASE_EN_1_BIT);
   clear_flash_status();
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
                    bk_erase_ctrl);
 
   // Immediately verify CTRL_REGWEN == 0 protects ADDR, PROG_TYPE_EN, CONTROL.
-  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CTRL_REGWEN_REG_OFFSET) ==
-            0u,
-        "Expected CTRL_REGWEN == 0 during ongoing Bank 1 erase");
+  CHECK(
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_CTRL_REGWEN_REG_OFFSET) == 0u,
+      "Expected CTRL_REGWEN == 0 during ongoing Bank 1 erase");
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x1234u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_TYPE_EN_REG_OFFSET, 0x0u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, 0u);
-  CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET) ==
-            0x80000u,
-        "ADDR must remain 0x80000 while CTRL_REGWEN == 0");
+  CHECK(
+      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET) == 0x80000u,
+      "ADDR must remain 0x80000 while CTRL_REGWEN == 0");
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_PROG_TYPE_EN_REG_OFFSET) ==
             0x3u,
         "PROG_TYPE_EN must remain 0x3 while CTRL_REGWEN == 0");
@@ -360,20 +354,14 @@ bool test_main(void) {
   //     and execute Bank Erase with PARTITION_SEL = 1. Verify BOTH Info and
   //     Data partitions of Bank 1 are erased to 0xFFFFFFFF.
   uint32_t mp_reg7 =
-      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_BASE_7_FIELD,
-                             256u) |
-      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_SIZE_7_FIELD,
-                             1u);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET,
-                   mp_reg7);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET,
-                   mp_reg7);
-  abs_mmio_write32(
-      kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
-      kInfoCfgAllowUnscrambled);
-  abs_mmio_write32(
-      kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
-      kInfoCfgAllowUnscrambled);
+      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_BASE_7_FIELD, 256u) |
+      bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_7_SIZE_7_FIELD, 1u);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET, mp_reg7);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_7_REG_OFFSET, mp_reg7);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
+                   kInfoCfgAllowUnscrambled);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
+                   kInfoCfgAllowUnscrambled);
 
   // Program 2 words into Bank 1 Data page 0 (0x80000, PARTITION_SEL = 0).
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
@@ -404,7 +392,8 @@ bool test_main(void) {
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_BANK1_INFO1_PAGE_CFG_REG_OFFSET,
                    info_cfg_no_erase);
 
-  // Execute Info-Selected Bank Erase on Bank 1 (ERASE_SEL = 1, PARTITION_SEL = 1).
+  // Execute Info-Selected Bank Erase on Bank 1 (ERASE_SEL = 1, PARTITION_SEL =
+  // 1).
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80000u);
   uint32_t info_bk_erase_ctrl =
       bitfield_bit32_write(bk_erase_ctrl, FLASH_CTRL_CONTROL_PARTITION_SEL_BIT,
@@ -439,7 +428,8 @@ bool test_main(void) {
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
                              FLASH_CTRL_CONTROL_OP_VALUE_READ) |
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, data_rd_ctrl);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   data_rd_ctrl);
   CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
         "Bank 1 Data read after Info-selected bank erase failed");
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
@@ -462,24 +452,24 @@ bool test_main(void) {
     uint32_t offset;
     uint32_t expected_mask;
   } const kPrimCsrs[] = {
-      {0x04u, 0x1fffu},     // CSR1
-      {0x0cu, 0xfffffffu},  // CSR3
-      {0x10u, 0xfffu},      // CSR4
-      {0x14u, 0x7fffffu},   // CSR5
-      {0x18u, 0x1ffffffu},  // CSR6
-      {0x1cu, 0x1ffffu},    // CSR7
-      {0x20u, 0xffffffffu}, // CSR8
-      {0x24u, 0xffffffffu}, // CSR9
-      {0x28u, 0xffffffffu}, // CSR10
-      {0x2cu, 0xffffffffu}, // CSR11
-      {0x30u, 0x3ffu},      // CSR12
-      {0x34u, 0x1fffffu},   // CSR13
-      {0x38u, 0x1ffu},      // CSR14
-      {0x3cu, 0x1ffu},      // CSR15
-      {0x40u, 0x1ffu},      // CSR16
-      {0x44u, 0x1ffu},      // CSR17
-      {0x48u, 0x1u},        // CSR18
-      {0x4cu, 0x1u},        // CSR19
+      {0x04u, 0x1fffu},      // CSR1
+      {0x0cu, 0xfffffffu},   // CSR3
+      {0x10u, 0xfffu},       // CSR4
+      {0x14u, 0x7fffffu},    // CSR5
+      {0x18u, 0x1ffffffu},   // CSR6
+      {0x1cu, 0x1ffffu},     // CSR7
+      {0x20u, 0xffffffffu},  // CSR8
+      {0x24u, 0xffffffffu},  // CSR9
+      {0x28u, 0xffffffffu},  // CSR10
+      {0x2cu, 0xffffffffu},  // CSR11
+      {0x30u, 0x3ffu},       // CSR12
+      {0x34u, 0x1fffffu},    // CSR13
+      {0x38u, 0x1ffu},       // CSR14
+      {0x3cu, 0x1ffu},       // CSR15
+      {0x40u, 0x1ffu},       // CSR16
+      {0x44u, 0x1ffu},       // CSR17
+      {0x48u, 0x1u},         // CSR18
+      {0x4cu, 0x1u},         // CSR19
   };
 
   for (size_t i = 0; i < ARRAYSIZE(kPrimCsrs); ++i) {
@@ -508,10 +498,12 @@ bool test_main(void) {
   // ---------------------------------------------------------------------------
   // 6. Double-Programmed Data Word ECC Fault (`OtFlashEccFault`):
   //    - Idle PROG_FIFO write + FIFO_RST recovery (Chunk 39)
-  //    - Double-programming 2x 64-bit words at 0x80000..0x8000f with ECC_EN=True
+  //    - Double-programming 2x 64-bit words at 0x80000..0x8000f with
+  //    ECC_EN=True
   //      and SCRAMBLE_EN=False (`0x55555555` -> `0x55555554`), exercising
   //      `ot_flash_add_ecc_fault` deduplication on word 1/3 (Chunk 14)
-  //    - Direct CPU store to `0x20080000` (`ot_flash_ecc_fault_write_with_attrs`,
+  //    - Direct CPU store to `0x20080000`
+  //    (`ot_flash_ecc_fault_write_with_attrs`,
   //      Chunk 13)
   //    - Direct CPU load from `0x20080000` with `ECC_EN = False`
   //      (`ot_flash_ecc_fault_read_with_attrs` bypass, Chunk 12)
@@ -578,7 +570,8 @@ bool test_main(void) {
   g_fault_count = 0;
   abs_mmio_write32(kFlashMemBase + 0x80000u, 0xdeadbeefu);
   CHECK(g_fault_count == 1u,
-        "Direct CPU store to ECC-faulted eFlash word must raise Store Access Fault");
+        "Direct CPU store to ECC-faulted eFlash word must raise Store Access "
+        "Fault");
 
   // (d) Temporarily disable ECC_EN on MP_REGION_7 and verify direct CPU read
   //     from 0x20080000 succeeds (`ot_flash_ecc_fault_read_with_attrs` bypass)
@@ -592,12 +585,14 @@ bool test_main(void) {
   CHECK(g_fault_count == 0u,
         "Direct CPU read with ECC_EN=False must not raise Load Access Fault");
   CHECK(raw_word == 0x55555554u,
-        "Direct CPU read with ECC_EN=False mismatch: got 0x%x, expected 0x55555554",
+        "Direct CPU read with ECC_EN=False mismatch: got 0x%x, expected "
+        "0x55555554",
         raw_word);
 
   // (e) Re-enable ECC_EN = True on MP_REGION_7 and execute controller OP_READ
   //     at 0x80008 (NUM = 1). Verify OP_STATUS == DONE|ERR, ERR_CODE.RD_ERR,
-  //     FAULT_STATUS.PHY_RELBL_ERR, ERR_ADDR == 0x80008, and RD_FIFO == 0xffffffff.
+  //     FAULT_STATUS.PHY_RELBL_ERR, ERR_ADDR == 0x80008, and RD_FIFO ==
+  //     0xffffffff.
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
                    kDataCfgEccNoScramble);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET,
@@ -607,7 +602,8 @@ bool test_main(void) {
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80008u);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, data_rd_ctrl);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   data_rd_ctrl);
   uint32_t ecc_rd_status = wait_op_done();
   CHECK(ecc_rd_status == ((1u << FLASH_CTRL_OP_STATUS_DONE_BIT) |
                           (1u << FLASH_CTRL_OP_STATUS_ERR_BIT)),
@@ -617,9 +613,9 @@ bool test_main(void) {
             abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET),
             FLASH_CTRL_ERR_CODE_RD_ERR_BIT),
         "OP_READ on ECC-corrupted word must set ERR_CODE.RD_ERR");
-  CHECK(bitfield_bit32_read(
-            abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_FAULT_STATUS_REG_OFFSET),
-            FLASH_CTRL_FAULT_STATUS_PHY_RELBL_ERR_BIT),
+  CHECK(bitfield_bit32_read(abs_mmio_read32(kFlashCoreBase +
+                                            FLASH_CTRL_FAULT_STATUS_REG_OFFSET),
+                            FLASH_CTRL_FAULT_STATUS_PHY_RELBL_ERR_BIT),
         "OP_READ on ECC-corrupted word must set FAULT_STATUS.PHY_RELBL_ERR");
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
             0x80008u,
@@ -629,15 +625,17 @@ bool test_main(void) {
         "OP_READ on ECC-corrupted word must return 0xffffffff in RD_FIFO");
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET) ==
             0x55555554u,
-        "OP_READ second word in StErr after RD_ERR must return latched flash_data_i (0x55555554)");
+        "OP_READ second word in StErr after RD_ERR must return latched "
+        "flash_data_i (0x55555554)");
 
   // (f) Write 0xffffffff to FAULT_STATUS (exercising non-rw0c bit guard and
-  //     verifying PHY_RELBL_ERR remains 1), then write 0x0 to clear PHY_RELBL_ERR.
+  //     verifying PHY_RELBL_ERR remains 1), then write 0x0 to clear
+  //     PHY_RELBL_ERR.
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FAULT_STATUS_REG_OFFSET,
                    0xffffffffu);
-  CHECK(bitfield_bit32_read(
-            abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_FAULT_STATUS_REG_OFFSET),
-            FLASH_CTRL_FAULT_STATUS_PHY_RELBL_ERR_BIT),
+  CHECK(bitfield_bit32_read(abs_mmio_read32(kFlashCoreBase +
+                                            FLASH_CTRL_FAULT_STATUS_REG_OFFSET),
+                            FLASH_CTRL_FAULT_STATUS_PHY_RELBL_ERR_BIT),
         "Writing 1s to RW0C FAULT_STATUS must not clear PHY_RELBL_ERR");
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FAULT_STATUS_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_FAULT_STATUS_REG_OFFSET) ==
@@ -662,7 +660,8 @@ bool test_main(void) {
   clear_flash_status();
 
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ADDR_REG_OFFSET, 0x80008u);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, data_rd_ctrl);
+  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET,
+                   data_rd_ctrl);
   CHECK(wait_op_done() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
         "OP_READ at 0x80008 after page erase failed");
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET) == 0u,

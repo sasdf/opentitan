@@ -6,7 +6,7 @@
 
 Given one or more Bazel test target patterns (e.g. //sw/device/tests/...), or one or more
 existing Bazel Build Event Protocol (`--bep-file`) JSON files, this script:
-1. Optionally runs `./bazelisk.sh test --config=qemu_coverage --build_event_json_file=<bep.json> <targets>`
+1. Optionally runs `./bazelisk.sh test --config=qemu_coverage` with `--build_event_json_file`
    so Bazel selects `@qemu_opentitan//:build/qemu-system-riscv32-cov` inside the sandbox.
 2. Parses `<bep.json>` to locate `testActionOutput` (`test.outputs/gcov/*.gcda` or `outputs.zip`)
    for all executed and cached test targets.
@@ -35,7 +35,7 @@ import tempfile
 import time
 import urllib.parse
 import zipfile
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 COV_SUBDIRS = (
     "libsystem-ot-cov.a.p",
@@ -48,16 +48,20 @@ def normalize_qemu_rel_path(f_path: str, qemu_dir: str) -> str:
     while rel_path.startswith("../"):
         rel_path = rel_path[3:]
     if rel_path.startswith(qemu_dir + "/"):
-        return rel_path[len(qemu_dir) + 1 :]
+        return rel_path[len(qemu_dir) + 1:]
     for marker in ("/qemu/", "/+qemu+qemu_opentitan/", "/qemu_opentitan/"):
         idx = rel_path.find(marker)
         if idx != -1:
-            return rel_path[idx + len(marker) :]
+            return rel_path[idx + len(marker):]
     return rel_path
 
 
-def is_qemu_source(rel_path: str, qemu_dir: str, existing_cache: Optional[Dict[str, bool]] = None) -> bool:
-    """Include all source/header/inc files that exist in the QEMU repository (no path filter lists)."""
+def is_qemu_source(
+    rel_path: str,
+    qemu_dir: str,
+    existing_cache: Optional[Dict[str, bool]] = None,
+) -> bool:
+    """Include all source/header/inc files that exist in the QEMU repository."""
     if not rel_path or rel_path.startswith("/"):
         return False
     if existing_cache is not None:
@@ -120,7 +124,7 @@ def split_bazel_args_and_targets(extra: List[str]) -> Tuple[List[str], List[str]
     while i < len(extra):
         tok = extra[i]
         if tok == "--":
-            targets.extend(extra[i + 1 :])
+            targets.extend(extra[i + 1:])
             break
         if tok.startswith(("//", "@", ":", "-//", "-@", "-:")):
             targets.append(tok)
@@ -128,11 +132,11 @@ def split_bazel_args_and_targets(extra: List[str]) -> Tuple[List[str], List[str]
         elif tok.startswith("-"):
             bazel_flags.append(tok)
             if (
-                "=" not in tok
-                and tok not in bool_short_flags
-                and not tok.startswith("--no")
-                and i + 1 < len(extra)
-                and not extra[i + 1].startswith(("-", "//", "@", ":"))
+                "=" not in tok and
+                tok not in bool_short_flags and
+                not tok.startswith("--no") and
+                i + 1 < len(extra) and
+                not extra[i + 1].startswith(("-", "//", "@", ":"))
             ):
                 bazel_flags.append(extra[i + 1])
                 i += 2
@@ -175,7 +179,9 @@ def run_bazel_coverage_tests(
     return res.returncode
 
 
-def parse_bep_test_candidates(bep_files: List[str]) -> Tuple[List[Tuple[str, Optional[str], Optional[str]]], Dict[str, int]]:
+def parse_bep_test_candidates(
+    bep_files: List[str],
+) -> Tuple[List[Tuple[str, Optional[str], Optional[str]]], Dict[str, int]]:
     """Extract unique test targets and their gcov_dir / outputs.zip paths from BEP JSON files."""
     by_label: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
     stats = {
@@ -211,7 +217,7 @@ def parse_bep_test_candidates(bep_files: List[str]) -> Tuple[List[Tuple[str, Opt
                     uri = out_entry.get("uri", "")
                     if not uri.startswith("file://"):
                         continue
-                    path = urllib.parse.unquote(uri[len("file://") :])
+                    path = urllib.parse.unquote(uri[len("file://"):])
                     if name.endswith(".gcda") or path.endswith(".gcda"):
                         parent = os.path.dirname(path)
                         if os.path.isdir(parent):
@@ -432,12 +438,15 @@ def build_file_summary(rel_path: str, raw_entry: Dict, qemu_dir: str) -> Dict:
             "snippet": snippet,
         })
 
+    line_cov_pct = (
+        round(100.0 * len(covered_lines) / len(exec_lines), 2) if exec_lines else 100.0
+    )
     return {
         "file": rel_path,
         "total_executable_lines": len(exec_lines),
         "covered_executable_lines": len(covered_lines),
         "uncovered_executable_lines": len(uncovered_lines),
-        "line_coverage_pct": round(100.0 * len(covered_lines) / len(exec_lines), 2) if exec_lines else 100.0,
+        "line_coverage_pct": line_cov_pct,
         "total_functions": len(funcs),
         "covered_functions": sum(1 for fn in funcs if fn["execution_count"] > 0),
         "uncovered_functions": [fn["name"] for fn in funcs if fn["execution_count"] == 0],
@@ -460,8 +469,11 @@ _WORKER_OBJS: List[str] = []
 _WORKER_EXISTS_CACHE: Dict[str, bool] = {}
 
 
-def _init_per_test_worker(cov_build_dir: str, qemu_dir: str, expected_stamps: Dict[str, bytes]) -> None:
-    global _WORKER_TMP, _WORKER_QEMU_DIR, _WORKER_EXPECTED_STAMPS, _WORKER_GCDA_PATHS, _WORKER_OBJS, _WORKER_EXISTS_CACHE
+def _init_per_test_worker(
+    cov_build_dir: str, qemu_dir: str, expected_stamps: Dict[str, bytes]
+) -> None:
+    global _WORKER_TMP, _WORKER_QEMU_DIR, _WORKER_EXPECTED_STAMPS
+    global _WORKER_GCDA_PATHS, _WORKER_OBJS, _WORKER_EXISTS_CACHE
     _WORKER_QEMU_DIR = qemu_dir
     _WORKER_EXPECTED_STAMPS = expected_stamps
     _WORKER_TMP = tempfile.mkdtemp(prefix=f"ptcov_w_{os.getpid()}_")
@@ -574,7 +586,11 @@ def _process_single_test(
                 continue
 
             lmap = file_line_counts.setdefault(rel_path, {})
-            el_map = exec_lines_meta.setdefault(rel_path, {}) if exec_lines_meta is not None else None
+            el_map = (
+                exec_lines_meta.setdefault(rel_path, {})
+                if exec_lines_meta is not None
+                else None
+            )
 
             for l_info in f_entry.get("lines", []):
                 ln = l_info["line_number"]
@@ -622,8 +638,11 @@ def _process_single_test(
 
 
 def classify_test_tier_hint(label: str) -> int:
-    """Return 1 for qemu_consistency / model_coverage tests, 2 for unit/driver/func tests, 3 for e2e/general."""
-    if "//sw/device/tests/qemu_consistency:" in label or "//sw/device/tests/qemu/model_coverage:" in label:
+    """Return 1 for consistency/coverage tests, 2 for unit/func tests, 3 for e2e/general."""
+    if (
+        "//sw/device/tests/qemu_consistency:" in label or
+        "//sw/device/tests/qemu/model_coverage:" in label
+    ):
         return 1
     if "//sw/device/silicon_creator/rom/e2e/" in label:
         return 3
@@ -725,7 +744,13 @@ def build_per_test_sqlite_db(
         initializer=_init_per_test_worker,
         initargs=(cov_build_dir, qemu_dir, expected_stamps),
     ) as pool:
-        for done_idx, (test_id, label, matched_cnt, intervals_by_file, exec_lines_meta) in enumerate(
+        for done_idx, (
+            test_id,
+            label,
+            matched_cnt,
+            intervals_by_file,
+            exec_lines_meta,
+        ) in enumerate(
             pool.imap_unordered(_process_single_test, tasks, chunksize=4), 1
         ):
             if matched_cnt == 0 or not intervals_by_file:
@@ -744,7 +769,9 @@ def build_per_test_sqlite_db(
                             fid = len(file_id_map) + 1
                             file_id_map[rel_path] = fid
                             cur.execute(
-                                "INSERT INTO files (file_id, path, total_executable_lines) VALUES (?, ?, ?);",
+                                "INSERT INTO files "
+                                "(file_id, path, total_executable_lines) "
+                                "VALUES (?, ?, ?);",
                                 (fid, rel_path, len(el_map)),
                             )
                         else:
@@ -756,7 +783,8 @@ def build_per_test_sqlite_db(
                         for ln, fn_name in sorted(el_map.items()):
                             exec_batch.append((fid, ln, fn_name))
                     cur.executemany(
-                        "INSERT OR IGNORE INTO executable_lines (file_id, line_number, func_name) VALUES (?, ?, ?);",
+                        "INSERT OR IGNORE INTO executable_lines "
+                        "(file_id, line_number, func_name) VALUES (?, ?, ?);",
                         exec_batch,
                     )
                     conn.commit()
@@ -767,7 +795,8 @@ def build_per_test_sqlite_db(
                         fid = len(file_id_map) + 1
                         file_id_map[rel_path] = fid
                         cur.execute(
-                            "INSERT INTO files (file_id, path, total_executable_lines) VALUES (?, ?, 0);",
+                            "INSERT INTO files "
+                            "(file_id, path, total_executable_lines) VALUES (?, ?, 0);",
                             (fid, rel_path),
                         )
                     for s_ln, e_ln, max_cnt in ivals:
@@ -776,7 +805,9 @@ def build_per_test_sqlite_db(
 
                 if len(interval_batch) >= 200000:
                     cur.executemany(
-                        "INSERT INTO line_intervals (file_id, test_id, start_line, end_line, max_hit_count) VALUES (?, ?, ?, ?, ?);",
+                        "INSERT INTO line_intervals "
+                        "(file_id, test_id, start_line, end_line, max_hit_count) "
+                        "VALUES (?, ?, ?, ?, ?);",
                         interval_batch,
                     )
                     interval_batch.clear()
@@ -786,7 +817,8 @@ def build_per_test_sqlite_db(
                 elapsed = time.time() - t0
                 print(
                     f"[per-test-db] Progress: {done_idx}/{len(tasks)} tests "
-                    f"(valid={valid_tests}, skipped={skipped_tests}, intervals={total_intervals}, elapsed={elapsed:.1f}s)",
+                    f"(valid={valid_tests}, skipped={skipped_tests}, "
+                    f"intervals={total_intervals}, elapsed={elapsed:.1f}s)",
                     flush=True,
                 )
 
@@ -797,7 +829,9 @@ def build_per_test_sqlite_db(
         )
     if interval_batch:
         cur.executemany(
-            "INSERT INTO line_intervals (file_id, test_id, start_line, end_line, max_hit_count) VALUES (?, ?, ?, ?, ?);",
+            "INSERT INTO line_intervals "
+            "(file_id, test_id, start_line, end_line, max_hit_count) "
+            "VALUES (?, ?, ?, ?, ?);",
             interval_batch,
         )
         interval_batch.clear()
@@ -832,7 +866,10 @@ def build_per_test_sqlite_db(
     }
     cur.executemany(
         "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?);",
-        [(k, json.dumps(v) if isinstance(v, (list, dict)) else str(v)) for k, v in meta_dict.items()],
+        [
+            (k, json.dumps(v) if isinstance(v, (list, dict)) else str(v))
+            for k, v in meta_dict.items()
+        ],
     )
     conn.commit()
     conn.close()
@@ -846,7 +883,8 @@ def build_per_test_sqlite_db(
     db_size_mb = os.path.getsize(out_db_path) / (1024 * 1024)
     print(
         f"[per-test-db] Completed in {elapsed_total:.2f}s: {out_db_path} ({db_size_mb:.1f} MB) | "
-        f"valid_tests={valid_tests}/{len(candidates)} | files={len(file_id_map)} | intervals={total_intervals}",
+        f"valid_tests={valid_tests}/{len(candidates)} | "
+        f"files={len(file_id_map)} | intervals={total_intervals}",
         flush=True,
     )
 
@@ -894,36 +932,81 @@ def main() -> None:
             "directly through to `./bazelisk.sh test`."
         ),
     )
-    parser.add_argument("--ot-dir", default=default_ot_dir,
-                        help="Path to OpenTitan workspace (defaults to repo root of this script)")
-    parser.add_argument("--qemu-dir", default=None,
-                        help="Path to QEMU source repository (auto-detected from .bazelrc-site / sibling qemu dir)")
-    parser.add_argument("--cov-build-dir", default=None,
-                        help="Path to build dir containing lib*-ot-cov.a.p/*.gcno (defaults to @qemu_opentitan/build)")
-    parser.add_argument("--bep-file", action="append", default=[],
-                        help="Optional existing Bazel Build Event JSON file(s) (skips running bazelisk.sh test if provided)")
-    parser.add_argument("--bazel-arg", action="append", default=[],
-                        help="Additional argument(s) to pass to ./bazelisk.sh test")
-    parser.add_argument("--out-dir", default=None,
-                        help="Directory to write uncovered_chunks.json and summary.md (defaults to <output_base>/qemu-cov-report)")
-    parser.add_argument("--out-json", default=None,
-                        help="Optional explicit path for uncovered_chunks.json")
-    parser.add_argument("--out-summary", default=None,
-                        help="Optional explicit path for summary.md")
-    parser.add_argument("--per-test-db", "--out-db", dest="per_test_db", default=None,
-                        help="Optional path to generate per-test coverage SQLite database (e.g. /root/coverage/per_test_coverage.sqlite)")
-    parser.add_argument("--per-test-meta", "--out-meta", dest="per_test_meta", default=None,
-                        help="Optional path for per-test coverage metadata JSON (defaults to <per-test-db-stem>_meta.json)")
-    parser.add_argument("--workers", "--per-test-workers", dest="workers", type=int, default=32,
-                        help="Number of parallel worker processes for per-test SQLite indexing (default: 32)")
-    parser.add_argument("--skip-aggregate-report", action="store_true",
-                        help="Skip generating aggregate uncovered_chunks.json/summary.md (only build --per-test-db)")
+    parser.add_argument(
+        "--ot-dir",
+        default=default_ot_dir,
+        help="Path to OpenTitan workspace (defaults to repo root of this script)",
+    )
+    parser.add_argument(
+        "--qemu-dir",
+        default=None,
+        help="Path to QEMU source repository (auto-detected from .bazelrc-site / sibling dir)",
+    )
+    parser.add_argument(
+        "--cov-build-dir",
+        default=None,
+        help="Path to build dir containing lib*-ot-cov.a.p/*.gcno",
+    )
+    parser.add_argument(
+        "--bep-file",
+        action="append",
+        default=[],
+        help="Optional existing Bazel Build Event JSON file(s)",
+    )
+    parser.add_argument(
+        "--bazel-arg",
+        action="append",
+        default=[],
+        help="Additional argument(s) to pass to ./bazelisk.sh test",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="Directory to write uncovered_chunks.json and summary.md",
+    )
+    parser.add_argument(
+        "--out-json",
+        default=None,
+        help="Optional explicit path for uncovered_chunks.json",
+    )
+    parser.add_argument(
+        "--out-summary",
+        default=None,
+        help="Optional explicit path for summary.md",
+    )
+    parser.add_argument(
+        "--per-test-db",
+        "--out-db",
+        dest="per_test_db",
+        default=None,
+        help="Optional path to generate per-test coverage SQLite database",
+    )
+    parser.add_argument(
+        "--per-test-meta",
+        "--out-meta",
+        dest="per_test_meta",
+        default=None,
+        help="Optional path for per-test coverage metadata JSON",
+    )
+    parser.add_argument(
+        "--workers",
+        "--per-test-workers",
+        dest="workers",
+        type=int,
+        default=32,
+        help="Number of parallel worker processes for per-test SQLite indexing (default: 32)",
+    )
+    parser.add_argument(
+        "--skip-aggregate-report",
+        action="store_true",
+        help="Skip generating aggregate uncovered_chunks.json/summary.md",
+    )
 
     raw_argv = sys.argv[1:]
     if "--" in raw_argv:
         dd_idx = raw_argv.index("--")
         args, extra_before = parser.parse_known_args(raw_argv[:dd_idx])
-        extra = extra_before + ["--"] + raw_argv[dd_idx + 1 :]
+        extra = extra_before + ["--"] + raw_argv[dd_idx + 1:]
     else:
         args, extra = parser.parse_known_args(raw_argv)
 
@@ -1004,7 +1087,11 @@ def main() -> None:
                                 cur["line_map"][ln] = max(cur["line_map"].get(ln, 0), cnt)
                             cur["func_for_line"].update(entry["func_for_line"])
                             for fname, fn in entry["funcs"].items():
-                                if fname not in cur["funcs"] or fn["execution_count"] > cur["funcs"][fname]["execution_count"]:
+                                prev_fn = cur["funcs"].get(fname)
+                                if (
+                                    prev_fn is None or
+                                    fn["execution_count"] > prev_fn["execution_count"]
+                                ):
                                     cur["funcs"][fname] = dict(fn)
 
             all_files: Dict[str, Dict] = {
@@ -1039,33 +1126,48 @@ def main() -> None:
             "files": sorted_files,
         }
 
-        json_path = os.path.abspath(args.out_json) if args.out_json else os.path.join(report_dir, "uncovered_chunks.json")
+        json_path = (
+            os.path.abspath(args.out_json)
+            if args.out_json
+            else os.path.join(report_dir, "uncovered_chunks.json")
+        )
         os.makedirs(os.path.dirname(json_path), exist_ok=True)
         with open(json_path, "w") as jf:
             json.dump(summary_payload, jf, indent=2)
 
+        bep_tot = stats["bep_test_results"]
+        bep_cached = stats["cached_test_results"]
+        line_pct = summary_payload["line_coverage_pct"]
+        fn_pct = summary_payload["function_coverage_pct"]
         md_lines = [
             "# QEMU Coverage Summary",
             "",
-            f"- **BEP Test Targets**: `{stats['bep_test_results']}` (`{stats['cached_test_results']}` cached)",
+            f"- **BEP Test Targets**: `{bep_tot}` (`{bep_cached}` cached)",
             f"- **Valid GCOV Directories Merged**: `{stats['valid_gcov_dirs']}`",
             f"- **Total Files**: `{len(sorted_files)}`",
-            f"- **Line Coverage**: `{tot_cov} / {tot_exec}` (`{summary_payload['line_coverage_pct']}%`)",
-            f"- **Function Coverage**: `{tot_fn_cov} / {tot_fn}` (`{summary_payload['function_coverage_pct']}%`)",
+            f"- **Line Coverage**: `{tot_cov} / {tot_exec}` (`{line_pct}%`)",
+            f"- **Function Coverage**: `{tot_fn_cov} / {tot_fn}` (`{fn_pct}%`)",
             f"- **Total Uncovered Chunks**: `{tot_chunks}`",
             "",
-            "| File | Line Coverage | Covered / Total Lines | Function Coverage | Uncovered Chunks |",
+            "| File | Line Coverage | Covered / Total Lines | "
+            "Function Coverage | Uncovered Chunks |",
             "| :--- | :---: | :---: | :---: | :---: |",
         ]
         for f in sorted_files:
+            f_fn_cov = f["covered_functions"]
+            f_fn_tot = f["total_functions"]
             md_lines.append(
                 f"| `{f['file']}` | **{f['line_coverage_pct']}%** | "
                 f"`{f['covered_executable_lines']} / {f['total_executable_lines']}` | "
-                f"{f['function_coverage_pct']}% (`{f['covered_functions']}/{f['total_functions']}`) | "
+                f"{f['function_coverage_pct']}% (`{f_fn_cov}/{f_fn_tot}`) | "
                 f"{len(f['uncovered_chunks'])} |"
             )
 
-        md_path = os.path.abspath(args.out_summary) if args.out_summary else os.path.join(report_dir, "summary.md")
+        md_path = (
+            os.path.abspath(args.out_summary)
+            if args.out_summary
+            else os.path.join(report_dir, "summary.md")
+        )
         os.makedirs(os.path.dirname(md_path), exist_ok=True)
         with open(md_path, "w") as mf:
             mf.write("\n".join(md_lines) + "\n")
@@ -1073,7 +1175,7 @@ def main() -> None:
         print(f"Coverage JSON written to: {json_path}")
         print(f"Coverage Summary written to: {md_path}")
         print(
-            f"Overall Line Coverage: {tot_cov}/{tot_exec} ({summary_payload['line_coverage_pct']}%) "
+            f"Overall Line Coverage: {tot_cov}/{tot_exec} ({line_pct}%) "
             f"across {len(sorted_files)} files ({tot_chunks} uncovered chunks)"
         )
 

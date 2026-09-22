@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/mmio.h"
@@ -15,6 +14,7 @@
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
 #include "alert_handler_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "i2c_regs.h"
 #include "rstmgr_regs.h"
 #include "spi_device_regs.h"
@@ -43,25 +43,25 @@ static void write_shadowed(uint32_t addr, uint32_t val) {
   abs_mmio_write32(addr, val);
 }
 
-#define EXPECT_EQ(actual, expected, msg)                                       \
-  do {                                                                         \
-    uint32_t _act = (uint32_t)(actual);                                        \
-    uint32_t _exp = (uint32_t)(expected);                                      \
-    if (_act != _exp) {                                                        \
-      LOG_ERROR("MISMATCH: %s (actual=0x%08x, expected=0x%08x)", msg, _act,    \
-                _exp);                                                         \
-      g_failures++;                                                            \
-    } else {                                                                   \
-      LOG_INFO("OK: %s (0x%08x)", msg, _act);                                  \
-    }                                                                          \
+#define EXPECT_EQ(actual, expected, msg)                                    \
+  do {                                                                      \
+    uint32_t _act = (uint32_t)(actual);                                     \
+    uint32_t _exp = (uint32_t)(expected);                                   \
+    if (_act != _exp) {                                                     \
+      LOG_ERROR("MISMATCH: %s (actual=0x%08x, expected=0x%08x)", msg, _act, \
+                _exp);                                                      \
+      g_failures++;                                                         \
+    } else {                                                                \
+      LOG_INFO("OK: %s (0x%08x)", msg, _act);                               \
+    }                                                                       \
   } while (0)
 
 bool test_main(void) {
   irq_global_ctrl(false);
 
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
 
   retention_sram_t *ret_sram = retention_sram_get();
   uint32_t reset_reasons = ret_sram->creator.reset_reasons;
@@ -88,7 +88,8 @@ bool test_main(void) {
     uint32_t post_e2_marker = ret_sram->owner.reserved[2];
     ret_sram->owner.reserved[2] = 0u;
     EXPECT_EQ(post_e2_marker, 0u,
-              "ALERT_HANDLER esc_tx[2] -> LC_CTRL (EscScrapState1) halts CPU via lc_cpu_en/lc_escalate_en in Phase 0");
+              "ALERT_HANDLER esc_tx[2] -> LC_CTRL (EscScrapState1) halts CPU "
+              "via lc_cpu_en/lc_escalate_en in Phase 0");
 
     return g_failures == 0;
   }
@@ -137,8 +138,8 @@ bool test_main(void) {
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET, 0x0100000cu);
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET, 0u);
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET, 1u);
-  EXPECT_EQ(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET),
-            0x0u, "SPI_DEVICE.CFG reset via SW_RST_CTRL_N_0");
+  EXPECT_EQ(abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET), 0x0u,
+            "SPI_DEVICE.CFG reset via SW_RST_CTRL_N_0");
 
   abs_mmio_write32(kSpiHost0Base + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0x0f0f0000u);
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_1_REG_OFFSET, 0u);
@@ -174,16 +175,21 @@ bool test_main(void) {
   abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET,
                    1u << RSTMGR_ALERT_INFO_CTRL_EN_BIT);
 
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_ACCUM_THRESH_SHADOWED_REG_OFFSET,
-                 0u);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE0_CYC_SHADOWED_REG_OFFSET,
-                 1200u);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE1_CYC_SHADOWED_REG_OFFSET,
-                 10u);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE2_CYC_SHADOWED_REG_OFFSET,
-                 10u);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE3_CYC_SHADOWED_REG_OFFSET,
-                 10u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_ACCUM_THRESH_SHADOWED_REG_OFFSET,
+      0u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE0_CYC_SHADOWED_REG_OFFSET,
+      1200u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE1_CYC_SHADOWED_REG_OFFSET,
+      10u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE2_CYC_SHADOWED_REG_OFFSET,
+      10u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_PHASE3_CYC_SHADOWED_REG_OFFSET,
+      10u);
 
   uint32_t classb_ctrl =
       (1u << ALERT_HANDLER_CLASSB_CTRL_SHADOWED_EN_BIT) |
@@ -191,20 +197,24 @@ bool test_main(void) {
       (0u << ALERT_HANDLER_CLASSB_CTRL_SHADOWED_MAP_E2_OFFSET) |
       (1u << ALERT_HANDLER_CLASSB_CTRL_SHADOWED_EN_E3_BIT) |
       (1u << ALERT_HANDLER_CLASSB_CTRL_SHADOWED_MAP_E3_OFFSET);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_CLASSB_CTRL_SHADOWED_REG_OFFSET,
-                 classb_ctrl);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_CLASSB_CTRL_SHADOWED_REG_OFFSET,
+      classb_ctrl);
 
-  // Map Alert 1 (UART1 fatal_fault, not locked by ROM) to Class B (value 1) and enable.
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_ALERT_CLASS_SHADOWED_1_REG_OFFSET,
-                 1u);
-  write_shadowed(kAlertHandlerBase + ALERT_HANDLER_ALERT_EN_SHADOWED_1_REG_OFFSET,
-                 1u);
+  // Map Alert 1 (UART1 fatal_fault, not locked by ROM) to Class B (value 1) and
+  // enable.
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_ALERT_CLASS_SHADOWED_1_REG_OFFSET, 1u);
+  write_shadowed(
+      kAlertHandlerBase + ALERT_HANDLER_ALERT_EN_SHADOWED_1_REG_OFFSET, 1u);
 
   // Trigger UART1 ALERT_TEST (Alert 1) -> Class B Phase 0 (E2) -> Phase 1 (E3)
-  abs_mmio_write32(TOP_EARLGREY_UART1_BASE_ADDR + UART_ALERT_TEST_REG_OFFSET, 1u);
+  abs_mmio_write32(TOP_EARLGREY_UART1_BASE_ADDR + UART_ALERT_TEST_REG_OFFSET,
+                   1u);
   busy_spin_micros(50);
 
-  // Attempt to write ret_sram->owner.reserved[2] during Phase 0 (while E2 is active).
+  // Attempt to write ret_sram->owner.reserved[2] during Phase 0 (while E2 is
+  // active).
   ret_sram->owner.reserved[2] = 0xdeadbeefu;
 
   busy_spin_micros(3000);

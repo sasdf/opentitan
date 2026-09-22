@@ -5,9 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "aon_timer_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "pwrmgr_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/irq.h"
@@ -16,6 +13,10 @@
 #include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "aon_timer_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "pwrmgr_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -41,12 +42,12 @@ static void pwrmgr_cdc_sync(void) {
 
 bool test_main(void) {
   // 1. Verify ALERT_TEST single-shot pulse for fatal_fault.
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdPwrmgrAonFatalFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdPwrmgrAonFatalFault));
   abs_mmio_write32(kPwrmgrBase + PWRMGR_ALERT_TEST_REG_OFFSET,
                    1u << PWRMGR_ALERT_TEST_FATAL_FAULT_BIT);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdPwrmgrAonFatalFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdPwrmgrAonFatalFault));
 
   // 2. Verify reset defaults of pwrmgr CSRs.
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) == 1u);
@@ -277,13 +278,15 @@ bool test_main(void) {
   access_fault_seen = false;
   abs_mmio_write8(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0x01u);
   CHECK(!access_fault_seen,
-        "Expected no StoreAccessFault on 8-bit write to INTR_ENABLE+0 (PERMIT=4'b0001)");
+        "Expected no StoreAccessFault on 8-bit write to INTR_ENABLE+0 "
+        "(PERMIT=4'b0001)");
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET) == 0x01u);
 
   access_fault_seen = false;
   abs_mmio_write8(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET + 1u, 0x00u);
   CHECK(access_fault_seen,
-        "Expected StoreAccessFault on 8-bit write to INTR_ENABLE+1 (PERMIT=4'b0001)");
+        "Expected StoreAccessFault on 8-bit write to INTR_ENABLE+1 "
+        "(PERMIT=4'b0001)");
   abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET, 0x00u);
 
   return true;

@@ -5,10 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "csrng_regs.h"
-#include "edn_regs.h"
-#include "entropy_src_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/runtime/hart.h"
@@ -19,10 +15,14 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "csrng_regs.h"
+#include "edn_regs.h"
+#include "entropy_src_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
 #define CHECK_EQ(a, b) CHECK((a) == (b))
-
 
 enum {
   kEntropySrcBase = TOP_EARLGREY_ENTROPY_SRC_BASE_ADDR,
@@ -128,20 +128,21 @@ bool test_main(void) {
 
   // 3. SW Instance (CMD_REQ) Command Stage Errors, UPDATE with CLEN > 0, and
   // FIPS_FORCE.
-  // 3a. Invalid ACMD (0x6) -> CMD_STS = 1 (INVALID_ACMD), RECOV_ALERT_STS bit 13
+  // 3a. Invalid ACMD (0x6) -> CMD_STS = 1 (INVALID_ACMD), RECOV_ALERT_STS bit
+  // 13
   uint32_t sts = csrng_send_sw_cmd(0x00000006u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           1u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      1u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET),
            1u << CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_ACMD_ALERT_BIT);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
 
   // 3b. GENERATE before INSTANTIATE -> CMD_STS = 3 (INVALID_CMD_SEQ), bit 14
   sts = csrng_send_sw_cmd(0x00001003u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           3u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      3u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET),
            1u << CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -151,15 +152,15 @@ bool test_main(void) {
   abs_mmio_write32(kCsrngBase + CSRNG_FIPS_FORCE_REG_OFFSET, 0x7u);
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x6666u);
   sts = csrng_send_sw_cmd(0x00000601u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           0u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      0u);
 
   // 3d. Duplicate INSTANTIATE when already instantiated -> CMD_STS = 3
   sts = csrng_send_sw_cmd(0x00000601u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           3u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      3u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET),
            1u << CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -167,9 +168,9 @@ bool test_main(void) {
   // 3e. UPDATE with CLEN = 1 (0x00000014 + 0x12345678) -> CMD_STS = 0
   const uint32_t upd_adata[1] = {0x12345678u};
   sts = csrng_send_sw_cmd(0x00000014u, upd_adata, 1);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           0u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      0u);
 
   // 3e2. GENERATE with GLEN = 0 (0x00000003) -> per csrng_cmd_stage.sv:378-431
   // and csrng_ctr_drbg_gen.sv:575-598, generates 1 128-bit block with glast=0
@@ -187,17 +188,18 @@ bool test_main(void) {
                  (1u << CSRNG_SW_CMD_STS_CMD_ACK_BIT)) != 0u,
                 100000);
   sts = abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           0u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      0u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET), 0u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET), 0u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_ERR_CODE_REG_OFFSET), 0u);
-  // Re-seed via RESEED (FLAG0=True) so state_db instance_status is 1 with FIPS_FORCE
+  // Re-seed via RESEED (FLAG0=True) so state_db instance_status is 1 with
+  // FIPS_FORCE
   sts = csrng_send_sw_cmd(0x00000602u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           0u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      0u);
 
   // 3f. Set RESEED_INTERVAL = 1, GENERATE 1 packet -> GENBITS_VLD = 0x3
   // (GENBITS_VLD | GENBITS_FIPS due to FIPS_FORCE), then next GENERATE fails
@@ -217,9 +219,9 @@ bool test_main(void) {
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET), 1u);
 
   sts = csrng_send_sw_cmd(0x00001003u, NULL, 0);
-  CHECK_EQ((sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) &
-               CSRNG_SW_CMD_STS_CMD_STS_MASK,
-           4u);
+  CHECK_EQ(
+      (sts >> CSRNG_SW_CMD_STS_CMD_STS_OFFSET) & CSRNG_SW_CMD_STS_CMD_STS_MASK,
+      4u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET),
            1u << CSRNG_RECOV_ALERT_STS_CMD_STAGE_RESEED_CNT_ALERT_BIT);
   abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -238,9 +240,9 @@ bool test_main(void) {
                  (1u << EDN_SW_CMD_STS_CMD_ACK_BIT)) != 0u,
                 100000);
   uint32_t edn_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
-  CHECK_EQ((edn_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) &
-               EDN_SW_CMD_STS_CMD_STS_MASK,
-           1u);
+  CHECK_EQ(
+      (edn_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) & EDN_SW_CMD_STS_CMD_STS_MASK,
+      1u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_HW_EXC_STS_REG_OFFSET), 0u);
   CHECK((abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET) &
          (1u << CSRNG_INTR_STATE_CS_HW_INST_EXC_BIT)) != 0u);
@@ -267,9 +269,9 @@ bool test_main(void) {
                  (1u << EDN_SW_CMD_STS_CMD_ACK_BIT)) != 0u,
                 100000);
   edn_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
-  CHECK_EQ((edn_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) &
-               EDN_SW_CMD_STS_CMD_STS_MASK,
-           4u);
+  CHECK_EQ(
+      (edn_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) & EDN_SW_CMD_STS_CMD_STS_MASK,
+      4u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_HW_EXC_STS_REG_OFFSET), 0u);
   CHECK((abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET) &
          (1u << CSRNG_INTR_STATE_CS_HW_INST_EXC_BIT)) != 0u);
@@ -319,9 +321,9 @@ bool test_main(void) {
            0x5u);
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REGWEN_REG_OFFSET,
                    0u);
-  CHECK_EQ(
-      abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REGWEN_REG_OFFSET),
-      0u);
+  CHECK_EQ(abs_mmio_read32(kCsrngBase +
+                           CSRNG_INT_STATE_READ_ENABLE_REGWEN_REG_OFFSET),
+           0u);
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REG_OFFSET, 0x7u);
   CHECK_EQ(abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REG_OFFSET),
            0x5u);

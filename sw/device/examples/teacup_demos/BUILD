@@ -44,11 +44,11 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
     qemu = qemu_params(
+        timeout = "moderate",
         qemu_args = [
             "-device",
             "at24c-eeprom,bus=ot-i2c0,address=0x34,rom-size=256",
         ],
-        timeout = "moderate",
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

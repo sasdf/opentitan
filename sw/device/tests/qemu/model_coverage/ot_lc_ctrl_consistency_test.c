@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/multibits.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -13,6 +12,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "lc_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -100,9 +100,9 @@ bool test_main(void) {
   CHECK(vendor_status == 0u);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_OTP_VENDOR_TEST_CTRL_REG_OFFSET,
                    0x5a5a5a5au);
-  CHECK(abs_mmio_read32(kLcCtrlBase +
-                        LC_CTRL_OTP_VENDOR_TEST_CTRL_REG_OFFSET) ==
-        0x5a5a5a5au);
+  CHECK(
+      abs_mmio_read32(kLcCtrlBase + LC_CTRL_OTP_VENDOR_TEST_CTRL_REG_OFFSET) ==
+      0x5a5a5a5au);
 
   // Release hardware mutex -> OTP_VENDOR_TEST_CTRL reads 0 when not owner.
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET,

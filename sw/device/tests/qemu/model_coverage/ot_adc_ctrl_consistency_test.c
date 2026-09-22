@@ -5,16 +5,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "adc_ctrl_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
-#include "pwrmgr_regs.h"
-#include "rv_plic_regs.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "adc_ctrl_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
+#include "pwrmgr_regs.h"
+#include "rv_plic_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -135,7 +136,8 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET) ==
         chn1_val);
 
-  // 5. While continuous ADC conversion is active (ADC_ENABLE=1, ONESHOT_MODE=0),
+  // 5. While continuous ADC conversion is active (ADC_ENABLE=1,
+  // ONESHOT_MODE=0),
   //    dynamically update ADC_PD_CTL and enable Filter 1 (out-of-range COND=1
   //    [0x100, 0x200] matching 0x000) and verify Filter 1 also matches while
   //    Filter 2 ([0x100, 0x200] COND=0) remains 0.
@@ -203,8 +205,7 @@ bool test_main(void) {
 
   // Arm pwrmgr for normal sleep (MAIN_PD_N=1, CORE_CLK_EN=1, IO_CLK_EN=1,
   // USB_CLK_EN_ACTIVE=1, LOW_POWER_HINT=1) with ADC_CTRL wakeup (bit 1).
-  uint32_t ctrl_orig =
-      abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
+  uint32_t ctrl_orig = abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0u);
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffffffffu);
   abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 1u);

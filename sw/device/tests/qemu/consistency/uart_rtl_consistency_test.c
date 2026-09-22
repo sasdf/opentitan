@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/mmio.h"
@@ -13,6 +12,7 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "uart_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -24,17 +24,17 @@ enum {
 
 static int g_failures = 0;
 
-#define EXPECT_EQ(actual, expected, msg, ...)                                  \
-  do {                                                                         \
-    uint32_t _act = (uint32_t)(actual);                                        \
-    uint32_t _exp = (uint32_t)(expected);                                      \
-    if (_act != _exp) {                                                        \
-      LOG_ERROR("MISMATCH: " msg " (actual=0x%08x, expected=0x%08x)",          \
-                ##__VA_ARGS__, _act, _exp);                                    \
-      g_failures++;                                                            \
-    } else {                                                                   \
-      LOG_INFO("OK: " msg " (0x%08x)", ##__VA_ARGS__, _act);                   \
-    }                                                                          \
+#define EXPECT_EQ(actual, expected, msg, ...)                         \
+  do {                                                                \
+    uint32_t _act = (uint32_t)(actual);                               \
+    uint32_t _exp = (uint32_t)(expected);                             \
+    if (_act != _exp) {                                               \
+      LOG_ERROR("MISMATCH: " msg " (actual=0x%08x, expected=0x%08x)", \
+                ##__VA_ARGS__, _act, _exp);                           \
+      g_failures++;                                                   \
+    } else {                                                          \
+      LOG_INFO("OK: " msg " (0x%08x)", ##__VA_ARGS__, _act);          \
+    }                                                                 \
   } while (0)
 
 static volatile uint32_t g_fault_count = 0;
@@ -57,8 +57,8 @@ bool test_main(void) {
   irq_global_ctrl(false);
 
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
 
   // ---------------------------------------------------------------------------
   // 1. ALERT_TEST one-shot pulse behavior (UART1 = Alert 1)
@@ -95,8 +95,7 @@ bool test_main(void) {
   EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_OVRD_REG_OFFSET), 0x3u,
             "OVRD mask preserves both TXEN (bit 0) and TXVAL (bit 1)");
 
-  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET,
-                   1u << UART_OVRD_TXEN_BIT);
+  abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 1u << UART_OVRD_TXEN_BIT);
   EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_OVRD_REG_OFFSET), 0x1u,
             "OVRD preserves TXEN=1, TXVAL=0");
   abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 0u);
@@ -113,8 +112,7 @@ bool test_main(void) {
             "VAL resets to 0x0000 before CTRL.TX/RX is enabled");
 
   uint32_t ctrl_llpbk = (0xffffu << UART_CTRL_NCO_OFFSET) |
-                        (1u << UART_CTRL_LLPBK_BIT) |
-                        (1u << UART_CTRL_RX_BIT);
+                        (1u << UART_CTRL_LLPBK_BIT) | (1u << UART_CTRL_RX_BIT);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, ctrl_llpbk);
   busy_spin_micros(20);
   EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET), 0xffffu,
@@ -129,9 +127,9 @@ bool test_main(void) {
   //    When TX FIFO is non-empty (tx_fifo_rvalid == 1), BOTH TXEMPTY and TXIDLE
   //    must be 0, even when CTRL.TX == 0.
   // ---------------------------------------------------------------------------
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET), 0x3cu,
             "STATUS is 0x3c (RXEMPTY|RXIDLE|TXIDLE|TXEMPTY) when idle/empty");
 
@@ -159,8 +157,7 @@ bool test_main(void) {
   //      regardless of rx_enable (CTRL.RX).
   // ---------------------------------------------------------------------------
   uint32_t ctrl_slpbk = (0x8000u << UART_CTRL_NCO_OFFSET) |
-                        (1u << UART_CTRL_SLPBK_BIT) |
-                        (1u << UART_CTRL_TX_BIT) |
+                        (1u << UART_CTRL_SLPBK_BIT) | (1u << UART_CTRL_TX_BIT) |
                         (1u << UART_CTRL_RX_BIT);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, ctrl_slpbk);
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0xa5u);
@@ -194,9 +191,9 @@ bool test_main(void) {
   //      counts rx_tick_baud ticks and raises event_rx_timeout when equal to
   //      TIMEOUT_CTRL.VAL.
   // ---------------------------------------------------------------------------
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET,
                    (1u << UART_TIMEOUT_CTRL_EN_BIT) | 4u);
@@ -214,22 +211,24 @@ bool test_main(void) {
   // 7. Wave 2: TIMEOUT_CTRL with EN=1, VAL=0 fires INTR_STATE.RX_TIMEOUT
   //    immediately even when RX FIFO is empty and CTRL.RX=0
   //    In uart_core.sv:376:
-  //      assign event_rx_timeout = (rx_timeout_count_q == uart_rxto_val) & uart_rxto_en;
+  //      assign event_rx_timeout = (rx_timeout_count_q == uart_rxto_val) &
+  //      uart_rxto_en;
   //    Because rx_timeout_count_q == 0 when rx_fifo_depth == 0, setting
   //    TIMEOUT_CTRL = (1 << 31) | 0 immediately asserts event_rx_timeout.
   // ---------------------------------------------------------------------------
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
 
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET,
                    (1u << UART_TIMEOUT_CTRL_EN_BIT) | 0u);
   intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_TIMEOUT_BIT) & 1u, 1u,
-            "TIMEOUT_CTRL EN=1, VAL=0 immediately sets INTR_STATE.RX_TIMEOUT even when RX FIFO is empty");
+            "TIMEOUT_CTRL EN=1, VAL=0 immediately sets INTR_STATE.RX_TIMEOUT "
+            "even when RX FIFO is empty");
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
 
@@ -244,11 +243,11 @@ bool test_main(void) {
                    (1u << UART_OVRD_TXEN_BIT) | (0u << UART_OVRD_TXVAL_BIT));
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
                    (0xffffu << UART_CTRL_NCO_OFFSET) |
-                       (1u << UART_CTRL_SLPBK_BIT) |
-                       (1u << UART_CTRL_TX_BIT));
+                       (1u << UART_CTRL_SLPBK_BIT) | (1u << UART_CTRL_TX_BIT));
   busy_spin_micros(20);
   EXPECT_EQ(abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET), 0xffffu,
-            "VAL remains 0xffff in SLPBK when OVRD.TXEN=1, OVRD.TXVAL=0 (sys_loopback taps tx_out before ovrd mux)");
+            "VAL remains 0xffff in SLPBK when OVRD.TXEN=1, OVRD.TXVAL=0 "
+            "(sys_loopback taps tx_out before ovrd mux)");
   abs_mmio_write32(kUart1Base + UART_OVRD_REG_OFFSET, 0u);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
 
@@ -261,9 +260,9 @@ bool test_main(void) {
   //      FIFO_STATUS.TXLVL = 1, STATUS.TXEMPTY = 0, INTR_STATE.TX_DONE = 0).
   // ---------------------------------------------------------------------------
   abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
                    (1u << UART_CTRL_NCO_OFFSET) | (1u << UART_CTRL_TX_BIT));
@@ -274,19 +273,22 @@ bool test_main(void) {
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
 
-  EXPECT_EQ((status >> UART_STATUS_TXIDLE_BIT) & 1u, 0u,
-            "STATUS.TXIDLE is 0 while transmitting with INTR_ENABLE=0 and NCO=1");
+  EXPECT_EQ(
+      (status >> UART_STATUS_TXIDLE_BIT) & 1u, 0u,
+      "STATUS.TXIDLE is 0 while transmitting with INTR_ENABLE=0 and NCO=1");
   EXPECT_EQ((fifo_status >> UART_FIFO_STATUS_TXLVL_OFFSET) & 0xffu, 1u,
-            "FIFO_STATUS.TXLVL is 1 after writing 2 bytes with INTR_ENABLE=0 and NCO=1");
+            "FIFO_STATUS.TXLVL is 1 after writing 2 bytes with INTR_ENABLE=0 "
+            "and NCO=1");
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_TX_DONE_BIT) & 1u, 0u,
-            "INTR_STATE.TX_DONE is 0 while transmitting with INTR_ENABLE=0 and NCO=1");
+            "INTR_STATE.TX_DONE is 0 while transmitting with INTR_ENABLE=0 and "
+            "NCO=1");
 
   // Clean up UART1 state.
   abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
 
   // ---------------------------------------------------------------------------
@@ -311,7 +313,8 @@ bool test_main(void) {
   abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
   g_fault_count = 0;
   *(volatile uint8_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET) = 0x05u;
-  EXPECT_EQ(g_fault_count, 1u, "sb to UART_INTR_ENABLE raises Store Access Fault");
+  EXPECT_EQ(g_fault_count, 1u,
+            "sb to UART_INTR_ENABLE raises Store Access Fault");
   *(volatile uint16_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET + 2u) = 0x05u;
   EXPECT_EQ(g_fault_count, 2u,
             "sh to UART_INTR_ENABLE+2 raises Store Access Fault");
@@ -359,23 +362,26 @@ bool test_main(void) {
   //     RW1C writes to INTR_STATE, and clearing only when INTR_TEST is written
   //     with 0.
   // ---------------------------------------------------------------------------
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   (1u << UART_FIFO_CTRL_RXRST_BIT) |
-                       (1u << UART_FIFO_CTRL_TXRST_BIT));
+  abs_mmio_write32(
+      kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+      (1u << UART_FIFO_CTRL_RXRST_BIT) | (1u << UART_FIFO_CTRL_TXRST_BIT));
   abs_mmio_write32(kUart1Base + UART_INTR_TEST_REG_OFFSET,
                    1u << UART_INTR_COMMON_RX_WATERMARK_BIT);
   intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 1u,
-            "INTR_TEST.RX_WATERMARK=1 asserts INTR_STATE.RX_WATERMARK when RX FIFO is empty");
+            "INTR_TEST.RX_WATERMARK=1 asserts INTR_STATE.RX_WATERMARK when RX "
+            "FIFO is empty");
   abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET,
                    1u << UART_INTR_COMMON_RX_WATERMARK_BIT);
   intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 1u,
-            "RW1C write to INTR_STATE.RX_WATERMARK does not clear status-type test_q");
+            "RW1C write to INTR_STATE.RX_WATERMARK does not clear status-type "
+            "test_q");
   abs_mmio_write32(kUart1Base + UART_INTR_TEST_REG_OFFSET, 0u);
   intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
   EXPECT_EQ((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u, 0u,
-            "INTR_TEST=0 clears status-type test_q and deasserts INTR_STATE.RX_WATERMARK");
+            "INTR_TEST=0 clears status-type test_q and deasserts "
+            "INTR_STATE.RX_WATERMARK");
 
   return g_failures == 0;
 }

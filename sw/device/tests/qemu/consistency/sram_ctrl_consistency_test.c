@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/csr.h"
@@ -15,6 +14,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 #include "sw/device/silicon_creator/lib/drivers/retention_sram.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sram_ctrl_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -42,24 +42,27 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   CSR_WRITE(CSR_REG_MEPC, mepc + step);
 }
 
-#define EXPECT_RTL(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) {                              \
-      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__);  \
-      all_ok = false;                           \
-    }                                           \
+#define EXPECT_RTL(cond, ...)                  \
+  do {                                         \
+    if (!(cond)) {                             \
+      LOG_ERROR("RTL_MISMATCH: " __VA_ARGS__); \
+      all_ok = false;                          \
+    }                                          \
   } while (0)
 
 bool test_main(void) {
   bool all_ok = true;
 
   // 1. ALERT_TEST (0x00) is WO: reads back as 0.
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
-             "ALERT_TEST must read back as 0");
-  EXPECT_RTL(abs_mmio_read32(kSramMainRegsBase + SRAM_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
+      "ALERT_TEST must read back as 0");
+  EXPECT_RTL(abs_mmio_read32(kSramMainRegsBase +
+                             SRAM_CTRL_ALERT_TEST_REG_OFFSET) == 0u,
              "Main SRAM ALERT_TEST must read back as 0");
 
-  // 2. STATUS (0x04) is RO: software writes must be ignored and reserved bits [31:6] read as 0.
+  // 2. STATUS (0x04) is RO: software writes must be ignored and reserved bits
+  // [31:6] read as 0.
   uint32_t status_before =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET, 0xffffffffu);
@@ -70,17 +73,24 @@ bool test_main(void) {
              status_after);
 
   // 3. EXEC_REGWEN (0x08), CTRL_REGWEN (0x10), READBACK_REGWEN (0x1c):
-  // 1-bit W0C registers with reset value 1; writing 1 preserves 1 and reserved bits read as 0.
-  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 0xffffffffu);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET) == 1u,
+  // 1-bit W0C registers with reset value 1; writing 1 preserves 1 and reserved
+  // bits read as 0.
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET,
+                   0xffffffffu);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_EXEC_REGWEN_REG_OFFSET) == 1u,
              "EXEC_REGWEN expected 1 after writing 0xffffffff");
 
-  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET, 0xffffffffu);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET) == 1u,
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET,
+                   0xffffffffu);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_CTRL_REGWEN_REG_OFFSET) == 1u,
              "CTRL_REGWEN expected 1 after writing 0xffffffff");
 
-  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET, 0xffffffffu);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET) == 1u,
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET,
+                   0xffffffffu);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_READBACK_REGWEN_REG_OFFSET) == 1u,
              "READBACK_REGWEN expected 1 after writing 0xffffffff");
 
   // 4. EXEC (0x0c) and READBACK (0x20) 4-bit MuBi4 RW registers:
@@ -98,20 +108,23 @@ bool test_main(void) {
 
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET,
                    0xfffffff0u | kMultiBitBool4True);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
-                 kMultiBitBool4True,
-             "READBACK expected 0x6 (MuBi4True) with upper bits masked");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
+          kMultiBitBool4True,
+      "READBACK expected 0x6 (MuBi4True) with upper bits masked");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET,
                    kMultiBitBool4False);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
-                 kMultiBitBool4False,
-             "READBACK expected 0x9 (MuBi4False)");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
+          kMultiBitBool4False,
+      "READBACK expected 0x9 (MuBi4False)");
 
   // 5. SCR_KEY_ROTATED (0x18) MuBi4 W1C & CTRL.RENEW_SCR_KEY (0x14 bit 0):
   // Clear SCR_KEY_ROTATED by writing MuBi4True (0x6) -> reads MuBi4False (0x9).
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4True);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
                  kMultiBitBool4False,
              "SCR_KEY_ROTATED expected 0x9 (MuBi4False) after W1C clear");
 
@@ -120,8 +133,9 @@ bool test_main(void) {
     abs_mmio_write32(ret_buf + i * sizeof(uint32_t), kTestPattern[i]);
   }
   for (size_t i = 0; i < kTestWords; ++i) {
-    EXPECT_RTL(abs_mmio_read32(ret_buf + i * sizeof(uint32_t)) == kTestPattern[i],
-               "Initial retention SRAM write/read mismatch at word %u", i);
+    EXPECT_RTL(
+        abs_mmio_read32(ret_buf + i * sizeof(uint32_t)) == kTestPattern[i],
+        "Initial retention SRAM write/read mismatch at word %u", i);
   }
 
   // Trigger CTRL.RENEW_SCR_KEY.
@@ -132,14 +146,17 @@ bool test_main(void) {
     status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_SCR_KEY_VALID_BIT));
 
-  EXPECT_RTL(bitfield_bit32_read(status, SRAM_CTRL_STATUS_SCR_KEY_SEED_VALID_BIT),
-             "STATUS.SCR_KEY_SEED_VALID should be set after key renewal (0x%08x)",
-             status);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+  EXPECT_RTL(
+      bitfield_bit32_read(status, SRAM_CTRL_STATUS_SCR_KEY_SEED_VALID_BIT),
+      "STATUS.SCR_KEY_SEED_VALID should be set after key renewal (0x%08x)",
+      status);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
                  kMultiBitBool4True,
              "SCR_KEY_ROTATED should be 0x6 (MuBi4True) after key renewal");
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
-             "CTRL is WO and must read back as 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
+      "CTRL is WO and must read back as 0");
 
   // Verify MuBi4 W1C (mubi4_and_hi) semantics on SCR_KEY_ROTATED (q = 0x6):
   // - Writing 0x9 (~wd = 0x6) preserves 0x6.
@@ -147,27 +164,34 @@ bool test_main(void) {
   // - Writing 0x6 (~wd = 0x9) clears q = 0x9 (MuBi4False).
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4False);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
                  kMultiBitBool4True,
              "SCR_KEY_ROTATED (0x6) should remain 0x6 after writing 0x9");
-  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET, 0x0u);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
-                 0xfu,
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
+                   0x0u);
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) == 0xfu,
              "SCR_KEY_ROTATED (0x6) should become 0xf after writing 0x0");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4True);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
-                 kMultiBitBool4False,
-             "SCR_KEY_ROTATED should clear to 0x9 (MuBi4False) after writing 0x6");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase +
+                      SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+          kMultiBitBool4False,
+      "SCR_KEY_ROTATED should clear to 0x9 (MuBi4False) after writing 0x6");
 
-  // 6. CTRL.INIT (0x14 bit 1): initializes SRAM, CTRL reads as 0 immediately, and sets STATUS.INIT_DONE.
+  // 6. CTRL.INIT (0x14 bit 1): initializes SRAM, CTRL reads as 0 immediately,
+  // and sets STATUS.INIT_DONE.
   for (size_t i = 0; i < kTestWords; ++i) {
     abs_mmio_write32(ret_buf + i * sizeof(uint32_t), kTestPattern[i]);
   }
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
                    1u << SRAM_CTRL_CTRL_INIT_BIT);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
-             "CTRL is WO and must read back as 0 even immediately after CTRL.INIT write");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
+      "CTRL is WO and must read back as 0 even immediately after CTRL.INIT "
+      "write");
   do {
     status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT));
@@ -210,13 +234,13 @@ bool test_main(void) {
   do {
     status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   } while (!bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT));
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
-                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
-                 kMultiBitBool4False,
-             "CTRL.RENEW_SCR_KEY written while CTRL.INIT is active must be "
-             "ignored (SCR_KEY_ROTATED expected 0x9, got 0x%x)",
-             abs_mmio_read32(kSramRetRegsBase +
-                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET));
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase +
+                      SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+          kMultiBitBool4False,
+      "CTRL.RENEW_SCR_KEY written while CTRL.INIT is active must be "
+      "ignored (SCR_KEY_ROTATED expected 0x9, got 0x%x)",
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET));
 
   // Simultaneous CTRL.RENEW_SCR_KEY | CTRL.INIT in a single write when idle
   // must trigger both key renewal and initialization.
@@ -249,10 +273,9 @@ bool test_main(void) {
   kLoadStoreFault = false;
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
                   kMultiBitBool4True);
-  EXPECT_RTL(!kLoadStoreFault &&
-                 abs_mmio_read32(kSramRetRegsBase +
-                                 SRAM_CTRL_EXEC_REG_OFFSET) ==
-                     kMultiBitBool4True,
+  EXPECT_RTL(!kLoadStoreFault && abs_mmio_read32(kSramRetRegsBase +
+                                                 SRAM_CTRL_EXEC_REG_OFFSET) ==
+                                     kMultiBitBool4True,
              "8-bit write to byte 0 of SRAM_CTRL_EXEC (PERMIT=4'b0001) must "
              "succeed");
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
@@ -266,7 +289,8 @@ bool test_main(void) {
   // 7. Lock REGWEN registers (W0C) and verify locked registers ignore writes.
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 0u);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 1u);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET) == 0u,
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_EXEC_REGWEN_REG_OFFSET) == 0u,
              "EXEC_REGWEN is W0C and must stay 0 once cleared");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
                    kMultiBitBool4True);
@@ -276,21 +300,25 @@ bool test_main(void) {
 
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET, 0u);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET, 1u);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REGWEN_REG_OFFSET) == 0u,
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_READBACK_REGWEN_REG_OFFSET) == 0u,
              "READBACK_REGWEN is W0C and must stay 0 once cleared");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET,
                    kMultiBitBool4True);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
-                 kMultiBitBool4False,
-             "READBACK write must be ignored when READBACK_REGWEN == 0");
+  EXPECT_RTL(
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
+          kMultiBitBool4False,
+      "READBACK write must be ignored when READBACK_REGWEN == 0");
 
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET, 0u);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET, 1u);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REGWEN_REG_OFFSET) == 0u,
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_CTRL_REGWEN_REG_OFFSET) == 0u,
              "CTRL_REGWEN is W0C and must stay 0 once cleared");
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
                    1u << SRAM_CTRL_CTRL_RENEW_SCR_KEY_BIT);
-  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
+  EXPECT_RTL(abs_mmio_read32(kSramRetRegsBase +
+                             SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET) ==
                  kMultiBitBool4False,
              "CTRL.RENEW_SCR_KEY must be ignored when CTRL_REGWEN == 0");
 

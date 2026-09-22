@@ -5,7 +5,8 @@
 /**
  * CW340 FPGA & QEMU Consistency Test for `ot_otbn` (`hw/opentitan/ot_otbn.c`).
  *
- * Strictly verifies identical hardware behavior between CW340 FPGA and QEMU for:
+ * Strictly verifies identical hardware behavior between CW340 FPGA and QEMU
+ * for:
  * 1. Write-only (`INTR_TEST`, `ALERT_TEST`, `CMD`) reads returning `0`, and
  *    read-only (`STATUS`, `FATAL_ALERT_CAUSE`) writes ignored (`ot_otbn.c`
  *    Chunks 15, 20).
@@ -15,16 +16,14 @@
  *    `STATUS == BUSY_EXECUTE (0x1)` (`ot_otbn.c` Chunks 8, 17, 18, 19).
  * 4. Illegal host bus write (`DMEM`/`IMEM`) during `BUSY_EXECUTE` locking OTBN
  *    (`STATUS == 0xFF`, `ERR_BITS.ILLEGAL_BUS_ACCESS`,
- *    `FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS`), ignored `DMEM`/`IMEM` writes while
- *    locked, and writable `INTR_STATE`/`INSN_CNT`/`ERR_BITS` while `STATUS == LOCKED`.
+ *    `FATAL_ALERT_CAUSE.ILLEGAL_BUS_ACCESS`), ignored `DMEM`/`IMEM` writes
+ * while locked, and writable `INTR_STATE`/`INSN_CNT`/`ERR_BITS` while `STATUS
+ * == LOCKED`.
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw/ip/otbn/data/otbn_regs.h"
-#include "hw/ip/rv_core_ibex/data/rv_core_ibex_regs.h"
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -32,6 +31,10 @@
 #include "sw/device/lib/testing/test_framework/check.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
+
+#include "hw/ip/otbn/data/otbn_regs.h"
+#include "hw/ip/rv_core_ibex/data/rv_core_ibex_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
@@ -61,9 +64,9 @@ void ottf_internal_isr(uint32_t *exc_info) {
 #define OTBN_ECALL() (0x00000073u)
 #define OTBN_NOP() (0x00000013u)
 #define OTBN_LOOPI(iters, bodysize_minus_1)                    \
-  ((((uint32_t)(bodysize_minus_1) & 0xfffu) << 20) |           \
+  ((((uint32_t)(bodysize_minus_1)&0xfffu) << 20) |             \
    ((((uint32_t)(iters) >> 5) & 0x1fu) << 15) | (0x1u << 12) | \
-   (((uint32_t)(iters) & 0x1fu) << 7) | 0x7bu)
+   (((uint32_t)(iters)&0x1fu) << 7) | 0x7bu)
 
 static void otbn_wait_for_not_running(void) {
   for (uint32_t i = 0; i < 1000000; ++i) {
@@ -76,18 +79,21 @@ static void otbn_wait_for_not_running(void) {
 }
 
 static void test_wo_ro_registers_and_invalid_cmd(void) {
-  LOG_INFO("Section 1 & 2a: W/O & R/O register accesses and invalid CMD opcode");
+  LOG_INFO(
+      "Section 1 & 2a: W/O & R/O register accesses and invalid CMD opcode");
 
   otbn_wait_for_not_running();
   abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
 
-  // 1a. Read write-only registers INTR_TEST, ALERT_TEST, and CMD -> must read 0.
+  // 1a. Read write-only registers INTR_TEST, ALERT_TEST, and CMD -> must read
+  // 0.
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_TEST_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_ALERT_TEST_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_CMD_REG_OFFSET) == 0u);
 
-  // 1b. Write read-only registers STATUS and FATAL_ALERT_CAUSE -> must be ignored.
+  // 1b. Write read-only registers STATUS and FATAL_ALERT_CAUSE -> must be
+  // ignored.
   uint32_t status_before = abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET);
   uint32_t fatal_before =
       abs_mmio_read32(kOtbnBase + OTBN_FATAL_ALERT_CAUSE_REG_OFFSET);
@@ -149,13 +155,16 @@ static void test_non_idle_register_writes(void) {
 }
 
 static void test_illegal_bus_access_lock_and_locked_writes(void) {
-  LOG_INFO("Section 3: Illegal host memory access lock & locked register/mem writes");
+  LOG_INFO(
+      "Section 3: Illegal host memory access lock & locked register/mem "
+      "writes");
 
   // Seed non-zero value in DMEM[0] while IDLE and verify it reads back.
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0xdeadbeefu);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0xdeadbeefu);
 
-  // Record expected CRC32 for writing 0x12345678 to DMEM[0] and IMEM[0] while IDLE.
+  // Record expected CRC32 for writing 0x12345678 to DMEM[0] and IMEM[0] while
+  // IDLE.
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x12345678u);
   abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0x12345678u);
@@ -183,11 +192,13 @@ static void test_illegal_bus_access_lock_and_locked_writes(void) {
 
   // Trigger ILLEGAL_BUS_ACCESS by reading DMEM while BUSY_EXECUTE.
   // Per otbn.sv:709-711,737-739:
-  // 1) Because dmem_access_core == 1 while BUSY_EXECUTE, mem_crc_data_in_valid == 0
+  // 1) Because dmem_access_core == 1 while BUSY_EXECUTE, mem_crc_data_in_valid
+  // == 0
   //    (LOAD_CHECKSUM does not advance).
-  // 2) On the cycle dmem_dummy_response_q returns rvalid_bus, locking_q is 0 and
-  //    u_dmem_rdata_bus_blanker outputs 39'h0 (7'h00 ECC instead of 7'h39), which
-  //    raises RV_CORE_IBEX_ERR_STATUS.FATAL_INTG_ERR and an internal NMI.
+  // 2) On the cycle dmem_dummy_response_q returns rvalid_bus, locking_q is 0
+  // and
+  //    u_dmem_rdata_bus_blanker outputs 39'h0 (7'h00 ECC instead of 7'h39),
+  //    which raises RV_CORE_IBEX_ERR_STATUS.FATAL_INTG_ERR and an internal NMI.
   load_integrity_fault_seen = false;
   (void)abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
   otbn_wait_for_not_running();

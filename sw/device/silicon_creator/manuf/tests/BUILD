@@ -400,6 +400,7 @@ opentitan_binary(
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            timeout = "moderate",
             binaries = {
                 ":sram_device_info_flash_wr_functest": "sram_program",
             },
@@ -415,9 +416,9 @@ opentitan_binary(
             """,
             test_harness = "//sw/host/tests/manuf/manuf_cp_device_info_flash_wr",
             testopt_bootstrap = "False",
-            timeout = "moderate",
         ),
         qemu = qemu_params(
+            timeout = "moderate",
             binaries = {
                 ":sram_device_info_flash_wr_functest": "sram_program",
             },
@@ -432,7 +433,6 @@ opentitan_binary(
             """,
             test_harness = "//sw/host/tests/manuf/manuf_cp_device_info_flash_wr",
             testopt_bootstrap = "False",
-            timeout = "moderate",
         ),
         spx_key = spx_key_for_lc_state(
             ECDSA_SPX_KEY_STRUCTS,

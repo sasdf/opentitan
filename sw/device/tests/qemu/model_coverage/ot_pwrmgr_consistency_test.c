@@ -71,8 +71,8 @@ bool test_main(void) {
   abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 1u);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET) == 0u);
 
-  // 2. Read-Only register write ignored semantics (CTRL_CFG_REGWEN, WAKE_STATUS,
-  // RESET_STATUS, ESCALATE_RESET_STATUS, FAULT_STATUS).
+  // 2. Read-Only register write ignored semantics (CTRL_CFG_REGWEN,
+  // WAKE_STATUS, RESET_STATUS, ESCALATE_RESET_STATUS, FAULT_STATUS).
   uint32_t ctrl_cfg_regwen_init =
       abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET);
   uint32_t wake_status_init =
@@ -101,15 +101,14 @@ bool test_main(void) {
         wake_status_init);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_STATUS_REG_OFFSET) ==
         reset_status_init);
-  CHECK(abs_mmio_read32(kPwrmgrBase +
-                        PWRMGR_ESCALATE_RESET_STATUS_REG_OFFSET) ==
-        esc_reset_status_init);
+  CHECK(
+      abs_mmio_read32(kPwrmgrBase + PWRMGR_ESCALATE_RESET_STATUS_REG_OFFSET) ==
+      esc_reset_status_init);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_FAULT_STATUS_REG_OFFSET) ==
         fault_status_init);
 
   // 3. Sub-word byte reads and sub-word write permit enforcement on CONTROL.
-  uint32_t ctrl_orig =
-      abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
+  uint32_t ctrl_orig = abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
   // Program CONTROL with 0x190 (MAIN_PD_N = 1, CORE_CLK_EN = 1, IO_CLK_EN = 1,
   // LOW_POWER_HINT = 0).
   const uint32_t ctrl_test_val = 0x00000190u;
@@ -159,8 +158,8 @@ bool test_main(void) {
 
   uint32_t wdog_count =
       abs_mmio_read32(kAonTimerBase + AON_TIMER_WDOG_COUNT_REG_OFFSET);
-  CHECK(wdog_count >= 2u,
-        "Expected WDOG_COUNT >= 2 after 50us, got %u", wdog_count);
+  CHECK(wdog_count >= 2u, "Expected WDOG_COUNT >= 2 after 50us, got %u",
+        wdog_count);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_STATUS_REG_OFFSET) ==
         reset_status_init);
 

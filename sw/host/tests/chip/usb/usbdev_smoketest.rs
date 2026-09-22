@@ -39,11 +39,8 @@ fn usbdev_echo_qemu(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) 
     let mut total_read = 0;
     let deadline = std::time::Instant::now() + opts.timeout;
     while total_read < 6 && std::time::Instant::now() < deadline {
-        match device.read_bulk_timeout(
-            0x81,
-            &mut buffer[total_read..],
-            Duration::from_millis(500),
-        ) {
+        match device.read_bulk_timeout(0x81, &mut buffer[total_read..], Duration::from_millis(500))
+        {
             Ok(n) if n > 0 => total_read += n,
             _ => {}
         }

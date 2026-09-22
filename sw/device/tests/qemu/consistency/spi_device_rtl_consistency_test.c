@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/mmio.h"
@@ -17,6 +16,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "spi_device_regs.h"
 
 OTTF_DEFINE_TEST_CONFIG();
@@ -79,9 +79,10 @@ static void test_alert_test_pulse(void) {
   is_cause = false;
   CHECK_DIF_OK(
       dif_alert_handler_alert_is_cause(&alert_handler, kAlert, &is_cause));
-  EXPECT_CHECK(!is_cause,
-               "SPI_DEVICE ALERT_CAUSE should remain 0 after clearing "
-               "(ALERT_TEST is a single-cycle pulse in spi_device.sv:1877-1896)");
+  EXPECT_CHECK(
+      !is_cause,
+      "SPI_DEVICE ALERT_CAUSE should remain 0 after clearing "
+      "(ALERT_TEST is a single-cycle pulse in spi_device.sv:1877-1896)");
 }
 
 /**
@@ -98,9 +99,10 @@ static void test_intr_test_tpm_header_not_empty_status_readback(void) {
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_INTR_TEST_REG_OFFSET, 0u);
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_INTR_STATE_REG_OFFSET, 0xffu);
 
-  const uint32_t kTpmHdrBit =
-      1u << SPI_DEVICE_INTR_STATE_TPM_HEADER_NOT_EMPTY_BIT;
-  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_INTR_TEST_REG_OFFSET, kTpmHdrBit);
+  const uint32_t kTpmHdrBit = 1u
+                              << SPI_DEVICE_INTR_STATE_TPM_HEADER_NOT_EMPTY_BIT;
+  abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_INTR_TEST_REG_OFFSET,
+                   kTpmHdrBit);
   uint32_t intr_state =
       abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_INTR_STATE_REG_OFFSET);
   EXPECT_CHECK((intr_state & kTpmHdrBit) != 0u,
@@ -139,10 +141,10 @@ static void test_cmd_info_read_pipeline_mode_mask(void) {
 }
 
 /**
- * Check 4: `ADDR_MODE` (`spid_addr_4b.sv:52-94` vs `ot_spi_device.c:2301-2304`).
- * Writing `ADDR_MODE` from software sets `sys_fw_new_addr_mode_req <= 1'b1`,
- * asserting bit 31 (`PENDING = 1`) until the 8th SPI clock edge of the next
- * SPI command.
+ * Check 4: `ADDR_MODE` (`spid_addr_4b.sv:52-94` vs
+ * `ot_spi_device.c:2301-2304`). Writing `ADDR_MODE` from software sets
+ * `sys_fw_new_addr_mode_req <= 1'b1`, asserting bit 31 (`PENDING = 1`) until
+ * the 8th SPI clock edge of the next SPI command.
  */
 static void test_addr_mode_pending_on_sw_write(void) {
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_ADDR_MODE_REG_OFFSET, 1u);
@@ -155,8 +157,7 @@ static void test_addr_mode_pending_on_sw_write(void) {
       addr_mode);
 
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_ADDR_MODE_REG_OFFSET, 0u);
-  addr_mode =
-      abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_ADDR_MODE_REG_OFFSET);
+  addr_mode = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_ADDR_MODE_REG_OFFSET);
   EXPECT_CHECK(
       addr_mode == 0x80000000u,
       "Writing 0 to ADDR_MODE while SPI is idle must set PENDING (bit 31) "
@@ -267,8 +268,8 @@ static void test_w2_egress_sram_subword_write_fault(void) {
  * Wave 2 Check 8 (W2-2): Unmapped SRAM hole `[0x1d40..0x1dff]` write fault
  * (`spi_device_reg_top.sv:131-137, 171` vs `ot_spi_device.c:2580-2586`).
  *
- * In RTL, `u_tlul2sram_egress` maps `[4096:7487]` (`0x1000..0x1d3f`, 848 words).
- * Offsets `0x1d40..0x1dff` (`7488..7679`) steer to `reg_steer = 2'd2`
+ * In RTL, `u_tlul2sram_egress` maps `[4096:7487]` (`0x1000..0x1d3f`, 848
+ * words). Offsets `0x1d40..0x1dff` (`7488..7679`) steer to `reg_steer = 2'd2`
  * (`u_reg_if`), where `addrmiss = 1 -> reg_error = 1` (`d_error = 1`),
  * raising a Store Access Fault (`mcause = 7`).
  */
@@ -279,19 +280,20 @@ static void test_w2_egress_unmapped_hole_write_fault(void) {
   abs_mmio_write32(kSpiDeviceBase + 0x1d40u, 0xdeadbeefu);
   g_expect_access_fault = false;
 
-  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u,
-               "W2-2: 32-bit write to unmapped SPI_DEVICE offset 0x1d40 "
-               "(between Egress [0x1000..0x1d3f] and Ingress [0x1e00..0x1fbf]) "
-               "must raise Store Access Fault (mcause=7), got count=%u mcause=%u",
-               g_access_fault_count, g_last_mcause);
+  EXPECT_CHECK(
+      g_access_fault_count == 1u && g_last_mcause == 7u,
+      "W2-2: 32-bit write to unmapped SPI_DEVICE offset 0x1d40 "
+      "(between Egress [0x1000..0x1d3f] and Ingress [0x1e00..0x1fbf]) "
+      "must raise Store Access Fault (mcause=7), got count=%u mcause=%u",
+      g_access_fault_count, g_last_mcause);
 }
 
 /**
  * Wave 2 Check 9 (W2-3): Unmapped SRAM hole `[0x1fc0..0x1fff]` read fault
  * (`spi_device_reg_top.sv:131-137, 171` vs `ot_spi_device.c:2544-2564`).
  *
- * In RTL, `u_tlul2sram_ingress` maps `[7680:8127]` (`0x1e00..0x1fbf`, 112 words).
- * Offsets `0x1fc0..0x1fff` (`8128..8191`) steer to `reg_steer = 2'd2`
+ * In RTL, `u_tlul2sram_ingress` maps `[7680:8127]` (`0x1e00..0x1fbf`, 112
+ * words). Offsets `0x1fc0..0x1fff` (`8128..8191`) steer to `reg_steer = 2'd2`
  * (`u_reg_if`), where `addrmiss = 1 -> reg_error = 1` (`d_error = 1`),
  * raising a Load Access Fault (`mcause = 5`).
  */
@@ -323,12 +325,12 @@ static void test_w2_ingress_unmapped_hole_read_fault(void) {
  * (`spi_device_reg_pkg.sv:837-911`, `spi_device_reg_top.sv` vs
  * `ot_spi_device.c:3110-3124`).
  *
- * - `CFG` (`0x14`, `PERMIT = 4'b1111`) and `TPM_STS` (`0x814`, `PERMIT = 4'b1111`)
- *   reject sub-word writes (`sb`/`sh`) with a Store Access Fault (`mcause = 7`)
- *   and leave register values unchanged.
+ * - `CFG` (`0x14`, `PERMIT = 4'b1111`) and `TPM_STS` (`0x814`, `PERMIT =
+ * 4'b1111`) reject sub-word writes (`sb`/`sh`) with a Store Access Fault
+ * (`mcause = 7`) and leave register values unchanged.
  * - `TPM_RID` (`0x82c`, `PERMIT = 4'b0001`) accepts a byte write at offset +0
- *   (`reg_be = 4'b0001`) and rejects a byte write at offset +1 (`reg_be = 4'b0010`)
- *   with `mcause = 7`.
+ *   (`reg_be = 4'b0001`) and rejects a byte write at offset +1 (`reg_be =
+ * 4'b0010`) with `mcause = 7`.
  */
 static void test_w5_spi_device_permit_subword_wr_err(void) {
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_CFG_REG_OFFSET, 0x00000004u);
@@ -378,18 +380,18 @@ static void test_w5_spi_device_permit_subword_wr_err(void) {
   abs_mmio_write8(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET + 1u, 0xa5u);
   g_expect_access_fault = false;
   tpm_rid = abs_mmio_read32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET);
-  EXPECT_CHECK(g_access_fault_count == 1u && g_last_mcause == 7u &&
-                   tpm_rid == 0x5au,
-               "W5-1d: 8-bit write to TPM_RID+1 (PERMIT=4'b0001, reg_be=4'b0010) "
-               "must raise Store Access Fault (mcause=7) and preserve 0x5a, "
-               "got count=%u mcause=%u tpm_rid=0x%08x",
-               g_access_fault_count, g_last_mcause, tpm_rid);
+  EXPECT_CHECK(
+      g_access_fault_count == 1u && g_last_mcause == 7u && tpm_rid == 0x5au,
+      "W5-1d: 8-bit write to TPM_RID+1 (PERMIT=4'b0001, reg_be=4'b0010) "
+      "must raise Store Access Fault (mcause=7) and preserve 0x5a, "
+      "got count=%u mcause=%u tpm_rid=0x%08x",
+      g_access_fault_count, g_last_mcause, tpm_rid);
   abs_mmio_write32(kSpiDeviceBase + SPI_DEVICE_TPM_RID_REG_OFFSET, 0u);
 }
 
 bool test_main(void) {
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
 
   LOG_INFO("Running spi_device_rtl_consistency_test...");
   test_alert_test_pulse();

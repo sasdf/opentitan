@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/ibex.h"
@@ -12,6 +11,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "adc_ctrl_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -87,11 +87,11 @@ bool test_main(void) {
   abs_mmio_write32(kAdcBase + ADC_CTRL_INTR_TEST_REG_OFFSET, 0x0u);
   CHECK(abs_mmio_read32(kAdcBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0x0u);
 
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdAdcCtrlAonFatalFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdAdcCtrlAonFatalFault));
   abs_mmio_write32(kAdcBase + ADC_CTRL_ALERT_TEST_REG_OFFSET, 0x1u);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdAdcCtrlAonFatalFault));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdAdcCtrlAonFatalFault));
 
   // 3. Verify ADC_FSM_RST gating and release behavior.
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_INTR_CTL_REG_OFFSET, 0x3ffu);
@@ -147,10 +147,9 @@ bool test_main(void) {
   aon_cdc_wait();
 
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0x1u);
-  IBEX_SPIN_FOR(
-      (abs_mmio_read32(kAdcBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET) & 0x1u) !=
-          0u,
-      2000);
+  IBEX_SPIN_FOR((abs_mmio_read32(kAdcBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET) &
+                 0x1u) != 0u,
+                2000);
   IBEX_SPIN_FOR(
       (abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET) &
        0x1u) != 0u,
@@ -270,12 +269,10 @@ bool test_main(void) {
   mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
   busy_spin_micros(50);
   for (int k = 0; k < 8; ++k) {
-    mmio_region_write32(adc,
-                        ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET + (k * 4),
-                        0u);
-    mmio_region_write32(adc,
-                        ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET + (k * 4),
-                        0u);
+    mmio_region_write32(
+        adc, ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET + (k * 4), 0u);
+    mmio_region_write32(
+        adc, ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET + (k * 4), 0u);
   }
   mmio_region_write32(adc, ADC_CTRL_FILTER_STATUS_REG_OFFSET, 0x1ffu);
   mmio_region_write32(adc, ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3ffu);
@@ -334,24 +331,30 @@ bool test_main(void) {
   mmio_region_write32(adc, ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
   aon_cdc_wait();
 
-  // 10. Verify ADC_CTRL_PERMIT sub-word write checks (adc_ctrl_reg_top.sv wr_err):
-  // - Sub-word write to ADC_PD_CTL (ADC_CTRL_PERMIT = 4'b1111) faults and blocks write.
-  // - Sub-word write to ADC_LP_SAMPLE_CTL+1 (ADC_CTRL_PERMIT = 4'b0001, reg_be = 4'b0010) faults.
-  // - Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT = 4'b0001, reg_be = 4'b0001) succeeds.
+  // 10. Verify ADC_CTRL_PERMIT sub-word write checks (adc_ctrl_reg_top.sv
+  // wr_err):
+  // - Sub-word write to ADC_PD_CTL (ADC_CTRL_PERMIT = 4'b1111) faults and
+  // blocks write.
+  // - Sub-word write to ADC_LP_SAMPLE_CTL+1 (ADC_CTRL_PERMIT = 4'b0001, reg_be
+  // = 4'b0010) faults.
+  // - Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT = 4'b0001,
+  // reg_be = 4'b0001) succeeds.
   uint32_t orig_pd = abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET);
   kFaultCount = 0;
   *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET)) = 0x55u;
-  CHECK(kFaultCount == 1u &&
-            abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) == orig_pd,
-        "Sub-word write to ADC_PD_CTL must fault and not modify register");
+  CHECK(
+      kFaultCount == 1u &&
+          abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) == orig_pd,
+      "Sub-word write to ADC_PD_CTL must fault and not modify register");
 
   kFaultCount = 0;
-  *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET + 1u)) =
-      0x11u;
+  *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET +
+                         1u)) = 0x11u;
   CHECK(kFaultCount == 1u &&
             abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) ==
                 2u,
-        "Sub-word write to ADC_LP_SAMPLE_CTL+1 must fault and not modify register");
+        "Sub-word write to ADC_LP_SAMPLE_CTL+1 must fault and not modify "
+        "register");
 
   kFaultCount = 0;
   *((volatile uint8_t *)(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET)) =
@@ -360,7 +363,8 @@ bool test_main(void) {
   CHECK(kFaultCount == 0u &&
             abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) ==
                 0x09u,
-        "Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT=4'b0001) must succeed");
+        "Byte-0 sub-word write to ADC_LP_SAMPLE_CTL (ADC_CTRL_PERMIT=4'b0001) "
+        "must succeed");
 
   return true;
 }

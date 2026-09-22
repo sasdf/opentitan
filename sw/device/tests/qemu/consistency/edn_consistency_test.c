@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/multibits.h"
@@ -21,6 +20,7 @@
 #include "alert_handler_regs.h"
 #include "csrng_regs.h"
 #include "edn_regs.h"
+#include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG();
 
@@ -61,38 +61,38 @@ static void test_reset_and_mubi_alerts(void) {
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0u);
 
   // 1a. Invalid EDN_ENABLE (0x5) -> bit 0 + recov_alert
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl((multi_bit_bool_t)0x5, kMultiBitBool4False,
                                  kMultiBitBool4False, kMultiBitBool4False));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         (1u << EDN_RECOV_ALERT_STS_EDN_ENABLE_FIELD_ALERT_BIT));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
   // 1b. Invalid BOOT_REQ_MODE (0x3) -> bit 1 + recov_alert
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4False, (multi_bit_bool_t)0x3,
                                  kMultiBitBool4False, kMultiBitBool4False));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         ((1u << EDN_RECOV_ALERT_STS_EDN_ENABLE_FIELD_ALERT_BIT) |
          (1u << EDN_RECOV_ALERT_STS_BOOT_REQ_MODE_FIELD_ALERT_BIT)));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
   // 1c. Invalid AUTO_REQ_MODE (0xc) -> bit 2 + recov_alert
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4False, kMultiBitBool4False,
                                  (multi_bit_bool_t)0xc, kMultiBitBool4False));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         ((1u << EDN_RECOV_ALERT_STS_EDN_ENABLE_FIELD_ALERT_BIT) |
          (1u << EDN_RECOV_ALERT_STS_BOOT_REQ_MODE_FIELD_ALERT_BIT) |
@@ -100,13 +100,13 @@ static void test_reset_and_mubi_alerts(void) {
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
   // 1d. Invalid CMD_FIFO_RST (0x7) -> bit 3 + recov_alert
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4False, kMultiBitBool4False,
                                  kMultiBitBool4False, (multi_bit_bool_t)0x7));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0xfu);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
@@ -125,14 +125,13 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
   CHECK_DIF_OK(dif_entropy_src_configure(
       &entropy_src, entropy_testutils_config_default(), kDifToggleEnabled));
 
-  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
-                   ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4False
-                        << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+  abs_mmio_write32(
+      kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+      ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+          ((uint32_t)kMultiBitBool4False
+           << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
 
   // Enable EDN0 in SWPortMode (EDN_ENABLE = True, others False).
   abs_mmio_write32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET, 0x3u);
@@ -149,10 +148,10 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
 
   // Send INSTANTIATE with flag0 = kMultiBitBool4True (0x6), clen = 0 (0x601).
   abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
-  IBEX_SPIN_FOR(
-      bitfield_bit32_read(abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET),
-                          EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT),
-      1000);
+  IBEX_SPIN_FOR(bitfield_bit32_read(
+                    abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET),
+                    EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT),
+                1000);
   sw_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(sw_sts, EDN_SW_CMD_STS_CMD_REG_RDY_BIT) == 1);
   CHECK(bitfield_bit32_read(sw_sts, EDN_SW_CMD_STS_CMD_RDY_BIT) == 1);
@@ -162,20 +161,20 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
 
   // Send duplicate INSTANTIATE -> CSRNG returns INVALID_CMD_SEQ (3).
   // Both CSRNG and EDN0 will raise recoverable alerts!
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
 
-  IBEX_SPIN_FOR(
-      bitfield_bit32_read(abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET),
-                          EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT),
-      1000);
+  IBEX_SPIN_FOR(bitfield_bit32_read(
+                    abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET),
+                    EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT),
+                1000);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
         kEdnStateRejectCsrngEntropy);
   sw_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
@@ -186,7 +185,8 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT));
 
-  // Verify writing 0xffffffff to RECOV_ALERT_STS (RW0C) preserves CSRNG_ACK_ERR!
+  // Verify writing 0xffffffff to RECOV_ALERT_STS (RW0C) preserves
+  // CSRNG_ACK_ERR!
   abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0xffffffffu);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT));
@@ -200,38 +200,40 @@ static void test_sw_port_mode_and_csrng_ack_err(void) {
 }
 
 static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
-  LOG_INFO("2b. Testing EDN0 HW_CMD_STS BOOT_MODE/AUTO_MODE latching and max_reqs_cnt restore...");
+  LOG_INFO(
+      "2b. Testing EDN0 HW_CMD_STS BOOT_MODE/AUTO_MODE latching and "
+      "max_reqs_cnt restore...");
 
   // Reset CSRNG state by disabling and re-enabling CSRNG.
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
-  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
-                   ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4False
-                        << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+  abs_mmio_write32(
+      kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+      ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+          ((uint32_t)kMultiBitBool4False
+           << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
 
-  // Part A: Boot Mode failure -> HW_CMD_STS.BOOT_MODE must remain 1 in RejectCsrngEntropy.
-  // Set BOOT_INS_CMD = 0x00000601 (flag0=True so CSRNG does not block on entropy_src)
-  // and BOOT_GEN_CMD = 0x00000601 (duplicate INSTANTIATE instead of GENERATE).
+  // Part A: Boot Mode failure -> HW_CMD_STS.BOOT_MODE must remain 1 in
+  // RejectCsrngEntropy. Set BOOT_INS_CMD = 0x00000601 (flag0=True so CSRNG does
+  // not block on entropy_src) and BOOT_GEN_CMD = 0x00000601 (duplicate
+  // INSTANTIATE instead of GENERATE).
   abs_mmio_write32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET, 0x00000601u);
   abs_mmio_write32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET, 0x00000601u);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4True, kMultiBitBool4True,
                                  kMultiBitBool4False, kMultiBitBool4False));
   IBEX_SPIN_FOR(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
                     kEdnStateRejectCsrngEntropy,
                 1000);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
 
   uint32_t hw_sts = abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_BOOT_MODE_BIT) == 1);
@@ -240,7 +242,8 @@ static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
   CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_CMD_ACK_BIT) == 1);
   CHECK(bitfield_field32_read(hw_sts, EDN_HW_CMD_STS_CMD_STS_FIELD) == 3u);
 
-  // Restore BOOT_INS_CMD / BOOT_GEN_CMD and disable EDN0; verify HW_CMD_STS clears to 0 on Idle.
+  // Restore BOOT_INS_CMD / BOOT_GEN_CMD and disable EDN0; verify HW_CMD_STS
+  // clears to 0 on Idle.
   abs_mmio_write32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET, 0x901u);
   abs_mmio_write32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET, 0xfff003u);
   abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -250,18 +253,18 @@ static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
         kEdnStateIdle);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET) == 0u);
 
-  // Part B: Auto Mode max_reqs_cnt restore on disable + HW_CMD_STS.AUTO_MODE latch.
-  // Reset CSRNG state and configure MAX_NUM_REQS_BETWEEN_RESEEDS = 0 prior to disable,
-  // then disable EDN0 so main_sm_done_pulse restores max_reqs_cnt = 0.
+  // Part B: Auto Mode max_reqs_cnt restore on disable + HW_CMD_STS.AUTO_MODE
+  // latch. Reset CSRNG state and configure MAX_NUM_REQS_BETWEEN_RESEEDS = 0
+  // prior to disable, then disable EDN0 so main_sm_done_pulse restores
+  // max_reqs_cnt = 0.
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9999u);
-  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
-                   ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4True
-                        << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
-                       ((uint32_t)kMultiBitBool4False
-                        << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+  abs_mmio_write32(
+      kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+      ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+          ((uint32_t)kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+          ((uint32_t)kMultiBitBool4False
+           << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
 
   abs_mmio_write32(kEdn0Base + EDN_MAX_NUM_REQS_BETWEEN_RESEEDS_REG_OFFSET, 0u);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
@@ -273,18 +276,18 @@ static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
   abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0x00000601u);
   abs_mmio_write32(kEdn0Base + EDN_GENERATE_CMD_REG_OFFSET, 0x00001003u);
 
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEdn0RecovAlert));
   abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
   IBEX_SPIN_FOR(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) ==
                     kEdnStateRejectCsrngEntropy,
                 1000);
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdCsrngRecovAlert));
-  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-      kTopEarlgreyAlertIdEdn0RecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdCsrngRecovAlert));
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEdn0RecovAlert));
   hw_sts = abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_BOOT_MODE_BIT) == 0);
   CHECK(bitfield_bit32_read(hw_sts, EDN_HW_CMD_STS_AUTO_MODE_BIT) == 1);
@@ -301,7 +304,8 @@ static void test_boot_and_auto_mode_hw_cmd_sts_and_max_reqs_cnt(void) {
 }
 
 static void test_fifo_depth_and_err_code_test(void) {
-  LOG_INFO("3. Testing EDN0 13-word FIFO depth, overflow, and ERR_CODE_TEST...");
+  LOG_INFO(
+      "3. Testing EDN0 13-word FIFO depth, overflow, and ERR_CODE_TEST...");
 
   // Disable external IRQs before triggering EDN0 fatal alert because
   // prim_alert_sender #(.IsFatal(1)) latches alert_set_q = 1 until hardware
@@ -316,8 +320,8 @@ static void test_fifo_depth_and_err_code_test(void) {
   abs_mmio_write32(edn0_recov_cause_reg, 1u);
   abs_mmio_write32(edn0_fatal_cause_reg, 1u);
 
-  // Verify continuous RECOV_ALERT_STS MuBi4 field alert re-assertion across rw0c
-  // while CTRL holds an invalid mubi4 value (edn_core.sv:473-475).
+  // Verify continuous RECOV_ALERT_STS MuBi4 field alert re-assertion across
+  // rw0c while CTRL holds an invalid mubi4 value (edn_core.sv:473-475).
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET,
                    make_edn_ctrl(kMultiBitBool4False, kMultiBitBool4False,
                                  kMultiBitBool4False, (multi_bit_bool_t)0x0));
@@ -327,7 +331,8 @@ static void test_fifo_depth_and_err_code_test(void) {
   abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
         (1u << EDN_RECOV_ALERT_STS_CMD_FIFO_RST_FIELD_ALERT_BIT));
-  // Restoring CTRL to valid mubi4 (0x9999) allows rw0c to clear RECOV_ALERT_STS.
+  // Restoring CTRL to valid mubi4 (0x9999) allows rw0c to clear
+  // RECOV_ALERT_STS.
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
   abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0u);
@@ -364,7 +369,8 @@ static void test_fifo_depth_and_err_code_test(void) {
   CHECK(abs_mmio_read32(edn0_fatal_cause_reg) == 0u);
 
   // Pushing a 14th word overflows RESEED_CMD FIFO -> sets SFIFO_RESCMD_ERR (0)
-  // and FIFO_WRITE_ERR (28), sets INTR_STATE.EDN_FATAL_ERR, and fires fatal_alert!
+  // and FIFO_WRITE_ERR (28), sets INTR_STATE.EDN_FATAL_ERR, and fires
+  // fatal_alert!
   abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0xdeadbeefu);
   IBEX_SPIN_FOR(abs_mmio_read32(edn0_fatal_cause_reg) == 1u, 100);
 
@@ -408,7 +414,8 @@ static void test_subword_wr_err_and_addrmiss(void) {
   CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) == 0x901u);
 
-  // 1. Unmapped offset 0x48 (EDN_MAIN_SM_STATE_REG_OFFSET + 4): addrmiss = 1 -> Load/Store Access Fault.
+  // 1. Unmapped offset 0x48 (EDN_MAIN_SM_STATE_REG_OFFSET + 4): addrmiss = 1 ->
+  // Load/Store Access Fault.
   g_fault_seen = false;
   (void)abs_mmio_read32(kEdn0Base + 0x48u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
@@ -417,28 +424,31 @@ static void test_subword_wr_err_and_addrmiss(void) {
   abs_mmio_write32(kEdn0Base + 0x48u, 0x12345678u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
 
-  // 2. Sub-word 8-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): wr_err = 1 -> Store Access Fault,
-  // write blocked, and no spurious recoverable alert asserted.
+  // 2. Sub-word 8-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): wr_err = 1
+  // -> Store Access Fault, write blocked, and no spurious recoverable alert
+  // asserted.
   g_fault_seen = false;
   abs_mmio_write8(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x99u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) == 0u);
 
-  // 3. Sub-word 16-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): reg_be = 4'b0011 -> succeeds!
+  // 3. Sub-word 16-bit store to EDN_CTRL (EDN_PERMIT[5] = 4'b0011): reg_be =
+  // 4'b0011 -> succeeds!
   g_fault_seen = false;
   *(volatile uint16_t *)(kEdn0Base + EDN_CTRL_REG_OFFSET) = 0x9999u;
   CHECK(!g_fault_seen);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
 
-  // 4. Sub-word 16-bit store to EDN_BOOT_INS_CMD (EDN_PERMIT[6] = 4'b1111): wr_err = 1 -> Store Access Fault,
-  // register value preserved.
+  // 4. Sub-word 16-bit store to EDN_BOOT_INS_CMD (EDN_PERMIT[6] = 4'b1111):
+  // wr_err = 1 -> Store Access Fault, register value preserved.
   g_fault_seen = false;
   *(volatile uint16_t *)(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) = 0xdead;
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
   CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) == 0x901u);
 
-  // 5. Sub-word 8-bit store to EDN_INTR_ENABLE (EDN_PERMIT[1] = 4'b0001): succeeds!
+  // 5. Sub-word 8-bit store to EDN_INTR_ENABLE (EDN_PERMIT[1] = 4'b0001):
+  // succeeds!
   g_fault_seen = false;
   abs_mmio_write8(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET, 0x3u);
   CHECK(!g_fault_seen);

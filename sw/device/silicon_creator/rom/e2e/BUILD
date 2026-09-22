@@ -420,10 +420,10 @@ opentitan_test(
         # bitstream target can fetch pre-spliced bitstream from GCP.
         tags = ["manual"],
     ),
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     qemu = qemu_params(
         otp = "//hw/ip/otp_ctrl/data:img_dev",
     ),
-    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -447,11 +447,11 @@ opentitan_test(
         exit_failure = MSG_PASS,
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_KEY)),
     ),
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     qemu = qemu_params(
         exit_failure = MSG_PASS,
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_KEY)),
     ),
-    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -476,11 +476,11 @@ opentitan_test(
         # fresh bitstream and clear all memories (ie: flash-based boot policy).
         testopt_clear_after_test = "True",
     ),
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     qemu = qemu_params(
         exit_failure = "(min_security_version_rom_ext:[^01])|(FAIL)|((min_security_version_rom_ext:0(?s:.*)){2,})|(PASS)",
         exit_success = "min_security_version_rom_ext:0(?s:.*)min_security_version_rom_ext:1(?s:.*)" + MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.BOOT_POLICY.ROLLBACK)),
     ),
-    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
         "//sw/device/lib/testing/test_framework:ottf_main",

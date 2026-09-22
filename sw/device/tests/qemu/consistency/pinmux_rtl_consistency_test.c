@@ -41,20 +41,20 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   }
 }
 
-#define EXPECT_CHECK(cond, fmt, ...)                \
-  do {                                              \
-    if (!(cond)) {                                  \
-      LOG_ERROR("MISMATCH: " fmt, ##__VA_ARGS__);   \
-      failures++;                                   \
-    }                                               \
+#define EXPECT_CHECK(cond, fmt, ...)              \
+  do {                                            \
+    if (!(cond)) {                                \
+      LOG_ERROR("MISMATCH: " fmt, ##__VA_ARGS__); \
+      failures++;                                 \
+    }                                             \
   } while (0)
 
 bool test_main(void) {
   uint32_t failures = 0;
 
   dif_alert_handler_t alert_handler;
-  CHECK_DIF_OK(dif_alert_handler_init(
-      mmio_region_from_addr(kAlertHandlerBase), &alert_handler));
+  CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
+                                      &alert_handler));
   CHECK_DIF_OK(dif_alert_handler_configure_alert(
       &alert_handler, kTopEarlgreyAlertIdPinmuxAonFatalFault,
       kDifAlertHandlerClassA, /*enabled=*/kDifToggleEnabled,
@@ -70,8 +70,9 @@ bool test_main(void) {
   bool is_cause = false;
   CHECK_DIF_OK(dif_alert_handler_alert_is_cause(
       &alert_handler, kTopEarlgreyAlertIdPinmuxAonFatalFault, &is_cause));
-  EXPECT_CHECK(is_cause,
-               "ALERT_CAUSE[PinmuxAonFatalFault] did not latch after ALERT_TEST");
+  EXPECT_CHECK(
+      is_cause,
+      "ALERT_CAUSE[PinmuxAonFatalFault] did not latch after ALERT_TEST");
 
   CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
       &alert_handler, kTopEarlgreyAlertIdPinmuxAonFatalFault));
@@ -243,7 +244,8 @@ bool test_main(void) {
   // ---------------------------------------------------------------------------
   // 6. Enabling a Posedge wakeup detector while the selected input (PADSEL=1,
   //    ConstantOne) is already steady high must NOT trigger a spurious wakeup
-  //    (pinmux_wkup.sv: filter_out_q tracks filter_out_d even while wkup_en_i=0)
+  //    (pinmux_wkup.sv: filter_out_q tracks filter_out_d even while
+  //    wkup_en_i=0)
   // ---------------------------------------------------------------------------
   abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_DETECTOR_0_REG_OFFSET,
                    PINMUX_WKUP_DETECTOR_0_MODE_0_VALUE_POSEDGE);
@@ -276,7 +278,8 @@ bool test_main(void) {
   busy_spin_micros(20);
 
   // ---------------------------------------------------------------------------
-  // 7. PINMUX_PERMIT sub-word write error (`wr_err`), valid sub-word read/write,
+  // 7. PINMUX_PERMIT sub-word write error (`wr_err`), valid sub-word
+  // read/write,
   //    and unmapped `addrmiss` (`0x8e0`)
   // ---------------------------------------------------------------------------
   load_fault_count = 0;
@@ -290,7 +293,8 @@ bool test_main(void) {
                "0x%02x (expected 0x83)",
                load_fault_count, mio_attr_b0);
 
-  // Sub-word write16 to MIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x3) -> wr_err
+  // Sub-word write16 to MIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x3) ->
+  // wr_err
   store_fault_count = 0;
   *(volatile uint16_t *)(kPinmuxBase + kMioAttrOff) = 0x0000u;
   EXPECT_CHECK(store_fault_count == 1u,
@@ -301,7 +305,8 @@ bool test_main(void) {
                "MIO_PAD_ATTR modified by rejected sub-word write16");
   abs_mmio_write32(kPinmuxBase + kMioAttrOff, orig_mio_attr);
 
-  // Sub-word write8 to DIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x1) -> wr_err
+  // Sub-word write8 to DIO_PAD_ATTR (PINMUX_PERMIT = 0x7, reg_be = 0x1) ->
+  // wr_err
   store_fault_count = 0;
   abs_mmio_write8(kPinmuxBase + kDioAttrOff, 0x83u);
   EXPECT_CHECK(store_fault_count == 1u,

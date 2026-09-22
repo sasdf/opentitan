@@ -142,7 +142,16 @@ impl Target for QemuSpi {
             };
             let len_bytes = (total_len as u16).to_le_bytes();
             let mut tx_buf = Vec::with_capacity(8 + total_len);
-            tx_buf.extend_from_slice(&[b'/', b'C', b'S', 0, spi_mode, 0, len_bytes[0], len_bytes[1]]);
+            tx_buf.extend_from_slice(&[
+                b'/',
+                b'C',
+                b'S',
+                0,
+                spi_mode,
+                0,
+                len_bytes[0],
+                len_bytes[1],
+            ]);
             for transfer in transaction.iter() {
                 match transfer {
                     Transfer::Read(buf) => tx_buf.resize(tx_buf.len() + buf.len(), 0),

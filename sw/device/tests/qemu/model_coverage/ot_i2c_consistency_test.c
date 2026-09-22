@@ -89,36 +89,37 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIor0,
                                         kTopEarlgreyPinmuxOutselI2c0Sda));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Sda,
-      kTopEarlgreyPinmuxInselIor0));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Sda,
+                                       kTopEarlgreyPinmuxInselIor0));
   CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIor1,
                                         kTopEarlgreyPinmuxOutselI2c0Scl));
-  CHECK_DIF_OK(dif_pinmux_input_select(
-      &pinmux, kTopEarlgreyPinmuxPeripheralInI2c0Scl,
-      kTopEarlgreyPinmuxInselIor1));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Scl,
+                                       kTopEarlgreyPinmuxInselIor1));
 
   // Program timings with sufficient T_R (20 cycles) and THD_DAT (10 cycles,
   // satisfying thd_dat + 1 < thd_sta = 60 in i2c_bus_monitor.sv) so open-drain
   // rise/fall times on CW340 FPGA never trigger false sda_released_but_low
   // arbitration loss or false stop_det during HoldBit -> ClockLow SDA changes.
-  abs_mmio_write32(kI2c0Base + I2C_TIMING0_REG_OFFSET,
-                   (60u << I2C_TIMING0_THIGH_OFFSET) |
-                       (60u << I2C_TIMING0_TLOW_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING1_REG_OFFSET,
-                   (20u << I2C_TIMING1_T_R_OFFSET) |
-                       (4u << I2C_TIMING1_T_F_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING0_REG_OFFSET,
+      (60u << I2C_TIMING0_THIGH_OFFSET) | (60u << I2C_TIMING0_TLOW_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING1_REG_OFFSET,
+      (20u << I2C_TIMING1_T_R_OFFSET) | (4u << I2C_TIMING1_T_F_OFFSET));
   abs_mmio_write32(kI2c0Base + I2C_TIMING2_REG_OFFSET,
                    (60u << I2C_TIMING2_TSU_STA_OFFSET) |
                        (60u << I2C_TIMING2_THD_STA_OFFSET));
   abs_mmio_write32(kI2c0Base + I2C_TIMING3_REG_OFFSET,
                    (10u << I2C_TIMING3_TSU_DAT_OFFSET) |
                        (10u << I2C_TIMING3_THD_DAT_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING4_REG_OFFSET,
-                   (60u << I2C_TIMING4_TSU_STO_OFFSET) |
-                       (60u << I2C_TIMING4_T_BUF_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING4_REG_OFFSET,
+      (60u << I2C_TIMING4_TSU_STO_OFFSET) | (60u << I2C_TIMING4_T_BUF_OFFSET));
 
-  // While CTRL.ENABLEHOST == 0, queue 1 byte in FDATA with START | STOP | NAKOK.
+  // While CTRL.ENABLEHOST == 0, queue 1 byte in FDATA with START | STOP |
+  // NAKOK.
   const uint32_t kFdataEntry =
       (0x7eu << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT) |
       (1u << I2C_FDATA_STOP_BIT) | (1u << I2C_FDATA_NAKOK_BIT);
@@ -168,11 +169,10 @@ bool test_main(void) {
   abs_mmio_write32(kI2c0Base + I2C_TARGET_ID_REG_OFFSET,
                    (0x33u << I2C_TARGET_ID_ADDRESS0_OFFSET) |
                        (0x7fu << I2C_TARGET_ID_MASK0_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT) |
-                       (1u << I2C_FDATA_STOP_BIT) |
-                       (1u << I2C_FDATA_NAKOK_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT) |
+          (1u << I2C_FDATA_STOP_BIT) | (1u << I2C_FDATA_NAKOK_BIT));
   while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
            kHostDoneMask) != kHostDoneMask) ||
          ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
@@ -184,14 +184,13 @@ bool test_main(void) {
 
   // 4B. Broadcast / non-matching address check with ENABLETARGET = 1 (Chunk 19:
   // ot_i2c_target_event when I2C_BROADCAST 0x00 does not match TARGET_ID 0x33).
-  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET,
-                   (1u << I2C_CTRL_ENABLEHOST_BIT) |
-                       (1u << I2C_CTRL_ENABLETARGET_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x00u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT) |
-                       (1u << I2C_FDATA_STOP_BIT) |
-                       (1u << I2C_FDATA_NAKOK_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_CTRL_REG_OFFSET,
+      (1u << I2C_CTRL_ENABLEHOST_BIT) | (1u << I2C_CTRL_ENABLETARGET_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x00u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT) |
+          (1u << I2C_FDATA_STOP_BIT) | (1u << I2C_FDATA_NAKOK_BIT));
   while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
            kHostAndTargetDoneMask) != kHostAndTargetDoneMask) ||
          ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
@@ -203,14 +202,13 @@ bool test_main(void) {
 
   // 4C. Cross-address Repeated START (Chunk 12: START to 0x33 without STOP,
   // followed by Repeated START to 0x34 with STOP | NAKOK).
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x68u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT) |
-                       (1u << I2C_FDATA_STOP_BIT) |
-                       (1u << I2C_FDATA_NAKOK_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x68u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT) |
+          (1u << I2C_FDATA_STOP_BIT) | (1u << I2C_FDATA_NAKOK_BIT));
   while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
            kHostAndTargetDoneMask) != kHostAndTargetDoneMask) ||
          ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
@@ -227,19 +225,17 @@ bool test_main(void) {
   abs_mmio_write32(kI2c0Base + I2C_TXDATA_REG_OFFSET, 0xa5u);
   abs_mmio_write32(kI2c0Base + I2C_TXDATA_REG_OFFSET, 0x5au);
   abs_mmio_write32(kI2c0Base + I2C_TXDATA_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x67u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (1u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_READB_BIT) |
-                       (1u << I2C_FDATA_RCONT_BIT) |
-                       (1u << I2C_FDATA_NAKOK_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (1u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_READB_BIT) |
-                       (1u << I2C_FDATA_RCONT_BIT) |
-                       (1u << I2C_FDATA_STOP_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x67u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (1u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_READB_BIT) |
+          (1u << I2C_FDATA_RCONT_BIT) | (1u << I2C_FDATA_NAKOK_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (1u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_READB_BIT) |
+          (1u << I2C_FDATA_RCONT_BIT) | (1u << I2C_FDATA_STOP_BIT));
   while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
            kHostAndTargetDoneMask) != kHostAndTargetDoneMask) ||
          ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
@@ -261,12 +257,12 @@ bool test_main(void) {
                    (1u << I2C_CTRL_ENABLEHOST_BIT) |
                        (1u << I2C_CTRL_ENABLETARGET_BIT) |
                        (1u << I2C_CTRL_ACK_CTRL_EN_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x55u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_STOP_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x55u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_STOP_BIT));
   while ((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
           (1u << I2C_STATUS_ACK_CTRL_STRETCH_BIT)) == 0u) {
   }
@@ -296,12 +292,12 @@ bool test_main(void) {
                    (1u << I2C_CTRL_ENABLEHOST_BIT) |
                        (1u << I2C_CTRL_ENABLETARGET_BIT) |
                        (1u << I2C_CTRL_ACK_CTRL_EN_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x77u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_STOP_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x77u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_STOP_BIT));
   while ((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
           (1u << I2C_STATUS_ACK_CTRL_STRETCH_BIT)) == 0u) {
   }
@@ -330,22 +326,22 @@ bool test_main(void) {
   // Send 8 30-byte write transactions (8 * 32 = 256 ACQ entries) + 1 6-byte
   // write transaction (8 ACQ entries) = 264 ACQ entries.
   LOG_INFO("Step 4G: STATUS.ACQFULL at 267 entries");
-  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET,
-                   (1u << I2C_CTRL_ENABLEHOST_BIT) |
-                       (1u << I2C_CTRL_ENABLETARGET_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_CTRL_REG_OFFSET,
+      (1u << I2C_CTRL_ENABLEHOST_BIT) | (1u << I2C_CTRL_ENABLETARGET_BIT));
   for (uint32_t t = 0; t < 9u; ++t) {
     uint32_t data_bytes = (t < 8u) ? 30u : 6u;
     abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0x7fffu);
-    abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                     (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                         (1u << I2C_FDATA_START_BIT));
+    abs_mmio_write32(
+        kI2c0Base + I2C_FDATA_REG_OFFSET,
+        (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
     for (uint32_t b = 0; b + 1u < data_bytes; ++b) {
       abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
                        ((b + 1u) & 0xffu) << I2C_FDATA_FBYTE_OFFSET);
     }
-    abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                     (0x55u << I2C_FDATA_FBYTE_OFFSET) |
-                         (1u << I2C_FDATA_STOP_BIT));
+    abs_mmio_write32(
+        kI2c0Base + I2C_FDATA_REG_OFFSET,
+        (0x55u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_STOP_BIT));
     while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
              kHostAndTargetDoneMask) != kHostAndTargetDoneMask) ||
            ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
@@ -354,9 +350,8 @@ bool test_main(void) {
   }
   tgt_fifo_status =
       abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET);
-  uint32_t acqlvl =
-      (tgt_fifo_status >> I2C_TARGET_FIFO_STATUS_ACQLVL_OFFSET) &
-      I2C_TARGET_FIFO_STATUS_ACQLVL_MASK;
+  uint32_t acqlvl = (tgt_fifo_status >> I2C_TARGET_FIFO_STATUS_ACQLVL_OFFSET) &
+                    I2C_TARGET_FIFO_STATUS_ACQLVL_MASK;
   CHECK(acqlvl == 264u);
   CHECK((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
          (1u << I2C_STATUS_ACQFULL_BIT)) == 0u);
@@ -364,23 +359,24 @@ bool test_main(void) {
   // Send 1 more 1-byte write transaction (AcqStart + AcqData + AcqStop = 3
   // entries -> acqlvl = 267 >= 266), asserting STATUS.ACQFULL == 1.
   abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0x7fffu);
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x66u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_START_BIT));
-  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
-                   (0x77u << I2C_FDATA_FBYTE_OFFSET) |
-                       (1u << I2C_FDATA_STOP_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x66u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_START_BIT));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (0x77u << I2C_FDATA_FBYTE_OFFSET) | (1u << I2C_FDATA_STOP_BIT));
   uint32_t spin9 = 0;
   while (((abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET) &
            kHostAndTargetDoneMask) != kHostAndTargetDoneMask) ||
          ((abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET) &
            (1u << I2C_INTR_STATE_CMD_COMPLETE_BIT)) == 0u)) {
     if (++spin9 > 50000u) {
-      LOG_ERROR("4G tx9 stall status=0x%08x intr=0x%08x cev=0x%08x tfifo=0x%08x",
-                abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET),
-                abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
-                abs_mmio_read32(kI2c0Base + I2C_CONTROLLER_EVENTS_REG_OFFSET),
-                abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET));
+      LOG_ERROR(
+          "4G tx9 stall status=0x%08x intr=0x%08x cev=0x%08x tfifo=0x%08x",
+          abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET),
+          abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+          abs_mmio_read32(kI2c0Base + I2C_CONTROLLER_EVENTS_REG_OFFSET),
+          abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET));
       CHECK(false);
     }
   }
@@ -397,21 +393,21 @@ bool test_main(void) {
   // 4H. Fast Mode Plus timing configuration check in ot_i2c_check_timings
   // (Chunks 1-5: ot_i2c.c:L817-L822, L836, L841, L846, L851).
   abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0x0u);
-  abs_mmio_write32(kI2c0Base + I2C_TIMING0_REG_OFFSET,
-                   (10u << I2C_TIMING0_THIGH_OFFSET) |
-                       (15u << I2C_TIMING0_TLOW_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING1_REG_OFFSET,
-                   (2u << I2C_TIMING1_T_R_OFFSET) |
-                       (2u << I2C_TIMING1_T_F_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING2_REG_OFFSET,
-                   (1u << I2C_TIMING2_TSU_STA_OFFSET) |
-                       (5u << I2C_TIMING2_THD_STA_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING3_REG_OFFSET,
-                   (1u << I2C_TIMING3_TSU_DAT_OFFSET) |
-                       (1u << I2C_TIMING3_THD_DAT_OFFSET));
-  abs_mmio_write32(kI2c0Base + I2C_TIMING4_REG_OFFSET,
-                   (1u << I2C_TIMING4_TSU_STO_OFFSET) |
-                       (1u << I2C_TIMING4_T_BUF_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING0_REG_OFFSET,
+      (10u << I2C_TIMING0_THIGH_OFFSET) | (15u << I2C_TIMING0_TLOW_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING1_REG_OFFSET,
+      (2u << I2C_TIMING1_T_R_OFFSET) | (2u << I2C_TIMING1_T_F_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING2_REG_OFFSET,
+      (1u << I2C_TIMING2_TSU_STA_OFFSET) | (5u << I2C_TIMING2_THD_STA_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING3_REG_OFFSET,
+      (1u << I2C_TIMING3_TSU_DAT_OFFSET) | (1u << I2C_TIMING3_THD_DAT_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING4_REG_OFFSET,
+      (1u << I2C_TIMING4_TSU_STO_OFFSET) | (1u << I2C_TIMING4_T_BUF_OFFSET));
   abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET,
                    1u << I2C_CTRL_ENABLEHOST_BIT);
   CHECK(abs_mmio_read32(kI2c0Base + I2C_TIMING0_REG_OFFSET) ==
