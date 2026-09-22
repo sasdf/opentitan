@@ -4691,6 +4691,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4751,6 +4757,12 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     fpga = fpga_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
         test_cmd = """
             --no-wait-for-usb-device
         """,
@@ -4844,8 +4856,6 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     qemu = qemu_params(
-        # Require the PHY_PINS_SENSE register.
-        tags = ["broken"],
         test_cmd = """
             --no-wait-for-usb-device
         """,
@@ -5113,6 +5123,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5137,6 +5153,7 @@ opentitan_test(
     name = "usbdev_logging_test",
     srcs = ["usbdev_logging_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
@@ -5144,6 +5161,10 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "eternal",
         tags = ["manual"],
+    ),
+    qemu = qemu_params(
+        rom = "//sw/device/lib/testing/test_rom:test_rom",
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     verilator = verilator_params(
         timeout = "long",
