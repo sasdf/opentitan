@@ -5995,9 +5995,23 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             timeout = "moderate",
+            needs_jtag = True,
+            otp = test_cfg["otp"],
+            rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
+            tags = [
+                "lc_{}".format(test_cfg["lc_state"]),
+            ],
+            test_cmd = """
+                --rom={rom:binary}
+                {rv_dm_delayed_en}
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:mem_access",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = test_cfg["otp"],
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
