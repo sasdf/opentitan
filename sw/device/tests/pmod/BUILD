@@ -9,6 +9,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "verilator_params",
 )
@@ -66,6 +67,11 @@ opentitan_test(
             "pmod",
         ],  # Requires the PMOD::BoB.
     ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mx66l1g45g",
+        },
+    ),
     silicon = silicon_params(
         tags = [
             "pmod",
@@ -99,6 +105,7 @@ opentitan_test(
     name = "spi_host_macronix128Mb_flash_test",
     srcs = ["spi_host_macronix128Mb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -107,6 +114,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mx25l12835f",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -129,6 +141,7 @@ opentitan_test(
     name = "spi_host_gigadevice256Mb_flash_test",
     srcs = ["spi_host_gigadevice256Mb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -137,6 +150,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "gd25q256",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -160,6 +178,7 @@ opentitan_test(
     name = "spi_host_gigadevice1Gb_flash_test",
     srcs = ["spi_host_gigadevice1Gb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -168,6 +187,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "gd25b01g",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -191,6 +215,7 @@ opentitan_test(
     name = "spi_host_issi256Mb_flash_test",
     srcs = ["spi_host_issi256Mb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -199,6 +224,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "is25wp256",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -222,6 +252,7 @@ opentitan_test(
     name = "spi_host_micron512Mb_flash_test",
     srcs = ["spi_host_micron512Mb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -230,6 +261,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "mt25ql512ab",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -253,6 +289,7 @@ opentitan_test(
     name = "spi_host_winbond1Gb_flash_test",
     srcs = ["spi_host_winbond1Gb_flash_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
@@ -261,6 +298,11 @@ opentitan_test(
             "manual",
             "pmod",
         ],  # Requires the PMOD::BoB.
+    ),
+    qemu = qemu_params(
+        globals = {
+            "ot-earlgrey-board.spiflash1": "w25q01jvq",
+        },
     ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
