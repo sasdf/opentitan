@@ -4,7 +4,7 @@
   // writes) being placed in a mis-aligned ePMP region. We must set a long
   // reset delay so that operations like bootstrapping do not try to use IOs
   // like the SPI before the ROM has set them up.
-  "reset_delay": "1000ms",
+  "reset_delay": "100ms",
   "pins": [
     // Resetting is done through the monitor on QEMU, but OpenTitanTool
     // expects a pin. We map a pin-like interface to ID 255 which can be used
@@ -45,6 +45,231 @@
       "pull_mode": "None",
       "alias_of": "24"
     },
+    {
+      "name": "TAP_STRAP0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "30"
+    },
+    {
+      "name": "TAP_STRAP1",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "27"
+    },
+    {
+      "name": "Ioc0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "22"
+    },
+    {
+      "name": "IOC0",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "22"
+    },
+    {
+      "name": "IOC1",
+      "alias_of": "23"
+    },
+    {
+      "name": "IOC2",
+      "alias_of": "24"
+    },
+    {
+      "name": "IOC3",
+      "alias_of": "25"
+    },
+    {
+      "name": "IOC4",
+      "alias_of": "26"
+    },
+    {
+      "name": "IOC5",
+      "alias_of": "27"
+    },
+    {
+      "name": "IOC6",
+      "alias_of": "28"
+    },
+    {
+      "name": "IOC7",
+      "alias_of": "29"
+    },
+    {
+      "name": "IOC8",
+      "alias_of": "30"
+    },
+    {
+      "name": "IOC9",
+      "alias_of": "31"
+    },
+    {
+      "name": "IOA0",
+      "alias_of": "0"
+    },
+    {
+      "name": "IOA1",
+      "alias_of": "1"
+    },
+    {
+      "name": "IOA2",
+      "alias_of": "2"
+    },
+    {
+      "name": "IOA3",
+      "alias_of": "3"
+    },
+    {
+      "name": "IOA4",
+      "alias_of": "4"
+    },
+    {
+      "name": "IOA5",
+      "alias_of": "5"
+    },
+    {
+      "name": "IOA6",
+      "alias_of": "6"
+    },
+    {
+      "name": "Ioa7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "PullUp",
+      "alias_of": "7"
+    },
+    {
+      "name": "IOA7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "PullUp",
+      "alias_of": "7"
+    },
+    {
+      "name": "Ioa8",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
+      "name": "IOA8",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
+      "name": "IOB0",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "0"
+    },
+    {
+      "name": "IOB1",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "1"
+    },
+    {
+      "name": "IOB2",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "2"
+    },
+    {
+      "name": "IOB3",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "3"
+    },
+    {
+      "name": "IOR5",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "5"
+    },
+    {
+      "name": "IOR6",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "6"
+    },
+    {
+      "name": "IOR7",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "PullUp",
+      "alias_of": "7"
+    },
+    {
+      "name": "IOR10",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "10"
+    },
+    {
+      "name": "IOR11",
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "8"
+    },
+    {
+      "name": "IOR12",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "12"
+    },
+    {
+      "name": "IOR13",
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None",
+      "alias_of": "13"
+    },
+    {
+      "name": "IOR8",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "14"
+    },
+    {
+      "name": "IOR9",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "15"
+    },
+    {
+      "name": "SYSRST_CTRL_EC_RST_L",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "14"
+    },
+    {
+      "name": "SYSRST_CTRL_FLASH_WP_L",
+      "mode": "OpenDrain",
+      "level": true,
+      "pull_mode": "PullUp",
+      "alias_of": "15"
+    }
   ],
   "strappings": [
     {
@@ -77,11 +302,65 @@
     // For now we model both straps as no-ops without any pins.
     {
       "name": "PINMUX_TAP_RISCV",
-      "pins": [],
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": false
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": true
+        }
+      ]
     },
     {
       "name": "PINMUX_TAP_LC",
-      "pins": [],
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": true
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": false
+        }
+      ]
+    },
+    {
+      "name": "PINMUX_TAP_DFT",
+      "pins": [
+        {
+          "name": "TAP_STRAP0",
+          "mode": "PushPull",
+          "level": true
+        },
+        {
+          "name": "TAP_STRAP1",
+          "mode": "PushPull",
+          "level": true
+        }
+      ]
+    },
+    {
+      "name": "RMA_BOOTSTRAP",
+      "pins": [
+        {
+          "name": "SW_STRAP0",
+          "level": false
+        },
+        {
+          "name": "SW_STRAP1",
+          "level": true
+        },
+        {
+          "name": "SW_STRAP2",
+          "level": true
+        }
+      ]
     },
     {
       "name": "SPI_TPM"
@@ -91,9 +370,34 @@
     {
       "name": "console",
       "alias_of": "0"
+    },
+    {
+      "name": "dut",
+      "alias_of": "1"
     }
   ],
   "provides": {
     "chip": "opentitan",
-  }
+  },
+  "gpios": [
+    "Ioa0",
+    "Ioa1",
+    "Ioa2",
+    "Ioa3",
+    "Ioa4",
+    "Ioa5",
+    "Ioa6",
+    "Ioa7",
+    "Ioa8",
+    "Ioc0",
+    "Ioc1",
+    "Ioc2",
+    "Ioc3",
+    "Ioc4",
+    "Ioc5",
+    "Ioc6",
+    "Ioc7",
+    "Ioc8",
+    "Ioc9"
+  ]
 }
