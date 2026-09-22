@@ -81,6 +81,16 @@ pub trait UsbDevice {
     /// after resetting the device and a new one has to be obtained.
     fn reset(&self) -> Result<()>;
 
+    /// Suspend the device on the bus.
+    fn suspend(&self) -> Result<()> {
+        anyhow::bail!("unimplemented suspend");
+    }
+
+    /// Resume the device on the bus.
+    fn resume(&self) -> Result<()> {
+        anyhow::bail!("unimplemented resume");
+    }
+
     /// Get the default timeout for operations.
     fn get_timeout(&self) -> Duration;
 
