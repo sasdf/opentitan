@@ -105,6 +105,8 @@ class OtDut():
 
         openocd_bin = resolve_runfile(_OPENOCD_BIN)
         openocd_cfg = resolve_runfile(_OPENOCD_ADAPTER_CONFIG)
+        if self.fpga == "sim_qemu":
+            self.fpga_dont_clear_bitstream = True
         if self.fpga:
             # Set host flags and device binary for FPGA DUT.
             interface = self.fpga if self.fpga == "hyper310" else "hyper340"
@@ -118,6 +120,16 @@ class OtDut():
             device_elf = device_elf.format(
                 base_dir=self._base_dev_dir(),
                 target=f"fpga_{self.fpga}_rom_with_fake_keys")
+            if self.fpga == "sim_qemu":
+                qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
+                host_flags = f"""
+                    --interface=qemu \
+                    --qemu-monitor-socket={qemu_monitor} \
+                    --openocd={openocd_bin} \
+                """
+                device_elf = _CP_DEVICE_ELF.format(
+                    base_dir=self._base_dev_dir(),
+                    target="sim_qemu_rom_with_fake_keys")
         else:
             # Set host flags and device binary for Silicon DUT.
             host_flags = host_flags.format(target="teacup",
@@ -224,6 +236,28 @@ class OtDut():
                 base_dir=self._base_dev_dir(),
                 sku=self.sku_config.name,
                 target=f"fpga_{self.fpga}_rom_with_fake_keys")
+            if self.fpga == "sim_qemu":
+                qemu_monitor = os.environ.get("QEMU_MONITOR", "qemu-monitor")
+                host_flags = f"""
+                    --interface=qemu \
+                    --qemu-monitor-socket={qemu_monitor} \
+                    --openocd={openocd_bin} \
+                """
+                target_str = "sim_qemu_rom_with_fake_keys"
+                individ_elf = _FT_INDIVID_DEVICE_ELF.format(
+                    base_dir=self._base_dev_dir(),
+                    sku=self.sku_config.name,
+                    ate_suffix=ate_suffix,
+                    target=target_str)
+                if self.sku_config.scrambling_bin:
+                    scrambling_bin = self.sku_config.scrambling_bin.format(
+                        base_dir=self._base_dev_dir(),
+                        sku=self.sku_config.name,
+                        target=target_str)
+                fw_bundle_bin = _FT_FW_BUNDLE_BIN.format(
+                    base_dir=self._base_dev_dir(),
+                    sku=self.sku_config.name,
+                    target=target_str)
         else:
             # Set host flags and device binaries for Silicon DUT.
             host_flags = host_flags.format(target="teacup",
@@ -297,6 +331,8 @@ class OtDut():
                                for cert_name in self.sku_config.dice_mldsa_certs_from_device)
                 cmd += "".join(" --dice-mldsa-certs-to-device={}".format(cert_name)
                                for cert_name in self.sku_config.dice_mldsa_certs_to_device)
+            elif self.fpga == "sim_qemu":
+                cmd += " --timeout=120s"
 
             # Get user confirmation before running command.
             logging.info(f"Running command: {cmd}")
