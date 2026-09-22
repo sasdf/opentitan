@@ -127,7 +127,7 @@ fn test_mem_access(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
             "rom",
             top_earlgrey::ROM_BASE_ADDR as u32,
             offset,
-            if offset as usize <= rom_data.len() {
+            if (offset as usize) + 4 <= rom_data.len() {
                 u32::from_le_bytes(rom_data[offset as usize..][..4].try_into().unwrap())
             } else {
                 0
