@@ -111,7 +111,7 @@ def main(args_in):
     )
     parser.add_argument(
         "--fpga",
-        choices=["hyper310", "cw340"],
+        choices=["hyper310", "cw340", "sim_qemu"],
         help="Run flow on FPGA (instead of silicon).",
     )
     parser.add_argument(

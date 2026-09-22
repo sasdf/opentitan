@@ -14,6 +14,10 @@ cp sw/host/provisioning/orchestrator/src/orchestrator.zip $TEST_TMPDIR
 
 ORCHESTRATOR_PATH=$TEST_TMPDIR/orchestrator.zip
 
+if [[ "${FPGA}" == "sim_qemu" ]]; then
+  source sw/host/provisioning/orchestrator/tests/qemu_setup.sh
+fi
+
 (
   # This script is run by a Bazel sh_test rule, which sets RUNFILES_DIR to point
   # at the test's runfiles. However, if RUNFILES_DIR is set, orchestrator.zip will
