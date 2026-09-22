@@ -230,7 +230,8 @@ void trigger_escalation(void) {
   CHECK_DIF_OK(dif_pwrmgr_alert_force(pwrmgr, alert));
 
   // If this busy spin expires the escalation didn't occur as expected.
-  busy_spin_micros(kWdogBiteMicros);
+  busy_spin_micros(kWdogBiteMicros *
+                   alert_handler_testutils_cycle_rescaling_factor());
   CHECK(false, "Timeout waiting for escalation to occur.");
 }
 
