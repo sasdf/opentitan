@@ -114,6 +114,7 @@ fn test_sw_strap_values(opts: &Opts, transport: &TransportWrapper) -> Result<()>
         match opts.init.backend_opts.interface.as_str() {
             "teacup" => sw_strap_set_teacup(transport, value)?,
             "verilator" => sw_strap_set_verilator(transport, value)?,
+            "qemu" => sw_strap_set_verilator(transport, value)?,
             intf => return Err(anyhow!("Unsupported interface: {intf}")),
         };
         if opts.init.backend_opts.interface == "teacup" {
