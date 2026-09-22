@@ -8,6 +8,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load("//rules:const.bzl", "CONST")
@@ -73,9 +74,15 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         changes_otp = True,
+        needs_jtag = True,
+        otp = "otp_img_bootstrap_rma",
+        test_harness = "//sw/host/tests/rom/e2e_bootstrap_rma",
+    ),
+    qemu = qemu_params(
         needs_jtag = True,
         otp = "otp_img_bootstrap_rma",
         test_harness = "//sw/host/tests/rom/e2e_bootstrap_rma",
@@ -93,6 +100,7 @@ opentitan_test(
     name = "e2e_bootstrap_disabled",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         # Since the bitstream disables bootstrap, there is no firmware to
@@ -106,4 +114,11 @@ opentitan_test(
         testopt_bootstrap = "False",
     ),
     manifest = None,
+    qemu = qemu_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware",
+        },
+        otp = "//hw/ip/otp_ctrl/data:img_bootstrap_disabled",
+        test_harness = "//sw/host/tests/rom/e2e_bootstrap_disabled",
+    ),
 )

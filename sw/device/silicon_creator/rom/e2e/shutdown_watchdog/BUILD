@@ -8,6 +8,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -106,6 +107,7 @@ SHUTDOWN_WATCHDOG_CASES = [
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             exit_success = t["exit_success"],
@@ -121,6 +123,17 @@ SHUTDOWN_WATCHDOG_CASES = [
         local_defines = [
             "HANG_SECS=2",
         ],
+        qemu = qemu_params(
+            exit_success = t["exit_success"],
+            otp = ":otp_img_shutdown_watchdog_{}_{}".format(
+                t["lc_state"],
+                t["bite_threshold"],
+            ),
+            tags = maybe_skip_in_ci(getattr(
+                CONST.LCV,
+                t["lc_state"].upper(),
+            )),
+        ),
         deps = [
             "//sw/device/lib/base:memory",
             "//sw/device/lib/dif:aon_timer",

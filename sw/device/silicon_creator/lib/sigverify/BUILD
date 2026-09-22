@@ -131,6 +131,9 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "long",
     ),
+    qemu = qemu_params(
+        timeout = "moderate",
+    ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
     verilator = verilator_params(tags = ["manual"]),

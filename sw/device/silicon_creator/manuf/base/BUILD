@@ -174,9 +174,9 @@ opentitan_test(
         test_cmd = """
             --provisioning-sram-elf={sram_cp_provision}
             --test-sram-elf={sram_cp_provision_functest}
-            --console-tx-indicator-pin=3
         """,
         test_harness = "//sw/host/tests/manuf/cp_provision_functest",
+        testopt_bootstrap = "False",
     ),
 )
 
@@ -473,6 +473,7 @@ manifest(d = {
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys",
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys",
             "//hw/top_earlgrey:silicon_creator",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
         ],
     )
     for sku, config in EARLGREY_SKUS.items()

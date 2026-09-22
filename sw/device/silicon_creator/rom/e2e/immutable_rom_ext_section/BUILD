@@ -22,6 +22,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/rom/e2e:defs.bzl",
@@ -198,6 +199,7 @@ IMMUTABLE_PARTITION_TEST_CASES = [
         srcs = ["immutable_rom_ext_section_test.c"],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_sival",
+            "//hw/top_earlgrey:sim_qemu_sival",
         ],
         linker_script = s["linker_script"],
         deps = [
@@ -222,8 +224,22 @@ IMMUTABLE_PARTITION_TEST_CASES = [
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            assemble = "{firmware}@{offset}",
+            binaries = {
+                ":immutable_rom_ext_section_test_{}".format(s["name"]): "firmware",
+            },
+            exit_failure = t["exit_failure"],
+            exit_success = t["exit_success"],
+            offset = s["offset"],
+            otp = ":otp_img_immutable_rom_ext_{}_{}".format(
+                t["name"],
+                s["name"],
+            ),
+        ),
+        qemu = qemu_params(
             assemble = "{firmware}@{offset}",
             binaries = {
                 ":immutable_rom_ext_section_test_{}".format(s["name"]): "firmware",
@@ -279,6 +295,7 @@ BAD_SECTION_BINS = {
         ],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw310_sival",
+            "//hw/top_earlgrey:sim_qemu_sival",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_virtual",
         deps = [
@@ -302,8 +319,16 @@ opentitan_test(
     name = "immutable_section_invalid_ok_when_disabled",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
+        assemble = "{invalid}@{rom_ext_slot_a}",
+        binaries = {
+            ":imm_section_invalid": "invalid",
+        },
+        otp = ":otp_img_immutable_rom_ext_exec_disabled_hash_valid_virtual_a",
+    ),
+    qemu = qemu_params(
         assemble = "{invalid}@{rom_ext_slot_a}",
         binaries = {
             ":imm_section_invalid": "invalid",
@@ -319,8 +344,19 @@ opentitan_test(
     name = "immutable_section_a_bad_b_good",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
+        assemble = "{invalid}@{rom_ext_slot_a} {valid}@{rom_ext_slot_b}",
+        binaries = {
+            ":imm_section_invalid": "invalid",
+            ":imm_section_valid": "valid",
+        },
+        exit_failure = DEFAULT_TEST_FAILURE_MSG,
+        exit_success = "(?msR)Immutable$.*PASS!$",
+        otp = ":otp_img_immutable_rom_ext_exec_enabled_hash_valid_virtual_a",
+    ),
+    qemu = qemu_params(
         assemble = "{invalid}@{rom_ext_slot_a} {valid}@{rom_ext_slot_b}",
         binaries = {
             ":imm_section_invalid": "invalid",
@@ -338,8 +374,19 @@ opentitan_test(
     name = "immutable_section_a_bad_b_bad",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
+        assemble = "{invalid}@{rom_ext_slot_a} {invalid}@{rom_ext_slot_b}",
+        binaries = {
+            ":imm_section_invalid": "invalid",
+        },
+        exit_failure = DEFAULT_TEST_SUCCESS_MSG,
+        # This fault code is kErrorRomImmSection.
+        exit_success = "BFV:034d5203$",
+        otp = ":otp_img_immutable_rom_ext_exec_enabled_hash_valid_virtual_a",
+    ),
+    qemu = qemu_params(
         assemble = "{invalid}@{rom_ext_slot_a} {invalid}@{rom_ext_slot_b}",
         binaries = {
             ":imm_section_invalid": "invalid",

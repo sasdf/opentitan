@@ -105,6 +105,7 @@ _MANUF_TEST_LOCKED_KEY = None
                 ) else "--bootstrap={firmware}"
             ) + " --initial-lc-state={lc_state}",
             test_harness = "//sw/host/tests/manuf/manuf_scrap",
+            testopt_bootstrap = str((lc_state, lc_val) not in _TEST_LOCKED_LC_ITEMS),
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -148,6 +149,7 @@ opentitan_test(
         otp = "//hw/ip/otp_ctrl/data:img_raw",
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_unlock_raw",
+        testopt_bootstrap = "False",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -178,6 +180,7 @@ opentitan_test(
         otp = "//hw/ip/otp_ctrl/data:img_raw",
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_volatile_unlock_raw",
+        testopt_bootstrap = "False",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -228,6 +231,7 @@ opentitan_test(
             tags = ["manuf"],
             test_cmd = "--initial-lc-state={lc_state}",
             test_harness = "//sw/host/tests/manuf/manuf_cp_yield_test",
+            testopt_bootstrap = "False",
         ),
         deps = [
             "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -310,6 +314,7 @@ cc_library(
             tags = ["manuf"],
             test_cmd = "--elf={firmware}",
             test_harness = "//sw/host/tests/manuf/manuf_sram_program_crc_check",
+            testopt_bootstrap = "False",
         ),
         silicon = silicon_params(
             interface = "hyper310",
@@ -395,6 +400,7 @@ opentitan_binary(
             "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            timeout = "moderate",
             binaries = {
                 ":sram_device_info_flash_wr_functest": "sram_program",
             },
@@ -412,6 +418,7 @@ opentitan_binary(
             testopt_bootstrap = "False",
         ),
         qemu = qemu_params(
+            timeout = "moderate",
             binaries = {
                 ":sram_device_info_flash_wr_functest": "sram_program",
             },
@@ -425,6 +432,7 @@ opentitan_binary(
                 --elf={sram_program}
             """,
             test_harness = "//sw/host/tests/manuf/manuf_cp_device_info_flash_wr",
+            testopt_bootstrap = "False",
         ),
         spx_key = spx_key_for_lc_state(
             ECDSA_SPX_KEY_STRUCTS,
@@ -510,6 +518,19 @@ opentitan_binary(
             test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
             testopt_bootstrap = "False",
         ),
+        qemu = qemu_params(
+            binaries = {
+                ":sram_exec_test": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
+            testopt_bootstrap = "False",
+        ),
         deps = [
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing:otp_ctrl_testutils",
@@ -550,6 +571,7 @@ opentitan_test(
         otp = ":otp_img_otp_ctrl_functest",
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_cp_test_lock",
+        testopt_bootstrap = "False",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",
@@ -586,6 +608,7 @@ opentitan_test(
         otp = ":otp_img_otp_ctrl_functest",
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/otp_ctrl:otp_ctrl",
+        testopt_bootstrap = "False",
     ),
     deps = [
         "//hw/ip/otp_ctrl/data:otp_ctrl_c_regs",

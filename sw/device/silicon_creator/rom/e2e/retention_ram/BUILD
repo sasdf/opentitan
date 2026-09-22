@@ -7,6 +7,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -51,10 +52,14 @@ opentitan_test(
     srcs = ["rom_e2e_ret_ram_init_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         otp = ":otp_img_reset_ret_ram",
         tags = maybe_skip_in_ci(CONST.LCV.RMA),
+    ),
+    qemu = qemu_params(
+        otp = ":otp_img_reset_ret_ram",
     ),
     deps = [
         "//sw/device/lib/base:memory",
@@ -71,10 +76,12 @@ opentitan_test(
     srcs = ["rom_e2e_ret_ram_keep_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         tags = maybe_skip_in_ci(CONST.LCV.RMA),
     ),
+    qemu = qemu_params(),
     deps = [
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//sw/device/lib/base:memory",

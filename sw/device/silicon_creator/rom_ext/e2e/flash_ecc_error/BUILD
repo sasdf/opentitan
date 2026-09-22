@@ -25,6 +25,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/rom/e2e:defs.bzl",
@@ -91,6 +92,7 @@ opentitan_binary(
     exec_env = [
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys",
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys",
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
     ],
     deps = [
         "//sw/device/lib/runtime:log",
@@ -107,6 +109,7 @@ opentitan_binary(
         exec_env = [
             "//hw/top_earlgrey:fpga_hyper310_rom_ext",
             "//hw/top_earlgrey:fpga_cw340_rom_ext",
+            "//hw/top_earlgrey:sim_qemu_rom_ext",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_{}".format(slot),
         deps = [
@@ -130,6 +133,7 @@ opentitan_binary(
         exec_env = [
             "//hw/top_earlgrey:fpga_hyper310_rom_ext",
             "//hw/top_earlgrey:fpga_cw340_rom_ext",
+            "//hw/top_earlgrey:sim_qemu_rom_ext",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_{}".format(slot),
         local_defines = [
@@ -171,8 +175,37 @@ opentitan_binary(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a} {fw_a}@{owner_slot_a} {rom_ext}@{rom_ext_slot_b} {fw_b}@{owner_slot_b}",
+            binaries = {
+                t["a"].format(c["cause"]): "fw_a",
+                t["b"].format(c["cause"]): "fw_b",
+                ":secret_page_setup": "setup",
+            },
+            exit_success = t["exit_success"].format(c["cause"]),
+            otp = ":otp_img_flash_ecc_error",
+            primary = t["primary"],
+            rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
+            test_cmd = """
+                # First run the setup program to make sure the keymgr secrets are configured.
+                # This is required to allow the ROM_EXT to run.
+                --exec="bootstrap --clear-uart=true {setup}"
+                --exec="console --non-interactive --exit-success='PASS!' --exit-failure='FAIL'"
+                # Next bootstrap the ROM_EXT alone so we can use boot services to set the
+                # primary slot.  This makes sure we boot the correct slot first.
+                --exec="bootstrap --clear-uart=true {rom_ext}"
+                --exec="rescue boot-svc set-next-bl0-slot --primary={primary} --get-response=true"
+                # Finally, boot the full firmware payload, which will corrupt a portion of
+                # the flash and ensure that the ROM_EXT exception handler can handle it.
+                --exec="bootstrap --clear-uart=true {firmware}"
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {fw_a}@{owner_slot_a} {rom_ext}@{rom_ext_slot_b} {fw_b}@{owner_slot_b}",
             binaries = {
                 t["a"].format(c["cause"]): "fw_a",
@@ -210,6 +243,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {fw_a}@{owner_slot_a} {rom_ext}@{rom_ext_slot_b} {fw_b}@{owner_slot_b}",
@@ -222,6 +256,35 @@ opentitan_test(
         # Since the flash ecc exception handler is disabled in this test,
         # we expect to see a load access fault when the ROM accesses the
         # corrupted flash word.
+        exit_success = "BFV:{}".format(hex_digits(CONST.BFV.ROM_EXT_INTR.LOAD_ACCESS)),
+        otp = ":otp_img_flash_exc_handler_disabled",
+        primary = "SlotA",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
+        test_cmd = """
+            # First run the setup program to make sure the keymgr secrets are configured.
+            # This is required to allow the ROM_EXT to run.
+            --exec="bootstrap --clear-uart=true {setup}"
+            --exec="console --non-interactive --exit-success='PASS!' --exit-failure='FAIL'"
+            # Next bootstrap the ROM_EXT alone so we can use boot services to set the
+            # primary slot.  This makes sure we boot the correct slot first.
+            --exec="bootstrap --clear-uart=true {rom_ext}"
+            --exec="rescue boot-svc set-next-bl0-slot --primary={primary} --get-response=true"
+            # Finally, boot the full firmware payload, which will corrupt a portion of
+            # the flash and ensure that the ROM_EXT exception handler can handle it.
+            --exec="bootstrap --clear-uart=true {firmware}"
+            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            no-op
+        """,
+        testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {fw_a}@{owner_slot_a} {rom_ext}@{rom_ext_slot_b} {fw_b}@{owner_slot_b}",
+        binaries = {
+            ":flash_ecc_self_corruption_slot_a_manifest_identifier": "fw_a",
+            ":uncorrupted_test_slot_b": "fw_b",
+            ":secret_page_setup": "setup",
+        },
+        exit_failure = "PASS!",
         exit_success = "BFV:{}".format(hex_digits(CONST.BFV.ROM_EXT_INTR.LOAD_ACCESS)),
         otp = ":otp_img_flash_exc_handler_disabled",
         primary = "SlotA",

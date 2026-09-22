@@ -8,6 +8,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load(
@@ -69,6 +70,7 @@ otp_json(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = ":otp_img_rom_ext_upgrade_interrupt_{}".format(lc_state),
@@ -77,6 +79,9 @@ otp_json(
             testopt_clear_before_test = "True",
         ),
         manifest = ":manifest_rom_ext_upgrade_interrupt",
+        qemu = qemu_params(
+            otp = ":otp_img_rom_ext_upgrade_interrupt_{}".format(lc_state),
+        ),
         deps = [
             "//sw/device/lib/testing:flash_ctrl_testutils",
             "//sw/device/lib/testing:nv_counter_testutils",

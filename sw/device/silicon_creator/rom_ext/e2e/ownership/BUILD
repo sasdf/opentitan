@@ -241,6 +241,7 @@ ownership_transfer_test(
             --rescue-after-activate={boot_test}
         """,
         "test_harness": "//sw/host/tests/ownership:transfer_test",
+        "timeout": "moderate",
     },
     deps = [
         "//sw/device/lib/base:status",
@@ -1039,6 +1040,7 @@ ownership_transfer_test(
             --keygen-check=true
         """,
         "test_harness": "//sw/host/tests/ownership:transfer_test",
+        "timeout": "moderate",
     },
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",

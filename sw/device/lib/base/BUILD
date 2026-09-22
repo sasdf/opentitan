@@ -472,6 +472,7 @@ test_suite(
     name = "base_functest_suite",
     tests = [
         ":crc32_functest",
+        ":hardened_functest",
         ":hardened_memory_functest",
     ],
 )

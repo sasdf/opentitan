@@ -28,6 +28,7 @@ exec_env_filegroup(
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": "cw310",
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": "cw340",
         "//hw/top_earlgrey:silicon_creator": "silicon",
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "silicon",
     },
     files = {
         "ft_personalize_sival_fpga_hyper310_rom_with_fake_keys.signed.bin": "cw310",
@@ -44,6 +45,7 @@ exec_env_filegroup(
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": "cw310",
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": "cw340",
         "//hw/top_earlgrey:silicon_creator": "silicon",
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "silicon",
     },
     files = {
         "ft_flash_scramble_sival_fpga_hyper310_rom_with_fake_keys.signed.bin": "cw310",

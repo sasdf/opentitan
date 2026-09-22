@@ -410,11 +410,13 @@ opentitan_test(
     name = "alert_handler_reverse_ping_in_deep_sleep_test",
     srcs = ["alert_handler_reverse_ping_in_deep_sleep_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         {
             # See #23038, this test requires a provisioned flash in sival.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
@@ -833,6 +835,7 @@ opentitan_test(
     name = "clkmgr_external_clk_src_for_sw_slow_test",
     srcs = ["clkmgr_external_clk_src_for_sw_slow_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
@@ -841,6 +844,7 @@ opentitan_test(
         # TODO(lowrisc/opentitan#19620): fpga doesn't support lowering main clk frequency
         tags = ["broken"],
     ),
+    qemu = qemu_params(tags = ["broken"]),
     verilator = verilator_params(tags = ["broken"]),
     deps = [
         ":clkmgr_external_clk_src_for_sw_impl",
@@ -1619,6 +1623,7 @@ opentitan_test(
     # tuning the health test thresholds for FPGA platforms in a robust way is not feasible
     # currently. Instead, the test is marked as "broken" on FPGA.
     fpga = fpga_params(tags = ["broken"]),
+    qemu = qemu_params(tags = ["broken"]),
     silicon = silicon_params(tags = ["flaky"]),
     verilator = verilator_params(timeout = "long"),
     deps = [
@@ -1679,6 +1684,10 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/mem",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/mem",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["manual"],
@@ -1711,6 +1720,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
+        "//hw/top_earlgrey:sim_qemu_base": None,
     },
     # This test is designed to run and complete entirely in the ROM boot stage.
     # Setting the `test_in_rom` flag makes the `opentitan_test` rule aware
@@ -1833,6 +1843,7 @@ _FLASH_CTRL_INFO_ACCESS_LC_STATES = get_lc_items(
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             otp = "//hw/ip/otp_ctrl/data:img_{}".format(lc_state),
@@ -1873,8 +1884,12 @@ test_suite(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_{}_manuf_personalized".format(lc_state),
+        ),
+        qemu = qemu_params(
             otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_{}_manuf_personalized".format(lc_state),
         ),
         deps = [
@@ -2003,9 +2018,11 @@ opentitan_test(
             "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
             # FIXME broken in sival ROM_EXT, remove this line when fixed. See #21706.
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu_broken",
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         },
     ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(timeout = "long"),
     deps = [
         "//hw/top_earlgrey/ip_autogen/flash_ctrl:flash_ctrl_c_regs",
@@ -2587,8 +2604,12 @@ _KMAC_APP_ROM_LIST = [
             hashfile,
         ],
         exec_env = {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:{}".format(exec_env): None,
         },
+        qemu = qemu_params(
+            rom = None if exec_env == "fpga_cw310_rom_with_fake_keys" else hashfile.replace("_hashfile", "_scr_vmem"),
+        ),
         deps = [
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
             "//sw/device/lib/base:mmio",
@@ -2633,11 +2654,13 @@ opentitan_test(
     name = "kmac_entropy_test",
     srcs = ["kmac_entropy_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:sim_verilator": None,
         },
     ),
@@ -2657,6 +2680,7 @@ opentitan_test(
     name = "kmac_error_conditions_test",
     srcs = ["kmac_error_conditions_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
@@ -2685,6 +2709,7 @@ opentitan_test(
     name = "kmac_entropy_stress_test",
     srcs = ["kmac_entropy_stress_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_dv": None,
@@ -2894,6 +2919,8 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_sival": None,
             "//hw/top_earlgrey:silicon_creator": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_verilator": None,
         },
     ),
@@ -3033,6 +3060,7 @@ opentitan_test(
     name = "otp_ctrl_mem_access_test",
     srcs = ["otp_ctrl_mem_access_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs to program OTP which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:sim_dv": None,
@@ -3062,6 +3090,7 @@ opentitan_test(
     name = "otp_ctrl_smoketest",
     srcs = ["otp_ctrl_smoketest.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs to program OTP which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
@@ -3152,6 +3181,10 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/pwm_smoketest",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/pwm_smoketest",
     ),
@@ -3380,6 +3413,9 @@ opentitan_test(
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
@@ -3416,6 +3452,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
     ),
     silicon = silicon_params(
@@ -3457,6 +3496,9 @@ opentitan_test(
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
@@ -3493,6 +3535,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
     silicon = silicon_params(
@@ -3534,6 +3579,9 @@ opentitan_test(
     ),
     fpga = fpga_params(
         tags = ["coverage_broken"],  # FIXME: broken in coverage mode.
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
     silicon = silicon_params(
@@ -3579,6 +3627,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
     silicon = silicon_params(
@@ -4340,6 +4391,8 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:silicon_creator": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     verilator = verilator_params(
@@ -4429,7 +4482,6 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
             "{firmware:elf}"
-            --console-tx-indicator-pin=0
         """,
         test_harness = "//sw/host/tests/chip/ottf_console_with_gpio_tx_indicator",
     ),
@@ -4482,10 +4534,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
         EARLGREY_CW340_TEST_ENVS,
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/ottf_dual_console",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/ottf_dual_console",
     ),
     deps = [
@@ -5648,6 +5705,7 @@ opentitan_test(
     name = "rstmgr_alert_info_test",
     srcs = ["rstmgr_alert_info_test.c"],
     broken = fpga_params(tags = ["broken"]),
+    broken_qemu = qemu_params(tags = ["broken"]),
     exec_env = dicts.add(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
@@ -5656,6 +5714,7 @@ opentitan_test(
             # TODO(lowrisc/opentitan#20589): Enable _sival* tests when bug is fixed
             "//hw/top_earlgrey:fpga_cw310_sival": "broken",
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": "broken",
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "broken_qemu",
         },
     ),
     fpga = fpga_params(
@@ -5736,6 +5795,7 @@ opentitan_test(
         "rv_core_ibex_address_translation_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         # This test needs access address translation unit which is blocked by rom_ext.
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
@@ -5866,12 +5926,16 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:silicon_creator": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
         otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
         tags = ["coverage_broken"],  # FIXME: Coverage mode heap is too small.
         test_harness = "//sw/host/tests/chip/power_virus",
+    ),
+    qemu = qemu_params(
+        otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_prod_manuf_personalized",
     ),
     silicon = silicon_params(
         timeout = "long",
@@ -6005,8 +6069,12 @@ opentitan_test(
         otp = ":flash_scrambling_smoketest_otp_img_rma",
     ),
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_dv": None,
     },
+    qemu = qemu_params(
+        otp = ":flash_scrambling_smoketest_otp_img_rma",
+    ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
@@ -6081,8 +6149,6 @@ _RV_DM_TEST_CONFIGURATIONS = [
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
             tags = [
                 "lc_{}".format(test_cfg["lc_state"]),
-                # Delayed enable currently not working in QEMU.
-                "broken" if test_cfg["rv_dm_delayed_en"] != "" else "",
             ],
             test_cmd = """
                 --bootstrap="{firmware}"
@@ -6177,8 +6243,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:jtag",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6295,9 +6370,16 @@ _LC_STATES_DEBUG_DISALLOWED = [
             {
                 "//hw/top_earlgrey:fpga_cw310_sival": None,
                 "//hw/top_earlgrey:fpga_cw340_sival": None,
+                "//hw/top_earlgrey:sim_qemu_sival": None,
             },
         ),
         fpga = fpga_params(
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+        ),
+        qemu = qemu_params(
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
                 "lc_{}".format(lc_state),
@@ -6332,9 +6414,20 @@ test_suite(
             {
                 "//hw/top_earlgrey:fpga_cw310_sival": None,
                 "//hw/top_earlgrey:fpga_cw340_sival": None,
+                "//hw/top_earlgrey:sim_qemu_sival": None,
             },
         ),
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = " --expect-fail" if lc_state_val in _LC_STATES_DEBUG_DISALLOWED else "",
+            test_harness = "//sw/host/tests/chip/rv_dm:lc_disabled",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6373,8 +6466,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6424,8 +6526,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req_when_cpu_halted",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6462,8 +6573,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:dtm",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6500,8 +6620,17 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:control_status",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6538,8 +6667,20 @@ test_suite(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_wakeup",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6595,8 +6736,20 @@ test_suite(
         srcs = ["rv_dm_access_after_hw_reset.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_hw_reset",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6634,6 +6787,7 @@ opentitan_test(
     name = "openocd_test",
     srcs = ["example_test_from_flash.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
@@ -6641,6 +6795,12 @@ opentitan_test(
         needs_jtag = True,
         otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
         # TODO(#22823): Remove "broken" tag once the test is fixed.
+        tags = ["broken"],
+        test_harness = "//sw/host/tests/chip/jtag:openocd_test",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/ip/otp_ctrl/data:img_test_unlocked0",
         tags = ["broken"],
         test_harness = "//sw/host/tests/chip/jtag:openocd_test",
     ),
@@ -6691,9 +6851,15 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/i2c_host_override",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/i2c_host_override",
     ),
@@ -6731,9 +6897,14 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/i2c_target",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/i2c_target",
     ),
     silicon = silicon_params(
@@ -6773,9 +6944,14 @@ opentitan_test(
     name = "status_report_test",
     srcs = ["status_report_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
     fpga = fpga_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_TEST_MSG,
+    ),
+    qemu = qemu_params(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_TEST_MSG,
     ),
@@ -6798,9 +6974,14 @@ opentitan_test(
     name = "status_report_overflow_test",
     srcs = ["status_report_overflow_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_test_rom": None,
     },
     fpga = fpga_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
+    ),
+    qemu = qemu_params(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
     ),
@@ -6817,11 +6998,17 @@ opentitan_test(
     # platform (as well as the RTL sim platforms) as these are the only
     # compatible with both pre- and post-silicon test environments.
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
     },
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/example_sival",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/example_sival",
     ),
@@ -6842,9 +7029,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
     ),
@@ -6876,9 +7069,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
     ),
@@ -6911,9 +7110,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
     ),
@@ -6947,9 +7152,14 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
     ),
     silicon = silicon_params(
@@ -6982,9 +7192,14 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
     ),
     silicon = silicon_params(
@@ -7021,9 +7236,15 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
+    ),
+    qemu = qemu_params(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
     ),
@@ -7114,6 +7335,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_isa_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         tags = ["manual"],
@@ -7141,6 +7372,7 @@ opentitan_binary(
         "rv_core_ibex_isa_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
@@ -7204,6 +7436,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_epmp_test": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         test_cmd = "--elf={firmware}",
@@ -7228,6 +7470,7 @@ opentitan_binary(
         "rv_core_ibex_epmp_test.c",
     ],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
@@ -7264,6 +7507,10 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
+    ),
+    qemu = qemu_params(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
     ),
@@ -7324,6 +7571,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_mem_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         binaries = {
             ":rv_core_ibex_mem_test_sram": "sram_program",
@@ -7348,6 +7605,7 @@ opentitan_binary(
     testonly = True,
     srcs = ["rv_core_ibex_mem_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
     },
     kind = "ram",
@@ -7420,6 +7678,10 @@ opentitan_test(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_baud_rate",
     ),
+    qemu = qemu_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_baud_rate",
+    ),
     silicon = silicon_params(
         test_cmd = " ".join([
             "--bootstrap=\"{firmware}\"",
@@ -7458,6 +7720,10 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_loopback",
+    ),
+    qemu = qemu_params(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_loopback",
     ),
@@ -7537,6 +7803,10 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
+    ),
+    qemu = qemu_params(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
     ),
@@ -7638,12 +7908,18 @@ opentitan_test(
     name = "sram_ctrl_lc_escalation_test",
     srcs = ["sram_ctrl_lc_escalation_test.c"],
     exec_env = {
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw310_sival": None,
     },
     fpga = fpga_params(
         timeout = "moderate",
         needs_jtag = True,
         otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/emulation:otp_img_rma_manuf_personalized",
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
     ),
@@ -7757,10 +8033,16 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
             "//hw/top_earlgrey:sim_dv": None,
         },
     ),
     fpga = fpga_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/pattgen:pattgen_ios",
+    ),
+    qemu = qemu_params(
         test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/pattgen:pattgen_ios",
     ),
@@ -7791,6 +8073,7 @@ opentitan_test(
     name = "hmac_error_conditions_test",
     srcs = ["hmac_error_conditions_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_verilator": None,
@@ -7815,6 +8098,7 @@ opentitan_test(
     name = "hmac_endianness_test",
     srcs = ["hmac_endianness_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_verilator": None,
@@ -7892,6 +8176,8 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
@@ -7920,6 +8206,10 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        exit_failure = "FAIL!",
+        exit_success = "Alert 3 is asserted",
+    ),
+    qemu = qemu_params(
         exit_failure = "FAIL!",
         exit_success = "Alert 3 is asserted",
     ),

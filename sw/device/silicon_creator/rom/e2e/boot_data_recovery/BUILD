@@ -9,6 +9,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load(
@@ -142,6 +143,7 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             exit_failure = msg_template_bfv_all_except(case["expected_bfv"]) if case["expected_bfv"] != None else DEFAULT_TEST_FAILURE_MSG,
@@ -156,6 +158,18 @@ BOOT_DATA_RECOVERY_MANIFEST = manifest(
             )),
         ),
         manifest = BOOT_DATA_RECOVERY_MANIFEST,
+        qemu = qemu_params(
+            exit_failure = msg_template_bfv_all_except(case["expected_bfv"]) if case["expected_bfv"] != None else DEFAULT_TEST_FAILURE_MSG,
+            exit_success = MSG_TEMPLATE_BFV.format(hex_digits(case["expected_bfv"])) if case["expected_bfv"] != None else MSG_PASS,
+            otp = ":otp_img_boot_data_recovery_{}_{}".format(
+                case["lc_state"],
+                case["default_boot_data"],
+            ),
+            tags = maybe_skip_in_ci(getattr(
+                CONST.LCV,
+                case["lc_state"].upper(),
+            )),
+        ),
         deps = [
             "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
             "//sw/device/lib/testing/test_framework:ottf_main",
