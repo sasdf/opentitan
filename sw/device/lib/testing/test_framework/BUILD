@@ -11,6 +11,7 @@ load(
     "EARLGREY_TEST_ENVS",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 
@@ -357,6 +358,17 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        flow_control_message = _FLOW_CONTROL_MESSAGE,
+        test_cmd = """
+            --exec="console --non-interactive --exit-success=WAIT --exit-failure=PASS|FAIL --flow-control"
+            console
+            --flow-control
+            --send="{flow_control_message}\n"
+            --exit-success="RESULT:{flow_control_message}"
+            --exit-failure="PASS|FAIL"
+        """,
+    ),
+    qemu = qemu_params(
         flow_control_message = _FLOW_CONTROL_MESSAGE,
         test_cmd = """
             --exec="console --non-interactive --exit-success=WAIT --exit-failure=PASS|FAIL --flow-control"

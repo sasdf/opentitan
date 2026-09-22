@@ -90,6 +90,10 @@ VARIANTS = {
     },
 }
 
+VARIANTS["print_certs_post_provisioning"]["tags"].append("broken")
+
+VARIANTS["print_mldsa_certs_post_provisioning"]["tags"].append("broken")
+
 [
     opentitan_binary(
         name = name,

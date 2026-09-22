@@ -7,6 +7,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -83,6 +84,7 @@ REDACT.update({"INVALID": 0x0})
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             binaries = {
@@ -102,6 +104,22 @@ REDACT.update({"INVALID": 0x0})
         ),
         # Skip signing by clearing the manifest configuration.
         manifest = None,
+        qemu = qemu_params(
+            binaries = {
+                "//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware",
+            },
+            exit_failure = MSG_PASS,
+            exit_success = MSG_TEMPLATE_BFV.format(hex_digits(error_redact(
+                CONST.BFV.BOOT_POLICY.BAD_IDENTIFIER,
+                lc_state_val,
+                redact_val,
+            ))),
+            otp = ":img_{}_{}".format(
+                lc_state,
+                redact.lower(),
+            ),
+            tags = maybe_skip_in_ci(lc_state_val),
+        ),
     )
     for lc_state, lc_state_val in get_lc_items()
     for redact, redact_val in REDACT.items()

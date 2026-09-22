@@ -6,6 +6,7 @@ load("//rules:const.bzl", "CONST", "hex")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
 load("//rules/opentitan:defs.bzl", "cw310_params", "fpga_params", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "qemu_params")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
     "ROM_EXT_VERSION",
@@ -69,12 +70,16 @@ _FAULT_TEST_CASES = {
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             exit_success = test_data["exit_success"],
         ),
         linker_script = ":ld_slot_a",
         manifest = "//sw/device/silicon_owner:manifest",
+        qemu = qemu_params(
+            exit_success = test_data["exit_success"],
+        ),
         deps = [
             "//hw/ip/uart/data:uart_c_regs",
             "//sw/device/lib/base:abs_mmio",
@@ -103,6 +108,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Note: the application stage may have a dependency on the ePMP
@@ -133,6 +139,30 @@ opentitan_test(
         ]),
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        exit_success = "\r\n".join([
+            "0: 00000000 ----- ---- sz=00000000",
+            "1: 00000000 ----- ---- sz=00000000",
+            "2: a....... ----- ---- sz=00000000",  # Application code start.
+            "3: a.......   TOR -X-R sz=........",  # Application code end.
+            "4: a0000000 NAPOT ---R sz=00080000",  # Application rodata region.
+            "5: 00000000 ----- ---- sz=00000000",
+            "6: 00000000 ----- ---- sz=00000000",
+            "7: 00000000 ----- ---- sz=00000000",
+            "8: 2....... ----- ---- sz=00000000",  # ROM_EXT code start.
+            "9: 2.......   TOR -X-R sz=........",  # ROM_EXT code end.
+            "10: 00000000 ----- ---- sz=00000000",
+            "11: 1001c000   NA4 ---- sz=00000004",  # Stack guard.
+            "12: 20000000 NAPOT ---R sz=00100000",  # Entire flash region.
+            "13: 00010000 NAPOT -XWR sz=00001000",  # RvDM regionn
+            "14: 40000000 NAPOT --WR sz=10000000",  # MMIO for peripherals.
+            "15: 10000000 NAPOT --WR sz=00020000",  # All of RAM.
+            "mseccfg = 00000006",  # rlb=true, mmwp=true, mml=false
+            ".*",
+            ".*PASS!",
+            "",
+        ]),
+    ),
     deps = [
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib:dbg_print",
@@ -164,6 +194,7 @@ SRAM_EXEC_TESTCASES = [
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             changes_otp = True,
@@ -172,6 +203,10 @@ SRAM_EXEC_TESTCASES = [
             testopt_clear_before_test = "True",
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+        qemu = qemu_params(
+            exit_success = test["exit_success"],
+            rom_ext = test["rom_ext"],
+        ),
         deps = [
             "//hw/ip/sram_ctrl/data:sram_ctrl_c_regs",
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -190,8 +225,24 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
+        device_status = "0x1",
+        needs_jtag = True,
+        owner_fw_version = "0",
+        rom_ext_sec_version = ROM_EXT_VERSION.SECURITY,
+        rom_ext_version = ROM_EXT_VERSION.MINOR,
+        test_cmd = """
+            --wait-for="PASS!"
+            --rom-ext-version="{rom_ext_version}"
+            --rom-ext-sec-version="{rom_ext_sec_version}"
+            --owner-fw-version="{owner_fw_version}"
+            --device-status="{device_status}"
+        """,
+        test_harness = "//sw/host/tests/rom_ext/device_status",
+    ),
+    qemu = qemu_params(
         device_status = "0x1",
         needs_jtag = True,
         owner_fw_version = "0",

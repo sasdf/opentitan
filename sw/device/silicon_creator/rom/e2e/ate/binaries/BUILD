@@ -12,6 +12,7 @@ exec_env_filegroup(
     testonly = True,
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_with_fake_keys": "cw310",
+        "//hw/top_earlgrey:sim_qemu_sival": "cw310",
         "//hw/top_earlgrey:silicon_creator": "silicon",
         "//hw/top_earlgrey:sim_dv": "sim_dv",
     },

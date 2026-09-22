@@ -9,6 +9,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -22,6 +23,7 @@ opentitan_binary(
         "//hw/top_earlgrey:fpga_cw310_sival": None,
         "//hw/top_earlgrey:silicon_creator": None,
         "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     spx_key = {},
     deps = [
@@ -38,8 +40,15 @@ opentitan_test(
     name = "ate_smoketest",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw310_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e/ate/binaries:ate_gpio_toggle_test_bins": "firmware",
+        },
+        otp = "//hw/ip/otp_ctrl/data/earlgrey_skus/sival:otp_img_dev_manuf_personalized",
+    ),
+    qemu = qemu_params(
         binaries = {
             "//sw/device/silicon_creator/rom/e2e/ate/binaries:ate_gpio_toggle_test_bins": "firmware",
         },

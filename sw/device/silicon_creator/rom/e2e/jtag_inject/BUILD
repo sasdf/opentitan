@@ -7,6 +7,7 @@ load(
     "cw310_params",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -42,6 +43,7 @@ package(default_visibility = ["//visibility:public"])
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             binaries = {
@@ -54,6 +56,18 @@ package(default_visibility = ["//visibility:public"])
                 "coverage_broken",  # FIXME: broken in coverage mode.
                 "cw310_rom_with_fake_keys",
             ],
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/chip/jtag:sram_load",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            binaries = {
+                "//sw/device/examples/sram_program:sram_program": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
             test_cmd = """
                 --elf={sram_program}
             """,
@@ -93,6 +107,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -101,6 +116,12 @@ test_suite(
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -135,6 +156,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -143,6 +165,12 @@ test_suite(
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:shutdown_execution_asm",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:shutdown_execution_asm",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -177,6 +205,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -186,6 +215,12 @@ test_suite(
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bark",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bark",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -220,6 +255,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -229,6 +265,12 @@ test_suite(
             test_cmd = " --elf={rom:elf}",
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bite",
             testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf} --breakpoint-timeout=2s",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_watchdog_bite",
         ),
         deps = [
             "//sw/device/lib/runtime:log",
@@ -269,10 +311,19 @@ LC_STATES_DEBUG_DISALLOWED = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw310_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             timeout = "moderate",
             logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:debug_test",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = ":img_{}_exec_disabled".format(lc_state),
             test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),

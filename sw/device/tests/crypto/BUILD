@@ -15,6 +15,7 @@ load(
     "opentitan_binary",
     "opentitan_binary_blob",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "verilator_params",
 )
@@ -260,7 +261,13 @@ cc_library(
 opentitan_test(
     name = "aes_gcm_functest",
     srcs = ["aes_gcm_functest.c"],
-    exec_env = CRYPTOTEST_EXEC_ENVS,
+    exec_env = dicts.add(
+        CRYPTOTEST_EXEC_ENVS,
+        {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
+        },
+    ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -327,7 +334,13 @@ opentitan_test(
 opentitan_test(
     name = "ecc_p256_dice_functest",
     srcs = ["ecc_p256_dice_functest.c"],
-    exec_env = CRYPTOTEST_EXEC_ENVS,
+    exec_env = dicts.add(
+        CRYPTOTEST_EXEC_ENVS,
+        {
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
+        },
+    ),
+    qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
         timeout = "eternal",
     ),
@@ -452,6 +465,8 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     verilator = verilator_params(
@@ -734,6 +749,9 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "long",
         tags = ["manual"],
+    ),
+    qemu = qemu_params(
+        timeout = "moderate",
     ),
     verilator = verilator_params(
         timeout = "eternal",
@@ -1345,6 +1363,9 @@ opentitan_test(
         timeout = "long",
         tags = ["manual"],
     ),
+    qemu = qemu_params(
+        timeout = "long",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         # This test can take > 60 minutes, so mark it manual as it shouldn't
@@ -1396,6 +1417,9 @@ opentitan_test(
         timeout = "long",
         tags = ["manual"],
     ),
+    qemu = qemu_params(
+        timeout = "long",
+    ),
     silicon = silicon_params(
         timeout = "long",
         tags = ["manual"],
@@ -1443,6 +1467,9 @@ opentitan_test(
     name = "rsa_3072_signature_functest",
     srcs = ["rsa_3072_signature_functest.c"],
     exec_env = CRYPTOTEST_EXEC_ENVS,
+    qemu = qemu_params(
+        timeout = "moderate",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["manual"],
@@ -1468,6 +1495,9 @@ opentitan_test(
     fpga = fpga_params(
         timeout = "long",
         tags = ["manual"],
+    ),
+    qemu = qemu_params(
+        timeout = "long",
     ),
     silicon = silicon_params(
         timeout = "long",

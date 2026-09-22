@@ -22,6 +22,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 otp_json(
@@ -46,11 +47,16 @@ JITTER_TESTCASES = [
     {
         "name": "disabled",
         "fpga": fpga_params(),
+        "qemu": qemu_params(),
         "defines": ["TEST_JITTER_DISABLED"],
     },
     {
         "name": "enabled",
         "fpga": fpga_params(
+            otp = ":otp_img_jitter_enabled",
+            tags = ["coverage"],
+        ),
+        "qemu": qemu_params(
             otp = ":otp_img_jitter_enabled",
             tags = ["coverage"],
         ),
@@ -65,9 +71,11 @@ JITTER_TESTCASES = [
         exec_env = {
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = testcase["fpga"],
         local_defines = testcase["defines"],
+        qemu = testcase["qemu"],
         deps = [
             "//hw/top_earlgrey/sw/autogen:top_earlgrey",
             "//sw/device/lib/dif:base",

@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -15,6 +16,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "",
@@ -29,6 +31,17 @@ opentitan_test(
         testopt_bootstrap = "False",
         testopt_clear_after_test = "True",
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext/e2e/rescue:boot_test_slot_a": "boot_test",
+        },
+        icount = "6,align=on",
+        test_cmd = """
+            --firmware={boot_test}
+        """,
+        test_harness = "//sw/host/tests/rescue:xmodem_protocol",
     ),
 )
 

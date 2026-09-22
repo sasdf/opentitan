@@ -110,6 +110,7 @@ _FAULT_CONFIG = {
         exec_env = [
             "//hw/top_earlgrey:fpga_hyper310_rom_ext",
             "//hw/top_earlgrey:fpga_cw340_rom_ext",
+            "//hw/top_earlgrey:sim_qemu_rom_ext",
         ],
         linker_script = position["linker_script"],
         deps = [
@@ -163,6 +164,7 @@ _FAULT_CONFIG = {
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -188,6 +190,27 @@ _FAULT_CONFIG = {
             testopt_bootstrap = "False",
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
+        ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a}",
+            binaries = {
+                ":boot_test_{}".format(name): "payload",
+            },
+            params = config["params"],
+            rom_ext = config["rom_ext"],
+            setup = config["setup"],
+            slot = position["slot"],
+            tags = config["tags"],
+            test_cmd = """
+                {setup}
+                # First make sure the ROM_EXT is faulting because there is no firmware
+                --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
+                # Load firmware via rescue
+                --exec="rescue {params} firmware --slot={slot} {payload:signed_bin}"
+                # Check for firmware execution
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                no-op
+            """,
         ),
     )
     for name, position in _POSITIONS.items()
@@ -255,6 +278,7 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             timeout = "moderate",
@@ -282,6 +306,31 @@ genrule(
             """,
             testopt_clear_after_test = "True",  # See important note at the top
         ),
+        qemu = qemu_params(
+            timeout = "moderate",
+            assemble = "{rom_ext}@{rom_ext_offset}",
+            binaries = {
+                ":boot_test_{}".format(name): "payload",
+                ":bad_rom_ext": "bad_rom_ext",
+            },
+            exit_failure = _RESCUE_ROMEXT_RESULTS[name == rxslot]["failure"],
+            exit_success = _RESCUE_ROMEXT_RESULTS[name == rxslot]["success"].format(slot = name),
+            image_name = "rescue_rom_ext_{}_{}.img".format(rxslot, name),
+            rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_virtual",
+            rom_ext_offset = _POSITIONS[rxslot]["rom_ext_offset"],
+            slot = position["slot"],
+            test_cmd = """
+                # First make sure the ROM_EXT is faulting because there is no firmware
+                --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
+                # Construct a firmware image with the bad ROM_EXT
+                --exec="image assemble --size=524288 --mirror=false --output={image_name} {bad_rom_ext}@{rom_ext_slot_a} {payload}@{owner_slot_a}"
+                # Load firmware via rescue, including the bad ROM_EXT
+                --exec="rescue firmware --raw --slot={slot} {image_name}"
+                # Check for firmware execution
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+        ),
     )
     for name, position in _POSITIONS.items()
     for rxslot in _POSITIONS.keys()
@@ -293,6 +342,7 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
@@ -320,6 +370,30 @@ genrule(
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
         ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
+            binaries = {
+                ":boot_test_slot_a": "slot_a",
+                ":boot_test_slot_b": "slot_b",
+            },
+            params = config["params"],
+            rom_ext = config["rom_ext"],
+            setup = config["setup"],
+            tags = config["tags"],
+            test_cmd = """
+                --exec="console --non-interactive --timeout=100ms"
+                {setup}
+                --exec="no-op --info='##### Set next slot via the rescue protocol'"
+                --exec="rescue {params} boot-svc set-next-bl0-slot --next=SlotB --get-response=false"
+                --exec="no-op --info='##### Check for firmware execution in slot B'"
+                --exec="console --non-interactive --exit-success='bl0_slot = __BB\r\n' --exit-failure='{exit_failure}'"
+                --exec="no-op --info='##### Reset and observe return to slot A.'"
+                --exec="gpio apply RESET"
+                --exec="gpio remove RESET"
+                --exec="console --non-interactive --exit-success='bl0_slot = AA__\r\n' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+        ),
     )
     for protocol, config in _CONFIGS.items()
 ]
@@ -330,6 +404,7 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
@@ -361,6 +436,34 @@ genrule(
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
         ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
+            binaries = {
+                ":boot_test_slot_a": "slot_a",
+                ":boot_test_slot_b": "slot_b",
+            },
+            params = config["params"],
+            rom_ext = config["rom_ext"],
+            setup = config["setup"],
+            tags = config["tags"],
+            test_cmd = """
+                --exec="console --non-interactive --timeout=100ms"
+                {setup}
+                --exec="no-op --info='##### Set primary slot via the rescue protocol'"
+                --exec="rescue {params} boot-svc set-next-bl0-slot --primary=SlotB"
+                --exec="no-op --info='##### Check for firmware execution in slot B'"
+                --exec="console --non-interactive --exit-success='bl0_slot = __BB\r\n' --exit-failure='{exit_failure}'"
+                --exec="no-op --info='##### Reset and observe continued execution in slot B'"
+                --exec="gpio apply RESET"
+                --exec="gpio remove RESET"
+                --exec="console --non-interactive --exit-success='bl0_slot = __BB\r\n' --exit-failure='{exit_failure}'"
+                --exec="no-op --info='##### Set primary slot via the rescue protocol'"
+                --exec="rescue {params} boot-svc set-next-bl0-slot --primary=SlotA --get-response=false"
+                --exec="no-op --info='##### Check for firmware execution in slot A'"
+                --exec="console --non-interactive --exit-success='bl0_slot = AA__\r\n' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+        ),
     )
     for protocol, config in _CONFIGS.items()
 ]
@@ -371,6 +474,7 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -391,6 +495,22 @@ genrule(
             testopt_bootstrap = "False",
             testopt_clear_after_test = "True",  # See important note at the top
         ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a}",
+            binaries = {
+                ":boot_test_slot_a": "payload",
+            },
+            rate = rate,
+            test_cmd = """
+                # First make sure the ROM_EXT is faulting because there is no firmware
+                --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
+                # Load firmware via rescue
+                --exec="rescue firmware --rate={rate} {payload:signed_bin}"
+                # Check for firmware execution
+                --exec="console --baudrate=115200 --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+        ),
     )
     # FPGA CW310 and CW340 only support the baudrate up to 230K.
     for rate in [
@@ -405,6 +525,7 @@ genrule(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -423,6 +544,21 @@ genrule(
             """,
             testopt_bootstrap = "False",
             testopt_clear_after_test = "True",  # See important note at the top
+        ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a}",
+            binaries = {
+                ":boot_test_slot_a": "payload",
+            },
+            rate = rate,
+            test_cmd = """
+                # Trigger rescue.
+                --exec="rescue no-op"
+                --exec="console --non-interactive --send='BAUD\r{rate}\r' --exit-success='unsupported baudrate' --exit-failure='BFV:.*\r\n'"
+                # Try the `REBO` mode and make sure we reboot without crash.
+                --exec="console --non-interactive --send='REBO\r' --exit-success='ROM:' --exit-failure='BFV:.*\r\n'"
+                no-op
+            """,
         ),
     )
     # FPGA CW310 and CW340 only support the baudrate up to 230K.
@@ -445,6 +581,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "",
@@ -466,6 +603,22 @@ opentitan_test(
         testopt_bootstrap = "False",
         testopt_clear_after_test = "True",  # See important note at the top
     ),
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a}",
+        binaries = {
+            ":boot_test_slot_a": "payload",
+        },
+        rom_ext = "//sw/device/silicon_creator/rom_ext/e2e/rescue/testdata:rom_ext_rescue_protocol_0",
+        test_cmd = """
+            # First make sure the ROM_EXT is faulting because there is no firmware
+            --exec="console --non-interactive --exit-success='BFV:' --exit-failure='PASS|FAIL'"
+            # Load firmware via rescue
+            --exec="rescue firmware {payload:signed_bin}"
+            # Check for firmware execution
+            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            no-op
+        """,
+    ),
 )
 
 opentitan_test(
@@ -476,6 +629,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout",
@@ -489,6 +643,17 @@ opentitan_test(
         """,
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout",
+        test_cmd = """
+            # Trigger rescue and do nothing.  We expect the inactivity timer to
+            # cause rescue to exit and then boot the firmware.
+            --exec="rescue no-op"
+            # Check for firmware execution
+            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            no-op
+        """,
     ),
     deps = [
         "//sw/device/lib/base:status",
@@ -515,6 +680,7 @@ opentitan_binary(
     exec_env = [
         "//hw/top_earlgrey:fpga_hyper310_rom_ext",
         "//hw/top_earlgrey:fpga_cw340_rom_ext",
+        "//hw/top_earlgrey:sim_qemu_rom_ext",
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_virtual",
     manifest = ":owner_fw_erased_status_manifest",
@@ -560,6 +726,7 @@ _RESCUE_ERASE_TESTCASES = {
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             active_slot = params["active_slot"],
@@ -583,6 +750,26 @@ _RESCUE_ERASE_TESTCASES = {
             testopt_clear_after_test = "True",
             testopt_clear_before_test = "True",
         ),
+        qemu = qemu_params(
+            active_slot = params["active_slot"],
+            assemble = "{rom_ext}@{active_slot} {bl0_slot_a}@{owner_slot_a} {bl0_slot_b}@{owner_slot_b}",
+            binaries = {
+                ":boot_test_slot_a": "bl0_slot_a",
+                ":boot_test_slot_b": "bl0_slot_b",
+                ":owner_fw_erased_status": "payload",
+            },
+            expected_status = params["expected_status"],
+            rescue_slot = params["rescue_slot"],
+            rom_ext = params["rom_ext"],
+            test_cmd = """
+                # Check for firmware execution
+                --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+                --exec="rescue firmware --raw --slot={rescue_slot} {payload:signed_bin}"
+                # Check the status of the BL0 slots after rescue
+                --exec="console --non-interactive --exit-success='{expected_status}\r\n' --exit-failure='{exit_failure}'"
+                no-op
+            """,
+        ),
     )
     for name, params in _RESCUE_ERASE_TESTCASES.items()
 ]
@@ -604,6 +791,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # We configure OTP to preserve the reset reason and set the watchdog timeout
@@ -623,6 +811,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_preserve_reset_prod",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu",
+        test_cmd = """
+            # Set the trigger with gpio command to simulate the trigger being jammed.
+            --exec="gpio set --mode PushPull --value true Ioa2"
+            # Check for firmware execution.  We'll enter rescue, timeout,
+            # then reboot and execute firmware.
+            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            no-op
+        """,
+    ),
     deps = [
         "//sw/device/lib/base:status",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -640,6 +840,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_failure = "ok: ",
@@ -656,6 +857,20 @@ opentitan_test(
         """,
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        exit_failure = "ok: ",
+        exit_success = "error: mode not allowed",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_restricted_commands",
+        test_cmd = """
+            # Trigger rescue and make sure we can get the device ID.
+            --exec="rescue get-device-id --reboot=false"
+            # Try the `RESQ` mode and make sure we get an error message.
+            --exec="console --non-interactive --send='RESQ\r' --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            # Try the `REBO` mode and make sure we reboot without crash.
+            --exec="console --non-interactive --send='REBO\r' --exit-success='ROM:' --exit-failure='BFV:.*\r\n'"
+            no-op
+        """,
     ),
     deps = [
         "//sw/device/lib/base:status",
@@ -675,6 +890,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         params = "-p spi-dfu -t gpio -v +Ioa2",
@@ -688,6 +904,17 @@ opentitan_test(
         """,
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu_restricted_commands",
+        setup = "--exec=\"gpio set --mode OpenDrain Ioa2\"",
+        test_cmd = """
+            {setup}
+            # Trigger rescue and make sure we can get the device ID.
+            --exec="rescue {params} get-device-id --reboot=false"
+            no-op
+        """,
     ),
     deps = [
         "//sw/device/lib/base:status",
@@ -703,6 +930,7 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -727,6 +955,23 @@ opentitan_test(
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
         ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a}",
+            exit_success = "BFV:05525304\r\n",
+            rescue_tmo = "{}s".format(config.get("rescue_timeout", 5) + 5),
+            rom_ext = config.get(
+                "alt_rom_ext",
+                config["rom_ext"],
+            ),
+            setup = config["setup"],
+            tags = config["tags"],
+            test_cmd = """
+                {setup}
+                # Check that the final boot-fault is "kErrorRescueInactivity".
+                --exec="console --non-interactive --exit-success='{exit_success}' --timeout={rescue_tmo}"
+                no-op
+            """,
+        ),
     )
     for name, config in _CONFIGS.items()
 ]
@@ -737,6 +982,7 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -749,6 +995,16 @@ opentitan_test(
             test_harness = "//sw/host/tests/rescue:rescue_test",
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
+        ),
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a}",
+            params = config["params"],
+            rom_ext = config["rom_ext"],
+            test_cmd = """
+            --rom-ext={rom_ext}
+            rescue {params} --action=get-boot-log
+            """,
+            test_harness = "//sw/host/tests/rescue:rescue_test",
         ),
     )
     for protocol, config in _CONFIGS.items()
@@ -797,6 +1053,7 @@ opentitan_test(
         exec_env = {
             "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -812,6 +1069,18 @@ opentitan_test(
             testopt_clear_after_test = "True",  # See important note at the top
             testopt_clear_before_test = "True",
         ),
+        qemu = qemu_params(
+            assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+            binaries = {
+                config["rom_ext"]: "romext",
+                "//sw/device/silicon_creator/rom_ext/e2e/attestation:print_certs": "firmware",
+            },
+            params = config["params"],
+            test_cmd = """
+            rescue {params} --action=get-owner-page
+            """,
+            test_harness = "//sw/host/tests/rescue:rescue_test",
+        ),
     )
     for protocol, config in _CONFIGS.items()
 ]
@@ -821,6 +1090,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -835,6 +1105,17 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_rescue_disability": "romext",
+            "//sw/device/silicon_creator/rom_ext/e2e/attestation:print_certs": "firmware",
+        },
+        test_cmd = """
+        rescue --action=disability
+        """,
+        test_harness = "//sw/host/tests/rescue:rescue_test",
+    ),
 )
 
 opentitan_test(
@@ -842,6 +1123,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -857,6 +1139,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu_rescue_disability": "romext",
+            "//sw/device/silicon_creator/rom_ext/e2e/attestation:print_certs": "firmware",
+        },
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        test_cmd = """
+        rescue {params} --action=disability
+        """,
+        test_harness = "//sw/host/tests/rescue:rescue_test",
+    ),
 )
 
 opentitan_test(
@@ -864,6 +1158,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "",
@@ -881,6 +1176,19 @@ opentitan_test(
         testopt_bootstrap = "False",
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a}",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
+        test_cmd = """
+            # Trigger rescue and make sure we can get the device ID.
+            --exec="rescue get-device-id --reboot=false"
+            # Send Invalid rescue command.
+            --exec="console --non-interactive --send='XYZ\r' --exit-success='error: unrecognized mode'"
+            # Try the `REBO` mode and make sure we reboot without crash.
+            --exec="console --non-interactive --send='REBO\r' --exit-success='ROM:' --exit-failure='BFV:.*\r\n'"
+            no-op
+        """,
+    ),
 )
 
 opentitan_test(
@@ -888,6 +1196,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -907,6 +1216,22 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_rescue_config_module_mismatch": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        test_cmd = """
+            --exec="console --non-interactive --exit-success='warning: rescue' --exit-failure='{exit_failure}'"
+            # Trigger rescue and make sure we can get the device ID even if the protocol specified in the rescue
+            # config doesn't match the ROM_EXT implementation.
+            --exec="rescue get-device-id --reboot=false"
+            # Try the `REBO` mode and make sure we reboot without crash.
+            --exec="console --non-interactive --send='REBO\r' --exit-success='Finished' --exit-failure='BFV:.*\r\n'"
+            no-op
+        """,
+    ),
 )
 
 opentitan_test(
@@ -914,6 +1239,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -929,6 +1255,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu_rescue_boot_svc_req_disability": "romext",
+            "//sw/device/silicon_creator/rom_ext/e2e/attestation:print_certs": "firmware",
+        },
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        test_cmd = """
+        rescue {params} --action=disability
+        """,
+        test_harness = "//sw/host/tests/rescue:rescue_test",
+    ),
 )
 
 opentitan_test(
@@ -936,6 +1274,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         timeout = "moderate",
@@ -947,6 +1286,15 @@ opentitan_test(
         test_harness = "//sw/host/tests/rescue:xmodem_rescue_error_handling",
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        timeout = "moderate",
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        test_harness = "//sw/host/tests/rescue:xmodem_rescue_error_handling",
+    ),
 )
 
 opentitan_test(
@@ -954,6 +1302,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -969,6 +1318,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu_flash_limit_zero": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        test_cmd = """
+        rescue {params} --action=spi-dfu-state-transitions
+        """,
+        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
+    ),
 )
 
 opentitan_test(
@@ -976,6 +1337,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -991,6 +1353,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        test_cmd = """
+        rescue {params} --action=invalid-spi-dfu-requests
+        """,
+        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
+    ),
 )
 
 opentitan_test(
@@ -998,6 +1372,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -1013,6 +1388,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_spidfu": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        params = "-p spi-dfu -t gpio -v +Ioa2",
+        test_cmd = """
+        rescue {params} --action=invalid-spi-flash-transaction
+        """,
+        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
+    ),
 )
 
 opentitan_test(
@@ -1020,6 +1407,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -1035,6 +1423,18 @@ opentitan_test(
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
     ),
+    qemu = qemu_params(
+        assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        binaries = {
+            "//sw/device/silicon_creator/rom_ext:rom_ext_usbdfu": "romext",
+            ":boot_test_slot_a": "firmware",
+        },
+        params = "-p usb-dfu -t strap -v 3",
+        test_cmd = """
+        rescue {params} --action=usb-dfu-out-chunk-too-big
+        """,
+        test_harness = "//sw/host/tests/rescue:dfu_rescue_error_handling",
+    ),
 )
 
 # Check that when we are not configured to rescue on watchdog timeout that
@@ -1047,12 +1447,17 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_failure = "(FAIL|BFV:|mode: RESQ).*",
         rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        exit_failure = "(FAIL|BFV:|mode: RESQ).*",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
     ),
     deps = [
         "//sw/device/lib/base:status",
@@ -1073,6 +1478,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_hyper310_rom_ext": None,
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_success = "mode: RESQ",
@@ -1085,6 +1491,10 @@ opentitan_test(
         """,
         testopt_clear_after_test = "True",  # See important note at the top
         testopt_clear_before_test = "True",
+    ),
+    qemu = qemu_params(
+        exit_success = "mode: RESQ",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_enter_on_watchdog",
     ),
     deps = [
         "//sw/device/lib/base:status",
