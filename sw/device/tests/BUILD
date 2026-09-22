@@ -4933,6 +4933,9 @@ opentitan_test(
         tags = ["manual"],
         test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
