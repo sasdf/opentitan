@@ -148,6 +148,7 @@ status_t i2c_device_process_byte(size_t i2c_idx, uint8_t data,
   struct device *device = &devices[i2c_idx];
   switch (signal) {
     case kDifI2cSignalStart:
+    case kDifI2cSignalRepeat:
       device->address = (data >> 1u);
       if (device->address == kI2cTargetMemoryDeviceAddr) {
         // emulate the memory device
