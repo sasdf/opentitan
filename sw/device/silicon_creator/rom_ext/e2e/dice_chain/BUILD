@@ -283,9 +283,11 @@ opentitan_test(
     ),
     slot_spec = ROM_EXT_VARIATIONS["dice_mldsa"].slot_spec,
     deps = [
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/base:status",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_main",
         "//sw/device/silicon_creator/lib/cert:ram_msg",
         "//sw/device/silicon_creator/lib/drivers:flash_ctrl",
