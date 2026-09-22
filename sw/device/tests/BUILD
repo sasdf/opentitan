@@ -4801,6 +4801,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_aon_wake",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --wake=reset
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_aon_wake",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5206,6 +5212,14 @@ opentitan_test(
     fpga = fpga_params(
         tags = ["coverage_broken"],  # RAM exhausted in coverage mode.
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --fin-phase=suspend
+            --init-phase=suspend
+            --logging-duration=0s
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5247,6 +5261,13 @@ opentitan_test(
     ),
     fpga = fpga_params(
         tags = ["coverage_broken"],  # RAM exhausted in coverage mode.
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --fin-phase=sleep-resume
+            --init-phase=sleep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
     silicon = silicon_params(
         test_cmd = """
@@ -5292,6 +5313,13 @@ opentitan_test(
     fpga = fpga_params(
         tags = ["coverage_broken"],  # RAM exhausted in coverage mode.
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --fin-phase=sleep-reset
+            --init-phase=sleep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5332,6 +5360,15 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw310_test_rom": None,
             "//hw/top_earlgrey:sim_dv": None,
         },
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+            --vbus-sense-wait=10ms
+            --fin-phase=deep-resume
+            --init-phase=sleep-disconnect
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
     silicon = silicon_params(
         test_cmd = """
