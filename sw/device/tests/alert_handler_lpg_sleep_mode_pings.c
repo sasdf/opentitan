@@ -93,6 +93,7 @@ void wait_enough_for_alert_ping(void) {
       busy_spin_micros(1000 * 22);
       break;
     case kDeviceSimDV:
+    case kDeviceSimQemu:
       // NUM_ALERTS*2*margin_of_safety*(2**DW)*(1/kClockFreqPeripheralHz)
       // 2*4*(2**16)*(42ns) = 22ms
       busy_spin_micros(1000 * 22);
