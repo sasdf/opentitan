@@ -344,7 +344,7 @@ impl QemuUsbDevice {
 
 impl UsbDevice for QemuUsbDevice {
     fn get_parent(&self) -> anyhow::Result<Box<dyn UsbDevice>> {
-        Err(anyhow!("this is the root USB device"))
+        Ok(Box::new(QemuUsbHub::new(self.host_channel.clone())))
     }
 
     fn get_vendor_id(&self) -> u16 {
@@ -671,6 +671,189 @@ impl UsbDevice for QemuUsbDevice {
             .context("failed to submit OUT transfer for bulk write")?;
         let sent_size = recv.recv_timeout(timeout)??;
         Ok(sent_size)
+    }
+}
+
+/// Virtual USB hub parent device for QEMU USBDEV.
+pub struct QemuUsbHub {
+    host_channel: mpsc::Sender<HostChannelEvent>,
+    port_status: std::cell::Cell<u16>,
+}
+
+const HUB_DEVICE_DESC: [u8; 18] = [
+    18, // bLength
+    1,  // bDescriptorType (Device)
+    0x00, 0x02, // bcdUSB (2.00)
+    9,    // bDeviceClass (LIBUSB_CLASS_HUB)
+    0,    // bDeviceSubClass
+    0,    // bDeviceProtocol
+    64,   // bMaxPacketSize0
+    0x6b, 0x1d, // idVendor (Linux Foundation)
+    0x02, 0x00, // idProduct
+    0x00, 0x01, // bcdDevice
+    0,    // iManufacturer
+    0,    // iProduct
+    0,    // iSerialNumber
+    1,    // bNumConfigurations
+];
+
+impl QemuUsbHub {
+    fn new(host_channel: mpsc::Sender<HostChannelEvent>) -> Self {
+        Self {
+            host_channel,
+            port_status: std::cell::Cell::new(0x0103),
+        }
+    }
+}
+
+impl UsbDevice for QemuUsbHub {
+    fn get_parent(&self) -> anyhow::Result<Box<dyn UsbDevice>> {
+        Err(anyhow!("this is the root USB device"))
+    }
+
+    fn get_vendor_id(&self) -> u16 {
+        0x1d6b
+    }
+
+    fn get_product_id(&self) -> u16 {
+        0x0002
+    }
+
+    fn get_serial_number(&self) -> Option<&str> {
+        None
+    }
+
+    fn set_active_configuration(&self, _config: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn claim_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn release_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn set_alternate_setting(&self, _iface: u8, _setting: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn kernel_driver_active(&self, _iface: u8) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+
+    fn detach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn attach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn device_descriptor(&self) -> desc::Device<'_> {
+        desc::Device::new(&HUB_DEVICE_DESC)
+    }
+
+    fn active_configuration(&self) -> anyhow::Result<desc::Configuration<'_>> {
+        anyhow::bail!("active_configuration not supported on QemuUsbHub")
+    }
+
+    fn bus_number(&self) -> u8 {
+        0
+    }
+
+    fn address(&self) -> u8 {
+        1
+    }
+
+    fn port_numbers(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(vec![])
+    }
+
+    fn read_string_descriptor_ascii(&self, _idx: u8) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
+    fn reset(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Reset)
+            .context("failed to send RESET")
+    }
+
+    fn get_timeout(&self) -> Duration {
+        Duration::from_secs(1)
+    }
+
+    fn write_control_timeout(
+        &self,
+        _request_type: u8,
+        request: u8,
+        value: u16,
+        _index: u16,
+        _buf: &[u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        // Standard USB Hub port feature selectors (USB 2.0 Spec Table 11-17):
+        // PORT_SUSPEND = 2, PORT_RESET = 4, PORT_POWER = 8
+        // LIBUSB_REQUEST_CLEAR_FEATURE = 1, LIBUSB_REQUEST_SET_FEATURE = 3
+        let set_feature = request == 3;
+        let mask = 1u16.checked_shl(value as u32).unwrap_or(0);
+        if set_feature {
+            self.port_status.set(self.port_status.get() | mask);
+        } else {
+            self.port_status.set(self.port_status.get() & !mask);
+        }
+        match (value, set_feature) {
+            (2, true) => self
+                .host_channel
+                .send(HostChannelEvent::Suspend)
+                .context("failed to send SUSPEND")?,
+            (2, false) => self
+                .host_channel
+                .send(HostChannelEvent::Resume)
+                .context("failed to send RESUME")?,
+            (4, true) => self
+                .host_channel
+                .send(HostChannelEvent::Reset)
+                .context("failed to send RESET")?,
+            _ => {}
+        }
+        Ok(0)
+    }
+
+    fn read_control_timeout(
+        &self,
+        _request_type: u8,
+        _request: u8,
+        _value: u16,
+        _index: u16,
+        buf: &mut [u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let status = self.port_status.get().to_le_bytes();
+        let copy_len = std::cmp::min(buf.len(), 4);
+        let bytes = [status[0], status[1], 0, 0];
+        buf[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        Ok(copy_len)
+    }
+
+    fn read_bulk_timeout(
+        &self,
+        _endpoint: u8,
+        _data: &mut [u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        anyhow::bail!("read_bulk_timeout not supported on QemuUsbHub")
+    }
+
+    fn write_bulk_timeout(
+        &self,
+        _endpoint: u8,
+        _data: &[u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        anyhow::bail!("write_bulk_timeout not supported on QemuUsbHub")
     }
 }
 

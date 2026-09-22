@@ -53,47 +53,8 @@ fn usbdev_aon_wake(opts: &Opts, transport: &TransportWrapper, uart: &dyn Uart) -
         );
     }
 
-    if opts.init.backend_opts.interface == "qemu" {
-        let usb_context = transport.usb()?;
-        let device = usb_context.device_by_id_with_timeout(
-            opts.usb.vid,
-            opts.usb.pid,
-            None,
-            opts.timeout,
-        )?;
-        let _ = UartConsole::wait_for(uart, r"configured, waiting for suspend", opts.timeout)?;
-        log::info!("suspend device");
-        device.suspend()?;
-        let _ = UartConsole::wait_for(uart, r"suspended, waiting for", opts.timeout)?;
-        log::info!("device has suspended");
-
-        match opts.wake {
-            WakeMethod::Reset => {
-                log::info!("reset device");
-                device.reset()?;
-                let _ = UartConsole::wait_for(
-                    uart,
-                    r"reset, take control back from aon",
-                    opts.timeout,
-                )?;
-            }
-            WakeMethod::Disconnect => {
-                log::info!("disconnect device");
-                opts.usb.enable_vbus(transport, false)?;
-                let _ = UartConsole::wait_for(
-                    uart,
-                    r"disconnect, take control back from aon",
-                    opts.timeout,
-                )?;
-            }
-        }
-
-        let _ = UartConsole::wait_for(uart, r"PASS!", opts.timeout)?;
-        return Ok(());
-    }
-
     // Wait for device to appear.
-    let (hub, port) = opts.usb.wait_for_device_and_get_parent(opts.timeout)?;
+    let (hub, port) = opts.usb.wait_for_device_and_get_parent(transport, opts.timeout)?;
 
     // Next, we suspend the device by directly accessing the parent hub.
     let _ = UartConsole::wait_for(uart, r"configured, waiting for suspend", opts.timeout)?;

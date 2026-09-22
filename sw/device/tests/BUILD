@@ -5335,6 +5335,7 @@ opentitan_test(
         test_cmd = """
             --fin-phase=suspend
             --init-phase=suspend
+            --logging-duration=0s
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
