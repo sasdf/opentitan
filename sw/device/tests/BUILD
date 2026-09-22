@@ -132,6 +132,7 @@ opentitan_test(
     name = "aes_interrupt_encryption_test",
     srcs = ["aes_interrupt_encryption_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:sim_verilator": None,
@@ -6035,9 +6036,18 @@ _RV_DM_TAP_SEL_LC_STATES = get_lc_items(
             {
                 "//hw/top_earlgrey:fpga_cw310_sival": None,
                 "//hw/top_earlgrey:fpga_cw340_sival": None,
+                "//hw/top_earlgrey:sim_qemu_sival": None,
             },
         ),
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:jtag_tap_sel",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
