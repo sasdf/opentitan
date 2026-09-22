@@ -9,6 +9,7 @@ load(
     "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
 )
 
@@ -23,6 +24,8 @@ CRYPTOTEST_EXEC_ENVS = {
     "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
     "//hw/top_earlgrey:fpga_cw340_test_rom": "fpga_cw340",
     "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": "fpga_cw340",
+    "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
 } | EARLGREY_SILICON_OWNER_ROM_EXT_ENVS
 
 FIRMWARE_DEPS = [
@@ -76,6 +79,13 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False):
             tags = tags,
             data = test_vectors,
             test_cmd = test_args,
+            test_harness = test_harness,
+        ),
+        qemu = qemu_params(
+            timeout = "eternal",
+            data = test_vectors,
+            tags = tags,
+            test_cmd = (test_args.replace("--timeout=250s", "--timeout=600s") if "--timeout=" in test_args else (("--timeout=600s " if "--run-keygen" in test_args else "--timeout=60s ") + test_args)) if test_args else "",
             test_harness = test_harness,
         ),
         exec_env = CRYPTOTEST_EXEC_ENVS,
