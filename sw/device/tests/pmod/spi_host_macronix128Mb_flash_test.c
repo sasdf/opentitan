@@ -36,6 +36,7 @@ static void init_test(dif_spi_host_t *spi_host) {
       platform_id = kSpiPinmuxPlatformIdTeacup;
       break;
     case kDeviceFpgaCw310:
+    case kDeviceSimQemu:
       platform_id = kSpiPinmuxPlatformIdCw310;
       break;
     case kDeviceFpgaCw340:
