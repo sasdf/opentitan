@@ -2093,9 +2093,14 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival": None,
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/gpio:gpio_pinmux",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/gpio:gpio_pinmux",
     ),
     silicon = silicon_params(
@@ -3602,6 +3607,12 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_wake",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_wake",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -3631,7 +3642,14 @@ opentitan_test(
 opentitan_test(
     name = "pwrmgr_sensor_ctrl_deep_sleep_wake_up",
     srcs = ["pwrmgr_sensor_ctrl_deep_sleep_wake_up.c"],
-    exec_env = {"//hw/top_earlgrey:sim_dv": None},
+    exec_env = {
+        "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+    },
+    qemu = qemu_params(
+        otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
+    ),
     deps = [
         "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
@@ -7520,6 +7538,9 @@ opentitan_test(
     fpga = fpga_params(
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7559,6 +7580,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
     ),
     silicon = silicon_params(
