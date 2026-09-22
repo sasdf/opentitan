@@ -42,6 +42,11 @@ alias(
 )
 
 alias(
+    name = "qemu-system-riscv32-cov",
+    actual = "@qemu_opentitan//:build/qemu-system-riscv32-cov",
+)
+
+alias(
     name = "qemu-img",
     actual = "@qemu_opentitan//:build/qemu-img",
 )
