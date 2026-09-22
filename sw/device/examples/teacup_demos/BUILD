@@ -5,6 +5,7 @@
 load(
     "//rules/opentitan:defs.bzl",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -14,7 +15,15 @@ opentitan_test(
     srcs = ["teacup_leds_demo.c"],
     exec_env = {
         "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
+    qemu = qemu_params(
+        qemu_args = [
+            "-device",
+            "at24c-eeprom,bus=ot-i2c0,address=0x34,rom-size=256",
+        ],
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/lib/boards/teacup_v1_3_0:leds",
@@ -31,7 +40,16 @@ opentitan_test(
     srcs = ["teacup_leds_and_screen_demo.c"],
     exec_env = {
         "//hw/top_earlgrey:silicon_owner_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
+    qemu = qemu_params(
+        timeout = "moderate",
+        qemu_args = [
+            "-device",
+            "at24c-eeprom,bus=ot-i2c0,address=0x34,rom-size=256",
+        ],
+    ),
     deps = [
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
         "//sw/device/examples/teacup_demos/data:bitmaps",
