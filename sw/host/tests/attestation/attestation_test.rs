@@ -156,7 +156,7 @@ fn attestation_test(opts: &Opts, transport: &TransportWrapper, owner_history: &[
 
     // Note: Finding UDS is allowed to fail on FPGA environments.
     let uds_bin = if opts.post_provisioning_tests {
-        Some(get_base64_blob(&capture[0], r"(?msR)UDS: (.*?)$")?)
+        get_base64_blob(&capture[0], r"(?msR)UDS: (.*?)$").ok()
     } else {
         None
     };
