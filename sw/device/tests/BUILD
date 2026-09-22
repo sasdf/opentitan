@@ -3993,10 +3993,19 @@ opentitan_test(
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
             "//hw/top_earlgrey:fpga_cw310_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
         test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/spi_device_ujson_console_test",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
         test_harness = "//sw/host/tests/chip/spi_device_ujson_console_test",
     ),
     deps = [
@@ -4016,6 +4025,7 @@ opentitan_test(
     name = "spi_device_sleep_test",
     srcs = ["spi_device_sleep_test.c"],
     exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         EARLGREY_CW340_TEST_ENVS,
         {
@@ -4024,6 +4034,9 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
     ),
     silicon = silicon_params(
@@ -4144,10 +4157,19 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw310_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
         },
     ),
     fpga = fpga_params(
         test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/spi_device:spi_host_config_test",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
         test_harness = "//sw/host/tests/chip/spi_device:spi_host_config_test",
     ),
     silicon = silicon_params(
