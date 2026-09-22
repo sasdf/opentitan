@@ -85,6 +85,7 @@ struct Opts {
 fn is_valid_pad(pad: &Pad, interface: &str) -> bool {
     match interface {
         "hyper310" => pad.valid_cw310,
+        "qemu" => pad.valid_cw310,
         "teacup" => pad.valid_silicon,
         _ => false,
     }
