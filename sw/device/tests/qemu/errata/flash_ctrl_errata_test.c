@@ -73,7 +73,6 @@ enum {
 
 static volatile uint32_t g_fault_count = 0;
 static volatile uint32_t g_last_fault_mcause = 0;
-static volatile uint32_t g_nmi_count = 0;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   (void)exc_info;
@@ -83,7 +82,6 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 
 void ottf_load_integrity_error_handler(uint32_t *exc_info) {
   (void)exc_info;
-  g_nmi_count++;
   abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET,
                    1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT);
 }
