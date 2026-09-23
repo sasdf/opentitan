@@ -678,6 +678,30 @@ opentitan_test(
 # Priority P23 Module: lc_ctrl
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p23_lc_ctrl ===
+opentitan_test(
+    name = "lc_ctrl_errata_test",
+    srcs = ["lc_ctrl_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/lc_ctrl/data:lc_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:memory",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:lc_ctrl",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p23_lc_ctrl ===
 #
 #
