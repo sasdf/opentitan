@@ -260,8 +260,10 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
   // 4. Verify [ERRATA-EDN-002] and [ERRATA-EDN-007] Part 3 on EDN1:
   // - Empty RESEED_CMD underflow in Auto Mode sets SFIFO_RESCMD_ERR |
   //   FIFO_READ_ERR and INTR_STATE.EDN_FATAL_ERR, but because fatal_loc_events
-  //   omits external FIFO errors, MAIN_SM_STATE does NOT enter Error (0x17e)
-  //   ([ERRATA-EDN-002]);
+  //   omits external FIFO errors (while edn_core.sv:530-560 still sends the
+  //   empty 0x00000000 word to CSRNG, which returns csrng_ack_err = 1),
+  //   MAIN_SM_STATE transitions to RejectCsrngEntropy (0x018) instead of
+  //   Error (0x17e) ([ERRATA-EDN-002]);
   // - Writing ERR_CODE_TEST = 21 (EDN_MAIN_SM_ERR) simultaneously escalates
   //   both EDN_MAIN_SM_ERR (21) and EDN_ACK_SM_ERR (20), moves MAIN_SM_STATE
   //   to Error (0x17e), and keeps HW_CMD_STS.AUTO_MODE latched at 1!
@@ -286,7 +288,7 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
       abs_mmio_read32(kEdn1Base + EDN_HW_CMD_STS_REG_OFFSET);
   CHECK((abs_mmio_read32(kEdn1Base + EDN_INTR_STATE_REG_OFFSET) &
          (1u << EDN_INTR_STATE_EDN_FATAL_ERR_BIT)) != 0u);
-  CHECK(sm_underflow == 0x06au);
+  CHECK(sm_underflow == 0x018u);
   CHECK((hw_sts_underflow & (1u << EDN_HW_CMD_STS_AUTO_MODE_BIT)) != 0u);
 
   abs_mmio_write32(kEdn1Base + EDN_ERR_CODE_TEST_REG_OFFSET,
