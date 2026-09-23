@@ -771,6 +771,45 @@ opentitan_test(
 # Priority P26 Module: clkmgr
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p26_clkmgr ===
+opentitan_test(
+    name = "clkmgr_errata_test",
+    srcs = ["clkmgr_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    qemu = qemu_params(
+        timeout = "short",
+    ),
+    deps = [
+        "//hw/ip/aon_timer/data:aon_timer_c_regs",
+        "//hw/ip/rv_core_ibex/data:rv_core_ibex_c_regs",
+        "//hw/top_earlgrey/ip_autogen/clkmgr:clkmgr_c_regs",
+        "//hw/top_earlgrey/ip_autogen/pwrmgr:pwrmgr_c_regs",
+        "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:math",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:aon_timer",
+        "//sw/device/lib/dif:clkmgr",
+        "//sw/device/lib/dif:pwrmgr",
+        "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:aon_timer_testutils",
+        "//sw/device/lib/testing:pwrmgr_testutils",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p26_clkmgr ===
 #
 #
