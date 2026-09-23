@@ -1179,6 +1179,26 @@ opentitan_test(
 # Priority P38 Module: xbar_main_and_xbar_peri
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p38_xbar_main_and_xbar_peri ===
+opentitan_test(
+    name = "xbar_main_and_xbar_peri_errata_test",
+    srcs = ["xbar_main_and_xbar_peri_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/pattgen/data:pattgen_c_regs",
+        "//hw/ip/spi_host/data:spi_host_c_regs",
+        "//hw/ip/sysrst_ctrl/data:sysrst_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p38_xbar_main_and_xbar_peri ===
 #
 #
