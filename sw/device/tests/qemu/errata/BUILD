@@ -137,6 +137,24 @@ opentitan_test(
 # Priority P07 Module: spi_device
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p07_spi_device ===
+opentitan_test(
+    name = "spi_device_errata_test",
+    srcs = ["spi_device_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/spi_device/data:spi_device_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p07_spi_device ===
 #
 #
