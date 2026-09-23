@@ -92,6 +92,26 @@ opentitan_test(
 # Priority P05 Module: adc_ctrl
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p05_adc_ctrl ===
+opentitan_test(
+    name = "adc_ctrl_errata_test",
+    srcs = ["adc_ctrl_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/adc_ctrl/data:adc_ctrl_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/arch:device",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p05_adc_ctrl ===
 #
 #
