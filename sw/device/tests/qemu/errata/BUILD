@@ -304,6 +304,26 @@ opentitan_test(
 # Priority P11 Module: aon_timer
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p11_aon_timer ===
+opentitan_test(
+    name = "aon_timer_errata_test",
+    srcs = ["aon_timer_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/aon_timer/data:aon_timer_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p11_aon_timer ===
 #
 #
