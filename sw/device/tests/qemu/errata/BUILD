@@ -1062,6 +1062,31 @@ opentitan_test(
 # Priority P35 Module: gpio
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p35_gpio ===
+opentitan_test(
+    name = "gpio_errata_test",
+    srcs = ["gpio_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/gpio/data:gpio_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:memory",
+        "//sw/device/lib/dif:gpio",
+        "//sw/device/lib/dif:pinmux",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p35_gpio ===
 #
 #
