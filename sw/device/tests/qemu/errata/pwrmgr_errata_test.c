@@ -94,15 +94,15 @@ static void pwrmgr_cdc_sync(void) {
 }
 
 /**
- * [ERRATA-PWRMGR-002] (BENIGN_RTL_IMPL_DETAIL):
+ * [pwrmgr.sv:502,512-515] (BENIGN_RTL_IMPL_DETAIL):
  * Verify that `WAKE_STATUS` (`0x24`) is masked by `slow_wakeup_en`
  * (`pwrmgr.sv:502, 512-515`) and remains `0` even when `aon_timer` `wkup_req`
  * is actively asserted unless `WAKEUP_EN` (`0x20`) is set and synchronized
  * across the slow AON clock domain via `CFG_CDC_SYNC` (`0x18`).
  */
-static void test_errata_pwrmgr_002_wake_status_cdc_masking(void) {
+static void test_pwrmgr_wake_status_cdc_masking(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWRMGR-002] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [pwrmgr.sv:502,512-515] (BENIGN_RTL_IMPL_DETAIL): "
       "WAKE_STATUS masking by slow_wakeup_en via CFG_CDC_SYNC");
 
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0u);
@@ -124,7 +124,8 @@ static void test_errata_pwrmgr_002_wake_status_cdc_masking(void) {
   uint32_t wake_status =
       abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET);
   CHECK(wake_status == 0u,
-        "[ERRATA-PWRMGR-002] WAKE_STATUS must be 0 when slow_wakeup_en==0, got "
+        "[pwrmgr.sv:502,512-515] WAKE_STATUS must be 0 when slow_wakeup_en==0, "
+        "got "
         "0x%08x",
         wake_status);
 
@@ -134,7 +135,8 @@ static void test_errata_pwrmgr_002_wake_status_cdc_masking(void) {
   busy_spin_micros(30);
   wake_status = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET);
   CHECK(wake_status == kAonTimerWkupBit,
-        "[ERRATA-PWRMGR-002] WAKE_STATUS must equal 0x%08x after CFG_CDC_SYNC, "
+        "[pwrmgr.sv:502,512-515] WAKE_STATUS must equal 0x%08x after "
+        "CFG_CDC_SYNC, "
         "got 0x%08x",
         kAonTimerWkupBit, wake_status);
 
@@ -149,7 +151,7 @@ static void test_errata_pwrmgr_002_wake_status_cdc_masking(void) {
 }
 
 /**
- * [ERRATA-PWRMGR-001] (SPEC_DOC_ERRATA) & [ERRATA-PWRMGR-004]:
+ * [pwrmgr_wake_info.sv:36-65] (SPEC_DOC_ERRATA) & [pwrmgr.sv:278-368]:
  * Verify that `WAKE_INFO` (`0x3c`) `record_en` (`pwrmgr_wake_info.sv:36-65`)
  * remains armed (`record_en == 1`) after low-power wakeup while
  * `WAKE_INFO_CAPTURE_DIS == 0` (`0x38`), immediately overriding `rw1c` clears
@@ -158,10 +160,10 @@ static void test_errata_pwrmgr_002_wake_status_cdc_masking(void) {
  * Also verify `CONTROL[8:4]` retention (`0x180`) and `LOW_POWER_HINT`
  * auto-clear upon low-power exit.
  */
-static void test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention(
-    void) {
+static void test_pwrmgr_wake_info_relatch_and_retention(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWRMGR-001] (SPEC_DOC_ERRATA) & [ERRATA-PWRMGR-004]: "
+      "Verifying [pwrmgr_wake_info.sv:36-65] (SPEC_DOC_ERRATA) & "
+      "[pwrmgr.sv:278-368]: "
       "WAKE_INFO rw1c immediate re-latch while WAKE_INFO_CAPTURE_DIS==0 and "
       "CONTROL retention across LowPowerExit");
 
@@ -198,12 +200,12 @@ static void test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention(
                    1u << AON_TIMER_WKUP_CTRL_ENABLE_BIT);
   wait_for_interrupt();
 
-  /* [ERRATA-PWRMGR-004]: Verify CONTROL[8:4] retained (0x180), LOW_POWER_HINT
+  /* [pwrmgr.sv:278-368]: Verify CONTROL[8:4] retained (0x180), LOW_POWER_HINT
    * cleared (0), and CTRL_CFG_REGWEN unlocked (1). */
   uint32_t ctrl_after =
       abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
   CHECK(ctrl_after == retained_ctrl_bits,
-        "[ERRATA-PWRMGR-004] Expected CONTROL == 0x%08x after wakeup, got "
+        "[pwrmgr.sv:278-368] Expected CONTROL == 0x%08x after wakeup, got "
         "0x%08x",
         retained_ctrl_bits, ctrl_after);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) == 1u,
@@ -214,21 +216,23 @@ static void test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention(
   uint32_t wake_info =
       abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
   CHECK((wake_info & kAonTimerWkupBit) != 0u,
-        "[ERRATA-PWRMGR-001] Expected WAKE_INFO to capture kAonTimerWkupBit, "
+        "[pwrmgr_wake_info.sv:36-65] Expected WAKE_INFO to capture "
+        "kAonTimerWkupBit, "
         "got 0x%08x",
         wake_info);
 
-  /* [ERRATA-PWRMGR-001]: Because `record_en == 1` (`WAKE_INFO_CAPTURE_DIS ==
-   * 0`) and `aon_timer` wakeup is still asserted (`wakeups_i != 0`), writing
-   * `0xff`
+  /* [pwrmgr_wake_info.sv:36-65]: Because `record_en == 1`
+   * (`WAKE_INFO_CAPTURE_DIS == 0`) and `aon_timer` wakeup is still asserted
+   * (`wakeups_i != 0`), writing `0xff`
    * (`rw1c`) to `WAKE_INFO` clears `info` on the write cycle and immediately
    * re-latches `kAonTimerWkupBit` on the very next clock cycle! */
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
   wake_info = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
-  CHECK((wake_info & kAonTimerWkupBit) != 0u,
-        "[ERRATA-PWRMGR-001] Expected WAKE_INFO to immediately re-latch "
-        "active wakeup after rw1c while WAKE_INFO_CAPTURE_DIS==0, got 0x%08x",
-        wake_info);
+  CHECK(
+      (wake_info & kAonTimerWkupBit) != 0u,
+      "[pwrmgr_wake_info.sv:36-65] Expected WAKE_INFO to immediately re-latch "
+      "active wakeup after rw1c while WAKE_INFO_CAPTURE_DIS==0, got 0x%08x",
+      wake_info);
 
   /* Once `WAKE_INFO_CAPTURE_DIS = 1` (`0x38`) is written (`record_en <= 0`),
    * `rw1c` clearing `WAKE_INFO` (`0xff`) keeps `WAKE_INFO == 0` even while
@@ -237,7 +241,7 @@ static void test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention(
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
   wake_info = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
   CHECK(wake_info == 0u,
-        "[ERRATA-PWRMGR-001] Expected WAKE_INFO == 0 after "
+        "[pwrmgr_wake_info.sv:36-65] Expected WAKE_INFO == 0 after "
         "WAKE_INFO_CAPTURE_DIS=1 + rw1c, got 0x%08x",
         wake_info);
 
@@ -256,16 +260,16 @@ static void test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention(
 }
 
 /**
- * [ERRATA-PWRMGR-003] (INTENDED_SECURITY_HARDENING):
+ * [pwrmgr_reg_pkg.sv:259-277] (INTENDED_SECURITY_HARDENING):
  * Verify `PWRMGR_PERMIT[17]` (`pwrmgr_reg_pkg.sv:259-277`) sub-word write
  * byte-enable enforcement (`4'b0011` on `CONTROL` `0x14` rejecting 8-bit `sb`
  * with Store Access Fault `mcause = 7` while allowing 16-bit `sh`, `4'b0001` on
  * `INTR_ENABLE` `0x04` allowing 8-bit `sb` at `+0` and faulting at `+1`), and
  * `addrmiss` synchronous bus faults (`mcause = 5 / 7`) at offset `0x44`.
  */
-static void test_errata_pwrmgr_003_permit_and_addrmiss_faults(void) {
+static void test_pwrmgr_permit_and_addrmiss_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWRMGR-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [pwrmgr_reg_pkg.sv:259-277] (INTENDED_SECURITY_HARDENING): "
       "PWRMGR_PERMIT[5]=4'b0011 sub-word write fault on CONTROL and addrmiss");
 
   uint32_t orig_ctrl = abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET);
@@ -293,15 +297,15 @@ static void test_errata_pwrmgr_003_permit_and_addrmiss_faults(void) {
 }
 
 /**
- * [ERRATA-PWRMGR-E4] (BENIGN_RTL_IMPL_DETAIL):
+ * [pwrmgr_reg_top.sv:432-652] (BENIGN_RTL_IMPL_DETAIL):
  * Verify 1-bit `INTR_*` mask (`0x1` rather than `0x3f`), `ALERT_TEST` (`0x0c`)
  * 1-cycle transient pulse (`q & qe`), `CTRL_CFG_REGWEN` (`0x10`, `ro`/`hwo`)
  * ignoring software writes of `0`, and `WAKEUP_EN_REGWEN` (`0x1c`) /
  * `RESET_EN_REGWEN` (`0x28`) `rw0c` permanent locking.
  */
-static void test_errata_pwrmgr_e4_intr_alert_and_regwen_locks(void) {
+static void test_pwrmgr_intr_alert_and_regwen_locks(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWRMGR-E4] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [pwrmgr_reg_top.sv:432-652] (BENIGN_RTL_IMPL_DETAIL): "
       "1-bit INTR mask, ALERT_TEST pulse, CTRL_CFG_REGWEN ro, and rw0c locks");
 
   /* 1. Verify `ALERT_TEST` 1-cycle transient pulse on repeated writes. */
@@ -359,10 +363,10 @@ static void test_errata_pwrmgr_e4_intr_alert_and_regwen_locks(void) {
 
 bool test_main(void) {
   LOG_INFO("Starting pwrmgr_errata_test (P29) on CW340 FPGA / QEMU...");
-  test_errata_pwrmgr_002_wake_status_cdc_masking();
-  test_errata_pwrmgr_001_and_004_wake_info_relatch_and_retention();
-  test_errata_pwrmgr_003_permit_and_addrmiss_faults();
-  test_errata_pwrmgr_e4_intr_alert_and_regwen_locks();
+  test_pwrmgr_wake_status_cdc_masking();
+  test_pwrmgr_wake_info_relatch_and_retention();
+  test_pwrmgr_permit_and_addrmiss_faults();
+  test_pwrmgr_intr_alert_and_regwen_locks();
   LOG_INFO("All pwrmgr_errata_test checks PASSED!");
   return true;
 }

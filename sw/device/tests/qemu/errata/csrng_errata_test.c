@@ -81,8 +81,8 @@ bool test_main(void) {
   disable_all();
 
   // =========================================================================
-  // 1. [ERRATA-CSRNG-001] / [E3-01] (TRUE_SILICON_ERRATA) &
-  //    [ERRATA-CSRNG-005a] / [E2-01a] (INTENDED_SECURITY_HARDENING):
+  // 1. [csrng_core.sv:754-761] / [E3-01] (TRUE_SILICON_ERRATA) &
+  //    [csrng_core.sv:783-846] / [E2-01a] (INTENDED_SECURITY_HARDENING):
   //    RECOV_ALERT_STS.FIPS_FORCE_ENABLE_FIELD_ALERT (bit 3) is omitted from
   //    recov_alert_event in csrng_core.sv:754-761 so recov_alert_o never fires
   //    to alert_handler when only CTRL.FIPS_FORCE_ENABLE is invalid (0x5999),
@@ -91,7 +91,7 @@ bool test_main(void) {
   //    while CTRL holds an invalid mubi4_t.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-001 / E3-01] (TRUE_SILICON_ERRATA) & "
+      "Verifying [csrng_core.sv:754-761 / E3-01] (TRUE_SILICON_ERRATA) & "
       "[E2-01a] (INTENDED_SECURITY_HARDENING): FIPS_FORCE_ENABLE omitted "
       "from recov_alert_event & continuous de=pfa rw0c block...");
   uint32_t alert_en_addr = kAlertHandlerBase +
@@ -144,13 +144,13 @@ bool test_main(void) {
   abs_mmio_write32(alert_cause_addr, 1u);
 
   // =========================================================================
-  // 2. [ERRATA-CSRNG-002] / [E3-02] (TRUE_SILICON_ERRATA):
+  // 2. [csrng_core.sv:1047-1054] / [E3-02] (TRUE_SILICON_ERRATA):
   //    HW_EXC_STS (rw0c) self-clears to 0x0000 after 1 clock cycle because
   //    hw2reg.hw_exc_sts.de = cs_enable_fo[50] (1'b1) instead of
   //    |hw_exception_sts, while INTR_STATE.CS_HW_INST_EXC latches 1.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-002 / E3-02] (TRUE_SILICON_ERRATA): "
+      "Verifying [csrng_core.sv:1047-1054 / E3-02] (TRUE_SILICON_ERRATA): "
       "HW_EXC_STS 1-cycle self-clear on HW app exception...");
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9996u);
@@ -170,13 +170,13 @@ bool test_main(void) {
   disable_all();
 
   // =========================================================================
-  // 3. [ERRATA-CSRNG-004] / [E1-02] (SPEC_DOC_ERRATA):
+  // 3. [csrng_core.sv:948-952] / [E1-02] (SPEC_DOC_ERRATA):
   //    Reading GENBITS while CTRL.SW_APP_ENABLE is false (0x9) returns 0x0 on
   //    the bus yet destructively pops u_prim_packer_fifo_sw_genbits, and
   //    GENBITS_VLD remains ungated (reports 0x3).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-004 / E1-02] (SPEC_DOC_ERRATA): GENBITS "
+      "Verifying [csrng_core.sv:948-952 / E1-02] (SPEC_DOC_ERRATA): GENBITS "
       "read when !SW_APP_ENABLE returns 0 yet pops FIFO...");
   abs_mmio_write32(kCsrngBase + CSRNG_FIPS_FORCE_REG_OFFSET, 0x7u);
   // CTRL = 0x6696: FIPS_FORCE_ENABLE=0x6, READ_INT_STATE=0x6,
@@ -210,7 +210,7 @@ bool test_main(void) {
            "[E1-02] Expected RESEED_COUNTER_2 == 1 after GENERATE completion");
 
   // =========================================================================
-  // 4. [ERRATA-CSRNG-005b] / [E2-01b] (SPEC_DOC_ERRATA):
+  // 4. [csrng_state_db.sv:142-175] / [E2-01b] (SPEC_DOC_ERRATA):
   //    Writing INT_STATE_NUM while CTRL.READ_INT_STATE is false (0x9) updates
   //    int_st_dump_id_q (to instance 2), but reg_rd_ptr_q remains forced to
   //    4'hf. Enabling CTRL.READ_INT_STATE afterwards without re-writing
@@ -218,7 +218,7 @@ bool test_main(void) {
   //    and the 2nd read to return word 0 (RESEED_COUNTER_2 == 1).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-005b / E2-01b] (SPEC_DOC_ERRATA): "
+      "Verifying [csrng_state_db.sv:142-175 / E2-01b] (SPEC_DOC_ERRATA): "
       "INT_STATE_NUM write when !READ_INT_STATE leaves reg_rd_ptr_q=4'hf...");
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_READ_ENABLE_REG_OFFSET, 0x7u);
   // Set READ_INT_STATE = MuBi4False (0x9): CTRL = 0x6966.
@@ -239,12 +239,12 @@ bool test_main(void) {
            "reseed_counter) to return 1");
 
   // =========================================================================
-  // 5. [ERRATA-CSRNG-006] / [E2-02] (INTENDED_SECURITY_HARDENING):
+  // 5. [csrng_core.sv:1765-1771] / [E2-02] (INTENDED_SECURITY_HARDENING):
   //    UNINSTANTIATE (UNI) synchronously zeroizes all 418 bits of
   //    internal_states_q[id], including RESEED_COUNTER_2.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-006 / E2-02] "
+      "Verifying [csrng_core.sv:1765-1771 / E2-02] "
       "(INTENDED_SECURITY_HARDENING): UNINSTANTIATE zeroizes "
       "RESEED_COUNTER_2...");
   sts = csrng_send_sw_cmd(0x00000005u, NULL, 0);
@@ -255,12 +255,12 @@ bool test_main(void) {
            "[E2-02] Expected RESEED_COUNTER_2 == 0 after UNINSTANTIATE");
 
   // =========================================================================
-  // 6. [ERRATA-CSRNG-007] / [E2-03] (INTENDED_SECURITY_HARDENING):
+  // 6. [csrng_reg_top.sv:2203-2232] / [E2-03] (INTENDED_SECURITY_HARDENING):
   //    Sub-word CSR writes (CSRNG_PERMIT) and unmapped offsets 0x60..0x7c
   //    (addrmiss) raise synchronous TileLink bus errors (mcause=7 / 5).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-007 / E2-03] "
+      "Verifying [csrng_reg_top.sv:2203-2232 / E2-03] "
       "(INTENDED_SECURITY_HARDENING): CSRNG_PERMIT sub-word write fault & "
       "0x7c addrmiss fault...");
   abs_mmio_write32(kCsrngBase + CSRNG_RESEED_INTERVAL_REG_OFFSET, 0xa5a55a5au);
@@ -279,7 +279,7 @@ bool test_main(void) {
            "[E2-03] Expected Load Access Fault at unmapped offset 0x7c");
 
   // =========================================================================
-  // 7. [ERRATA-CSRNG-003] / [E1-01] (TRUE_SILICON_ERRATA):
+  // 7. [csrng_core.sv:501-532] / [E1-01] (TRUE_SILICON_ERRATA):
   //    Asymmetric CTRL.ENABLE gating between ERR_CODE (bits 0..25, 28..30
   //    gated; bit 26 CMD_GEN_CNT_ERR ungated) and event_cs_fatal_err (bits
   //    20..26 ungated).
@@ -291,7 +291,7 @@ bool test_main(void) {
   //      even while CTRL.ENABLE is false!
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CSRNG-003 / E1-01] (TRUE_SILICON_ERRATA): "
+      "Verifying [csrng_core.sv:501-532 / E1-01] (TRUE_SILICON_ERRATA): "
       "Asymmetric CTRL.ENABLE gating on ERR_CODE vs event_cs_fatal_err...");
   disable_all();
   abs_mmio_write32(kCsrngBase + CSRNG_ERR_CODE_TEST_REG_OFFSET, 0u);

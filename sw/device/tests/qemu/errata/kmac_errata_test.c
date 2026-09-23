@@ -79,7 +79,7 @@ bool test_main(void) {
   wait_kmac_idle();
 
   // =========================================================================
-  // 1. [ERRATA-KMAC-003] (TRUE_SILICON_ERRATA — Verified First While
+  // 1. [kmac_errchk.sv:268] (TRUE_SILICON_ERRATA — Verified First While
   // ERR_CODE==0):
   //    CFG_SHADOWED.KMAC_EN is evaluated independently of CFG_SHADOWED.MODE
   //    across kmac_errchk.sv, kmac_core.sv, and sha3pad.sv:
@@ -98,7 +98,7 @@ bool test_main(void) {
   //      Raises ErrIncorrectFunctionName (0x07010000) even though mode=Sha3.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-003] (TRUE_SILICON_ERRATA): Subcase 3A "
+      "Verifying [kmac_errchk.sv:268] (TRUE_SILICON_ERRATA): Subcase 3A "
       "(kmac_en=1, mode=Sha3, kstrength=L256, PREFIX='KMAC')...");
 
   CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET), 0x00000000u,
@@ -120,9 +120,10 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   // --- Subcase 3A: kmac_en = 1, mode = Sha3 (0), kstrength = L256, PREFIX =
-  // "KMAC" --- Also exercises [ERRATA-KMAC-008] (latching SwMode from
-  // StRandReset and verifying that 5 ENTROPY_SEED words stall while the 6th
-  // word completes StSwSeedWait -> StRandReady with ERR_CODE == 0x00000000).
+  // "KMAC" --- Also exercises [kmac_entropy.sv:357-381,527-556,604-644]
+  // (latching SwMode from StRandReset and verifying that 5 ENTROPY_SEED words
+  // stall while the 6th word completes StSwSeedWait -> StRandReady with
+  // ERR_CODE == 0x00000000).
   uint32_t cfg_3a = 0;
   cfg_3a = bitfield_bit32_write(cfg_3a, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
   cfg_3a = bitfield_field32_write(cfg_3a, KMAC_CFG_SHADOWED_MODE_FIELD,
@@ -146,7 +147,8 @@ bool test_main(void) {
   }
   uint32_t status_5seeds = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   CHECK((status_5seeds & (1u << KMAC_STATUS_SHA3_SQUEEZE_BIT)) == 0u,
-        "[ERRATA-KMAC-008] Expected stall after 5 ENTROPY_SEED words");
+        "[kmac_entropy.sv:357-381,527-556,604-644] Expected stall after 5 "
+        "ENTROPY_SEED words");
   abs_mmio_write32(kKmacBase + KMAC_ENTROPY_SEED_REG_OFFSET, 0x12345678u + 5u);
   wait_kmac_squeeze();
   uint32_t intr_3a = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
@@ -158,10 +160,10 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   CHECK_EQ(intr_3a & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT), 0u,
-           "[ERRATA-KMAC-003 3A] Expected kmac_err == 0 when kmac_en=1, "
+           "[kmac_errchk.sv:268 3A] Expected kmac_err == 0 when kmac_en=1, "
            "mode=Sha3, PREFIX='KMAC'");
   CHECK_EQ(err_3a, 0x00000000u,
-           "[ERRATA-KMAC-003 3A] Expected ERR_CODE == 0 when kmac_en=1, "
+           "[kmac_errchk.sv:268 3A] Expected ERR_CODE == 0 when kmac_en=1, "
            "mode=Sha3, PREFIX='KMAC'");
 
   // Compute True NIST KMAC-256 (kmac_en = 1, mode = CShake (3), kstrength =
@@ -230,22 +232,22 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   LOG_INFO(
-      "[ERRATA-KMAC-003 3A] Digests: d_kmac_sha3=0x%08x, "
+      "[kmac_errchk.sv:268 3A] Digests: d_kmac_sha3=0x%08x, "
       "d_manual_hybrid=0x%08x, "
       "d_true_kmac=0x%08x, d_plain_sha3=0x%08x (intr=0x%08x, err_code=0x%08x)",
       d_kmac_sha3, d_manual_hybrid, d_true_kmac, d_plain_sha3, intr_3a, err_3a);
   CHECK(d_kmac_sha3 != d_true_kmac,
-        "[ERRATA-KMAC-003 3A] Expected d_kmac_sha3 != d_true_kmac");
+        "[kmac_errchk.sv:268 3A] Expected d_kmac_sha3 != d_true_kmac");
   CHECK(d_kmac_sha3 != d_plain_sha3,
-        "[ERRATA-KMAC-003 3A] Expected d_kmac_sha3 != d_plain_sha3");
+        "[kmac_errchk.sv:268 3A] Expected d_kmac_sha3 != d_plain_sha3");
   CHECK_EQ(d_kmac_sha3, d_manual_hybrid,
-           "[ERRATA-KMAC-003 3A] Expected bit-exact match d_kmac_sha3 == "
+           "[kmac_errchk.sv:268 3A] Expected bit-exact match d_kmac_sha3 == "
            "d_manual_hybrid (SHA3-256(bytepad(K,136) || M))");
 
   // --- Subcase 3B: kmac_en = 1, mode = Shake (2), kstrength = L256, PREFIX =
   // "KMAC" ---
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-003] Subcase 3B (kmac_en=1, mode=Shake, "
+      "Verifying [kmac_errchk.sv:268] Subcase 3B (kmac_en=1, mode=Shake, "
       "kstrength=L256, PREFIX='KMAC')...");
   uint32_t cfg_3b = bitfield_field32_write(cfg_3a, KMAC_CFG_SHADOWED_MODE_FIELD,
                                            KMAC_CFG_SHADOWED_MODE_VALUE_SHAKE);
@@ -266,33 +268,36 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   LOG_INFO(
-      "[ERRATA-KMAC-003 3B] d_kmac_shake=0x%08x (intr=0x%08x, err_code=0x%08x)",
+      "[kmac_errchk.sv:268 3B] d_kmac_shake=0x%08x (intr=0x%08x, "
+      "err_code=0x%08x)",
       d_kmac_shake, intr_3b, err_3b);
   CHECK_EQ(intr_3b & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT), 0u,
-           "[ERRATA-KMAC-003 3B] Expected kmac_err == 0 when kmac_en=1, "
+           "[kmac_errchk.sv:268 3B] Expected kmac_err == 0 when kmac_en=1, "
            "mode=Shake, PREFIX='KMAC'");
   CHECK_EQ(err_3b, 0x00000000u,
-           "[ERRATA-KMAC-003 3B] Expected ERR_CODE == 0 when kmac_en=1, "
+           "[kmac_errchk.sv:268 3B] Expected ERR_CODE == 0 when kmac_en=1, "
            "mode=Shake, PREFIX='KMAC'");
   CHECK(d_kmac_shake != d_true_kmac && d_kmac_shake != d_kmac_sha3,
-        "[ERRATA-KMAC-003 3B] Expected d_kmac_shake to differ from d_true_kmac "
+        "[kmac_errchk.sv:268 3B] Expected d_kmac_shake to differ from "
+        "d_true_kmac "
         "and d_kmac_sha3");
 
   // --- Subcase 3C: kmac_en = 1, mode = Sha3 (0), kstrength = L256, PREFIX = 0
   // ---
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-003] Subcase 3C (kmac_en=1, mode=Sha3, "
+      "Verifying [kmac_errchk.sv:268] Subcase 3C (kmac_en=1, mode=Sha3, "
       "kstrength=L256, PREFIX=0 -> ErrIncorrectFunctionName)...");
   abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0u);
   write_cfg_shadowed(cfg_3a);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
   uint32_t err_code_3c = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
-  LOG_INFO("[ERRATA-KMAC-003 3C] ERR_CODE=0x%08x when PREFIX=0 and mode=Sha3",
-           err_code_3c);
+  LOG_INFO(
+      "[kmac_errchk.sv:268 3C] ERR_CODE=0x%08x when PREFIX=0 and mode=Sha3",
+      err_code_3c);
   CHECK_EQ(
       err_code_3c, 0x07010000u,
-      "[ERRATA-KMAC-003 3C] Expected ErrIncorrectFunctionName (0x07010000) "
+      "[kmac_errchk.sv:268 3C] Expected ErrIncorrectFunctionName (0x07010000) "
       "in Sha3 mode when KMAC_EN=1 and PREFIX != KMAC");
   wait_kmac_absorb();
   abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x44332211u);
@@ -307,31 +312,33 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   // =========================================================================
-  // 2. [ERRATA-KMAC-001] (SPEC_DOC_ERRATA):
+  // 2. [kmac_app.sv:200,728-734] (SPEC_DOC_ERRATA):
   //    SwPushedMsgFifo (0x02) fires in StIdle and encodes 5-bit sparse
   //    kmac_mux_sel_e (SelNone = 0x14) + truncated 8-bit st_e (0xbe) =
   //    0x0200be14.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-001] (SPEC_DOC_ERRATA): SwPushedMsgFifo in "
+      "Verifying [kmac_app.sv:200,728-734] (SPEC_DOC_ERRATA): SwPushedMsgFifo "
+      "in "
       "StIdle...");
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
   abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x11223344u);
   uint32_t err_code_001 = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   CHECK_EQ(err_code_001, 0x0200be14u,
-           "[ERRATA-KMAC-001] Expected ERR_CODE 0x0200be14 in StIdle");
+           "[kmac_app.sv:200,728-734] Expected ERR_CODE 0x0200be14 in StIdle");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    1u << KMAC_CMD_ERR_PROCESSED_BIT);
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   // =========================================================================
-  // 3. [ERRATA-KMAC-002] (SPEC_DOC_ERRATA):
+  // 3. [kmac_errchk.sv:236-246,321-376,399] (SPEC_DOC_ERRATA):
   //    kmac_errchk blocks CmdStart on UnexpectedModeStrength (0x06) when
   //    EN_UNSUPPORTED_MODESTRENGTH = 0, and packs 6-bit sparse cmd (0x2e) in
   //    ERR_CODE[5:0].
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-002] (SPEC_DOC_ERRATA): block_swcmd on "
+      "Verifying [kmac_errchk.sv:236-246,321-376,399] (SPEC_DOC_ERRATA): "
+      "block_swcmd on "
       "UnexpectedModeStrength & 6-bit sparse cmd...");
   uint32_t cfg_bad_mode = 0;
   cfg_bad_mode =
@@ -346,10 +353,12 @@ bool test_main(void) {
       abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   uint32_t status_002a = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   CHECK_EQ(err_code_002a, 0x06020012u,
-           "[ERRATA-KMAC-002] Expected ERR_CODE 0x06020012 for MODE=1");
+           "[kmac_errchk.sv:236-246,321-376,399] Expected ERR_CODE 0x06020012 "
+           "for MODE=1");
   CHECK((status_002a & (1u << KMAC_STATUS_SHA3_IDLE_BIT)) != 0u &&
             (status_002a & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) == 0u,
-        "[ERRATA-KMAC-002] Expected CmdStart to be blocked (SHA3_IDLE=1), got "
+        "[kmac_errchk.sv:236-246,321-376,399] Expected CmdStart to be blocked "
+        "(SHA3_IDLE=1), got "
         "0x%08x",
         status_002a);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -361,21 +370,24 @@ bool test_main(void) {
   uint32_t err_code_002b =
       abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
   CHECK_EQ(err_code_002b, 0x0804002eu,
-           "[ERRATA-KMAC-002] Expected 6-bit sparse CmdProcess (0x2e) in "
+           "[kmac_errchk.sv:236-246,321-376,399] Expected 6-bit sparse "
+           "CmdProcess (0x2e) in "
            "ERR_CODE 0x0804002e");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    1u << KMAC_CMD_ERR_PROCESSED_BIT);
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   // =========================================================================
-  // 4. [ERRATA-KMAC-007] & [ERRATA-KMAC-008] (INTENDED_SECURITY_HARDENING):
+  // 4. [kmac_entropy.sv:345-348,526-556,683-717] &
+  // [kmac_entropy.sv:357-381,527-556,604-644] (INTENDED_SECURITY_HARDENING):
   //    Verify that once mode_q is latched to SwMode (in Subcase 3A above),
   //    writing ENTROPY_MODE=EdnMode updates CFG_SHADOWED readback, but hardware
   //    ignores the mode change (does not enter StRandEdn or timeout even with
   //    EDN0 disabled and WAIT_TIMER=2000).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-007] & [ERRATA-KMAC-008] "
+      "Verifying [kmac_entropy.sv:345-348,526-556,683-717] & "
+      "[kmac_entropy.sv:357-381,527-556,604-644] "
       "(INTENDED_SECURITY_HARDENING): 6-word seed & ENTROPY_MODE latch...");
   uint32_t saved_edn0_ctrl = abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
@@ -404,7 +416,8 @@ bool test_main(void) {
   uint32_t cfg_rb = abs_mmio_read32(kKmacBase + KMAC_CFG_SHADOWED_REG_OFFSET);
   CHECK_EQ(bitfield_field32_read(cfg_rb, KMAC_CFG_SHADOWED_ENTROPY_MODE_FIELD),
            KMAC_CFG_SHADOWED_ENTROPY_MODE_VALUE_EDN_MODE,
-           "[ERRATA-KMAC-007] Expected CFG_SHADOWED readback to show EdnMode");
+           "[kmac_entropy.sv:345-348,526-556,683-717] Expected CFG_SHADOWED "
+           "readback to show EdnMode");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
   wait_kmac_absorb();
@@ -415,7 +428,8 @@ bool test_main(void) {
   CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET) &
                (1u << KMAC_INTR_STATE_KMAC_ERR_BIT),
            0u,
-           "[ERRATA-KMAC-007] Expected mode_q to stay locked to SwMode without "
+           "[kmac_entropy.sv:345-348,526-556,683-717] Expected mode_q to stay "
+           "locked to SwMode without "
            "EDN timeout");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
@@ -438,12 +452,12 @@ bool test_main(void) {
   wait_kmac_idle();
 
   // =========================================================================
-  // 5. [ERRATA-KMAC-004] (SPEC_DOC_ERRATA):
+  // 5. [sha3pad.sv:327-358,509-533] (SPEC_DOC_ERRATA):
   //    Raw 44-byte PREFIX_0..10 absorption in cSHAKE absorbs stale upper
   //    PREFIX_10 bytes even when PREFIX_0 encodes empty N="" and S="".
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-004] (SPEC_DOC_ERRATA): Raw 44-byte "
+      "Verifying [sha3pad.sv:327-358,509-533] (SPEC_DOC_ERRATA): Raw 44-byte "
       "PREFIX_0..10 absorption...");
   uint32_t cfg_cshake = 0;
   cfg_cshake = bitfield_field32_write(cfg_cshake, KMAC_CFG_SHADOWED_MODE_FIELD,
@@ -483,20 +497,22 @@ bool test_main(void) {
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
   wait_kmac_idle();
   CHECK_EQ(cshake_clean_w0, 0xbb97943eu,
-           "[ERRATA-KMAC-004] Expected golden cSHAKE w0=0xbb97943e");
+           "[sha3pad.sv:327-358,509-533] Expected golden cSHAKE w0=0xbb97943e");
   CHECK(cshake_stale_w0 != cshake_clean_w0,
-        "[ERRATA-KMAC-004] Expected stale PREFIX_10 to alter cSHAKE digest "
+        "[sha3pad.sv:327-358,509-533] Expected stale PREFIX_10 to alter cSHAKE "
+        "digest "
         "(0x%08x vs 0x%08x)",
         cshake_stale_w0, cshake_clean_w0);
 
   // =========================================================================
-  // 6. [ERRATA-KMAC-005a] & [ERRATA-KMAC-005b] (SPEC_DOC_ERRATA &
+  // 6. [kmac.sv:684] & [kmac_app.sv:497-513] (SPEC_DOC_ERRATA &
   //    TRUE_SILICON_ERRATA):
   //    ERR_CODE remains sticky across CMD.err_processed = 1, and
   //    CMD.err_processed = 1 does NOT abort active SW hashing in StSw.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-005a/b] (TRUE_SILICON_ERRATA): ERR_CODE "
+      "Verifying [kmac.sv:684 / kmac_app.sv:497-513] (TRUE_SILICON_ERRATA): "
+      "ERR_CODE "
       "sticky & CMD.err_processed no-abort in StSw...");
   write_cfg_shadowed(cfg_sha3_kmac0);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -508,7 +524,7 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_RUN << KMAC_CMD_CMD_OFFSET);
   CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET), 0x08040131u,
-           "[ERRATA-KMAC-005] Expected ERR_CODE 0x08040131 on CMD.RUN in "
+           "[kmac.hjson:664-669] Expected ERR_CODE 0x08040131 on CMD.RUN in "
            "StAbsorb");
 
   // Write CMD.err_processed = 1.
@@ -518,11 +534,11 @@ bool test_main(void) {
 
   // Verify ERR_CODE is still 0x08040131 (sticky) AND SHA3_ABSORB is still 1!
   CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET), 0x08040131u,
-           "[ERRATA-KMAC-005a] Expected ERR_CODE to remain sticky across "
+           "[kmac.sv:684] Expected ERR_CODE to remain sticky across "
            "CMD.err_processed = 1");
   uint32_t status_005b = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   CHECK((status_005b & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) != 0u,
-        "[ERRATA-KMAC-005b] Expected SHA3_ABSORB=1 to remain active after "
+        "[kmac_app.sv:497-513] Expected SHA3_ABSORB=1 to remain active after "
         "CMD.err_processed = 1 in StSw, got 0x%08x",
         status_005b);
 
@@ -531,11 +547,13 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_PROCESS << KMAC_CMD_CMD_OFFSET);
   wait_kmac_squeeze();
-  CHECK_EQ(read_unmasked_state_word(0), sha3_kmac0_w0,
-           "[ERRATA-KMAC-005b] Expected active SW hash to complete normally");
+  CHECK_EQ(
+      read_unmasked_state_word(0), sha3_kmac0_w0,
+      "[kmac_app.sv:497-513] Expected active SW hash to complete normally");
 
   // =========================================================================
-  // 7. [ERRATA-KMAC-006a/b/c] (INTENDED_SECURITY_HARDENING):
+  // 7. [kmac_staterd.sv:45-92 / kmac_reg_pkg.sv:544-592]
+  // (INTENDED_SECURITY_HARDENING):
   //    (a) STATE write -> Store Access Fault (mcause=7);
   //        MSG_FIFO read -> Load Access Fault (mcause=5).
   //    (b) KMAC_PERMIT sub-word CSR write fault (mcause=7) while sub-word read
@@ -543,14 +561,15 @@ bool test_main(void) {
   //    (c) STATE sub-word byte read reflects word-first STATE_ENDIANNESS swap.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-KMAC-006a/b/c] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [kmac_staterd.sv:45-92 / kmac_reg_pkg.sv:544-592] "
+      "(INTENDED_SECURITY_HARDENING): "
       "TL-UL bus faults & STATE sub-word endianness...");
   uint8_t byte0_s0_le = abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET);
   uint8_t byte0_s1_le =
       abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u);
   CHECK_EQ((uint8_t)(byte0_s0_le ^ byte0_s1_le),
            (uint8_t)(sha3_kmac0_w0 & 0xffu),
-           "[ERRATA-KMAC-006c] Expected unmasked lb[0] == w0[7:0] when "
+           "[kmac_staterd.sv:45-92] Expected unmasked lb[0] == w0[7:0] when "
            "STATE_ENDIANNESS=0");
 
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -573,7 +592,7 @@ bool test_main(void) {
       abs_mmio_read8(kKmacBase + KMAC_STATE_REG_OFFSET + 0x100u);
   CHECK_EQ((uint8_t)(byte0_s0_be ^ byte0_s1_be),
            (uint8_t)((sha3_kmac0_w0 >> 24) & 0xffu),
-           "[ERRATA-KMAC-006c] Expected unmasked lb[0] == w0[31:24] when "
+           "[kmac_staterd.sv:45-92] Expected unmasked lb[0] == w0[31:24] when "
            "STATE_ENDIANNESS=1");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
@@ -584,7 +603,7 @@ bool test_main(void) {
   last_mcause = 0;
   abs_mmio_write32(kKmacBase + KMAC_STATE_REG_OFFSET, 0x12345678u);
   CHECK(load_store_fault_seen && last_mcause == 7u,
-        "[ERRATA-KMAC-006a] Expected Store Access Fault (mcause=7) on STATE "
+        "[kmac_staterd.sv:56] Expected Store Access Fault (mcause=7) on STATE "
         "write, got fault=%d mcause=%u",
         load_store_fault_seen, last_mcause);
 
@@ -592,27 +611,29 @@ bool test_main(void) {
   load_store_fault_seen = false;
   last_mcause = 0;
   (void)abs_mmio_read32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET);
-  CHECK(load_store_fault_seen && last_mcause == 5u,
-        "[ERRATA-KMAC-006a] Expected Load Access Fault (mcause=5) on MSG_FIFO "
-        "read, got fault=%d mcause=%u",
-        load_store_fault_seen, last_mcause);
+  CHECK(
+      load_store_fault_seen && last_mcause == 5u,
+      "[kmac_staterd.sv:56] Expected Load Access Fault (mcause=5) on MSG_FIFO "
+      "read, got fault=%d mcause=%u",
+      load_store_fault_seen, last_mcause);
 
   // (b) KMAC_PERMIT sub-word CSR write fault (mcause = 7) vs sub-word CSR read.
   abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0xa5a55a5au);
   load_store_fault_seen = false;
   uint8_t pfx_b0 = abs_mmio_read8(kKmacBase + KMAC_PREFIX_0_REG_OFFSET);
   CHECK(!load_store_fault_seen && pfx_b0 == 0x5au,
-        "[ERRATA-KMAC-006b] Expected sub-word CSR read to succeed");
+        "[kmac_reg_pkg.sv:544-592] Expected sub-word CSR read to succeed");
 
   load_store_fault_seen = false;
   last_mcause = 0;
   abs_mmio_write8(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0xffu);
   CHECK(load_store_fault_seen && last_mcause == 7u,
-        "[ERRATA-KMAC-006b] Expected Store Access Fault (mcause=7) on "
+        "[kmac_reg_pkg.sv:544-592] Expected Store Access Fault (mcause=7) on "
         "sub-word write to PREFIX_0");
-  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET), 0xa5a55a5au,
-           "[ERRATA-KMAC-006b] Expected sub-word write to PREFIX_0 to be "
-           "dropped");
+  CHECK_EQ(
+      abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET), 0xa5a55a5au,
+      "[kmac_reg_pkg.sv:544-592] Expected sub-word write to PREFIX_0 to be "
+      "dropped");
 
   LOG_INFO("All KMAC errata & security hardening checks passed!");
   return true;

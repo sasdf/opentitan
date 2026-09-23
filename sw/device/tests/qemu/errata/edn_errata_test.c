@@ -77,10 +77,10 @@ static void reset_entropy_complex_enable_csrng(void) {
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, 0x9666u);
 }
 
-static void verify_errata_edn_008_permit_and_addrmiss_faults(void) {
+static void verify_edn_permit_and_addrmiss_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-EDN-008] (INTENDED_SECURITY_HARDENING) & "
-      "[ERRATA-EDN-003]: EDN_PERMIT sub-word write faults (mcause=7) and "
+      "Verifying [edn_reg_pkg.sv:311-330] (INTENDED_SECURITY_HARDENING) & "
+      "[edn_core.sv:692-750]: EDN_PERMIT sub-word write faults (mcause=7) and "
       "unmapped 0x48..0x7c addrmiss faults (mcause=5/7)");
 
   g_access_fault_count = 0;
@@ -115,13 +115,14 @@ static void verify_errata_edn_008_permit_and_addrmiss_faults(void) {
   CHECK(g_access_fault_count == 4u);
   CHECK(g_last_mcause == (uint32_t)kIbexExcStoreAccessFault);
 
-  LOG_INFO("[ERRATA-EDN-008] & [ERRATA-EDN-003] confirmed: faults=%u",
-           g_access_fault_count);
+  LOG_INFO(
+      "[edn_reg_pkg.sv:311-330] & [edn_core.sv:692-750] confirmed: faults=%u",
+      g_access_fault_count);
 }
 
-static void verify_errata_edn_001_recov_alert_sts_rw0c_mubi_preserve(void) {
+static void verify_edn_recov_alert_sts_rw0c_mubi_preserve(void) {
   LOG_INFO(
-      "Verifying [ERRATA-EDN-001] (SPEC_DOC_ERRATA): RECOV_ALERT_STS "
+      "Verifying [edn_core.sv:388-404] (SPEC_DOC_ERRATA): RECOV_ALERT_STS "
       "*_FIELD_ALERT bits (0..3) ignore rw0c clears while CTRL holds invalid "
       "mubi4_t");
 
@@ -145,14 +146,16 @@ static void verify_errata_edn_001_recov_alert_sts_rw0c_mubi_preserve(void) {
   CHECK(recov_after == 0u);
 
   LOG_INFO(
-      "[ERRATA-EDN-001] confirmed: RECOV_ALERT_STS remained 0x%x during rw0c "
+      "[edn_core.sv:388-404] confirmed: RECOV_ALERT_STS remained 0x%x during "
+      "rw0c "
       "clear with invalid CTRL, cleared to 0x%x after CTRL repair",
       recov_during, recov_after);
 }
 
-static void verify_errata_edn_004_cmd_fifo_rst_continuous_clear(void) {
+static void verify_edn_cmd_fifo_rst_continuous_clear(void) {
   LOG_INFO(
-      "Verifying [ERRATA-EDN-004] (BENIGN_RTL_IMPL_DETAIL): CTRL.CMD_FIFO_RST "
+      "Verifying [edn_core.sv:702-707] (BENIGN_RTL_IMPL_DETAIL): "
+      "CTRL.CMD_FIFO_RST "
       "== 0x6 continuously holds replay FIFOs cleared and suppresses overflow");
 
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x6996u);
@@ -165,15 +168,16 @@ static void verify_errata_edn_004_cmd_fifo_rst_continuous_clear(void) {
 
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
   LOG_INFO(
-      "[ERRATA-EDN-004] confirmed: 20 writes while CMD_FIFO_RST=0x6 produced "
+      "[edn_core.sv:702-707] confirmed: 20 writes while CMD_FIFO_RST=0x6 "
+      "produced "
       "ERR_CODE=0x%x",
       err_code);
 }
 
-static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
-    void) {
+static void verify_edn_err_code_test_and_auto_underflow(void) {
   LOG_INFO(
-      "Verifying [ERRATA-EDN-007] (TRUE_SILICON_ERRATA): ERR_CODE_TEST bits "
+      "Verifying [edn_core.sv:314-317] (TRUE_SILICON_ERRATA): ERR_CODE_TEST "
+      "bits "
       "0,1,28..30 gated by EDN_ENABLE, and bits 28..30 omitted from "
       "event_edn_fatal_err");
 
@@ -223,12 +227,13 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
   LOG_INFO(
-      "[ERRATA-EDN-007] confirmed: ERR_CODE_TEST=28..30 latched ERR_CODE=0x%x "
+      "[edn_core.sv:314-317] confirmed: ERR_CODE_TEST=28..30 latched "
+      "ERR_CODE=0x%x "
       "with INTR_STATE=0x%x (no EDN_FATAL_ERR), whereas bit 0 set "
       "INTR_STATE=0x%x",
       type_err_code, type_intr, src_intr);
 
-  // 3. Verify [ERRATA-EDN-005] on EDN0:
+  // 3. Verify [edn_core.sv:620-632] on EDN0:
   // Queue a valid 1-word RESEED command (0x00000602) in RESEED_CMD with
   // MAX_NUM_REQS_BETWEEN_RESEEDS = 0, enable Auto Mode (0x9696), and send
   // UNINSTANTIATE (0x00000005) on SW_CMD_REQ so CSRNG stays uninstantiated.
@@ -237,7 +242,7 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
   // instance (csrng_ack_err = 1), transitioning MAIN_SM_STATE to
   // RejectCsrngEntropy (0x018) while HW_CMD_STS.AUTO_MODE remains sticky at 1!
   LOG_INFO(
-      "Verifying [ERRATA-EDN-005] (SPEC_DOC_ERRATA): "
+      "Verifying [edn_core.sv:620-632] (SPEC_DOC_ERRATA): "
       "HW_CMD_STS.AUTO_MODE stays latched at 1 in RejectCsrngEntropy (0x018)");
   reset_entropy_complex_enable_csrng();
   abs_mmio_write32(kEdn0Base + EDN_MAX_NUM_REQS_BETWEEN_RESEEDS_REG_OFFSET, 0u);
@@ -257,18 +262,19 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
   CHECK((hw_sts_reject & (1u << EDN_HW_CMD_STS_AUTO_MODE_BIT)) != 0u);
   CHECK((recov_reject & (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT)) != 0u);
 
-  // 4. Verify [ERRATA-EDN-002] and [ERRATA-EDN-007] Part 3 on EDN1:
+  // 4. Verify [edn_core.sv:307-318] and [edn_core.sv:314-317] Part 3 on EDN1:
   // - Empty RESEED_CMD underflow in Auto Mode sets SFIFO_RESCMD_ERR |
   //   FIFO_READ_ERR and INTR_STATE.EDN_FATAL_ERR, but because fatal_loc_events
   //   omits external FIFO errors (while edn_core.sv:530-560 still sends the
   //   empty 0x00000000 word to CSRNG, which returns csrng_ack_err = 1),
   //   MAIN_SM_STATE transitions to RejectCsrngEntropy (0x018) instead of
-  //   Error (0x17e) ([ERRATA-EDN-002]);
+  //   Error (0x17e) ([edn_core.sv:307-318]);
   // - Writing ERR_CODE_TEST = 21 (EDN_MAIN_SM_ERR) simultaneously escalates
   //   both EDN_MAIN_SM_ERR (21) and EDN_ACK_SM_ERR (20), moves MAIN_SM_STATE
   //   to Error (0x17e), and keeps HW_CMD_STS.AUTO_MODE latched at 1!
   LOG_INFO(
-      "Verifying [ERRATA-EDN-002] (SPEC_DOC_ERRATA) & [ERRATA-EDN-007] Part 3: "
+      "Verifying [edn_core.sv:307-318] (SPEC_DOC_ERRATA) & "
+      "[edn_core.sv:314-317] Part 3: "
       "Auto-mode empty-FIFO underflow does not escalate to Error (0x17e), "
       "while "
       "ERR_CODE_TEST=21 sets both EDN_MAIN_SM_ERR and EDN_ACK_SM_ERR");
@@ -305,7 +311,8 @@ static void verify_errata_edn_007_002_005_err_code_test_and_auto_underflow(
   CHECK((hw_sts_error & (1u << EDN_HW_CMD_STS_AUTO_MODE_BIT)) != 0u);
 
   LOG_INFO(
-      "[ERRATA-EDN-002], [ERRATA-EDN-005], & [ERRATA-EDN-007] confirmed: "
+      "[edn_core.sv:307-318], [edn_core.sv:620-632], & [edn_core.sv:314-317] "
+      "confirmed: "
       "reject state=0x%x (AUTO_MODE=%u), underflow state=0x%x (!=0x17e), "
       "escalated ERR_CODE=0x%x, state=0x%x (AUTO_MODE=%u)",
       sm_reject, (hw_sts_reject >> EDN_HW_CMD_STS_AUTO_MODE_BIT) & 1u,
@@ -319,11 +326,11 @@ bool test_main(void) {
 
   reset_entropy_complex_enable_csrng();
 
-  verify_errata_edn_008_permit_and_addrmiss_faults();
-  verify_errata_edn_001_recov_alert_sts_rw0c_mubi_preserve();
-  verify_errata_edn_004_cmd_fifo_rst_continuous_clear();
-  verify_errata_edn_007_002_005_err_code_test_and_auto_underflow();
+  verify_edn_permit_and_addrmiss_faults();
+  verify_edn_recov_alert_sts_rw0c_mubi_preserve();
+  verify_edn_cmd_fifo_rst_continuous_clear();
+  verify_edn_err_code_test_and_auto_underflow();
 
-  LOG_INFO("All edn errata checks ([ERRATA-EDN-001..008]) confirmed!");
+  LOG_INFO("All edn errata checks ([edn_core.sv:388-404..008]) confirmed!");
   return true;
 }

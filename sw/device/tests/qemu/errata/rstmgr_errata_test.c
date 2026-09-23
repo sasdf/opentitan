@@ -7,23 +7,23 @@
  *
  * Exercises and confirms all 5 silicon / spec / architectural behaviors in
  * `/root/knowledge/errata/rstmgr.md`:
- * - [ERRATA-RSTMGR-001]: `ALERT_INFO_CTRL.INDEX` and `CPU_INFO_CTRL.INDEX`
+ * - [rstmgr.sv:1187-1257]: `ALERT_INFO_CTRL.INDEX` and `CPU_INFO_CTRL.INDEX`
  *   (clocked on `rst_por_ni` with `.de(1'b0)`) retain their pre-reset values
  *   across non-POR `SW_RESET` reboots, while `.EN` is cleared to `0` by
  *   `dump_capture_halt = rst_hw_req`.
- * - [ERRATA-RSTMGR-002a/b]: Out-of-bounds `ALERT_INFO` reads (`INDEX = 9..15`)
- *   return `0x00000000` (`CrashStoreSlot = 9`, `SlotCntWidth = 4`), whereas
- *   out-of-bounds `CPU_INFO` reads (`INDEX = 8..15`) wrap around and alias
- *   `slots[0..7]` because `CrashStoreSlot = 8` (`SlotCntWidth = 3 < IdxWidth`)
- *   ties off `slot_sel_i[3]` (`rstmgr_crash_info.sv:15-52`).
- * - [ERRATA-RSTMGR-003]: `RESET_REQ = kMultiBitBool4True (0x6)` can be
+ * - [rstmgr_crash_info.sv:13-52]: Out-of-bounds `ALERT_INFO` reads (`INDEX
+ * = 9..15`) return `0x00000000` (`CrashStoreSlot = 9`, `SlotCntWidth = 4`),
+ * whereas out-of-bounds `CPU_INFO` reads (`INDEX = 8..15`) wrap around and
+ * alias `slots[0..7]` because `CrashStoreSlot = 8` (`SlotCntWidth = 3 <
+ * IdxWidth`) ties off `slot_sel_i[3]` (`rstmgr_crash_info.sv:15-52`).
+ * - [rstmgr.sv:1193]: `RESET_REQ = kMultiBitBool4True (0x6)` can be
  *   cancelled in-flight by writing `kMultiBitBool4False (0x9)` before the
  *   200 kHz AON clock (`clk_slow_i`, 5 us period) synchronizer samples it.
- * - [ERRATA-RSTMGR-004]: Pulsing `SW_RST_CTRL_N[3]` (`USB`) clears
+ * - [top_earlgrey.sv:1698,1706-1707]: Pulsing `SW_RST_CTRL_N[3]` (`USB`) clears
  *   `USBDEV.WAKE_EVENTS` (`src_q = 0`) and leaves it stuck at `0` because
  *   `dst_qs_o` in `USB_AON` did not change (`prim_reg_cdc_arb.sv:99-100`);
  *   pulsing `SW_RST_CTRL_N[4]` (`USB_AON`) restores `USBDEV.WAKE_EVENTS`.
- * - [ERRATA-RSTMGR-005]: `ALERT_INFO` and `CPU_INFO` (`RSTMGR_PERMIT =
+ * - [rstmgr_reg_pkg.sv:247-276]: `ALERT_INFO` and `CPU_INFO` (`RSTMGR_PERMIT =
  * 4'b1111`) silently ignore 32-bit `sw` writes (`d_error = 0`) while faulting
  * (`mcause = 7`) on sub-word `sb`/`sh` writes, and offsets `0x70..0x7F` (`AW =
  * 7`) fault with `addrmiss = 1` (`mcause = 5 / 7`).
@@ -83,9 +83,9 @@ void ottf_exception_handler(uint32_t *exc_info) {
   abort();
 }
 
-static void test_errata_rstmgr_003_reset_req_in_flight_cancel(void) {
+static void test_rstmgr_reset_req_in_flight_cancel(void) {
   LOG_INFO(
-      "Testing [ERRATA-RSTMGR-003]: RESET_REQ in-flight cancellation before "
+      "Testing [rstmgr.sv:1193]: RESET_REQ in-flight cancellation before "
       "clk_slow_i");
 
   // Write kMultiBitBool4True (0x6) to RESET_REQ and immediately cancel with
@@ -100,14 +100,14 @@ static void test_errata_rstmgr_003_reset_req_in_flight_cancel(void) {
   busy_spin_micros(30);
   uint32_t reset_req =
       abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET);
-  CHECK_EQ(
-      reset_req, (uint32_t)kMultiBitBool4False,
-      "[ERRATA-RSTMGR-003] Expected RESET_REQ == kMultiBitBool4False (0x9)");
+  CHECK_EQ(reset_req, (uint32_t)kMultiBitBool4False,
+           "[rstmgr.sv:1193] Expected RESET_REQ == kMultiBitBool4False (0x9)");
 }
 
-static void test_errata_rstmgr_004_usb_vs_usb_aon_sw_reset_cdc_quirk(void) {
+static void test_rstmgr_usb_vs_usb_aon_sw_reset_cdc_quirk(void) {
   LOG_INFO(
-      "Testing [ERRATA-RSTMGR-004]: SW_RST_CTRL_N[3] (USB) vs SW_RST_CTRL_N[4] "
+      "Testing [top_earlgrey.sv:1698,1706-1707]: SW_RST_CTRL_N[3] (USB) vs "
+      "SW_RST_CTRL_N[4] "
       "(USB_AON) CDC quirk");
 
   // Connect UsbdevSense to ConstantOne so VBUS is sensed.
@@ -137,7 +137,8 @@ static void test_errata_rstmgr_004_usb_vs_usb_aon_sw_reset_cdc_quirk(void) {
   busy_spin_micros(60);
   wake_events = abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
   CHECK_EQ(wake_events, 0u,
-           "[ERRATA-RSTMGR-004] Expected USBDEV.WAKE_EVENTS == 0 after pulsing "
+           "[top_earlgrey.sv:1698,1706-1707] Expected USBDEV.WAKE_EVENTS == 0 "
+           "after pulsing "
            "only SW_RST_CTRL_N_3 (USB)");
 
   // 2. Pulse SW_RST_CTRL_N_4 (USB_AON) (0 -> 1): resets dst_qs_o to 0,
@@ -149,7 +150,8 @@ static void test_errata_rstmgr_004_usb_vs_usb_aon_sw_reset_cdc_quirk(void) {
   busy_spin_micros(60);
   wake_events = abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
   CHECK((wake_events & (1u << USBDEV_WAKE_EVENTS_MODULE_ACTIVE_BIT)) != 0u,
-        "[ERRATA-RSTMGR-004] Expected USBDEV.WAKE_EVENTS.MODULE_ACTIVE "
+        "[top_earlgrey.sv:1698,1706-1707] Expected "
+        "USBDEV.WAKE_EVENTS.MODULE_ACTIVE "
         "restored after pulsing SW_RST_CTRL_N_4 (USB_AON)");
 
   // Acknowledge wake to restore idle state.
@@ -158,9 +160,9 @@ static void test_errata_rstmgr_004_usb_vs_usb_aon_sw_reset_cdc_quirk(void) {
   busy_spin_micros(40);
 }
 
-static void test_errata_rstmgr_005_permit_subword_and_addrmiss_faults(void) {
+static void test_rstmgr_permit_subword_and_addrmiss_faults(void) {
   LOG_INFO(
-      "Testing [ERRATA-RSTMGR-005]: RSTMGR_PERMIT (4'b1111 on "
+      "Testing [rstmgr_reg_pkg.sv:247-276]: RSTMGR_PERMIT (4'b1111 on "
       "ALERT_INFO/CPU_INFO) & 0x70..0x7F addrmiss");
 
   // 1. 32-bit sw writes to read-only ALERT_INFO (0x24) and CPU_INFO (0x34) are
@@ -177,7 +179,7 @@ static void test_errata_rstmgr_005_permit_subword_and_addrmiss_faults(void) {
   g_last_mcause = 0;
   abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET, 0xAAu);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-RSTMGR-005] Expected sb to ALERT_INFO to trap");
+           "[rstmgr_reg_pkg.sv:247-276] Expected sb to ALERT_INFO to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
 
@@ -186,7 +188,7 @@ static void test_errata_rstmgr_005_permit_subword_and_addrmiss_faults(void) {
   *(volatile uint16_t *)(uintptr_t)(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET) =
       0xBBCCu;
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-RSTMGR-005] Expected sh to CPU_INFO to trap");
+           "[rstmgr_reg_pkg.sv:247-276] Expected sh to CPU_INFO to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
 
@@ -201,7 +203,8 @@ static void test_errata_rstmgr_005_permit_subword_and_addrmiss_faults(void) {
   g_last_mcause = 0;
   abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET + 1u, 0x00u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-RSTMGR-005] Expected byte 1 sb to ALERT_INFO_CTRL to trap");
+           "[rstmgr_reg_pkg.sv:247-276] Expected byte 1 sb to ALERT_INFO_CTRL "
+           "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
 
@@ -210,24 +213,26 @@ static void test_errata_rstmgr_005_permit_subword_and_addrmiss_faults(void) {
   g_last_mcause = 0;
   (void)abs_mmio_read32(kRstmgrBase + 0x70u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-RSTMGR-005] Expected read at unmapped offset 0x70 to trap");
+           "[rstmgr_reg_pkg.sv:247-276] Expected read at unmapped offset 0x70 "
+           "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvLoadAccessFault, "Expected mcause=5");
 
   g_fault_count = 0;
   g_last_mcause = 0;
   abs_mmio_write32(kRstmgrBase + 0x70u, 0x12345678u);
-  CHECK_EQ(
-      g_fault_count, 1u,
-      "[ERRATA-RSTMGR-005] Expected write at unmapped offset 0x70 to trap");
+  CHECK_EQ(g_fault_count, 1u,
+           "[rstmgr_reg_pkg.sv:247-276] Expected write at unmapped offset 0x70 "
+           "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
 }
 
-static void verify_post_sw_reset_errata_001_and_002(void) {
+static void verify_post_sw_reset_regwen_and_crash_info(void) {
   LOG_INFO(
-      "Verifying [ERRATA-RSTMGR-001] & [ERRATA-RSTMGR-002a/b] after SW_RESET");
+      "Verifying [rstmgr.sv:1187-1257] & [rstmgr_crash_info.sv:13-52] after "
+      "SW_RESET");
 
-  // 1. [ERRATA-RSTMGR-001]: Verify ALERT_INFO_CTRL.INDEX (5) and
+  // 1. [rstmgr.sv:1187-1257]: Verify ALERT_INFO_CTRL.INDEX (5) and
   // CPU_INFO_CTRL.INDEX (6) persisted across non-POR SW_RESET (clocked on
   // rst_por_ni with .de(1'b0)), while .EN was cleared to 0 by rst_hw_req.
   uint32_t alert_ctrl =
@@ -242,21 +247,22 @@ static void verify_post_sw_reset_errata_001_and_002(void) {
   uint32_t cpu_en = (cpu_ctrl >> RSTMGR_CPU_INFO_CTRL_EN_BIT) & 1u;
 
   CHECK_EQ(alert_idx, kTestAlertIndex,
-           "[ERRATA-RSTMGR-001] Expected ALERT_INFO_CTRL.INDEX == %u to "
+           "[rstmgr.sv:1187-1257] Expected ALERT_INFO_CTRL.INDEX == %u to "
            "persist across SW_RESET",
            kTestAlertIndex);
   CHECK_EQ(alert_en, 0u,
-           "[ERRATA-RSTMGR-001] Expected ALERT_INFO_CTRL.EN cleared to 0 on "
+           "[rstmgr.sv:1187-1257] Expected ALERT_INFO_CTRL.EN cleared to 0 on "
            "SW_RESET");
-  CHECK_EQ(cpu_idx, kTestCpuIndex,
-           "[ERRATA-RSTMGR-001] Expected CPU_INFO_CTRL.INDEX == %u to persist "
-           "across SW_RESET",
-           kTestCpuIndex);
   CHECK_EQ(
-      cpu_en, 0u,
-      "[ERRATA-RSTMGR-001] Expected CPU_INFO_CTRL.EN cleared to 0 on SW_RESET");
+      cpu_idx, kTestCpuIndex,
+      "[rstmgr.sv:1187-1257] Expected CPU_INFO_CTRL.INDEX == %u to persist "
+      "across SW_RESET",
+      kTestCpuIndex);
+  CHECK_EQ(cpu_en, 0u,
+           "[rstmgr.sv:1187-1257] Expected CPU_INFO_CTRL.EN cleared to 0 on "
+           "SW_RESET");
 
-  // 2. [ERRATA-RSTMGR-002a]: ALERT_INFO_ATTR == 9, and out-of-bounds
+  // 2. [rstmgr_crash_info.sv:13-46]: ALERT_INFO_ATTR == 9, and out-of-bounds
   // INDEX = 9..15 returns 0x00000000.
   uint32_t alert_attr =
       abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_ATTR_REG_OFFSET);
@@ -265,14 +271,15 @@ static void verify_post_sw_reset_errata_001_and_002(void) {
     abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET,
                      idx << RSTMGR_ALERT_INFO_CTRL_INDEX_OFFSET);
     uint32_t val = abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET);
-    CHECK_EQ(
-        val, 0u,
-        "[ERRATA-RSTMGR-002a] Expected ALERT_INFO[INDEX=%u] == 0, got 0x%08x",
-        idx, val);
+    CHECK_EQ(val, 0u,
+             "[rstmgr_crash_info.sv:13-46] Expected ALERT_INFO[INDEX=%u] == 0, "
+             "got 0x%08x",
+             idx, val);
   }
 
-  // 3. [ERRATA-RSTMGR-002b]: CPU_INFO_ATTR == 8 (`SlotCntWidth = $clog2(8) =
-  // 3`), so out-of-bounds INDEX = 8..15 aliases slots[0..7] (`INDEX & 0x7`)!
+  // 3. [rstmgr_crash_info.sv:15-52]: CPU_INFO_ATTR == 8 (`SlotCntWidth =
+  // $clog2(8) = 3`), so out-of-bounds INDEX = 8..15 aliases slots[0..7] (`INDEX
+  // & 0x7`)!
   uint32_t cpu_attr =
       abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_ATTR_REG_OFFSET);
   CHECK_EQ(cpu_attr, 8u, "Expected CPU_INFO_ATTR == 8");
@@ -297,10 +304,11 @@ static void verify_post_sw_reset_errata_001_and_002(void) {
                      oob_idx << RSTMGR_CPU_INFO_CTRL_INDEX_OFFSET);
     uint32_t oob_val =
         abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET);
-    CHECK_EQ(oob_val, cpu_slots[i],
-             "[ERRATA-RSTMGR-002b] Expected CPU_INFO[INDEX=%u] (0x%08x) to "
-             "alias CPU_INFO[INDEX=%u] (0x%08x)",
-             oob_idx, oob_val, i, cpu_slots[i]);
+    CHECK_EQ(
+        oob_val, cpu_slots[i],
+        "[rstmgr_crash_info.sv:15-52] Expected CPU_INFO[INDEX=%u] (0x%08x) to "
+        "alias CPU_INFO[INDEX=%u] (0x%08x)",
+        oob_idx, oob_val, i, cpu_slots[i]);
   }
 }
 
@@ -309,12 +317,12 @@ bool test_main(void) {
   LOG_INFO("rstmgr_errata_test boot: reset_reasons = 0x%08x", reset_reasons);
 
   if ((reset_reasons & (1u << RSTMGR_RESET_INFO_SW_RESET_BIT)) == 0u) {
-    // Boot 1 (POR): test [ERRATA-RSTMGR-003], [ERRATA-RSTMGR-004], and
-    // [ERRATA-RSTMGR-005], then arm ALERT_INFO_CTRL / CPU_INFO_CTRL with
-    // non-zero INDEX and trigger SW_RESET.
-    test_errata_rstmgr_003_reset_req_in_flight_cancel();
-    test_errata_rstmgr_004_usb_vs_usb_aon_sw_reset_cdc_quirk();
-    test_errata_rstmgr_005_permit_subword_and_addrmiss_faults();
+    // Boot 1 (POR): test [rstmgr.sv:1193], [top_earlgrey.sv:1698,1706-1707],
+    // and [rstmgr_reg_pkg.sv:247-276], then arm ALERT_INFO_CTRL / CPU_INFO_CTRL
+    // with non-zero INDEX and trigger SW_RESET.
+    test_rstmgr_reset_req_in_flight_cancel();
+    test_rstmgr_usb_vs_usb_aon_sw_reset_cdc_quirk();
+    test_rstmgr_permit_subword_and_addrmiss_faults();
 
     LOG_INFO(
         "Arming ALERT_INFO_CTRL (INDEX=%u, EN=1) & CPU_INFO_CTRL (INDEX=%u, "
@@ -332,8 +340,9 @@ bool test_main(void) {
     CHECK(false, "Expected SW_RESET to fire within 200 us");
   }
 
-  // Boot 2 (SW_RESET): verify [ERRATA-RSTMGR-001] and [ERRATA-RSTMGR-002a/b].
-  verify_post_sw_reset_errata_001_and_002();
+  // Boot 2 (SW_RESET): verify [rstmgr.sv:1187-1257] and
+  // [rstmgr_crash_info.sv:13-52].
+  verify_post_sw_reset_regwen_and_crash_info();
 
   LOG_INFO("All rstmgr errata checks PASSED");
   return true;

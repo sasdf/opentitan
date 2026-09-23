@@ -7,13 +7,13 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `rv_dm` (P21).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-RV_DM-001] (SPEC_DOC_ERRATA):
+ * - [dm_mem.sv:71-86,389-403] (SPEC_DOC_ERRATA):
  *   `Halted..Exception` are 8-byte spaced at `0x100, 0x108, 0x110, 0x118`
  *   (accessing `0x104` or `0x10c` raises a TL-UL bus fault, contrary to
  *   `theory_of_operation.md:10`), and `0x338..0x387` (`ABSTRACTCMD`,
  *   `PROGRAM_BUFFER`, `DATA0/1`) are implemented (contrary to
  *   `theory_of_operation.md:11`).
- * - [ERRATA-RV_DM-002] (TRUE_SILICON_ERRATA):
+ * - [dm_mem.sv:378-402] (TRUE_SILICON_ERRATA):
  *   Read-only (`swaccess: "ro"`) regions `WHERETO` (`0x300`), `ABSTRACTCMD`
  *   (`0x338..0x35c`), `PROGRAM_BUFFER` (`0x360..0x37c`), and `FLAGS`
  *   (`0x400..0x7fc`) use `gen_wr_err(we_i, be_i, FullRegMask)`
@@ -22,12 +22,12 @@
  * bus-fault
  *   (`d_error = 1`, `mcause = 7`), whereas `ROM` (`0x800..0xffc`) rejects
  *   32-bit writes (`err_d = we_i`).
- * - [ERRATA-RV_DM-003] (INTENDED_SECURITY_HARDENING):
+ * - [rv_dm.sv:238-243,505-520] (INTENDED_SECURITY_HARDENING):
  *   `RV_DM.REGS` (`0x41200000`) remains accessible independent of `RV_DM.MEM`
  *   (`0x00010000`) lifecycle gating (`u_tlul_lc_gate_rom`), allowing software
  *   to write `LATE_DEBUG_ENABLE = kMultiBitBool32True` (`0x96969696`) to ungate
  *   `RV_DM.MEM`.
- * - [ERRATA-RV_DM-004] (INTENDED_SECURITY_HARDENING):
+ * - [rv_dm_reg_pkg.sv:53-57] (INTENDED_SECURITY_HARDENING):
  *   `RV_DM.REGS` (`BlockAw = 4`) asserts `addrmiss` (`d_error = 1`) at unmapped
  *   offset `0x0c`, and `RV_DM_REGS_PERMIT` rejects sub-word writes to
  *   `LATE_DEBUG_ENABLE` (`0x08`, `PERMIT = 4'b1111`) with `mcause = 7` while
@@ -107,11 +107,13 @@ static bool try_write8(uint32_t addr, uint8_t val) {
 }
 
 bool test_main(void) {
-  // 1. Verify [ERRATA-RV_DM-004] & [ERRATA-RV_DM-003]: RV_DM.REGS (0x41200000)
+  // 1. Verify [rv_dm_reg_pkg.sv:53-57] & [rv_dm.sv:238-243,505-520]: RV_DM.REGS
+  // (0x41200000)
   //    is always open on the peripheral bus, faults on unmapped 0x0c, and
   //    enforces RV_DM_REGS_PERMIT on LATE_DEBUG_ENABLE (0x08) vs REGWEN (0x04).
   LOG_INFO(
-      "Verifying [ERRATA-RV_DM-003..004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [rv_dm.sv:238-243,505-520..004] "
+      "(INTENDED_SECURITY_HARDENING): "
       "RV_DM.REGS 0x0c addrmiss, RV_DM_REGS_PERMIT, and LATE_DEBUG_ENABLE...");
 
   CHECK(!try_read32(kRvDmRegsBase + 0x0cu, NULL),
@@ -143,11 +145,11 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
         kMultiBitBool32True);
 
-  // 2. Verify [ERRATA-RV_DM-001] (SPEC_DOC_ERRATA):
+  // 2. Verify [dm_mem.sv:71-86,389-403] (SPEC_DOC_ERRATA):
   //    Halted..Exception at 8-byte stride (0x100, 0x108, 0x110, 0x118) vs
   //    faulting 0x104/0x10c, and implemented 0x338..0x387 vs unmapped gaps.
   LOG_INFO(
-      "Verifying [ERRATA-RV_DM-001] (SPEC_DOC_ERRATA): 8-byte stride "
+      "Verifying [dm_mem.sv:71-86,389-403] (SPEC_DOC_ERRATA): 8-byte stride "
       "0x100..0x118 (0x104/0x10c fault) & implemented 0x338..0x387...");
 
   uint32_t val = 0;
@@ -171,14 +173,14 @@ bool test_main(void) {
   CHECK(try_read32(kRvDmMemBase + 0x380u, &val) && val == 0x00000000u,
         "DATA0 (0x380) must be implemented");
 
-  // 3. Verify [ERRATA-RV_DM-002] (TRUE_SILICON_ERRATA):
+  // 3. Verify [dm_mem.sv:378-402] (TRUE_SILICON_ERRATA):
   //    Read-only regions WhereTo (0x300), AbstractCmd (0x338..0x35c),
   //    ProgBuf (0x360..0x37c), and Flags (0x400..0x7fc) succeed with d_error=0
   //    on 32-bit writes (be_i = 4'b1111) while ignoring the write data, but
   //    fault with d_error=1 on sub-word writes (sb/sh), whereas Debug ROM
   //    (0x800..0xffc) faults even on 32-bit writes (err_d = we_i).
   LOG_INFO(
-      "Verifying [ERRATA-RV_DM-002] (TRUE_SILICON_ERRATA): RO regions succeed "
+      "Verifying [dm_mem.sv:378-402] (TRUE_SILICON_ERRATA): RO regions succeed "
       "on 32-bit sw (d_error=0) but fault on sub-word sb/sh (d_error=1)...");
 
   CHECK(try_write32(kRvDmMemBase + 0x300u, 0xdeadbeefu),
@@ -213,6 +215,6 @@ bool test_main(void) {
   abs_mmio_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
                    orig_late_dbg);
 
-  LOG_INFO("All [ERRATA-RV_DM-001..004] checks confirmed!");
+  LOG_INFO("All [dm_mem.sv:71-86,389-403..004] checks confirmed!");
   return true;
 }

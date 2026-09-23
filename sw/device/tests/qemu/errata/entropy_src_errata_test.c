@@ -7,15 +7,15 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `entropy_src` (`P18`).
  *
  * Empirically confirms on physical CW340 FPGA silicon and QEMU:
- * 1. [ERRATA-ENTROPY_SRC-003] & [ERRATA-ENTROPY_SRC-004] (SPEC_DOC_ERRATA /
- *    INTENDED_SECURITY_HARDENING, MEDIUM):
+ * 1. [entropy_src_core.sv:653-770] & [entropy_src_core.sv:557-561]
+ * (SPEC_DOC_ERRATA / INTENDED_SECURITY_HARDENING, MEDIUM):
  *    - `RECOV_ALERT_STS.ES_THRESH_CFG_ALERT` (`entropy_src_core.sv:2178-2180`)
  *      is a continuous combinational level signal that overrides `rw0c` clears
  *      while `ALERT_THRESHOLD` is non-complementary (`0x12345678`).
  *    - `REGWEN` uses `mubi4_test_false_loose(MODULE_ENABLE)` (`!= 0x6`), so
  *      writing `0x5` to `MODULE_ENABLE` keeps `REGWEN == 1`.
- * 2. [ERRATA-ENTROPY_SRC-001], [ERRATA-ENTROPY_SRC-002] &
- *    [ERRATA-ENTROPY_SRC-006] (SPEC_DOC_ERRATA, MEDIUM):
+ * 2. [entropy_src_core.sv:1042-1043], [entropy_src_main_sm.sv:62-68] &
+ *    [entropy_src_main_sm.sv:58-68] (SPEC_DOC_ERRATA, MEDIUM):
  *    - In conditioned `FW_OV_ENTROPY_INSERT` mode (`entropy_src_main_sm.sv`),
  *      enabling `MODULE_ENABLE` enters `FWInsertStart` (`0x0c3`,
  *      `DEBUG_STATUS.MAIN_SM_IDLE == 0`), and after completing a SHA3-384 hash,
@@ -25,17 +25,17 @@
  * (`0x11223344`) in `pfifo_precon` (`FW_OV_WR_FIFO_FULL == 0`) does NOT set
  *      `ES_FW_OV_DISABLE_ALERT` (`entropy_src_core.sv:2691-2692`) and absorbs
  *      that odd 32-bit word into the current SHA3-384 digest.
- * 3. [ERRATA-ENTROPY_SRC-008] (INTENDED_SECURITY_HARDENING, LOW):
+ * 3. [entropy_src_core.sv:3007-3020] (INTENDED_SECURITY_HARDENING, LOW):
  *    - `ES_BUS_CMP_ALERT` (`entropy_src_core.sv:3007-3020`) compares `[63:0]`
  *      of consecutive seeds and asserts on the 12th `ENTROPY_DATA` read
  *      (`sfifo_esfinal_pop`).
- * 4. [ERRATA-ENTROPY_SRC-005] (TRUE_SILICON_ERRATA, LOW, 65%):
+ * 4. [entropy_src_core.sv:2967] (TRUE_SILICON_ERRATA, LOW, 65%):
  *    - Reading an empty `ENTROPY_DATA` returns `0` with `ERR_CODE == 0` on
  *      reads `1..11` (`swread_idx_q = 0..10`) and only latches
  *      `SFIFO_ESFINAL_ERR | FIFO_READ_ERR` (`0x20000008`) on the 12th read
  *      (`swread_idx_q == 11`, `swread_done == 1`).
- * 5. [ERRATA-ENTROPY_SRC-011] (INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
- * BUS.INTEGRITY):
+ * 5. [entropy_src_reg_pkg.sv:980-1038] (INTENDED_SECURITY_HARDENING, INFO —
+ * SEC_CM: BUS.INTEGRITY):
  *    - `ENTROPY_SRC_PERMIT` (`entropy_src_reg_pkg.sv:980-1038`) rejects 8-bit
  *      `sb` writes to `CONF` (`4'b1111`, `mcause = 7`) while accepting `sb` to
  *      byte 0 of `MODULE_ENABLE` (`4'b0001`).
@@ -81,14 +81,15 @@ bool test_main(void) {
   CHECK_STATUS_OK(entropy_testutils_stop_all());
 
   // ---------------------------------------------------------------------------
-  // 1. [ERRATA-ENTROPY_SRC-003] & [ERRATA-ENTROPY_SRC-004]
+  // 1. [entropy_src_core.sv:653-770] & [entropy_src_core.sv:557-561]
   //    (SPEC_DOC_ERRATA / INTENDED_SECURITY_HARDENING):
   //    - ES_THRESH_CFG_ALERT level signal overrides rw0c clear while
   //      ALERT_THRESHOLD is non-complementary (0x12345678).
   //    - REGWEN stays 1 when MODULE_ENABLE is written with 0x5 (loose false).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-ENTROPY_SRC-003/004]: sticky ES_THRESH_CFG_ALERT & "
+      "Verifying [entropy_src_core.sv:557-561,653-770]: sticky "
+      "ES_THRESH_CFG_ALERT & "
       "loose-false REGWEN");
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEntropySrcRecovAlert));
@@ -97,11 +98,12 @@ bool test_main(void) {
   abs_mmio_write32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET, 0u);
   uint32_t recov_sts =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
-  CHECK(bitfield_bit32_read(
-            recov_sts, ENTROPY_SRC_RECOV_ALERT_STS_ES_THRESH_CFG_ALERT_BIT),
-        "[ERRATA-ENTROPY_SRC-003] Expected ES_THRESH_CFG_ALERT to remain 1 "
-        "after rw0c clear while ALERT_THRESHOLD=0x12345678 (got 0x%x)",
-        recov_sts);
+  CHECK(
+      bitfield_bit32_read(recov_sts,
+                          ENTROPY_SRC_RECOV_ALERT_STS_ES_THRESH_CFG_ALERT_BIT),
+      "[entropy_src_core.sv:653-770] Expected ES_THRESH_CFG_ALERT to remain 1 "
+      "after rw0c clear while ALERT_THRESHOLD=0x12345678 (got 0x%x)",
+      recov_sts);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_ALERT_THRESHOLD_REG_OFFSET,
                    ENTROPY_SRC_ALERT_THRESHOLD_REG_RESVAL);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -113,7 +115,8 @@ bool test_main(void) {
   abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET, 0x5u);
   uint32_t regwen = abs_mmio_read32(kEsBase + ENTROPY_SRC_REGWEN_REG_OFFSET);
   CHECK(regwen == 1u,
-        "[ERRATA-ENTROPY_SRC-004] Expected REGWEN == 1 when MODULE_ENABLE=0x5 "
+        "[entropy_src_core.sv:557-561] Expected REGWEN == 1 when "
+        "MODULE_ENABLE=0x5 "
         "(mubi4_test_false_loose), got 0x%x",
         regwen);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
@@ -122,13 +125,14 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   LOG_INFO(
-      "[ERRATA-ENTROPY_SRC-003/004] CONFIRMED: ES_THRESH_CFG_ALERT sticky & "
+      "[entropy_src_core.sv:557-561,653-770] CONFIRMED: ES_THRESH_CFG_ALERT "
+      "sticky & "
       "REGWEN=1 on MODULE_ENABLE=0x5");
 
   // ---------------------------------------------------------------------------
-  // 2. [ERRATA-ENTROPY_SRC-001], [ERRATA-ENTROPY_SRC-002] &
-  //    [ERRATA-ENTROPY_SRC-006] (SPEC_DOC_ERRATA, MEDIUM) +
-  //    [ERRATA-ENTROPY_SRC-008] (INTENDED_SECURITY_HARDENING, LOW):
+  // 2. [entropy_src_core.sv:1042-1043], [entropy_src_main_sm.sv:62-68] &
+  //    [entropy_src_main_sm.sv:58-68] (SPEC_DOC_ERRATA, MEDIUM) +
+  //    [entropy_src_core.sv:3007-3020] (INTENDED_SECURITY_HARDENING, LOW):
   //    - Conditioned FW_OV_ENTROPY_INSERT enters FWInsertStart (0x0c3) with
   //      MAIN_SM_IDLE == 0, and pulses sha3_start_o immediately in Idle so
   //      words written in FWInsertStart (0x11111111, 0x22222222) BEFORE
@@ -141,7 +145,8 @@ bool test_main(void) {
   //      ES_BUS_CMP_ALERT.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-ENTROPY_SRC-001/002/006/008]: FWInsertStart (0x0c3), "
+      "Verifying [entropy_src_core.sv:1042-1043,3007-3020 / "
+      "entropy_src_main_sm.sv:58-68]: FWInsertStart (0x0c3), "
       "pre-SHA3_START absorption, & ES_BUS_CMP_ALERT");
   uint32_t conf_fw_ov_sha3 =
       (kMultiBitBool4True << ENTROPY_SRC_CONF_FIPS_ENABLE_OFFSET) |
@@ -186,7 +191,8 @@ bool test_main(void) {
   recov_sts = abs_mmio_read32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(
             recov_sts, ENTROPY_SRC_RECOV_ALERT_STS_ES_FW_OV_DISABLE_ALERT_BIT),
-        "[ERRATA-ENTROPY_SRC-001] Expected ES_FW_OV_DISABLE_ALERT == 0 when "
+        "[entropy_src_core.sv:1042-1043] Expected ES_FW_OV_DISABLE_ALERT == 0 "
+        "when "
         "FW_OV_WR_FIFO_FULL == 0 despite 1 unprocessed 32-bit word in "
         "pfifo_precon");
 
@@ -202,7 +208,7 @@ bool test_main(void) {
   CHECK(sm_state == 0x0c3u &&
             !bitfield_bit32_read(debug_status,
                                  ENTROPY_SRC_DEBUG_STATUS_MAIN_SM_IDLE_BIT),
-        "[ERRATA-ENTROPY_SRC-006] Expected MAIN_SM_STATE == 0x0c3 "
+        "[entropy_src_main_sm.sv:58-68] Expected MAIN_SM_STATE == 0x0c3 "
         "(FWInsertStart) and MAIN_SM_IDLE == 0 after SHA3 completion");
 
   uint32_t seed1_w0 =
@@ -211,11 +217,12 @@ bool test_main(void) {
     (void)abs_mmio_read32(kEsBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
   }
   abs_mmio_write32(kEsBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET, 0xfu);
-  CHECK(seed1_w0 == 0x1d9845a5u,
-        "[ERRATA-ENTROPY_SRC-002] Expected words (0x11111111, 0x22222222) "
-        "written in FWInsertStart prior to FW_OV_SHA3_START=True to be "
-        "absorbed into SHA3-384 digest (0x1d9845a5), got 0x%08x",
-        seed1_w0);
+  CHECK(
+      seed1_w0 == 0x1d9845a5u,
+      "[entropy_src_main_sm.sv:62-68] Expected words (0x11111111, 0x22222222) "
+      "written in FWInsertStart prior to FW_OV_SHA3_START=True to be "
+      "absorbed into SHA3-384 digest (0x1d9845a5), got 0x%08x",
+      seed1_w0);
 
   // Clear the half-word in pfifo_precon by cycling MODULE_ENABLE (which keep
   // rdata_capt in QEMU? Wait: disabling MODULE_ENABLE resets rdata_capt_vld!).
@@ -269,7 +276,8 @@ bool test_main(void) {
   recov_sts = abs_mmio_read32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(bitfield_bit32_read(recov_sts,
                             ENTROPY_SRC_RECOV_ALERT_STS_ES_BUS_CMP_ALERT_BIT),
-        "[ERRATA-ENTROPY_SRC-008] Expected ES_BUS_CMP_ALERT set on 12th read "
+        "[entropy_src_core.sv:3007-3020] Expected ES_BUS_CMP_ALERT set on 12th "
+        "read "
         "of identical seed (got 0x%x)",
         recov_sts);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET, 0u);
@@ -277,19 +285,21 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   LOG_INFO(
-      "[ERRATA-ENTROPY_SRC-001/002/006/008] CONFIRMED: seed1_w0=0x%08x, "
+      "[entropy_src_core.sv:1042-1043,3007-3020 / "
+      "entropy_src_main_sm.sv:58-68] CONFIRMED: seed1_w0=0x%08x, "
       "MAIN_SM_STATE=0x%03x, ES_BUS_CMP_ALERT=1",
       seed1_w0, sm_state);
 
   // ---------------------------------------------------------------------------
-  // 3. [ERRATA-ENTROPY_SRC-005] (TRUE_SILICON_ERRATA, LOW, 65%):
+  // 3. [entropy_src_core.sv:2967] (TRUE_SILICON_ERRATA, LOW, 65%):
   //    Reading an empty ENTROPY_DATA returns 0 with ERR_CODE == 0 on
   //    reads 1..11 (swread_idx_q = 0..10) and only latches SFIFO_ESFINAL_ERR |
   //    FIFO_READ_ERR (0x20000008) on the 12th read (swread_idx_q == 11,
   //    swread_done == 1).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-ENTROPY_SRC-005] (TRUE_SILICON_ERRATA): ENTROPY_DATA "
+      "Verifying [entropy_src_core.sv:2967] (TRUE_SILICON_ERRATA): "
+      "ENTROPY_DATA "
       "empty underflow only fires on 12th read");
   CHECK_STATUS_OK(
       ottf_alerts_ignore_alert(kTopEarlgreyAlertIdEntropySrcFatalAlert));
@@ -299,7 +309,7 @@ bool test_main(void) {
   uint32_t err_code_11 =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_ERR_CODE_REG_OFFSET);
   CHECK(err_code_11 == 0u,
-        "[ERRATA-ENTROPY_SRC-005] Expected ERR_CODE == 0 after 11 empty "
+        "[entropy_src_core.sv:2967] Expected ERR_CODE == 0 after 11 empty "
         "ENTROPY_DATA reads, got 0x%08x",
         err_code_11);
 
@@ -312,37 +322,41 @@ bool test_main(void) {
                             ENTROPY_SRC_ERR_CODE_SFIFO_ESFINAL_ERR_BIT) &&
             bitfield_bit32_read(err_code_12,
                                 ENTROPY_SRC_ERR_CODE_FIFO_READ_ERR_BIT),
-        "[ERRATA-ENTROPY_SRC-005] Expected SFIFO_ESFINAL_ERR | FIFO_READ_ERR "
+        "[entropy_src_core.sv:2967] Expected SFIFO_ESFINAL_ERR | FIFO_READ_ERR "
         "(0x20000008) on 12th empty read, got 0x%08x",
         err_code_12);
   LOG_INFO(
-      "[ERRATA-ENTROPY_SRC-005] CONFIRMED: ERR_CODE after 11 reads=0x%08x, "
+      "[entropy_src_core.sv:2967] CONFIRMED: ERR_CODE after 11 reads=0x%08x, "
       "after 12th read=0x%08x",
       err_code_11, err_code_12);
 
   // ---------------------------------------------------------------------------
-  // 4. [ERRATA-ENTROPY_SRC-011] (INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
-  // BUS.INTEGRITY):
+  // 4. [entropy_src_reg_pkg.sv:980-1038] (INTENDED_SECURITY_HARDENING, INFO —
+  // SEC_CM: BUS.INTEGRITY):
   //    ENTROPY_SRC_PERMIT rejects 8-bit sb writes to CONF (4'b1111, mcause=7)
   //    while accepting 8-bit sb writes to byte 0 of MODULE_ENABLE (4'b0001).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-ENTROPY_SRC-011] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [entropy_src_reg_pkg.sv:980-1038] "
+      "(INTENDED_SECURITY_HARDENING): "
       "ENTROPY_SRC_PERMIT sub-word write protection");
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kEsBase + ENTROPY_SRC_CONF_REG_OFFSET, 0x66u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[ERRATA-ENTROPY_SRC-011] Expected sb to CONF (PERMIT=4'b1111) to "
+        "[entropy_src_reg_pkg.sv:980-1038] Expected sb to CONF "
+        "(PERMIT=4'b1111) to "
         "fault with mcause=7");
 
   g_load_store_fault = false;
   abs_mmio_write8(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                   kMultiBitBool4False);
   CHECK(!g_load_store_fault,
-        "[ERRATA-ENTROPY_SRC-011] Expected sb to MODULE_ENABLE+0 "
+        "[entropy_src_reg_pkg.sv:980-1038] Expected sb to MODULE_ENABLE+0 "
         "(PERMIT=4'b0001) to succeed");
-  LOG_INFO("[ERRATA-ENTROPY_SRC-011] CONFIRMED: ENTROPY_SRC_PERMIT enforced");
+  LOG_INFO(
+      "[entropy_src_reg_pkg.sv:980-1038] CONFIRMED: ENTROPY_SRC_PERMIT "
+      "enforced");
 
   LOG_INFO("=== ALL ENTROPY_SRC ERRATA CHECKS PASSED ===");
   return true;

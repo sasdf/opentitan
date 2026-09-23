@@ -7,16 +7,16 @@
  *
  * Exercises and confirms all 3 silicon / spec / architectural behaviors in
  * `/root/knowledge/errata/usbdev.md`:
- * - [ERRATA-USBDEV-001]: `USBSTAT.rx_empty` reads `0` at reset and whenever
- *   `USBCTRL.enable == 0` (`connect_en & ~rx_fifo_rvalid` in `usbdev.sv:268`,
- *   contradicting `resval: "1"` in `usbdev.hjson`), and
+ * - [usbdev.sv:263-268,709-710]: `USBSTAT.rx_empty` reads `0` at reset and
+ * whenever `USBCTRL.enable == 0` (`connect_en & ~rx_fifo_rvalid` in
+ * `usbdev.sv:268`, contradicting `resval: "1"` in `usbdev.hjson`), and
  * `USBCTRL.device_address` is held at `0` whenever `USBCTRL.enable == 0`
  * (`clr_devaddr_o = ~connect_en_i | link_reset`).
- * - [ERRATA-USBDEV-002]: Writing `USBCTRL.resume_link_active = 1` from
- *   `LinkPowered` transitions `USBSTAT.link_state` through `LinkResuming (6)`
- *   into `LinkActiveNoSOF (5)` (not `LinkActive (3)`), and
+ * - [usbdev_linkstate.sv:144-200]: Writing `USBCTRL.resume_link_active = 1`
+ * from `LinkPowered` transitions `USBSTAT.link_state` through `LinkResuming
+ * (6)` into `LinkActiveNoSOF (5)` (not `LinkActive (3)`), and
  *   `PHY_CONFIG.tx_osc_test_mode` forces `PHY_PINS_SENSE.tx_oe_o = 1`.
- * - [ERRATA-USBDEV-003]: `USBDEV.BUFFER` (`0x800..0xFFF`, `tlul_adapter_sram
+ * - [usbdev.sv:760-763]: `USBDEV.BUFFER` (`0x800..0xFFF`, `tlul_adapter_sram
  *   #(.ByteAccess(0))`) permits sub-word reads (`lb`/`lh`, `d_error = 0`)
  *   while rejecting sub-word writes (`sb`/`sh`) with a Store Access Fault
  *   (`mcause = 7`); sub-word writes to multi-byte CSRs (`USBCTRL`) and accesses
@@ -71,9 +71,9 @@ void ottf_exception_handler(uint32_t *exc_info) {
   abort();
 }
 
-static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
+static void test_usbdev_rx_empty_and_devaddr_gated_by_enable(void) {
   LOG_INFO(
-      "Testing [ERRATA-USBDEV-001]: rx_empty & device_address gated by "
+      "Testing [usbdev.sv:263-268,709-710]: rx_empty & device_address gated by "
       "USBCTRL.enable");
 
   // Drive idle J state (DP_O = 1, DN_O = 0) via PHY_PINS_DRIVE so the bus is
@@ -101,7 +101,7 @@ static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
   uint32_t rx_empty = (usbstat >> USBDEV_USBSTAT_RX_EMPTY_BIT) & 1u;
   CHECK_EQ(rx_depth, 0u, "Expected RX_DEPTH == 0 after RX_RST");
   CHECK_EQ(rx_empty, 0u,
-           "[ERRATA-USBDEV-001] Expected USBSTAT.rx_empty == 0 when "
+           "[usbdev.sv:263-268,709-710] Expected USBSTAT.rx_empty == 0 when "
            "USBCTRL.enable == 0");
 
   // 2. Writing USBCTRL.device_address = 0x2a with USBCTRL.enable = 0 is
@@ -114,7 +114,7 @@ static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
   uint32_t devaddr = (usbctrl >> USBDEV_USBCTRL_DEVICE_ADDRESS_OFFSET) &
                      USBDEV_USBCTRL_DEVICE_ADDRESS_MASK;
   CHECK_EQ(devaddr, 0u,
-           "[ERRATA-USBDEV-001] Expected device_address == 0 when "
+           "[usbdev.sv:263-268,709-710] Expected device_address == 0 when "
            "USBCTRL.enable == 0");
 
   // 3. Enable USBCTRL.enable = 1 first so connect_en propagates and
@@ -126,7 +126,7 @@ static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
   rx_empty = (usbstat >> USBDEV_USBSTAT_RX_EMPTY_BIT) & 1u;
   CHECK_EQ(rx_empty, 1u,
-           "[ERRATA-USBDEV-001] Expected USBSTAT.rx_empty == 1 when "
+           "[usbdev.sv:263-268,709-710] Expected USBSTAT.rx_empty == 1 when "
            "USBCTRL.enable == 1");
 
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET,
@@ -137,7 +137,7 @@ static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
   devaddr = (usbctrl >> USBDEV_USBCTRL_DEVICE_ADDRESS_OFFSET) &
             USBDEV_USBCTRL_DEVICE_ADDRESS_MASK;
   CHECK_EQ(devaddr, kTestAddr,
-           "[ERRATA-USBDEV-001] Expected device_address == 0x2a when "
+           "[usbdev.sv:263-268,709-710] Expected device_address == 0x2a when "
            "USBCTRL.enable == 1");
 
   // 4. Clearing USBCTRL.enable = 0 clears both device_address -> 0 and
@@ -150,17 +150,18 @@ static void test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable(void) {
             USBDEV_USBCTRL_DEVICE_ADDRESS_MASK;
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
   rx_empty = (usbstat >> USBDEV_USBSTAT_RX_EMPTY_BIT) & 1u;
-  CHECK_EQ(
-      devaddr, 0u,
-      "[ERRATA-USBDEV-001] Expected device_address cleared to 0 on disable");
-  CHECK_EQ(
-      rx_empty, 0u,
-      "[ERRATA-USBDEV-001] Expected USBSTAT.rx_empty cleared to 0 on disable");
+  CHECK_EQ(devaddr, 0u,
+           "[usbdev.sv:263-268,709-710] Expected device_address cleared to 0 "
+           "on disable");
+  CHECK_EQ(rx_empty, 0u,
+           "[usbdev.sv:263-268,709-710] Expected USBSTAT.rx_empty cleared to 0 "
+           "on disable");
 }
 
-static void test_errata_usbdev_002_resume_link_active_no_sof_and_tx_osc(void) {
+static void test_usbdev_resume_link_active_no_sof_and_tx_osc(void) {
   LOG_INFO(
-      "Testing [ERRATA-USBDEV-002]: resume_link_active -> LinkActiveNoSOF(5) & "
+      "Testing [usbdev_linkstate.sv:144-200]: resume_link_active -> "
+      "LinkActiveNoSOF(5) & "
       "tx_osc_test_mode");
 
   // Drive idle J state (DP_O = 1, DN_O = 0) via PHY_PINS_DRIVE so bus is not
@@ -182,7 +183,8 @@ static void test_errata_usbdev_002_resume_link_active_no_sof_and_tx_osc(void) {
   uint32_t link_state = (usbstat >> USBDEV_USBSTAT_LINK_STATE_OFFSET) &
                         USBDEV_USBSTAT_LINK_STATE_MASK;
   CHECK_EQ(link_state, 1u,
-           "[ERRATA-USBDEV-002] Expected link_state == LinkPowered (1), got %u",
+           "[usbdev_linkstate.sv:144-200] Expected link_state == LinkPowered "
+           "(1), got %u",
            link_state);
 
   // 2. Trigger RESUME_LINK_ACTIVE (wo pulse) from LinkPowered (1) ->
@@ -195,10 +197,10 @@ static void test_errata_usbdev_002_resume_link_active_no_sof_and_tx_osc(void) {
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
   link_state = (usbstat >> USBDEV_USBSTAT_LINK_STATE_OFFSET) &
                USBDEV_USBSTAT_LINK_STATE_MASK;
-  CHECK_EQ(
-      link_state, 5u,
-      "[ERRATA-USBDEV-002] Expected link_state == LinkActiveNoSOF (5), got %u",
-      link_state);
+  CHECK_EQ(link_state, 5u,
+           "[usbdev_linkstate.sv:144-200] Expected link_state == "
+           "LinkActiveNoSOF (5), got %u",
+           link_state);
 
   // Release PHY_PINS_DRIVE override and verify PHY_CONFIG.tx_osc_test_mode
   // forces PHY_PINS_SENSE.tx_oe_o == 1.
@@ -208,19 +210,19 @@ static void test_errata_usbdev_002_resume_link_active_no_sof_and_tx_osc(void) {
   busy_spin_micros(20);
   uint32_t pins_sense =
       abs_mmio_read32(kUsbdevBase + USBDEV_PHY_PINS_SENSE_REG_OFFSET);
-  CHECK_EQ((pins_sense >> USBDEV_PHY_PINS_SENSE_TX_OE_O_BIT) & 1u, 1u,
-           "[ERRATA-USBDEV-002] Expected PHY_PINS_SENSE.tx_oe_o == 1 in "
-           "tx_osc_test_mode");
+  CHECK_EQ(
+      (pins_sense >> USBDEV_PHY_PINS_SENSE_TX_OE_O_BIT) & 1u, 1u,
+      "[usbdev_linkstate.sv:144-200] Expected PHY_PINS_SENSE.tx_oe_o == 1 in "
+      "tx_osc_test_mode");
 
   // Restore defaults.
   abs_mmio_write32(kUsbdevBase + USBDEV_PHY_CONFIG_REG_OFFSET, 0x0u);
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0x0u);
 }
 
-static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
-    void) {
+static void test_usbdev_buffer_asymmetric_subword_and_csr_faults(void) {
   LOG_INFO(
-      "Testing [ERRATA-USBDEV-003]: BUFFER sub-word read OK / write fault & "
+      "Testing [usbdev.sv:760-763]: BUFFER sub-word read OK / write fault & "
       "CSR TL-UL faults");
 
   const uint32_t kBufferWord0 = kUsbdevBase + USBDEV_BUFFER_REG_OFFSET;
@@ -242,7 +244,7 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   uint16_t h1 = *(const volatile uint16_t *)(uintptr_t)(kBufferWord0 + 2u);
   CHECK_EQ(
       g_fault_count, 0u,
-      "[ERRATA-USBDEV-003] Sub-word reads from USBDEV.BUFFER must not fault");
+      "[usbdev.sv:760-763] Sub-word reads from USBDEV.BUFFER must not fault");
   CHECK_EQ(b0, 0x44u, "Byte 0 mismatch");
   CHECK_EQ(b1, 0x33u, "Byte 1 mismatch");
   CHECK_EQ(b2, 0x22u, "Byte 2 mismatch");
@@ -255,7 +257,7 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   g_last_mcause = 0;
   abs_mmio_write8(kBufferWord0, 0xAAu);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-USBDEV-003] Expected sb to USBDEV.BUFFER to trap");
+           "[usbdev.sv:760-763] Expected sb to USBDEV.BUFFER to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected Store Access Fault (mcause=7) on sb to BUFFER");
 
@@ -263,12 +265,12 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   g_last_mcause = 0;
   *(volatile uint16_t *)(uintptr_t)(kBufferWord0 + 2u) = 0xBBCCu;
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-USBDEV-003] Expected sh to USBDEV.BUFFER to trap");
+           "[usbdev.sv:760-763] Expected sh to USBDEV.BUFFER to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected Store Access Fault (mcause=7) on sh to BUFFER");
   CHECK_EQ(
       abs_mmio_read32(kBufferWord0), kPattern,
-      "[ERRATA-USBDEV-003] Rejected sub-word writes must not corrupt BUFFER");
+      "[usbdev.sv:760-763] Rejected sub-word writes must not corrupt BUFFER");
 
   // 4. Sub-word write (`sb`) to multi-byte CSR (`USBCTRL`, permit `4'b0111`)
   // traps with Store Access Fault (`mcause = 7`).
@@ -276,7 +278,7 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   g_last_mcause = 0;
   abs_mmio_write8(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0x01u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-USBDEV-003] Expected sb to USBCTRL to trap");
+           "[usbdev.sv:760-763] Expected sb to USBCTRL to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected Store Access Fault (mcause=7) on sb to USBCTRL");
 
@@ -285,7 +287,7 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   g_last_mcause = 0;
   (void)abs_mmio_read32(kUsbdevBase + 0x100u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-USBDEV-003] Expected read from unmapped gap 0x100 to trap");
+           "[usbdev.sv:760-763] Expected read from unmapped gap 0x100 to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvLoadAccessFault,
            "Expected Load Access Fault (mcause=5) on gap read");
 
@@ -293,7 +295,7 @@ static void test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults(
   g_last_mcause = 0;
   abs_mmio_write32(kUsbdevBase + 0x100u, 0xDEADBEEFu);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-USBDEV-003] Expected write to unmapped gap 0x100 to trap");
+           "[usbdev.sv:760-763] Expected write to unmapped gap 0x100 to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected Store Access Fault (mcause=7) on gap write");
 }
@@ -309,9 +311,9 @@ bool test_main(void) {
       kTopEarlgreyPinmuxInselConstantOne));
   busy_spin_micros(20);
 
-  test_errata_usbdev_001_rx_empty_and_devaddr_gated_by_enable();
-  test_errata_usbdev_002_resume_link_active_no_sof_and_tx_osc();
-  test_errata_usbdev_003_buffer_asymmetric_subword_and_csr_faults();
+  test_usbdev_rx_empty_and_devaddr_gated_by_enable();
+  test_usbdev_resume_link_active_no_sof_and_tx_osc();
+  test_usbdev_buffer_asymmetric_subword_and_csr_faults();
 
   LOG_INFO("All usbdev errata checks PASSED");
   return true;

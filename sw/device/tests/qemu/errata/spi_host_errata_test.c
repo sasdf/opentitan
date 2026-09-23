@@ -7,7 +7,7 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Suite for `spi_host` (P30).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * 1. [ERRATA-SPI_HOST-001] ([E1-01] SPEC_DOC_ERRATA, MEDIUM):
+ * 1. [spi_host_data_fifos.sv:71-73,122-125] ([E1-01] SPEC_DOC_ERRATA, MEDIUM):
  *    - 73-word effective `TXDATA` queue depth (`TxDepth + 1 = 73` due to greedy
  *      pop into `u_select` / `spi_host_byte_select`):
  *      * 72 words -> `STATUS.TXQD == 72`, `STATUS.TXFULL == 0`, `OVERFLOW ==
@@ -19,15 +19,15 @@
  *      `STATUS.CMDQD == 1` in `Idle` when a `WrOnly` (`DIRECTION = 2`) command
  *      is queued with `CONTROL.SPIEN = 1`, `CONFIGOPTS = 0`, and an empty TX
  *      FIFO.
- * 2. [ERRATA-SPI_HOST-002] ([E2-01] SPEC_DOC_ERRATA, LOW):
+ * 2. [spi_host.sv:212-215,252,272-286,425-461] ([E2-01] SPEC_DOC_ERRATA, LOW):
  *    - Level-sensitive `CONTROL.SW_RST = 1` continuously discards `TXDATA` and
  *      `COMMAND` writes (`STATUS.TXQD == 0`, `STATUS.CMDQD == 0`).
  *    - When `CONTROL.SW_RST = 0` and `CONTROL.SPIEN = 0`, `COMMAND` writes are
  *      still validated and queued into `u_cmd_queue` (`STATUS.CMDQD` reaches 4,
  *      `STATUS.READY` becomes 0), and a 5th invalid command sets
  *      `ERROR_STATUS.CMD_BUSY = 1` while masking `CMDINVAL` (`~command_busy`).
- * 3. [ERRATA-SPI_HOST-003] ([E2-02] INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
- * BUS.INTEGRITY):
+ * 3. [spi_host_reg_pkg.sv:329-366] ([E2-02] INTENDED_SECURITY_HARDENING, INFO —
+ * SEC_CM: BUS.INTEGRITY):
  *    - `SPI_HOST_PERMIT` rejects `sb` writes to `CONTROL` (`4'b1111`,
  * `mcause=7`) and `COMMAND` (`4'b0011`, `mcause=7`), whereas `sb` writes to
  * `TXDATA`
@@ -85,14 +85,16 @@ bool test_main(void) {
   spi_host_sw_reset_and_clear();
 
   // ---------------------------------------------------------------------------
-  // 1. [ERRATA-SPI_HOST-001] ([E1-01] SPEC_DOC_ERRATA, MEDIUM):
+  // 1. [spi_host_data_fifos.sv:71-73,122-125] ([E1-01] SPEC_DOC_ERRATA,
+  // MEDIUM):
   //    - 73-word effective TXDATA queue depth (TxDepth=72 + 1 word in
   //    u_select).
   //    - Combinational STATUS.TXSTALL=1 with STATUS.ACTIVE=0 and STATUS.CMDQD=1
   //      in Idle when a WrOnly command is issued with an empty TX FIFO.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SPI_HOST-001] (SPEC_DOC_ERRATA): 73-word TXDATA depth "
+      "Verifying [spi_host_data_fifos.sv:71-73,122-125] (SPEC_DOC_ERRATA): "
+      "73-word TXDATA depth "
       "& combinational Idle TXSTALL");
   for (uint32_t i = 0; i < 72; ++i) {
     abs_mmio_write32(kSpiHostBase + SPI_HOST_TXDATA_REG_OFFSET, 0x1000u + i);
@@ -103,7 +105,8 @@ bool test_main(void) {
   uint32_t txqd = bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD);
   bool txfull = bitfield_bit32_read(status, SPI_HOST_STATUS_TXFULL_BIT);
   CHECK(txqd == 72u && !txfull && err_sts == 0u,
-        "[ERRATA-SPI_HOST-001] After 72 words expected TXQD=72, TXFULL=0, "
+        "[spi_host_data_fifos.sv:71-73,122-125] After 72 words expected "
+        "TXQD=72, TXFULL=0, "
         "ERROR_STATUS=0 (got TXQD=%u, TXFULL=%d, err=0x%x)",
         txqd, txfull, err_sts);
 
@@ -114,17 +117,19 @@ bool test_main(void) {
   txqd = bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD);
   txfull = bitfield_bit32_read(status, SPI_HOST_STATUS_TXFULL_BIT);
   CHECK(txqd == 73u && txfull && err_sts == 0u,
-        "[ERRATA-SPI_HOST-001] After 73rd word expected TXQD=73, TXFULL=1, "
+        "[spi_host_data_fifos.sv:71-73,122-125] After 73rd word expected "
+        "TXQD=73, TXFULL=1, "
         "ERROR_STATUS=0 (got TXQD=%u, TXFULL=%d, err=0x%x)",
         txqd, txfull, err_sts);
 
   // 74th word triggers ERROR_STATUS.OVERFLOW (bit 0)!
   abs_mmio_write32(kSpiHostBase + SPI_HOST_TXDATA_REG_OFFSET, 0x1049u);
   err_sts = abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
-  CHECK(bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_OVERFLOW_BIT),
-        "[ERRATA-SPI_HOST-001] Expected 74th TXDATA word to set "
-        "ERROR_STATUS.OVERFLOW=1, got 0x%x",
-        err_sts);
+  CHECK(
+      bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_OVERFLOW_BIT),
+      "[spi_host_data_fifos.sv:71-73,122-125] Expected 74th TXDATA word to set "
+      "ERROR_STATUS.OVERFLOW=1, got 0x%x",
+      err_sts);
 
   // Reset FIFOs, set CONFIGOPTS=0, CSID=0, CONTROL.SPIEN=1, and issue a WrOnly
   // command (DIRECTION=2, LEN=0) with an empty TX FIFO:
@@ -142,22 +147,26 @@ bool test_main(void) {
   bool active = bitfield_bit32_read(status, SPI_HOST_STATUS_ACTIVE_BIT);
   uint32_t cmdqd = bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD);
   CHECK(txstall && !active && cmdqd == 1u,
-        "[ERRATA-SPI_HOST-001] Expected combinational TXSTALL=1, ACTIVE=0, "
+        "[spi_host_data_fifos.sv:71-73,122-125] Expected combinational "
+        "TXSTALL=1, ACTIVE=0, "
         "CMDQD=1 in Idle on empty-TX WrOnly command (status=0x%08x)",
         status);
   LOG_INFO(
-      "[ERRATA-SPI_HOST-001] CONFIRMED: TXQD=73 before OVERFLOW, and Idle "
+      "[spi_host_data_fifos.sv:71-73,122-125] CONFIRMED: TXQD=73 before "
+      "OVERFLOW, and Idle "
       "TXSTALL=1 with ACTIVE=0 & CMDQD=1");
 
   // ---------------------------------------------------------------------------
-  // 2. [ERRATA-SPI_HOST-002] ([E2-01] SPEC_DOC_ERRATA, LOW):
+  // 2. [spi_host.sv:212-215,252,272-286,425-461] ([E2-01] SPEC_DOC_ERRATA,
+  // LOW):
   //    - Level-sensitive CONTROL.SW_RST = 1 discards TXDATA and COMMAND writes.
   //    - When CONTROL.SPIEN = 0, COMMAND writes are queued (CMDQD = 4,
   //      READY = 0) and validated, and a 5th invalid command sets CMD_BUSY = 1
   //      while masking CMDINVAL (~command_busy).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SPI_HOST-002] (SPEC_DOC_ERRATA): level-sensitive "
+      "Verifying [spi_host.sv:212-215,252,272-286,425-461] (SPEC_DOC_ERRATA): "
+      "level-sensitive "
       "SW_RST & SPIEN=0 COMMAND queueing/error masking");
   abs_mmio_write32(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET,
                    1u << SPI_HOST_CONTROL_SW_RST_BIT);
@@ -167,7 +176,8 @@ bool test_main(void) {
   status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
   CHECK(bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) == 0u &&
             bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 0u,
-        "[ERRATA-SPI_HOST-002] Expected TXDATA & COMMAND writes while SW_RST=1 "
+        "[spi_host.sv:212-215,252,272-286,425-461] Expected TXDATA & COMMAND "
+        "writes while SW_RST=1 "
         "to be discarded (status=0x%08x)",
         status);
 
@@ -182,7 +192,8 @@ bool test_main(void) {
   status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
   CHECK(bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 4u &&
             !bitfield_bit32_read(status, SPI_HOST_STATUS_READY_BIT),
-        "[ERRATA-SPI_HOST-002] Expected CMDQD=4 and READY=0 when 4 commands "
+        "[spi_host.sv:212-215,252,272-286,425-461] Expected CMDQD=4 and "
+        "READY=0 when 4 commands "
         "are queued with SPIEN=0 (status=0x%08x)",
         status);
 
@@ -196,23 +207,25 @@ bool test_main(void) {
   err_sts = abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
   CHECK(bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDBUSY_BIT) &&
             !bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDINVAL_BIT),
-        "[ERRATA-SPI_HOST-002] Expected 5th invalid command to set CMD_BUSY=1 "
+        "[spi_host.sv:212-215,252,272-286,425-461] Expected 5th invalid "
+        "command to set CMD_BUSY=1 "
         "and mask CMDINVAL=0 (got ERROR_STATUS=0x%x)",
         err_sts);
   LOG_INFO(
-      "[ERRATA-SPI_HOST-002] CONFIRMED: SW_RST level discard, SPIEN=0 CMDQD=4, "
+      "[spi_host.sv:212-215,252,272-286,425-461] CONFIRMED: SW_RST level "
+      "discard, SPIEN=0 CMDQD=4, "
       "and CMD_BUSY masking CMDINVAL");
 
   // ---------------------------------------------------------------------------
-  // 3. [ERRATA-SPI_HOST-003] ([E2-02] INTENDED_SECURITY_HARDENING — SEC_CM:
-  // BUS.INTEGRITY):
+  // 3. [spi_host_reg_pkg.sv:329-366] ([E2-02] INTENDED_SECURITY_HARDENING —
+  // SEC_CM: BUS.INTEGRITY):
   //    - SPI_HOST_PERMIT rejects sb to CONTROL (4'b1111) and COMMAND (4'b0011)
   //      with mcause=7, whereas sb to TXDATA (0x28) succeeds (TXQD=1).
   //    - Write to RXDATA (0x24) faults (mcause=7) and read from TXDATA (0x28)
   //      faults (mcause=5), while read from COMMAND (0x20, wo) returns 0.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SPI_HOST-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [spi_host_reg_pkg.sv:329-366] (INTENDED_SECURITY_HARDENING): "
       "SPI_HOST_PERMIT & RXDATA/TXDATA window faults");
   spi_host_sw_reset_and_clear();
 
@@ -220,28 +233,32 @@ bool test_main(void) {
   g_last_mcause = 0;
   abs_mmio_write8(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET, 0u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[ERRATA-SPI_HOST-003] Expected sb to CONTROL (PERMIT=4'b1111) to "
+        "[spi_host_reg_pkg.sv:329-366] Expected sb to CONTROL (PERMIT=4'b1111) "
+        "to "
         "fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, 0u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[ERRATA-SPI_HOST-003] Expected sb to COMMAND (PERMIT=4'b0011) to "
+        "[spi_host_reg_pkg.sv:329-366] Expected sb to COMMAND (PERMIT=4'b0011) "
+        "to "
         "fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write32(kSpiHostBase + SPI_HOST_RXDATA_REG_OFFSET, 0u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[ERRATA-SPI_HOST-003] Expected write to RXDATA (0x24) to fault with "
+        "[spi_host_reg_pkg.sv:329-366] Expected write to RXDATA (0x24) to "
+        "fault with "
         "mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   (void)abs_mmio_read32(kSpiHostBase + SPI_HOST_TXDATA_REG_OFFSET);
   CHECK(g_load_store_fault && g_last_mcause == 5u,
-        "[ERRATA-SPI_HOST-003] Expected read from TXDATA (0x28) to fault with "
+        "[spi_host_reg_pkg.sv:329-366] Expected read from TXDATA (0x28) to "
+        "fault with "
         "mcause=5");
 
   g_load_store_fault = false;
@@ -254,12 +271,14 @@ bool test_main(void) {
   status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
   CHECK(!g_load_store_fault &&
             bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) == 1u,
-        "[ERRATA-SPI_HOST-003] Expected sb to TXDATA (0x28) to succeed and "
+        "[spi_host_reg_pkg.sv:329-366] Expected sb to TXDATA (0x28) to succeed "
+        "and "
         "increment TXQD to 1 (status=0x%08x)",
         status);
   spi_host_sw_reset_and_clear();
   LOG_INFO(
-      "[ERRATA-SPI_HOST-003] CONFIRMED: SPI_HOST_PERMIT & RXDATA/TXDATA window "
+      "[spi_host_reg_pkg.sv:329-366] CONFIRMED: SPI_HOST_PERMIT & "
+      "RXDATA/TXDATA window "
       "access checks enforced");
 
   LOG_INFO("=== ALL SPI_HOST ERRATA CHECKS PASSED ===");

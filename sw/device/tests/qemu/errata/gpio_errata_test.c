@@ -101,16 +101,16 @@ static void expect_store8_fault(uint32_t addr, uint8_t val) {
 }
 
 /**
- * [ERRATA-GPIO-001] (GPIO-E2-01 — BENIGN_RTL_IMPL_DETAIL):
+ * [gpio.sv:62-63] (GPIO-E2-01 — BENIGN_RTL_IMPL_DETAIL):
  * Verify `GPIO.DATA_IN` bidirectional self-loopback double-XOR cancellation of
  * `MIO_PAD_ATTR.INVERT` (`prim_xilinx_ultrascale_pad_wrapper.sv:76, 97`),
  * `MIO_PERIPH_INSEL` `ConstantZero`/`ConstantOne` inversion bypass
  * (`pinmux.sv:470-475`), and `MIO_PAD_ATTR.INPUT_DISABLE` (`0x80`) pre-invert
  * clamp (`in_raw_o = 0` before `^ attr_i.invert`).
  */
-static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
+static void test_gpio_pad_invert_and_input_disable(void) {
   LOG_INFO(
-      "Verifying [ERRATA-GPIO-001] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [gpio.sv:62-63] (BENIGN_RTL_IMPL_DETAIL): "
       "MIO_PAD_ATTR.INVERT double-XOR cancellation, Constant0/1 bypass, and "
       "INPUT_DISABLE pre-invert clamp");
 
@@ -137,14 +137,14 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 0u,
-      "[ERRATA-GPIO-001] Expected DATA_IN[2]==0 when DIRECT_OUT[2]==0 with "
+      "[gpio.sv:62-63] Expected DATA_IN[2]==0 when DIRECT_OUT[2]==0 with "
       "INVERT=1 (double-XOR cancellation)");
 
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 1u << 2);
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 1u,
-      "[ERRATA-GPIO-001] Expected DATA_IN[2]==1 when DIRECT_OUT[2]==1 with "
+      "[gpio.sv:62-63] Expected DATA_IN[2]==1 when DIRECT_OUT[2]==1 with "
       "INVERT=1 (double-XOR cancellation)");
 
   /* 2. MIO_PERIPH_INSEL ConstantZero (`0`) and ConstantOne (`1`) bypass
@@ -156,7 +156,7 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 0u,
-      "[ERRATA-GPIO-001] ConstantZero must bypass MIO_PAD_ATTR.INVERT");
+      "[gpio.sv:62-63] ConstantZero must bypass MIO_PAD_ATTR.INVERT");
 
   CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
                                        kTopEarlgreyPinmuxPeripheralInGpioGpio2,
@@ -164,7 +164,7 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 1u,
-      "[ERRATA-GPIO-001] ConstantOne must bypass MIO_PAD_ATTR.INVERT");
+      "[gpio.sv:62-63] ConstantOne must bypass MIO_PAD_ATTR.INVERT");
 
   /* 3. MIO_PAD_ATTR.INPUT_DISABLE (`0x80`) clamps `in_raw_o` to `0` BEFORE
    * the input XOR (`in_o = attr_i.invert ^ 0`):
@@ -182,7 +182,7 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 0u,
-      "[ERRATA-GPIO-001] Expected DATA_IN[2]==0 when INPUT_DISABLE=1, "
+      "[gpio.sv:62-63] Expected DATA_IN[2]==0 when INPUT_DISABLE=1, "
       "INVERT=0");
 
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
@@ -192,7 +192,7 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
   busy_spin_micros(10);
   CHECK(
       ((abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) >> 2) & 1u) == 1u,
-      "[ERRATA-GPIO-001] Expected DATA_IN[2]==1 when INPUT_DISABLE=1, "
+      "[gpio.sv:62-63] Expected DATA_IN[2]==1 when INPUT_DISABLE=1, "
       "INVERT=1 (pre-invert clamp 0 ^ 1 == 1)");
 
   /* Restore pad attributes and GPIO OE/OUT. */
@@ -202,7 +202,7 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
 }
 
 /**
- * [ERRATA-GPIO-002] (GPIO-E2-02 — INTENDED_SECURITY_HARDENING):
+ * [gpio_reg_pkg.sv:247-264] (GPIO-E2-02 — INTENDED_SECURITY_HARDENING):
  * Verify `GPIO_PERMIT[16]` (`gpio_reg_pkg.sv:247-264`) rejects 16-bit halfword
  * (`sh`) and 8-bit (`sb`) writes to `MASKED_OUT_*` / `MASKED_OE_*` /
  * `DIRECT_OUT` (`GPIO_PERMIT = 4'b1111`) with synchronous Store Access Fault
@@ -211,9 +211,9 @@ static void test_errata_gpio_001_pad_invert_and_input_disable(void) {
  * to `ALERT_TEST+0` (`GPIO_PERMIT = 4'b0001`) while faulting at `ALERT_TEST+1`,
  * and raises Load/Store Access Faults (`mcause = 5 / 7`) at offset `>= 0x40`.
  */
-static void test_errata_gpio_002_permit_subword_and_data_in_faults(void) {
+static void test_gpio_permit_subword_and_data_in_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-GPIO-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [gpio_reg_pkg.sv:247-264] (INTENDED_SECURITY_HARDENING): "
       "GPIO_PERMIT=4'b1111 rejecting 16-bit sh on MASKED_OUT_*/MASKED_OE_* and "
       "asymmetric DATA_IN write fault");
 
@@ -258,15 +258,15 @@ static void test_errata_gpio_002_permit_subword_and_data_in_faults(void) {
 }
 
 /**
- * [ERRATA-GPIO-003] (GPIO-E4-01 — BENIGN_RTL_IMPL_DETAIL):
+ * [gpio.sv:123-152] (GPIO-E4-01 — BENIGN_RTL_IMPL_DETAIL):
  * Verify continuous level-interrupt (`INTR_CTRL_EN_LVLLOW` / `LVLHIGH`)
  * immediate re-latch on `INTR_STATE` `RW1C` while input level remains active
  * (`gpio.sv:139-145`) and `ALERT_TEST` (`0x0c`) 1-cycle transient pulse
  * (`gpio.sv:149-152`).
  */
-static void test_errata_gpio_003_level_intr_relatch_and_alert_pulse(void) {
+static void test_gpio_level_intr_relatch_and_alert_pulse(void) {
   LOG_INFO(
-      "Verifying [ERRATA-GPIO-003] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [gpio.sv:123-152] (BENIGN_RTL_IMPL_DETAIL): "
       "continuous level-interrupt INTR_STATE RW1C re-latch and ALERT_TEST "
       "pulse");
 
@@ -287,7 +287,7 @@ static void test_errata_gpio_003_level_intr_relatch_and_alert_pulse(void) {
   abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u);
   busy_spin_micros(5);
   CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & 1u) == 1u,
-        "[ERRATA-GPIO-003] Expected INTR_STATE[0] to remain 1 after RW1C while "
+        "[gpio.sv:123-152] Expected INTR_STATE[0] to remain 1 after RW1C while "
         "LVLLOW condition is active");
 
   /* Once LVLLOW is disabled, RW1C clears INTR_STATE[0] to 0. */
@@ -307,9 +307,9 @@ static void test_errata_gpio_003_level_intr_relatch_and_alert_pulse(void) {
 
 bool test_main(void) {
   LOG_INFO("Starting gpio_errata_test (P35) on CW340 FPGA / QEMU...");
-  test_errata_gpio_001_pad_invert_and_input_disable();
-  test_errata_gpio_002_permit_subword_and_data_in_faults();
-  test_errata_gpio_003_level_intr_relatch_and_alert_pulse();
+  test_gpio_pad_invert_and_input_disable();
+  test_gpio_permit_subword_and_data_in_faults();
+  test_gpio_level_intr_relatch_and_alert_pulse();
   LOG_INFO("All gpio_errata_test checks PASSED!");
   return true;
 }

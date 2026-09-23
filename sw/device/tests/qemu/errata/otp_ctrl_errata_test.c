@@ -7,14 +7,14 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `otp_ctrl` (P24).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-OTP_CTRL-001] (SPEC_DOC_ERRATA):
+ * - [otp_ctrl_part_unbuf.sv:248-259] (SPEC_DOC_ERRATA):
  *   When an unbuffered software partition's `*_READ_LOCK` is `0`
  *   (`VENDOR_TEST_READ_LOCK == 0`), reading its digest offset via either
  *   `SW_CFG_WINDOW` or `DAI` (`DIRECT_ACCESS_CMD.RD`) fails with `AccessError`
  *   (because `otp_ctrl_part_unbuf.sv:248` has no digest exemption and
  *   `otp_ctrl_dai.sv:315` only exempts `PartInfo[part_idx].hw_digest`), while
  *   the core `VENDOR_TEST_DIGEST_0/1` CSRs remain readable.
- * - [ERRATA-OTP_CTRL-002] (INTENDED_SECURITY_HARDENING):
+ * - [otp_ctrl.hjson:2133] (INTENDED_SECURITY_HARDENING):
  *   Reading a read-locked unbuffered partition in `SW_CFG_WINDOW`
  * simultaneously raises a synchronous TL-UL Load Access Fault (`d_error = 1`,
  * `mcause = 5`) and latches `ERR_CODE_0 = AccessError`,
@@ -22,10 +22,10 @@
  * writing to `SW_CFG_WINDOW` raises a synchronous Store Access Fault
  * (`ErrOnWrite = 1` in `u_tlul_adapter_sram`) without setting `ERR_CODE_0` or
  * `INTR_STATE.OTP_ERROR`.
- * - [ERRATA-OTP_CTRL-003] (INTENDED_SECURITY_HARDENING):
+ * - [otp_ctrl_dai.sv:184] (INTENDED_SECURITY_HARDENING):
  *   `INTR_STATE.otp_operation_done` pulses even when a DAI command aborts with
  *   `AccessError`, and `DIRECT_ACCESS_RDATA_0/1` is cleared to `0`.
- * - [ERRATA-OTP_CTRL-004] (INTENDED_SECURITY_HARDENING):
+ * - [otp_ctrl.hjson:1829] (INTENDED_SECURITY_HARDENING):
  *   `otp_ctrl.prim` (`0x40138000`) is gated by `u_tlul_lc_gate`
  * (`lc_dft_en[0]`), and `OTP_CTRL_CORE_PERMIT` / `OTP_CTRL_PRIM_PERMIT` enforce
  * sub-word write faults (`wr_err`).
@@ -69,12 +69,12 @@ static void wait_for_dai_idle(void) {
 bool test_main(void) {
   wait_for_dai_idle();
 
-  // 1. Verify [ERRATA-OTP_CTRL-002] (INTENDED_SECURITY_HARDENING):
+  // 1. Verify [otp_ctrl.hjson:2133] (INTENDED_SECURITY_HARDENING):
   //    Read-locked SW_CFG_WINDOW read triggers BOTH synchronous TL-UL d_error=1
   //    AND asynchronous ERR_CODE_0 = AccessError / INTR_STATE.OTP_ERROR,
   //    whereas SW_CFG_WINDOW write triggers ONLY d_error=1 (ErrOnWrite=1).
   LOG_INFO(
-      "Verifying [ERRATA-OTP_CTRL-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [otp_ctrl.hjson:2133] (INTENDED_SECURITY_HARDENING): "
       "SW_CFG_WINDOW read-locked dual d_error=1 + ERR_CODE_0 vs ErrOnWrite...");
 
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
@@ -111,12 +111,12 @@ bool test_main(void) {
       OTP_CTRL_INTR_STATE_OTP_ERROR_BIT));
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
 
-  // 2. Verify [ERRATA-OTP_CTRL-003] (INTENDED_SECURITY_HARDENING):
+  // 2. Verify [otp_ctrl_dai.sv:184] (INTENDED_SECURITY_HARDENING):
   //    DAI read populates DIRECT_ACCESS_RDATA_0 on unlocked partition, then on
   //    a locked partition DAI read sets BOTH otp_operation_done and otp_error
   //    while clearing DIRECT_ACCESS_RDATA_0/1 to 0.
   LOG_INFO(
-      "Verifying [ERRATA-OTP_CTRL-003] (INTENDED_SECURITY_HARDENING): DAI "
+      "Verifying [otp_ctrl_dai.sv:184] (INTENDED_SECURITY_HARDENING): DAI "
       "otp_operation_done on AccessError & DIRECT_ACCESS_RDATA_0/1 "
       "clearing...");
 
@@ -157,13 +157,14 @@ bool test_main(void) {
                         OTP_CTRL_DIRECT_ACCESS_RDATA_1_REG_OFFSET) == 0x0u);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET, 0x3u);
 
-  // 3. Verify [ERRATA-OTP_CTRL-001] (SPEC_DOC_ERRATA):
+  // 3. Verify [otp_ctrl_part_unbuf.sv:248-259] (SPEC_DOC_ERRATA):
   //    Reading VENDOR_TEST_DIGEST_OFFSET (56) via SW_CFG_WINDOW and DAI while
   //    VENDOR_TEST_READ_LOCK == 0 fails with AccessError (whereas core CSRs
   //    VENDOR_TEST_DIGEST_0/1 succeed), and unaligned byte address in the last
   //    word of an unlocked partition succeeds.
   LOG_INFO(
-      "Verifying [ERRATA-OTP_CTRL-001] (SPEC_DOC_ERRATA): Unbuffered SW digest "
+      "Verifying [otp_ctrl_part_unbuf.sv:248-259] (SPEC_DOC_ERRATA): "
+      "Unbuffered SW digest "
       "read-lock AccessError in SW_CFG_WINDOW & DAI...");
 
   (void)abs_mmio_read32(kOtpCoreBase +
@@ -196,11 +197,11 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_11_REG_OFFSET) ==
         kOtpErrNoError);
 
-  // 4. Verify [ERRATA-OTP_CTRL-004] (INTENDED_SECURITY_HARDENING):
+  // 4. Verify [otp_ctrl.hjson:1829] (INTENDED_SECURITY_HARDENING):
   //    otp_ctrl.prim (0x40138000) u_tlul_lc_gate lc_dft_en gating and
   //    OTP_CTRL_CORE_PERMIT / OTP_CTRL_PRIM_PERMIT sub-word write faults.
   LOG_INFO(
-      "Verifying [ERRATA-OTP_CTRL-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [otp_ctrl.hjson:1829] (INTENDED_SECURITY_HARDENING): "
       "otp_ctrl.prim 0x40138000 lc_dft_en gate & PERMIT sub-word faults...");
 
   uint32_t lc_state =
@@ -236,6 +237,6 @@ bool test_main(void) {
                         OTP_CTRL_DIRECT_ACCESS_WDATA_0_REG_OFFSET) ==
         0x11223344u);
 
-  LOG_INFO("All [ERRATA-OTP_CTRL-001..004] checks confirmed!");
+  LOG_INFO("All [otp_ctrl_part_unbuf.sv:248-259..004] checks confirmed!");
   return true;
 }

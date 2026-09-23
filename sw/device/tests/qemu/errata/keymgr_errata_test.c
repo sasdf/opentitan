@@ -9,34 +9,35 @@
  * Empirically confirms the software-visible hardware errata, specification
  * discrepancies, and security hardening behaviors documented in
  * `/root/knowledge/errata/keymgr.md`:
- * - [ERRATA-KEYMGR-001] (TRUE_SILICON_ERRATA): Off-by-one stage index in
+ * - [keymgr.sv:436-464] (TRUE_SILICON_ERRATA): Off-by-one stage index in
  *   `adv_dvalid` seed validation (`keymgr.sv:436-464, 537-538`): advancing
  *   `CreatorRootKey -> OwnerIntKey` checks `owner_seed_vld` (Flash Info Page 2)
  *   instead of `creator_seed_vld` (Flash Info Page 1), setting
  *   `DEBUG.INVALID_OWNER_SEED` (bit 1) and `ERR_CODE.INVALID_KMAC_INPUT` (bit
  * 2) while preserving `WORKING_STATE = CreatorRootKey (2)` when `OwnerSeed` is
  *   all-zeros (`0x00...00`).
- * - [ERRATA-KEYMGR-002] & [ERRATA-KEYMGR-006] (INTENDED_SECURITY_HARDENING):
+ * - [keymgr.sv:369-370] & [keymgr_ctrl.sv:185] (INTENDED_SECURITY_HARDENING):
  *   `SW_BINDING_REGWEN` stays locked (`0`) when `ADVANCE` fails with
  *   `INVALID_KMAC_INPUT`, and only unlocks (`1`) after a valid `ADVANCE`
  *   succeeds (`DONE_SUCCESS`).
- * - [ERRATA-KEYMGR-003] & Companion Item 1/3 (INTENDED_SECURITY_HARDENING):
+ * - [keymgr_ctrl.sv:154] & Companion Item 1/3 (INTENDED_SECURITY_HARDENING):
  *   Unenumerated `CONTROL_SHADOWED.OPERATION` encodings (`5..7`) map to
  *   `dis_op` (`keymgr_ctrl.sv:154`), transitioning `WORKING_STATE` to
  *   `Disabled (5)` with `OP_STATUS = DONE_SUCCESS (2)` and `ERR_CODE = 0`;
  *   in `Disabled (5)`, `CFG_REGWEN` remains `1` and triggering `START = 1`
  *   completes with `OP_STATUS = DONE_ERROR (3)`, `ERR_CODE.INVALID_OP (0x1)`,
  *   and `FAULT_STATUS = 0`.
- * - [ERRATA-KEYMGR-004] (INTENDED_SECURITY_HARDENING): `SIDELOAD_CLEAR` is a
- *   continuous level-clear register (`clr_i` overrides `set_i` during
- *   `GEN_HW_OUT` while `GEN_HW_OUT` completes with `DONE_SUCCESS`).
- * - [ERRATA-KEYMGR-005] (INTENDED_SECURITY_HARDENING): `INVALID_KMAC_INPUT`
+ * - [keymgr_sideload_key_ctrl.sv:78-87] (INTENDED_SECURITY_HARDENING):
+ * `SIDELOAD_CLEAR` is a continuous level-clear register (`clr_i` overrides
+ * `set_i` during `GEN_HW_OUT` while `GEN_HW_OUT` completes with
+ * `DONE_SUCCESS`).
+ * - [keymgr_ctrl.sv:259] (INTENDED_SECURITY_HARDENING): `INVALID_KMAC_INPUT`
  *   (`KEY_VERSION > MAX_*_KEY_VER_SHADOWED`) gates `data_valid_o = 0` so
  *   `SW_SHARE0/1_OUTPUT` retains its prior key shares and `WORKING_STATE` is
  *   preserved.
- * - [ERRATA-KEYMGR-007] (INTENDED_SECURITY_HARDENING): Sub-word write (`sb`)
- *   to `KEYMGR_PERMIT` 4-byte register and read from unmapped offset `>= 0xfc`
- *   trigger synchronous TL-UL `d_error = 1` bus faults (`mcause = 7 / 5`).
+ * - [keymgr_reg_pkg.sv:472-536] (INTENDED_SECURITY_HARDENING): Sub-word write
+ * (`sb`) to `KEYMGR_PERMIT` 4-byte register and read from unmapped offset `>=
+ * 0xfc` trigger synchronous TL-UL `d_error = 1` bus faults (`mcause = 7 / 5`).
  */
 
 #include "sw/device/lib/base/abs_mmio.h"
@@ -128,8 +129,8 @@ static void program_flash_secrets_and_reboot(
   wait_for_interrupt();
 }
 
-static void run_phase1_errata_keymgr_001_and_006(void) {
-  LOG_INFO("Phase 1: Confirming [ERRATA-KEYMGR-001] & [ERRATA-KEYMGR-006]");
+static void run_phase1_keymgr_cdi_and_zero_inputs(void) {
+  LOG_INFO("Phase 1: Confirming [keymgr.sv:436-464] & [keymgr_ctrl.sv:185]");
 
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
   dif_kmac_t kmac;
@@ -159,7 +160,7 @@ static void run_phase1_errata_keymgr_001_and_006(void) {
   abs_mmio_write32(kBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0x0u);
   CHECK(abs_mmio_read32(kBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 0x0u);
 
-  // [ERRATA-KEYMGR-001]: Advance CreatorRootKey (2) -> OwnerIntKey (3).
+  // [keymgr.sv:436-464]: Advance CreatorRootKey (2) -> OwnerIntKey (3).
   // Even though CreatorRootKey -> OwnerIntKey hashes CreatorSeed (Info Page 1,
   // which is valid), `adv_dvalid[OwnerInt]` in `keymgr.sv:459-460, 538` checks
   // `owner_seed_vld` (Info Page 2, which we programmed to all-zeros
@@ -168,7 +169,7 @@ static void run_phase1_errata_keymgr_001_and_006(void) {
   //   ERR_CODE  = INVALID_KMAC_INPUT (bit 2 = 0x4)
   //   DEBUG     = INVALID_OWNER_SEED (bit 1 = 0x2)
   //   WORKING_STATE preserved at CreatorRootKey (2)
-  //   SW_BINDING_REGWEN kept locked at 0 ([ERRATA-KEYMGR-006]).
+  //   SW_BINDING_REGWEN kept locked at 0 ([keymgr_ctrl.sv:185]).
   CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
       kTopEarlgreyAlertIdKeymgrRecovOperationErr));
   uint32_t adv_ctrl = KEYMGR_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE
@@ -199,7 +200,7 @@ static void run_phase1_errata_keymgr_001_and_006(void) {
 }
 
 static void run_phase2_remaining_errata(void) {
-  LOG_INFO("Phase 2: Confirming [ERRATA-KEYMGR-002..007] with valid seeds");
+  LOG_INFO("Phase 2: Confirming [keymgr.sv:369-370..007] with valid seeds");
 
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
   dif_kmac_t kmac;
@@ -217,7 +218,7 @@ static void run_phase2_remaining_errata(void) {
         KEYMGR_WORKING_STATE_STATE_VALUE_CREATOR_ROOT_KEY);
 
   // Lock SW_BINDING_REGWEN = 0, then advance CreatorRootKey (2) -> OwnerIntKey
-  // (3) with valid OwnerSeed. Verify [ERRATA-KEYMGR-002]/[ERRATA-KEYMGR-006]
+  // (3) with valid OwnerSeed. Verify [keymgr.sv:369-370]/[keymgr_ctrl.sv:185]
   // that SW_BINDING_REGWEN unlocks back to 1 upon successful ADVANCE.
   abs_mmio_write32(kBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET, 0x0u);
   CHECK(abs_mmio_read32(kBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 0x0u);
@@ -227,8 +228,8 @@ static void run_phase2_remaining_errata(void) {
         KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_INTERMEDIATE_KEY);
   CHECK(abs_mmio_read32(kBase + KEYMGR_SW_BINDING_REGWEN_REG_OFFSET) == 0x1u);
 
-  // [ERRATA-KEYMGR-004]: SIDELOAD_CLEAR continuous level-clear behavior.
-  // Write SIDELOAD_CLEAR = 2 (KMAC) and trigger GEN_HW_OUT to KMAC.
+  // [keymgr_sideload_key_ctrl.sv:78-87]: SIDELOAD_CLEAR continuous level-clear
+  // behavior. Write SIDELOAD_CLEAR = 2 (KMAC) and trigger GEN_HW_OUT to KMAC.
   // Verify the operation succeeds (`DONE_SUCCESS`, `ERR_CODE = 0`) while
   // `SIDELOAD_CLEAR` remains latched at `2` (continuous level clear).
   abs_mmio_write32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET, 2u);
@@ -242,7 +243,7 @@ static void run_phase2_remaining_errata(void) {
         2u);
   abs_mmio_write32(kBase + KEYMGR_SIDELOAD_CLEAR_REG_OFFSET, 0u);
 
-  // [ERRATA-KEYMGR-005]: INVALID_KMAC_INPUT (`KEY_VERSION >
+  // [keymgr_ctrl.sv:259]: INVALID_KMAC_INPUT (`KEY_VERSION >
   // MAX_OWNER_INT_KEY_VER`) gates `data_valid_o = 0`, preserving
   // `SW_SHARE0/1_OUTPUT` and `WORKING_STATE`.
   abs_mmio_write32(kBase + KEYMGR_MAX_OWNER_INT_KEY_VER_SHADOWED_REG_OFFSET,
@@ -295,7 +296,7 @@ static void run_phase2_remaining_errata(void) {
   CHECK(abs_mmio_read32(kBase + KEYMGR_WORKING_STATE_REG_OFFSET) ==
         KEYMGR_WORKING_STATE_STATE_VALUE_OWNER_KEY);
 
-  // [ERRATA-KEYMGR-003] & Companion Item 1/3: Unenumerated OPERATION = 6 acts
+  // [keymgr_ctrl.sv:154] & Companion Item 1/3: Unenumerated OPERATION = 6 acts
   // as OP_DISABLE (`dis_op`), transitioning WORKING_STATE to Disabled (5) with
   // OP_STATUS = DONE_SUCCESS (2) and ERR_CODE = 0.
   uint32_t unenum_dis_ctrl = 6u << KEYMGR_CONTROL_SHADOWED_OPERATION_OFFSET;
@@ -326,9 +327,10 @@ static void run_phase2_remaining_errata(void) {
   CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
       kTopEarlgreyAlertIdKeymgrRecovOperationErr));
 
-  // [ERRATA-KEYMGR-007]: Sub-word write (`sb`) to `CONTROL_SHADOWED` (4-byte
-  // permit mask `4'b1111`) and word read from unmapped offset `0xfc` trigger
-  // synchronous TL-UL `d_error = 1` exceptions (`mcause = 7` and `mcause = 5`).
+  // [keymgr_reg_pkg.sv:472-536]: Sub-word write (`sb`) to `CONTROL_SHADOWED`
+  // (4-byte permit mask `4'b1111`) and word read from unmapped offset `0xfc`
+  // trigger synchronous TL-UL `d_error = 1` exceptions (`mcause = 7` and
+  // `mcause = 5`).
   g_fault_seen = false;
   g_fault_mcause = 0;
   abs_mmio_write8(kBase + KEYMGR_CONTROL_SHADOWED_REG_OFFSET, 0x01u);
@@ -350,13 +352,13 @@ bool test_main(void) {
   if (reset_info == kDifRstmgrResetInfoPor) {
     // On first boot (POR), program valid CreatorSecret (Info Page 1) and
     // all-zero OwnerSecret (Info Page 2), lock OTP SECRET2, and reboot into
-    // Phase 1 to empirically verify [ERRATA-KEYMGR-001] & [ERRATA-KEYMGR-006].
+    // Phase 1 to empirically verify [keymgr.sv:436-464] & [keymgr_ctrl.sv:185].
     program_flash_secrets_and_reboot(&kZeroSecret, kBootPhase1BadOwnerSeed);
     return false;
   }
 
   if (phase_magic == kBootPhase1BadOwnerSeed) {
-    run_phase1_errata_keymgr_001_and_006();
+    run_phase1_keymgr_cdi_and_zero_inputs();
     return false;
   }
 

@@ -7,7 +7,7 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `sensor_ctrl` (P28).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-SENSOR_CTRL-001] (SPEC_DOC_ERRATA):
+ * - [ast_alert.sv:44-75] (SPEC_DOC_ERRATA):
  *   1) `ALERT_TRIG` drives `ast_alert.sv:44-75`, which latches `p_alert <=
  * 1'b1` on a `1 -> 0` pulse while `ALERT_EN_0 == kMultiBitBool4False` (`0x9`),
  *      so re-enabling `ALERT_EN_0 == kMultiBitBool4True` (`0x6`) later
@@ -18,7 +18,7 @@
  *      `RECOV_ALERT[0] = 1` until `ALERT_TRIG[0]` is cleared to `0`.
  *   3) `CFG_REGWEN` (`rw0c`) locks both `FATAL_ALERT_EN` and all 11
  *      `ALERT_EN_0..10` registers (`sensor_ctrl_reg_top.sv:655-1280`).
- * - [ERRATA-SENSOR_CTRL-002] (INTENDED_SECURITY_HARDENING):
+ * - [sensor_ctrl_reg_pkg.sv:254-284] (INTENDED_SECURITY_HARDENING):
  *   `SENSOR_CTRL_PERMIT` assigns a 2-byte minimum write mask (`4'b0011`) to the
  *   11/12-bit multiregs (`ALERT_TRIG`, `FATAL_ALERT_EN`, `RECOV_ALERT`, and
  *   read-only `FATAL_ALERT`), causing 1-byte `sb` stores to fault with
@@ -60,7 +60,7 @@ enum {
 
 bool test_main(void) {
   LOG_INFO(
-      "Verifying [ERRATA-SENSOR_CTRL-001] (SPEC_DOC_ERRATA): ast_alert.sv "
+      "Verifying [ast_alert.sv:44-75] (SPEC_DOC_ERRATA): ast_alert.sv "
       "persistent ALERT_TRIG latch across 1->0 pulse & continuous re-latch...");
 
   // Disable ALERT_EN_0 (kMultiBitBool4False = 0x9) and clear RECOV_ALERT.
@@ -124,7 +124,8 @@ bool test_main(void) {
                         SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET) == 0u);
 
   LOG_INFO(
-      "Verifying [ERRATA-SENSOR_CTRL-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [sensor_ctrl_reg_pkg.sv:254-284] "
+      "(INTENDED_SECURITY_HARDENING): "
       "SENSOR_CTRL_PERMIT 4'b0011 8-bit sb faults & 0x74..0x7f addrmiss...");
 
   // 32-bit write to RO FATAL_ALERT (0x4c) succeeds with d_error=0 and is
@@ -158,6 +159,6 @@ bool test_main(void) {
   abs_mmio_write32(kSensorCtrlBase + 0x7cu, 0x1u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault);
 
-  LOG_INFO("All [ERRATA-SENSOR_CTRL-001..002] checks confirmed!");
+  LOG_INFO("All [ast_alert.sv:44-75..002] checks confirmed!");
   return true;
 }

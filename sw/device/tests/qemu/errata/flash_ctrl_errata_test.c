@@ -9,27 +9,28 @@
  * Empirically confirms all software-visible hardware errata, specification
  * discrepancies, and security hardening behaviors documented in
  * `/root/knowledge/errata/flash_ctrl.md`:
- * - [ERRATA-FLASH_CTRL-001] (TRUE_SILICON_ERRATA): `ERR_ADDR` (`0x188`) is
+ * - [flash_ctrl.sv:1084-1086] (TRUE_SILICON_ERRATA): `ERR_ADDR` (`0x188`) is
  *   omitted from `hw2reg.err_addr.de` on `PROG_WIN_ERR` and `PROG_TYPE_ERR`
  *   (`flash_ctrl.sv:1083-1086`), retaining the previous error address despite
  *   `flash_ctrl.hjson` and `programmers_guide.md` instructing software to read
  *   `ERR_ADDR`.
- * - [ERRATA-FLASH_CTRL-002] (TRUE_SILICON_ERRATA): Single-word controller read
+ * - [flash_ctrl_rd.sv:96-102] (TRUE_SILICON_ERRATA): Single-word controller
+ * read
  *   (`CONTROL.NUM = 0`) `op_err_addr_o` 1-cycle pipeline hazard
  *   (`flash_ctrl_rd.sv:96-102, 135-147`): when a 1-word read faults with
  *   `MP_ERR`, `ERR_ADDR` latches the *previous* read error address while
  *   `op_err_addr_o` updates for the next read failure.
- * - [ERRATA-FLASH_CTRL-003] & [ERRATA-FLASH_CTRL-011] (SPEC_DOC_ERRATA):
+ * - [flash_ctrl_erase.sv:58-62] & [flash_ctrl.sv:1159-1160] (SPEC_DOC_ERRATA):
  *   `FlashOpErase` masks `ERR_ADDR` to 2 KiB page (`~0x7ff`) or 512 KiB bank
  *   (`~0x7ffff`) boundaries (`flash_ctrl_erase.sv:58-62`), and
  *   `INTR_STATE.CORR_ERR` (`bit 5`) never asserts on `ERR_CODE` controller
  *   errors (`flash_ctrl.sv:1159-1160`).
- * - [ERRATA-FLASH_CTRL-004] (SPEC_DOC_ERRATA): `PROG_WIN_ERR` and
+ * - [flash_ctrl_prog.sv:128-130] (SPEC_DOC_ERRATA): `PROG_WIN_ERR` and
  *   `PROG_TYPE_ERR` assert simultaneously and hold `flash_ctrl_prog` in
  *   `StErr` (`OP_STATUS.DONE = 0`, `CONTROL.START = 1`, `CTRL_REGWEN = 0`)
  *   until `CONTROL.NUM + 1` dummy words are pushed to `PROG_FIFO`.
- * - [ERRATA-FLASH_CTRL-005] (INTENDED_SECURITY_HARDENING) &
- *   [ERRATA-FLASH_CTRL-006] (TRUE_SILICON_ERRATA):
+ * - [flash_ctrl.sv:621-671] (INTENDED_SECURITY_HARDENING) &
+ *   [tlul_adapter_sram.sv:340-350] (TRUE_SILICON_ERRATA):
  *   Reading `RD_FIFO` (`0x1b4`) when empty/no-op outputs `39'h0` (`data_intg =
  *   7'h0 != 7'h39`), triggering both `LoadAccessFault` (`mcause = 5`) and an
  *   Ibex `load_resp_intg_err_o` NMI (`mcause = 0xffffffe0`); similarly, any
@@ -38,13 +39,14 @@
  *   `tlul_adapter_sram.sv:340-350`), triggering both `StoreAccessFault`
  *   (`mcause = 7`) and an Ibex `store_resp_intg_err_o` NMI (`mcause =
  *   0xffffffe0`) + `RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR`.
- * - [ERRATA-FLASH_CTRL-007..010] (INTENDED_SECURITY_HARDENING): `PROG_FIFO`
+ * - [flash_ctrl.sv:524-552..010] (INTENDED_SECURITY_HARDENING): `PROG_FIFO`
  *   (`ErrOnRead=1`, `.ByteAccess(0)`), `RD_FIFO` (`ErrOnWrite=1` without NMI),
  *   and CSR `PERMIT` sub-word write faults (`mcause = 5 / 7`).
- * - [ERRATA-FLASH_CTRL-012] (SPEC_DOC_ERRATA): `flash_ctrl_prim` `CSR2`
+ * - [flash_ctrl_prim_reg_top.sv:355-570] (SPEC_DOC_ERRATA): `flash_ctrl_prim`
+ * `CSR2`
  * (`0x08`) bypasses `CSR0_REGWEN` (`0x00`) after `CSR0_REGWEN` is locked to
  * `0`.
- * - [ERRATA-FLASH_CTRL-013] (SPEC_DOC_ERRATA): Level-sensitive `FIFO_RST`
+ * - [flash_ctrl.sv:560] (SPEC_DOC_ERRATA): Level-sensitive `FIFO_RST`
  *   holds `RD_FIFO` empty (`CURR_FIFO_LVL.RD == 0`) during `OP_READ`.
  */
 
@@ -130,11 +132,11 @@ bool test_main(void) {
       "=== OpenTitan Earlgrey FLASH_CTRL Errata Confirmation Suite (P09) ===");
 
   // ---------------------------------------------------------------------------
-  // 1. [ERRATA-FLASH_CTRL-002] (TRUE_SILICON_ERRATA): Single-word read
+  // 1. [flash_ctrl_rd.sv:96-102] (TRUE_SILICON_ERRATA): Single-word read
   //    (`CONTROL.NUM = 0`) `op_err_addr_o` 1-cycle pipeline hazard.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-002] (TRUE_SILICON_ERRATA): NUM=0 1-word "
+      "Verifying [flash_ctrl_rd.sv:96-102] (TRUE_SILICON_ERRATA): NUM=0 1-word "
       "read ERR_ADDR pipeline hazard");
   // Ensure Bank 1 Data region (`0x80000..0xfffff`) is disabled (`MP_ERR`).
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_MP_REGION_CFG_7_REG_OFFSET, 0u);
@@ -168,14 +170,14 @@ bool test_main(void) {
         0x8345cu);
 
   // ---------------------------------------------------------------------------
-  // 2. [ERRATA-FLASH_CTRL-001] (TRUE_SILICON_ERRATA) &
-  //    [ERRATA-FLASH_CTRL-004] (SPEC_DOC_ERRATA):
+  // 2. [flash_ctrl.sv:1084-1086] (TRUE_SILICON_ERRATA) &
+  //    [flash_ctrl_prog.sv:128-130] (SPEC_DOC_ERRATA):
   //    `PROG_WIN_ERR` and `PROG_TYPE_ERR` assert simultaneously, hold
   //    `flash_ctrl_prog` in `StErr` until `NUM + 1` dummy words are pushed to
   //    `PROG_FIFO`, and NEVER update `ERR_ADDR` (`0x188`).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-001] & [ERRATA-FLASH_CTRL-004]: "
+      "Verifying [flash_ctrl.sv:1084-1086] & [flash_ctrl_prog.sv:128-130]: "
       "PROG_WIN_ERR + PROG_TYPE_ERR StErr drain & ERR_ADDR omission");
   clear_flash_status();
   CHECK_STATUS_OK(
@@ -193,9 +195,9 @@ bool test_main(void) {
       bitfield_field32_write(0u, FLASH_CTRL_CONTROL_NUM_FIELD, 1u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_CONTROL_REG_OFFSET, prog_ctrl);
 
-  // Verify [ERRATA-FLASH_CTRL-004]: Both PROG_WIN_ERR and PROG_TYPE_ERR assert
-  // immediately, and `flash_ctrl_prog` stays in `StErr` (`OP_STATUS.DONE == 0`,
-  // `CTRL_REGWEN == 0`) until `NUM + 1 = 2` dummy words are pushed to
+  // Verify [flash_ctrl_prog.sv:128-130]: Both PROG_WIN_ERR and PROG_TYPE_ERR
+  // assert immediately, and `flash_ctrl_prog` stays in `StErr` (`OP_STATUS.DONE
+  // == 0`, `CTRL_REGWEN == 0`) until `NUM + 1 = 2` dummy words are pushed to
   // PROG_FIFO.
   uint32_t err_code =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET);
@@ -216,8 +218,8 @@ bool test_main(void) {
   CHECK(prog_st == ((1u << FLASH_CTRL_OP_STATUS_DONE_BIT) |
                     (1u << FLASH_CTRL_OP_STATUS_ERR_BIT)));
 
-  // Verify [ERRATA-FLASH_CTRL-001]: `ERR_ADDR` was NOT updated to `0x80ffc` and
-  // still holds `0x8345c` from Step 1d!
+  // Verify [flash_ctrl.sv:1084-1086]: `ERR_ADDR` was NOT updated to `0x80ffc`
+  // and still holds `0x8345c` from Step 1d!
   CHECK(abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET) ==
         0x8345cu);
   clear_flash_status();
@@ -225,12 +227,14 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
   // ---------------------------------------------------------------------------
-  // 3. [ERRATA-FLASH_CTRL-003] & [ERRATA-FLASH_CTRL-011] (SPEC_DOC_ERRATA):
+  // 3. [flash_ctrl_erase.sv:58-62] & [flash_ctrl.sv:1159-1160]
+  // (SPEC_DOC_ERRATA):
   //    Page/Bank Erase masks `ERR_ADDR` to `~0x7ff` / `~0x7ffff`, and
   //    `INTR_STATE.CORR_ERR` never asserts on `ERR_CODE` errors.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-003] & [ERRATA-FLASH_CTRL-011]: Erase "
+      "Verifying [flash_ctrl_erase.sv:58-62] & [flash_ctrl.sv:1159-1160]: "
+      "Erase "
       "ERR_ADDR masking & CORR_ERR exclusion");
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdFlashCtrlRecovErr));
@@ -268,8 +272,8 @@ bool test_main(void) {
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
   // ---------------------------------------------------------------------------
-  // 4. [ERRATA-FLASH_CTRL-005] (INTENDED_SECURITY_HARDENING) &
-  //    [ERRATA-FLASH_CTRL-006] (TRUE_SILICON_ERRATA):
+  // 4. [flash_ctrl.sv:621-671] (INTENDED_SECURITY_HARDENING) &
+  //    [tlul_adapter_sram.sv:340-350] (TRUE_SILICON_ERRATA):
   //    - Empty/No-Op read of `RD_FIFO` (`0x1b4`) outputs `39'h0` (`data_intg =
   //    0`)
   //      -> triggers `LoadAccessFault` (`mcause = 5`) + Load Integrity NMI
@@ -279,7 +283,8 @@ bool test_main(void) {
   //      Store Integrity NMI (`mcause = 0xffffffe0`).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-005] & [ERRATA-FLASH_CTRL-006]: RD_FIFO "
+      "Verifying [flash_ctrl.sv:621-671] & [tlul_adapter_sram.sv:340-350]: "
+      "RD_FIFO "
       "empty read & eFlash store Bus Integrity NMI");
   CHECK_STATUS_OK(
       ottf_alerts_ignore_alert(kTopEarlgreyAlertIdRvCoreIbexFatalHwErr));
@@ -295,14 +300,14 @@ bool test_main(void) {
   CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
 
   // ---------------------------------------------------------------------------
-  // 5. [ERRATA-FLASH_CTRL-007..010] (INTENDED_SECURITY_HARDENING):
+  // 5. [flash_ctrl.sv:524-552..010] (INTENDED_SECURITY_HARDENING):
   //    - Write to `RD_FIFO` (`0x1b4`) -> `StoreAccessFault` (`mcause = 7`).
   //    - Read from `PROG_FIFO` (`0x1b0`) -> `LoadAccessFault` (`mcause = 5`).
   //    - Sub-word write (`sb`) to `PROG_FIFO` (`0x1b0`) and `CONTROL` (`0x20`)
   //      -> `StoreAccessFault` (`mcause = 7`).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-007..010]: PROG_FIFO/RD_FIFO & CSR PERMIT "
+      "Verifying [flash_ctrl.sv:524-552..010]: PROG_FIFO/RD_FIFO & CSR PERMIT "
       "TL-UL access faults");
   g_fault_count = 0;
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_RD_FIFO_REG_OFFSET, 0x12345678u);
@@ -325,11 +330,13 @@ bool test_main(void) {
   CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
 
   // ---------------------------------------------------------------------------
-  // 6. [ERRATA-FLASH_CTRL-012] (SPEC_DOC_ERRATA): `flash_ctrl_prim` `CSR2`
+  // 6. [flash_ctrl_prim_reg_top.sv:355-570] (SPEC_DOC_ERRATA):
+  // `flash_ctrl_prim` `CSR2`
   //    (`0x08`) bypasses `CSR0_REGWEN` (`0x00`) after `CSR0_REGWEN` is locked.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-012]: flash_ctrl_prim CSR2 bypasses "
+      "Verifying [flash_ctrl_prim_reg_top.sv:355-570]: flash_ctrl_prim CSR2 "
+      "bypasses "
       "CSR0_REGWEN");
   abs_mmio_write32(kFlashPrimBase + 0x04u, 0x123u);  // CSR1
   CHECK(abs_mmio_read32(kFlashPrimBase + 0x04u) == 0x123u);
@@ -344,11 +351,11 @@ bool test_main(void) {
   CHECK((abs_mmio_read32(kFlashPrimBase + 0x08u) & 0x88u) == 0x00u);
 
   // ---------------------------------------------------------------------------
-  // 7. [ERRATA-FLASH_CTRL-013] (SPEC_DOC_ERRATA): Level-sensitive `FIFO_RST`
+  // 7. [flash_ctrl.sv:560] (SPEC_DOC_ERRATA): Level-sensitive `FIFO_RST`
   //    holds `RD_FIFO` empty (`CURR_FIFO_LVL.RD == 0`) during `OP_READ`.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-FLASH_CTRL-013]: Level-sensitive FIFO_RST holds "
+      "Verifying [flash_ctrl.sv:560]: Level-sensitive FIFO_RST holds "
       "RD_FIFO empty during OP_READ");
   const uint32_t kInfoCfgAllowRead =
       bitfield_field32_write(0u, FLASH_CTRL_MP_REGION_CFG_7_EN_7_FIELD,

@@ -12,40 +12,42 @@
  * physical CW340 FPGA silicon (`fpga_cw340_rom_with_fake_keys`) and QEMU
  * (`sim_qemu_rom_with_fake_keys`):
  *
- * - `[ERRATA-AES-001]` (`TRUE_SILICON_ERRATA`): `TRIGGER.DATA_OUT_CLEAR` sets
- *   `STATUS.OUTPUT_LOST = 1` whenever `STATUS.OUTPUT_VALID == 1`
+ * - `[aes_control_fsm.sv:762]` (`TRUE_SILICON_ERRATA`):
+ * `TRIGGER.DATA_OUT_CLEAR` sets `STATUS.OUTPUT_LOST = 1` whenever
+ * `STATUS.OUTPUT_VALID == 1`
  * (`aes_control_fsm.sv:757-762` `output_lost_we = ctrl_we_o | data_out_we_o`
  * omits `& ~data_out_clear_we`), even when `MANUAL_OPERATION == 0`.
- * - `[ERRATA-AES-002]` (`INTENDED_SECURITY_HARDENING`): `CTRL_SHADOWED`
- *   pre-shadow sparse field sanitization (`aes_ctrl_reg_shadowed.sv:75-120`)
- *   resolves invalid `OPERATION`, `MODE`, `KEY_LEN`, and `PRNG_RESEED_RATE`
- *   encodings into `ctrl_wd = 0x1481` before `prim_subreg_shadow`, so writing
- *   two distinct invalid values (`0x0000` then `0x00ff`) commits `0x1481`
- *   without triggering `STATUS.ALERT_RECOV_CTRL_UPDATE_ERR`.
- * - `[ERRATA-AES-003]` (`TRUE_SILICON_ERRATA` / `INTENDED_SECURITY_HARDENING`):
- *   The first (staged) write and update-error write to `CTRL_SHADOWED`
- *   immediately assert `qe_o` / `ctrl_we_o` (`aes_ctrl_reg_shadowed.sv:70-74`,
- *   `aes_control_fsm.sv:338-343, 698-762`), clearing `STATUS.OUTPUT_VALID`,
- *   `STATUS.OUTPUT_LOST`, and `DATA_IN` tracking (`STATUS.INPUT_READY = 1`)
- *   before the shadow register commits.
- * - `[ERRATA-AES-004]` (`INTENDED_SECURITY_HARDENING`): `aes_reg_status`
- *   arming (`armed_q = 1`, `aes_reg_status.sv:31-78`) requires all 16
- *   `KEY_SHARE` words (`8` per share, even in `AES-128` / `AES-192` modes)
+ * - `[aes_ctrl_reg_shadowed.sv:75-120]` (`INTENDED_SECURITY_HARDENING`):
+ * `CTRL_SHADOWED` pre-shadow sparse field sanitization
+ * (`aes_ctrl_reg_shadowed.sv:75-120`) resolves invalid `OPERATION`, `MODE`,
+ * `KEY_LEN`, and `PRNG_RESEED_RATE` encodings into `ctrl_wd = 0x1481` before
+ * `prim_subreg_shadow`, so writing two distinct invalid values (`0x0000` then
+ * `0x00ff`) commits `0x1481` without triggering
+ * `STATUS.ALERT_RECOV_CTRL_UPDATE_ERR`.
+ * - `[aes_ctrl_reg_shadowed.sv:70-74]` (`TRUE_SILICON_ERRATA` /
+ * `INTENDED_SECURITY_HARDENING`): The first (staged) write and update-error
+ * write to `CTRL_SHADOWED` immediately assert `qe_o` / `ctrl_we_o`
+ * (`aes_ctrl_reg_shadowed.sv:70-74`, `aes_control_fsm.sv:338-343, 698-762`),
+ * clearing `STATUS.OUTPUT_VALID`, `STATUS.OUTPUT_LOST`, and `DATA_IN` tracking
+ * (`STATUS.INPUT_READY = 1`) before the shadow register commits.
+ * - `[aes_reg_status.sv:31-78]` (`INTENDED_SECURITY_HARDENING`):
+ * `aes_reg_status` arming (`armed_q = 1`, `aes_reg_status.sv:31-78`) requires
+ * all 16 `KEY_SHARE` words (`8` per share, even in `AES-128` / `AES-192` modes)
  *   and resets the readiness bitmap to a single bit on any partial word write.
- * - `[ERRATA-AES-005]` (`E2` — In-Place `DATA_IN_0..3` Single-Word Overwrite
- *   Before `CTRL_LOAD`): `DATA_IN_0..3` writes are never gated by `STATUS.IDLE`
- *   or `STATUS.INPUT_READY`; overwriting a single `DATA_IN_0` word while
- *   `STATUS.INPUT_READY == 0` updates the pending block in place without
+ * - `[aes_core.sv:280-285]` (`E2` — In-Place `DATA_IN_0..3` Single-Word
+ * Overwrite Before `CTRL_LOAD`): `DATA_IN_0..3` writes are never gated by
+ * `STATUS.IDLE` or `STATUS.INPUT_READY`; overwriting a single `DATA_IN_0` word
+ * while `STATUS.INPUT_READY == 0` updates the pending block in place without
  *   resetting `data_in_new_q`.
- * - `[ERRATA-AES-006]` (`SPEC_DOC_ERRATA`): While `TRIGGER.PRNG_RESEED` is
- *   pending (`STATUS.IDLE == 0`), `aes_control_fsm.sv:317-335` gates off
- *   `KEY_SHARE`, `IV`, and `CTRL_SHADOWED` writes (silently dropping them)
- *   while accepting `DATA_IN_0..3` writes.
- * - `[ERRATA-AES-007]` (`INTENDED_SECURITY_HARDENING`): 3-tier `AES_PERMIT[34]`
- *   byte-enable masks (`4'b1111` on `KEY_SHARE`/`IV`/`DATA_IN`/`DATA_OUT`,
- *   `4'b0011` on `CTRL_SHADOWED`, `4'b0001` on `CTRL_AUX_SHADOWED`/`TRIGGER`)
- *   raise synchronous Store Access Fault (`mcause = 7`) on narrower sub-word
- *   writes.
+ * - `[aes_control_fsm.sv:317-335]` (`SPEC_DOC_ERRATA`): While
+ * `TRIGGER.PRNG_RESEED` is pending (`STATUS.IDLE == 0`),
+ * `aes_control_fsm.sv:317-335` gates off `KEY_SHARE`, `IV`, and `CTRL_SHADOWED`
+ * writes (silently dropping them) while accepting `DATA_IN_0..3` writes.
+ * - `[aes_reg_pkg.sv:377-412]` (`INTENDED_SECURITY_HARDENING`): 3-tier
+ * `AES_PERMIT[34]` byte-enable masks (`4'b1111` on
+ * `KEY_SHARE`/`IV`/`DATA_IN`/`DATA_OUT`, `4'b0011` on `CTRL_SHADOWED`,
+ * `4'b0001` on `CTRL_AUX_SHADOWED`/`TRIGGER`) raise synchronous Store Access
+ * Fault (`mcause = 7`) on narrower sub-word writes.
  */
 
 #include <stdbool.h>
@@ -145,12 +147,12 @@ bool test_main(void) {
   wait_aes_idle();
 
   // =========================================================================
-  // Check 1: [ERRATA-AES-001] (TRUE_SILICON_ERRATA)
+  // Check 1: [aes_control_fsm.sv:762] (TRUE_SILICON_ERRATA)
   // `TRIGGER.DATA_OUT_CLEAR` sets `STATUS.OUTPUT_LOST = 1` whenever
   // `STATUS.OUTPUT_VALID == 1`, even when `MANUAL_OPERATION == 0`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-001] (TRUE_SILICON_ERRATA): "
+      "Verifying [aes_control_fsm.sv:762] (TRUE_SILICON_ERRATA): "
       "TRIGGER.DATA_OUT_CLEAR sets STATUS.OUTPUT_LOST=1 when OUTPUT_VALID==1 "
       "even with MANUAL_OPERATION=0...");
   uint32_t ctrl_auto_ecb128 =
@@ -176,7 +178,8 @@ bool test_main(void) {
   uint32_t status_before_clear =
       abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((status_before_clear & (1u << AES_STATUS_OUTPUT_LOST_BIT)) == 0u,
-        "[ERRATA-AES-001] Expected OUTPUT_LOST == 0 before DATA_OUT_CLEAR");
+        "[aes_control_fsm.sv:762] Expected OUTPUT_LOST == 0 before "
+        "DATA_OUT_CLEAR");
 
   // Issue TRIGGER.DATA_OUT_CLEAR while OUTPUT_VALID == 1 without reading
   // DATA_OUT_0..3.
@@ -186,23 +189,25 @@ bool test_main(void) {
   uint32_t status_after_clear =
       abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((status_after_clear & (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u,
-        "[ERRATA-AES-001] Expected OUTPUT_VALID == 0 after DATA_OUT_CLEAR, "
+        "[aes_control_fsm.sv:762] Expected OUTPUT_VALID == 0 after "
+        "DATA_OUT_CLEAR, "
         "got 0x%08x",
         status_after_clear);
   CHECK((status_after_clear & (1u << AES_STATUS_OUTPUT_LOST_BIT)) != 0u,
-        "[ERRATA-AES-001] Expected OUTPUT_LOST == 1 after DATA_OUT_CLEAR while "
+        "[aes_control_fsm.sv:762] Expected OUTPUT_LOST == 1 after "
+        "DATA_OUT_CLEAR while "
         "OUTPUT_VALID == 1 in MANUAL_OPERATION=0 mode, got 0x%08x",
         status_after_clear);
 
   // =========================================================================
-  // Check 2: [ERRATA-AES-003] (TRUE_SILICON_ERRATA /
+  // Check 2: [aes_ctrl_reg_shadowed.sv:70-74] (TRUE_SILICON_ERRATA /
   // INTENDED_SECURITY_HARDENING) First (staged) write and update-error write to
   // `CTRL_SHADOWED` immediately assert `ctrl_we_o`, clearing
   // `STATUS.OUTPUT_LOST` and `STATUS.OUTPUT_VALID` before the shadow register
   // commits.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-003] (TRUE_SILICON_ERRATA): "
+      "Verifying [aes_ctrl_reg_shadowed.sv:70-74] (TRUE_SILICON_ERRATA): "
       "First (staged) write and update-error write to CTRL_SHADOWED "
       "immediately clear STATUS.OUTPUT_LOST and STATUS.OUTPUT_VALID...");
   // Issue ONLY the 1st (staged) write to CTRL_SHADOWED while OUTPUT_LOST == 1:
@@ -211,7 +216,8 @@ bool test_main(void) {
   uint32_t status_after_staged_ctrl =
       abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((status_after_staged_ctrl & (1u << AES_STATUS_OUTPUT_LOST_BIT)) == 0u,
-        "[ERRATA-AES-003] Expected 1st (staged) CTRL_SHADOWED write to clear "
+        "[aes_ctrl_reg_shadowed.sv:70-74] Expected 1st (staged) CTRL_SHADOWED "
+        "write to clear "
         "OUTPUT_LOST immediately, got 0x%08x",
         status_after_staged_ctrl);
   // Complete the 2nd matching write to commit CTRL_SHADOWED:
@@ -239,7 +245,8 @@ bool test_main(void) {
   wait_aes_idle();
   uint32_t status_staged_ov = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((status_staged_ov & (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u,
-        "[ERRATA-AES-003] Expected 1st (staged) CTRL_SHADOWED write to clear "
+        "[aes_ctrl_reg_shadowed.sv:70-74] Expected 1st (staged) CTRL_SHADOWED "
+        "write to clear "
         "OUTPUT_VALID immediately, got 0x%08x",
         status_staged_ov);
   // Mismatched 2nd write -> shadow update error:
@@ -251,19 +258,21 @@ bool test_main(void) {
       abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((status_err_update &
          (1u << AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT)) != 0u,
-        "[ERRATA-AES-003] Expected ALERT_RECOV_CTRL_UPDATE_ERR == 1 after "
+        "[aes_ctrl_reg_shadowed.sv:70-74] Expected ALERT_RECOV_CTRL_UPDATE_ERR "
+        "== 1 after "
         "mismatched 2nd write, got 0x%08x",
         status_err_update);
 
   // =========================================================================
-  // Check 3: [ERRATA-AES-002] (INTENDED_SECURITY_HARDENING)
+  // Check 3: [aes_ctrl_reg_shadowed.sv:75-120] (INTENDED_SECURITY_HARDENING)
   // `CTRL_SHADOWED` pre-shadow sparse sanitization maps two distinct invalid
   // encodings (`0x0000` on Phase 1 and `0x00ff` on Phase 2) to `0x1481` before
   // `prim_subreg_shadow`, committing `0x1481` without raising
   // `ALERT_RECOV_CTRL_UPDATE_ERR`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [aes_ctrl_reg_shadowed.sv:75-120] "
+      "(INTENDED_SECURITY_HARDENING): "
       "Pre-shadow sparse sanitization commits 0x1481 on mismatched invalid "
       "writes (0x0000 then 0x00ff) without shadow update error...");
   abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, 0x0000u);
@@ -273,27 +282,30 @@ bool test_main(void) {
       abs_mmio_read32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET);
   uint32_t status_sanitized = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK(sanitized_ctrl == 0x1481u,
-        "[ERRATA-AES-002] Expected sanitized CTRL_SHADOWED == 0x1481, got "
+        "[aes_ctrl_reg_shadowed.sv:75-120] Expected sanitized CTRL_SHADOWED == "
+        "0x1481, got "
         "0x%08x",
         sanitized_ctrl);
   CHECK((status_sanitized &
          (1u << AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT)) == 0u,
-        "[ERRATA-AES-002] Expected ALERT_RECOV_CTRL_UPDATE_ERR == 0 after "
+        "[aes_ctrl_reg_shadowed.sv:75-120] Expected "
+        "ALERT_RECOV_CTRL_UPDATE_ERR == 0 after "
         "pre-shadow sanitized writes, got 0x%08x",
         status_sanitized);
 
   // =========================================================================
-  // Check 4 & Check 5: [ERRATA-AES-004] & [ERRATA-AES-005]
-  // - [ERRATA-AES-004]: `aes_reg_status` arming forces all 16 `KEY_SHARE` words
+  // Check 4 & Check 5: [aes_reg_status.sv:31-78] & [aes_core.sv:280-285]
+  // - [aes_reg_status.sv:31-78]: `aes_reg_status` arming forces all 16
+  // `KEY_SHARE` words
   //   (`8` per share, even in `AES-128` mode) to be written and resets the
   //   readiness bitmap on any single-word write.
-  // - [ERRATA-AES-005]: Overwriting a single `DATA_IN_0` word while
+  // - [aes_core.sv:280-285]: Overwriting a single `DATA_IN_0` word while
   //   `STATUS.INPUT_READY == 0` (before `CTRL_LOAD`) updates the plaintext
   //   block in place without resetting `data_in_new_q`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-004] (INTENDED_SECURITY_HARDENING) & "
-      "[ERRATA-AES-005] (IN-PLACE DATA_IN OVERWRITE): "
+      "Verifying [aes_reg_status.sv:31-78] (INTENDED_SECURITY_HARDENING) & "
+      "[aes_core.sv:280-285] (IN-PLACE DATA_IN OVERWRITE): "
       "Armed 16-word KEY_SHARE tracking & single-word DATA_IN_0 overwrite...");
   write_ctrl_shadowed(ctrl_auto_ecb128);
   for (uint32_t i = 0; i < 8u; ++i) {
@@ -313,7 +325,8 @@ bool test_main(void) {
     uint32_t ct =
         abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4u);
     CHECK(ct == kExpectedCipher128[i],
-          "[ERRATA-AES-004] Initial AES-128 block word %u mismatch: got 0x%08x",
+          "[aes_reg_status.sv:31-78] Initial AES-128 block word %u mismatch: "
+          "got 0x%08x",
           i, ct);
   }
 
@@ -329,21 +342,23 @@ bool test_main(void) {
   wait_aes_idle();
   uint32_t st_partial_key = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((st_partial_key & (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u,
-        "[ERRATA-AES-004] Expected OUTPUT_VALID == 0 after 1-word KEY_SHARE0_0 "
+        "[aes_reg_status.sv:31-78] Expected OUTPUT_VALID == 0 after 1-word "
+        "KEY_SHARE0_0 "
         "write, got 0x%08x",
         st_partial_key);
   CHECK((st_partial_key & (1u << AES_STATUS_INPUT_READY_BIT)) == 0u,
-        "[ERRATA-AES-005] Expected INPUT_READY == 0 while 4 DATA_IN words are "
+        "[aes_core.sv:280-285] Expected INPUT_READY == 0 while 4 DATA_IN words "
+        "are "
         "buffered waiting for KEY_SHARE, got 0x%08x",
         st_partial_key);
 
-  // [ERRATA-AES-005]: While `STATUS.INPUT_READY == 0`, overwrite ONLY
+  // [aes_core.sv:280-285]: While `STATUS.INPUT_READY == 0`, overwrite ONLY
   // `DATA_IN_0` with the true `kPlaintext128[0]` (without rewriting
   // `DATA_IN_1..3`).
   abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET, kPlaintext128[0]);
 
-  // [ERRATA-AES-004]: Write `KEY_SHARE0_1..7` and only the lower 4 words
-  // `KEY_SHARE1_0..3` (enough for a 128-bit key, but omitting upper words
+  // [aes_reg_status.sv:31-78]: Write `KEY_SHARE0_1..7` and only the lower 4
+  // words `KEY_SHARE1_0..3` (enough for a 128-bit key, but omitting upper words
   // `KEY_SHARE1_4..7`). Verify automatic encryption STILL does not start
   // because `u_reg_status_key_init` has `Width = 16` independent of `KEY_LEN`!
   for (uint32_t i = 1; i < 8u; ++i) {
@@ -356,7 +371,8 @@ bool test_main(void) {
   wait_aes_idle();
   uint32_t st_12words = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((st_12words & (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u,
-        "[ERRATA-AES-004] Expected OUTPUT_VALID == 0 when KEY_SHARE1_4..7 are "
+        "[aes_reg_status.sv:31-78] Expected OUTPUT_VALID == 0 when "
+        "KEY_SHARE1_4..7 are "
         "unwritten in AES-128 mode, got 0x%08x",
         st_12words);
 
@@ -371,19 +387,20 @@ bool test_main(void) {
     uint32_t ct =
         abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4u);
     CHECK(ct == kExpectedCipher128[i],
-          "[ERRATA-AES-004/005] Post-16-word key & in-place DATA_IN_0 "
+          "[aes_reg_status.sv:31-78 / aes_core.sv:280-285] Post-16-word key & "
+          "in-place DATA_IN_0 "
           "overwrite word %u mismatch: got 0x%08x",
           i, ct);
   }
 
   // =========================================================================
-  // Check 6: [ERRATA-AES-006] (SPEC_DOC_ERRATA)
+  // Check 6: [aes_control_fsm.sv:317-335] (SPEC_DOC_ERRATA)
   // While `TRIGGER.PRNG_RESEED` is pending (`STATUS.IDLE == 0`), writes to
   // `KEY_SHARE`, `IV`, and `CTRL_SHADOWED` are silently dropped, whereas writes
   // to `DATA_IN_0..3` are accepted.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-006] (SPEC_DOC_ERRATA): "
+      "Verifying [aes_control_fsm.sv:317-335] (SPEC_DOC_ERRATA): "
       "Pending TRIGGER.PRNG_RESEED (STATUS.IDLE==0) drops KEY_SHARE, IV, and "
       "CTRL_SHADOWED writes while accepting DATA_IN_0..3 writes...");
   uint32_t ctrl_manual_cbc128 =
@@ -423,7 +440,7 @@ bool test_main(void) {
                    1u << AES_TRIGGER_PRNG_RESEED_BIT);
   uint32_t st_reseed = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((st_reseed & (1u << AES_STATUS_IDLE_BIT)) == 0u,
-        "[ERRATA-AES-006] Expected STATUS.IDLE == 0 during stalled "
+        "[aes_control_fsm.sv:317-335] Expected STATUS.IDLE == 0 during stalled "
         "PRNG_RESEED, got 0x%08x",
         st_reseed);
 
@@ -464,23 +481,26 @@ bool test_main(void) {
   for (uint32_t i = 0; i < 4u; ++i) {
     uint32_t iv_got = abs_mmio_read32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u);
     CHECK(iv_got == kKnownIv[i],
-          "[ERRATA-AES-006] IV_%u write while IDLE==0 must be ignored: got "
+          "[aes_control_fsm.sv:317-335] IV_%u write while IDLE==0 must be "
+          "ignored: got "
           "0x%08x",
           i, iv_got);
   }
   uint32_t ctrl_got = abs_mmio_read32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET);
   CHECK(ctrl_got == ctrl_manual_cbc128,
-        "[ERRATA-AES-006] CTRL_SHADOWED write while IDLE==0 must be ignored: "
+        "[aes_control_fsm.sv:317-335] CTRL_SHADOWED write while IDLE==0 must "
+        "be ignored: "
         "got 0x%08x",
         ctrl_got);
   uint32_t st_after_reseed = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((st_after_reseed & (1u << AES_STATUS_INPUT_READY_BIT)) == 0u,
-        "[ERRATA-AES-006] Expected INPUT_READY == 0 proving DATA_IN_0..3 "
+        "[aes_control_fsm.sv:317-335] Expected INPUT_READY == 0 proving "
+        "DATA_IN_0..3 "
         "writes were accepted while IDLE == 0, got 0x%08x",
         st_after_reseed);
 
   // =========================================================================
-  // Check 7: [ERRATA-AES-007] (INTENDED_SECURITY_HARDENING)
+  // Check 7: [aes_reg_pkg.sv:377-412] (INTENDED_SECURITY_HARDENING)
   // 3-tier `AES_PERMIT[34]` byte-enable masks (`4'b1111`, `4'b0011`,
   // `4'b0001`):
   // - 8-bit `sb` write to `CTRL_SHADOWED` (`0x74`, permit `4'b0011`) faults
@@ -492,26 +512,30 @@ bool test_main(void) {
   //   succeed without fault.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-AES-007] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [aes_reg_pkg.sv:377-412] (INTENDED_SECURITY_HARDENING): "
       "3-tier AES_PERMIT sub-word write faults (mcause=7) vs permitted "
       "widths...");
   g_fault_count = 0;
   g_last_mcause = 0;
   abs_mmio_write8(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, 0x01u);
   CHECK(g_fault_count == 1u,
-        "[ERRATA-AES-007] Expected 8-bit write to CTRL_SHADOWED (0x74) to "
+        "[aes_reg_pkg.sv:377-412] Expected 8-bit write to CTRL_SHADOWED (0x74) "
+        "to "
         "fault");
   CHECK(g_last_mcause == 7u,
-        "[ERRATA-AES-007] Expected Store Access Fault (mcause=7), got 0x%08x",
+        "[aes_reg_pkg.sv:377-412] Expected Store Access Fault (mcause=7), got "
+        "0x%08x",
         g_last_mcause);
 
   g_fault_count = 0;
   g_last_mcause = 0;
   *(volatile uint16_t *)(kAesBase + AES_IV_0_REG_OFFSET) = 0x1234u;
-  CHECK(g_fault_count == 1u,
-        "[ERRATA-AES-007] Expected 16-bit write to IV_0 (0x40) to fault");
+  CHECK(
+      g_fault_count == 1u,
+      "[aes_reg_pkg.sv:377-412] Expected 16-bit write to IV_0 (0x40) to fault");
   CHECK(g_last_mcause == 7u,
-        "[ERRATA-AES-007] Expected Store Access Fault (mcause=7), got 0x%08x",
+        "[aes_reg_pkg.sv:377-412] Expected Store Access Fault (mcause=7), got "
+        "0x%08x",
         g_last_mcause);
 
   g_fault_count = 0;
@@ -524,7 +548,7 @@ bool test_main(void) {
   abs_mmio_write8(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, aux_val);
   abs_mmio_write8(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, aux_val);
   CHECK(g_fault_count == 0u,
-        "[ERRATA-AES-007] Expected 16-bit CTRL_SHADOWED and 8-bit "
+        "[aes_reg_pkg.sv:377-412] Expected 16-bit CTRL_SHADOWED and 8-bit "
         "CTRL_AUX_SHADOWED writes to succeed without fault");
 
   LOG_INFO("All 7 AES errata & hardening items verified successfully!");

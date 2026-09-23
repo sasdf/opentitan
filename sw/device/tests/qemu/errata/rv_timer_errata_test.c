@@ -11,7 +11,7 @@
  * errata, specification errata, and security hardening behaviors on physical
  * CW340 FPGA silicon and QEMU (`sim_qemu`):
  *
- * - `[ERRATA-RV_TIMER-001]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `MEDIUM
+ * - `[timer_core.sv:32-39]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `MEDIUM
  * (65%)`): `CFG0` (`0x10c`) has no hardware `regwen` or `!CTRL.active0` lock
  *   (`rv_timer_reg_top.sv:525`), and `timer_core.sv:32-39` resets `tick_count`
  *   on exact equality (`tick_count == prescaler`) while driving `tick` on
@@ -20,7 +20,7 @@
  *   and asserts `tick = 1` on every single clock cycle until `tick_count` wraps
  *   `12'hfff -> 12'h000` (`(4096 - tick_count) * step` runaway burst).
  *
- * - `[ERRATA-RV_TIMER-002]` (`SPEC_DOC_ERRATA` — `LOW` / `HIGH (95%)`):
+ * - `[timer_core.sv:39-46]` (`SPEC_DOC_ERRATA` — `LOW` / `HIGH (95%)`):
  *   Setting `CFG0.step = 0` halts `mtime` progression (`mtime_d = mtime + 0`),
  *   but the combinational comparator `intr[0] = active & (mtime >=
  * mtimecmp[0])`
@@ -28,13 +28,13 @@
  *   whenever `mtime >= mtimecmp` (and re-asserts after `W1C` until `mtime <
  *   mtimecmp` or `CTRL.active0 = 0`).
  *
- * - `[ERRATA-RV_TIMER-003]` (`BENIGN_RTL_IMPL_DETAIL` / `E2`):
+ * - `[rv_timer_reg_top.sv:118-119,477-492]` (`BENIGN_RTL_IMPL_DETAIL` / `E2`):
  *   The `{ skipto: "0x100" }` unmapped offset hole (`0x008..0x0fc`) between
  *   `CTRL` (`0x004`) and `INTR_ENABLE0` (`0x100`) asserts `addrmiss = 1` ->
  *   `d_error = 1` (`mcause = 5` Load Access Fault / `mcause = 7` Store Access
  *   Fault).
  *
- * - `[ERRATA-RV_TIMER-004]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
+ * - `[rv_timer_reg_pkg.sv:138-149]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
  *   `RV_TIMER_PERMIT[5] = 4'b0111` (`rv_timer_reg_pkg.sv:144`,
  *   `rv_timer_reg_top.sv:495-507`) requires bytes 0, 1, and 2 simultaneously on
  *   `CFG0` (`0x10c`), causing every sub-word store (`sh` to `CFG0.prescale` or
@@ -95,9 +95,9 @@ static void rv_timer_reset_clean(void) {
   abs_mmio_write32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET, 1u);
 }
 
-static void test_errata_001_cfg0_ungated_and_live_prescale_runaway(void) {
+static void test_cfg0_ungated_and_live_prescale_runaway(void) {
   LOG_INFO(
-      "Verifying [ERRATA-RV_TIMER-001] (TRUE_SILICON_ERRATA): CFG0 "
+      "Verifying [timer_core.sv:32-39] (TRUE_SILICON_ERRATA): CFG0 "
       "ungated write while active & tick_count > new_prescaler 12-bit "
       "wrap runaway...");
   rv_timer_reset_clean();
@@ -152,14 +152,14 @@ static void test_errata_001_cfg0_ungated_and_live_prescale_runaway(void) {
 
   rv_timer_reset_clean();
   LOG_INFO(
-      "[ERRATA-RV_TIMER-001] confirmed: live prescale reduction caused "
+      "[timer_core.sv:32-39] confirmed: live prescale reduction caused "
       "mid_wrap=%u, full_wrap=%u vs clean mtime=%u.",
       mid_wrap_mtime, runaway_mtime, clean_mtime);
 }
 
-static void test_errata_002_step_zero_combinational_intr(void) {
+static void test_step_zero_combinational_intr(void) {
   LOG_INFO(
-      "Verifying [ERRATA-RV_TIMER-002] (SPEC_DOC_ERRATA): CFG0.step==0 "
+      "Verifying [timer_core.sv:39-46] (SPEC_DOC_ERRATA): CFG0.step==0 "
       "halts mtime but combinational (mtime >= mtimecmp) still asserts "
       "INTR_STATE0...");
   rv_timer_reset_clean();
@@ -197,13 +197,14 @@ static void test_errata_002_step_zero_combinational_intr(void) {
 
   rv_timer_reset_clean();
   LOG_INFO(
-      "[ERRATA-RV_TIMER-002] confirmed: step==0 freezes mtime=100 while "
+      "[timer_core.sv:39-46] confirmed: step==0 freezes mtime=100 while "
       "mtime>=mtimecmp continuously asserts INTR_STATE0.");
 }
 
-static void test_errata_003_unmapped_skipto_hole_bus_error(void) {
+static void test_unmapped_skipto_hole_bus_error(void) {
   LOG_INFO(
-      "Verifying [ERRATA-RV_TIMER-003] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [rv_timer_reg_top.sv:118-119,477-492] "
+      "(BENIGN_RTL_IMPL_DETAIL): "
       "unmapped skipto hole (0x008..0x0fc) raises synchronous Load/Store "
       "Access Faults (mcause=5/7)...");
   rv_timer_reset_clean();
@@ -224,14 +225,15 @@ static void test_errata_003_unmapped_skipto_hole_bus_error(void) {
   CHECK(g_last_mcause == kIbexExcStoreAccessFault);
 
   LOG_INFO(
-      "[ERRATA-RV_TIMER-003] confirmed: unmapped hole 0x008..0x0fc "
+      "[rv_timer_reg_top.sv:118-119,477-492] confirmed: unmapped hole "
+      "0x008..0x0fc "
       "faulted (load_faults=%u, store_faults=%u).",
       g_load_fault_count, g_store_fault_count);
 }
 
-static void test_errata_004_cfg0_3byte_permit_subword_fault(void) {
+static void test_cfg0_3byte_permit_subword_fault(void) {
   LOG_INFO(
-      "Verifying [ERRATA-RV_TIMER-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [rv_timer_reg_pkg.sv:138-149] (INTENDED_SECURITY_HARDENING): "
       "RV_TIMER_PERMIT[5]=4'b0111 rejects all sub-word writes (sh/sb) to "
       "CFG0 with mcause=7...");
   rv_timer_reset_clean();
@@ -266,17 +268,17 @@ static void test_errata_004_cfg0_3byte_permit_subword_fault(void) {
 
   rv_timer_reset_clean();
   LOG_INFO(
-      "[ERRATA-RV_TIMER-004] confirmed: sub-word sh/sb writes to CFG0 "
+      "[rv_timer_reg_pkg.sv:138-149] confirmed: sub-word sh/sb writes to CFG0 "
       "faulted with mcause=7 (faults=%u).",
       g_store_fault_count);
 }
 
 bool test_main(void) {
   LOG_INFO("Starting rv_timer hardware errata confirmation suite...");
-  test_errata_001_cfg0_ungated_and_live_prescale_runaway();
-  test_errata_002_step_zero_combinational_intr();
-  test_errata_003_unmapped_skipto_hole_bus_error();
-  test_errata_004_cfg0_3byte_permit_subword_fault();
+  test_cfg0_ungated_and_live_prescale_runaway();
+  test_step_zero_combinational_intr();
+  test_unmapped_skipto_hole_bus_error();
+  test_cfg0_3byte_permit_subword_fault();
   LOG_INFO("All rv_timer errata checks confirmed on hardware!");
   return true;
 }

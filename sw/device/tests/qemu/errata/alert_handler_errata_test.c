@@ -8,20 +8,21 @@
  *
  * Exercises and confirms all 4 silicon / spec / architectural behaviors in
  * `/root/knowledge/errata/alert_handler.md`:
- * - [ERRATA-ALERT_HANDLER-001] ([E1-01]): Interrupt timeout timer (`TimeoutSt`)
+ * - [alert_handler.sv:251] ([E1-01]): Interrupt timeout timer (`TimeoutSt`)
  *   is gated by `irq[k] = INTR_STATE.CLASSx & INTR_ENABLE.CLASSx`
  *   (`alert_handler.sv:251`), not `INTR_STATE.CLASSx` alone.
- * - [ERRATA-ALERT_HANDLER-002] ([E2-01]): `CLASSx_CTRL_SHADOWED.EN` is gated by
+ * - [alert_handler_reg_wrap.sv:193-213] ([E2-01]): `CLASSx_CTRL_SHADOWED.EN` is
+ * gated by
  *   `(EN_E0 | EN_E1 | EN_E2 | EN_E3)` (`alert_handler_reg_wrap.sv:193-213`), so
  *   `EN = 1` with `EN_E0..3 = 0` prevents accumulation while `LOC_ALERT_CAUSE`
  *   still latches.
- * - [ERRATA-ALERT_HANDLER-003] ([E2-02]): `CLASSx_CLR_SHADOWED` is a persistent
- *   `SwAccessRW` shadow register (`qs` retains `1` after commit), and its
- *   1-cycle `q & qe` pulse clears `CLASSx_ACCUM_CNT` without exiting
+ * - [alert_handler_reg_top.sv:12777-12826] ([E2-02]): `CLASSx_CLR_SHADOWED` is
+ * a persistent `SwAccessRW` shadow register (`qs` retains `1` after commit),
+ * and its 1-cycle `q & qe` pulse clears `CLASSx_ACCUM_CNT` without exiting
  * `TimeoutSt`.
- * - [ERRATA-ALERT_HANDLER-004] ([E2-03]): `ALERT_HANDLER_PERMIT` sub-word write
- *   faults (`wr_err -> d_error = 1`, `mcause = 7`) and unmapped offset `>=
- * 0x578` `addrmiss` bus faults (`mcause = 5 / 7`).
+ * - [alert_handler_reg_top.sv:15920-16274] ([E2-03]): `ALERT_HANDLER_PERMIT`
+ * sub-word write faults (`wr_err -> d_error = 1`, `mcause = 7`) and unmapped
+ * offset `>= 0x578` `addrmiss` bus faults (`mcause = 5 / 7`).
  */
 
 #include <stdbool.h>
@@ -77,9 +78,10 @@ static void write_shadowed(uint32_t addr, uint32_t val) {
   abs_mmio_write32(addr, val);
 }
 
-static void test_errata_alert_handler_002_class_en_gated_by_esc_enables(void) {
+static void test_alert_handler_class_en_gated_by_esc_enables(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ALERT_HANDLER-002] ([E2-01]): CLASSx_CTRL_SHADOWED.EN "
+      "Verifying [alert_handler_reg_wrap.sv:193-213] ([E2-01]): "
+      "CLASSx_CTRL_SHADOWED.EN "
       "gated by |EN_E0..E3");
 
   uint32_t loc_en5_addr = kAlertBase +
@@ -113,12 +115,14 @@ static void test_errata_alert_handler_002_class_en_gated_by_esc_enables(void) {
   // Verify LOC_ALERT_CAUSE[5] latched 1 AND INTR_STATE.CLASSB latched 1,
   // while CLASSB_ACCUM_CNT remained 0 because `class_en = en & (|en_e0..3)` ==
   // 0!
-  CHECK_EQ(abs_mmio_read32(loc_cause5_addr), 1u,
-           "[ERRATA-ALERT_HANDLER-002] Expected LOC_ALERT_CAUSE[5] == 1");
+  CHECK_EQ(
+      abs_mmio_read32(loc_cause5_addr), 1u,
+      "[alert_handler_reg_wrap.sv:193-213] Expected LOC_ALERT_CAUSE[5] == 1");
   CHECK_EQ(
       abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSB_ACCUM_CNT_REG_OFFSET),
       0u,
-      "[ERRATA-ALERT_HANDLER-002] Expected CLASSB_ACCUM_CNT == 0 when EN=1 but "
+      "[alert_handler_reg_wrap.sv:193-213] Expected CLASSB_ACCUM_CNT == 0 when "
+      "EN=1 but "
       "EN_E0..3 == 0");
 
   // Also verify E4-01: disabling LOC_ALERT_EN_SHADOWED[5] does NOT mask
@@ -134,11 +138,11 @@ static void test_errata_alert_handler_002_class_en_gated_by_esc_enables(void) {
                    1u << ALERT_HANDLER_INTR_STATE_CLASSB_BIT);
 }
 
-static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
-    void) {
+static void test_alert_handler_timeout_irq_and_clr_shadowed(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ALERT_HANDLER-001] ([E1-01]) & "
-      "[ERRATA-ALERT_HANDLER-003] ([E2-02]): TimeoutSt gated by irq[k] & "
+      "Verifying [alert_handler.sv:251] ([E1-01]) & "
+      "[alert_handler_reg_top.sv:12777-12826] ([E2-02]): TimeoutSt gated by "
+      "irq[k] & "
       "CLASSA_CLR_SHADOWED");
 
   uint32_t intr_en_orig =
@@ -185,7 +189,7 @@ static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
       1u, "Expected CLASSA_ACCUM_CNT == 1");
   CHECK_EQ(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET),
            0u,
-           "[ERRATA-ALERT_HANDLER-001] Expected CLASSA_STATE == Idle (0) when "
+           "[alert_handler.sv:251] Expected CLASSA_STATE == Idle (0) when "
            "INTR_ENABLE.CLASSA == 0");
 
   // 2. [E1-01]: Setting INTR_ENABLE.CLASSA = 1 asserts `irq[0] = 1` and starts
@@ -194,7 +198,7 @@ static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
                    intr_en_orig | (1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
   CHECK_EQ(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET),
            1u,
-           "[ERRATA-ALERT_HANDLER-001] Expected CLASSA_STATE == Timeout (1) "
+           "[alert_handler.sv:251] Expected CLASSA_STATE == Timeout (1) "
            "when INTR_ENABLE.CLASSA == 1");
 
   // 3. [E2-02]: Committing 1 to CLASSA_CLR_SHADOWED while in `TimeoutSt` clears
@@ -205,16 +209,19 @@ static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
   CHECK_EQ(abs_mmio_read32(kAlertBase +
                            ALERT_HANDLER_CLASSA_CLR_SHADOWED_REG_OFFSET),
            1u,
-           "[ERRATA-ALERT_HANDLER-003] Expected CLASSA_CLR_SHADOWED to read "
+           "[alert_handler_reg_top.sv:12777-12826] Expected "
+           "CLASSA_CLR_SHADOWED to read "
            "back as 1 after committing 1");
   CHECK_EQ(
       abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET),
       0u,
-      "[ERRATA-ALERT_HANDLER-003] Expected CLASSA_ACCUM_CNT cleared to 0 by "
+      "[alert_handler_reg_top.sv:12777-12826] Expected CLASSA_ACCUM_CNT "
+      "cleared to 0 by "
       "CLASSA_CLR_SHADOWED");
   CHECK_EQ(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET),
            1u,
-           "[ERRATA-ALERT_HANDLER-003] Expected CLASSA_STATE to remain Timeout "
+           "[alert_handler_reg_top.sv:12777-12826] Expected CLASSA_STATE to "
+           "remain Timeout "
            "(1) after CLASSA_CLR_SHADOWED while irq[0] == 1");
 
   // 4. [E1-01]: Clearing INTR_ENABLE.CLASSA to 0 deasserts `irq[0]` and aborts
@@ -225,7 +232,7 @@ static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
       intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
   CHECK_EQ(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET),
            0u,
-           "[ERRATA-ALERT_HANDLER-001] Expected CLASSA_STATE to return to Idle "
+           "[alert_handler.sv:251] Expected CLASSA_STATE to return to Idle "
            "(0) when INTR_ENABLE.CLASSA cleared");
 
   // Clean up.
@@ -235,9 +242,10 @@ static void test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed(
                    1u << ALERT_HANDLER_INTR_STATE_CLASSA_BIT);
 }
 
-static void test_errata_alert_handler_004_permit_subword_and_addrmiss(void) {
+static void test_alert_handler_permit_subword_and_addrmiss(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ALERT_HANDLER-004] ([E2-03]): ALERT_HANDLER_PERMIT "
+      "Verifying [alert_handler_reg_top.sv:15920-16274] ([E2-03]): "
+      "ALERT_HANDLER_PERMIT "
       "sub-word wr_err & >= 0x578 addrmiss");
 
   // 1. 1-byte write to CLASSA_TIMEOUT_CYC_SHADOWED (PERMIT = 4'b1111) traps
@@ -247,7 +255,7 @@ static void test_errata_alert_handler_004_permit_subword_and_addrmiss(void) {
   abs_mmio_write8(
       kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET, 0xAAu);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-ALERT_HANDLER-004] Expected sb to "
+           "[alert_handler_reg_top.sv:15920-16274] Expected sb to "
            "CLASSA_TIMEOUT_CYC_SHADOWED to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -261,7 +269,7 @@ static void test_errata_alert_handler_004_permit_subword_and_addrmiss(void) {
       kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
       0x55u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-ALERT_HANDLER-004] Expected sb to "
+           "[alert_handler_reg_top.sv:15920-16274] Expected sb to "
            "CLASSA_ACCUM_THRESH_SHADOWED to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -288,7 +296,8 @@ static void test_errata_alert_handler_004_permit_subword_and_addrmiss(void) {
   g_last_mcause = 0;
   (void)abs_mmio_read32(kAlertBase + 0x578u);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-ALERT_HANDLER-004] Expected read at unmapped offset 0x578 "
+           "[alert_handler_reg_top.sv:15920-16274] Expected read at unmapped "
+           "offset 0x578 "
            "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvLoadAccessFault, "Expected mcause=5");
 
@@ -296,7 +305,8 @@ static void test_errata_alert_handler_004_permit_subword_and_addrmiss(void) {
   g_last_mcause = 0;
   abs_mmio_write32(kAlertBase + 0x578u, 0xDEADBEEFu);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-ALERT_HANDLER-004] Expected write at unmapped offset 0x578 "
+           "[alert_handler_reg_top.sv:15920-16274] Expected write at unmapped "
+           "offset 0x578 "
            "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -307,9 +317,9 @@ bool test_main(void) {
       "Starting alert_handler CW340 FPGA & QEMU errata confirmation test "
       "(P27)");
 
-  test_errata_alert_handler_002_class_en_gated_by_esc_enables();
-  test_errata_alert_handler_001_and_003_timeout_irq_and_clr_shadowed();
-  test_errata_alert_handler_004_permit_subword_and_addrmiss();
+  test_alert_handler_class_en_gated_by_esc_enables();
+  test_alert_handler_timeout_irq_and_clr_shadowed();
+  test_alert_handler_permit_subword_and_addrmiss();
 
   LOG_INFO("All alert_handler errata checks PASSED");
   return true;

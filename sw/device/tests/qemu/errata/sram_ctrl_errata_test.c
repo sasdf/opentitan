@@ -7,7 +7,7 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Suite for `sram_ctrl` (P25).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * 1. [ERRATA-SRAM_CTRL-001] (SPEC_DOC_ERRATA, LOW):
+ * 1. [sram_ctrl_regs_reg_top.sv:555-579] (SPEC_DOC_ERRATA, LOW):
  *    `SCR_KEY_ROTATED` (`0x18`) is a `MuBi4` `SwAccessW1C` register updated on
  *    every write via `mubi4_and_hi(q, ~wd)`:
  *    - Writing `0x9` (`kMultiBitBool4False`) preserves `0x6`
@@ -17,15 +17,15 @@
  *      into `0x0`.
  *    - Writing `0x6` (`kMultiBitBool4True`) cleanly clears `0x6` to `0x9`
  *      (`kMultiBitBool4False`).
- * 2. [ERRATA-SRAM_CTRL-003] (INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
- * BUS.INTEGRITY): All 9 `sram_ctrl` CSRs (`0x00..0x20`) have
+ * 2. [sram_ctrl_reg_pkg.sv:152-162] (INTENDED_SECURITY_HARDENING, INFO —
+ * SEC_CM: BUS.INTEGRITY): All 9 `sram_ctrl` CSRs (`0x00..0x20`) have
  * `SRAM_CTRL_REGS_PERMIT = 4'b0001`:
  *    - An 8-bit `sb` write to byte lane `0` (`EXEC_REGWEN + 0`) succeeds,
  *      whereas an 8-bit `sb` write to byte lane `1` (`EXEC_REGWEN + 1`,
  *      `reg_be[0] == 0`) faults synchronously with `mcause = 7`.
  *    - Reading an unmapped CSR offset (`0x24`) faults with `mcause = 5`,
  *      while reading `CTRL` (`0x14`, `wo`) returns `0x0`.
- * 3. [ERRATA-SRAM_CTRL-004] (INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
+ * 3. [sram_ctrl.sv:272-305] (INTENDED_SECURITY_HARDENING, INFO — SEC_CM:
  * MEM.SCRAMBLE):
  *    - Rotating the scrambling key (`CTRL.RENEW_SCR_KEY = 1`) without
  *      `CTRL.INIT = 1` keeps `STATUS.INIT_DONE == 1`, and running
@@ -112,13 +112,14 @@ bool test_main(void) {
   uintptr_t ret_buf = kSramRetRamBase + offsetof(retention_sram_t, owner);
 
   // ---------------------------------------------------------------------------
-  // 1. [ERRATA-SRAM_CTRL-001] (SPEC_DOC_ERRATA, LOW):
+  // 1. [sram_ctrl_regs_reg_top.sv:555-579] (SPEC_DOC_ERRATA, LOW):
   //    SCR_KEY_ROTATED (0x18) MuBi4 SwAccessW1C bitwise mubi4_and_hi(q, ~wd)
   //    behavior on 0x9 (no-op), 0x0 (corrupts 0x6 -> 0xf), 0xf (corrupts
   //    0x6 -> 0x0), and 0x6 (clears 0x6 -> 0x9).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SRAM_CTRL-001] (SPEC_DOC_ERRATA): SCR_KEY_ROTATED "
+      "Verifying [sram_ctrl_regs_reg_top.sv:555-579] (SPEC_DOC_ERRATA): "
+      "SCR_KEY_ROTATED "
       "mubi4_and_hi(q, ~wd) W1C semantics");
   sram_ret_renew_key();
   uint32_t rot =
@@ -132,7 +133,7 @@ bool test_main(void) {
   rot =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET);
   CHECK(rot == kMultiBitBool4True,
-        "[ERRATA-SRAM_CTRL-001] Expected writing 0x9 to preserve "
+        "[sram_ctrl_regs_reg_top.sv:555-579] Expected writing 0x9 to preserve "
         "SCR_KEY_ROTATED == 0x6, got 0x%x",
         rot);
 
@@ -142,7 +143,7 @@ bool test_main(void) {
   rot =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET);
   CHECK(rot == 0xfu,
-        "[ERRATA-SRAM_CTRL-001] Expected writing 0x0 to corrupt "
+        "[sram_ctrl_regs_reg_top.sv:555-579] Expected writing 0x0 to corrupt "
         "SCR_KEY_ROTATED from 0x6 to 0xf, got 0x%x",
         rot);
 
@@ -153,7 +154,7 @@ bool test_main(void) {
   rot =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET);
   CHECK(rot == 0x0u,
-        "[ERRATA-SRAM_CTRL-001] Expected writing 0xf to corrupt "
+        "[sram_ctrl_regs_reg_top.sv:555-579] Expected writing 0xf to corrupt "
         "SCR_KEY_ROTATED from 0x6 to 0x0, got 0x%x",
         rot);
 
@@ -165,21 +166,22 @@ bool test_main(void) {
   rot =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET);
   CHECK(rot == kMultiBitBool4False,
-        "[ERRATA-SRAM_CTRL-001] Expected writing 0x6 to clear "
+        "[sram_ctrl_regs_reg_top.sv:555-579] Expected writing 0x6 to clear "
         "SCR_KEY_ROTATED to 0x9, got 0x%x",
         rot);
   LOG_INFO(
-      "[ERRATA-SRAM_CTRL-001] CONFIRMED: SCR_KEY_ROTATED(0x9->0x6, 0x0->0xf, "
+      "[sram_ctrl_regs_reg_top.sv:555-579] CONFIRMED: "
+      "SCR_KEY_ROTATED(0x9->0x6, 0x0->0xf, "
       "0xf->0x0, 0x6->0x9)");
 
   // ---------------------------------------------------------------------------
-  // 2. [ERRATA-SRAM_CTRL-003] (INTENDED_SECURITY_HARDENING — SEC_CM:
+  // 2. [sram_ctrl_reg_pkg.sv:152-162] (INTENDED_SECURITY_HARDENING — SEC_CM:
   // BUS.INTEGRITY):
   //    SRAM_CTRL_REGS_PERMIT = 4'b0001 accepts sb to +0, faults sb to +1
   //    (mcause=7), and faults unmapped read at 0x24 (mcause=5).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SRAM_CTRL-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [sram_ctrl_reg_pkg.sv:152-162] (INTENDED_SECURITY_HARDENING): "
       "SRAM_CTRL_REGS_PERMIT = 4'b0001 sub-word CSR access");
   CHECK(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
         "Expected WO register CTRL (0x14) to read back 0");
@@ -187,26 +189,29 @@ bool test_main(void) {
   g_load_store_fault = false;
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 1u);
   CHECK(!g_load_store_fault,
-        "[ERRATA-SRAM_CTRL-003] Expected sb to EXEC_REGWEN+0 (PERMIT=4'b0001) "
+        "[sram_ctrl_reg_pkg.sv:152-162] Expected sb to EXEC_REGWEN+0 "
+        "(PERMIT=4'b0001) "
         "to succeed");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET + 1u, 1u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[ERRATA-SRAM_CTRL-003] Expected sb to EXEC_REGWEN+1 (reg_be=4'b0010) "
+        "[sram_ctrl_reg_pkg.sv:152-162] Expected sb to EXEC_REGWEN+1 "
+        "(reg_be=4'b0010) "
         "to fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   (void)abs_mmio_read32(kSramRetRegsBase + 0x24u);
   CHECK(g_load_store_fault && g_last_mcause == 5u,
-        "[ERRATA-SRAM_CTRL-003] Expected unmapped CSR read at 0x24 to fault "
+        "[sram_ctrl_reg_pkg.sv:152-162] Expected unmapped CSR read at 0x24 to "
+        "fault "
         "with mcause=5");
-  LOG_INFO("[ERRATA-SRAM_CTRL-003] CONFIRMED: PERMIT=4'b0001 enforced");
+  LOG_INFO("[sram_ctrl_reg_pkg.sv:152-162] CONFIRMED: PERMIT=4'b0001 enforced");
 
   // ---------------------------------------------------------------------------
-  // 3. [ERRATA-SRAM_CTRL-004] (INTENDED_SECURITY_HARDENING — SEC_CM:
+  // 3. [sram_ctrl.sv:272-305] (INTENDED_SECURITY_HARDENING — SEC_CM:
   // MEM.SCRAMBLE):
   //    - CTRL.INIT = 1 sets STATUS.INIT_DONE = 1 while keeping SCR_KEY_VALID
   //    = 1.
@@ -218,7 +223,7 @@ bool test_main(void) {
   //    - Subsequent CTRL.INIT = 1 restores valid 39-bit SECDED ECC.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-SRAM_CTRL-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [sram_ctrl.sv:272-305] (INTENDED_SECURITY_HARDENING): "
       "RENEW_SCR_KEY status independence & stale-key ECC NMI");
   sram_ret_init_mem();
   uint32_t status =
@@ -242,7 +247,7 @@ bool test_main(void) {
   sram_ret_renew_key();
   status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   CHECK(bitfield_bit32_read(status, SRAM_CTRL_STATUS_INIT_DONE_BIT),
-        "[ERRATA-SRAM_CTRL-004] Expected STATUS.INIT_DONE to remain 1 after "
+        "[sram_ctrl.sv:272-305] Expected STATUS.INIT_DONE to remain 1 after "
         "CTRL.RENEW_SCR_KEY=1 without CTRL.INIT (status=0x%x)",
         status);
 
@@ -250,7 +255,7 @@ bool test_main(void) {
     (void)abs_mmio_read32(ret_buf + i * 4u);
   }
   CHECK(g_nmi_load_integ_count >= 1u,
-        "[ERRATA-SRAM_CTRL-004] Expected reading stale SRAM words after "
+        "[sram_ctrl.sv:272-305] Expected reading stale SRAM words after "
         "CTRL.RENEW_SCR_KEY=1 to trigger Ibex Load Integrity NMI "
         "(mcause=0xffffffe0), got nmi_count=%u",
         g_nmi_load_integ_count);
@@ -263,7 +268,7 @@ bool test_main(void) {
       g_nmi_load_integ_count == nmi_before,
       "Expected read after CTRL.INIT=1 to succeed without Load Integrity NMI");
   LOG_INFO(
-      "[ERRATA-SRAM_CTRL-004] CONFIRMED: INIT_DONE remained 1 across "
+      "[sram_ctrl.sv:272-305] CONFIRMED: INIT_DONE remained 1 across "
       "RENEW_SCR_KEY, stale read fired Load Integrity NMI (count=%u), "
       "CTRL.INIT restored clean ECC",
       g_nmi_load_integ_count);

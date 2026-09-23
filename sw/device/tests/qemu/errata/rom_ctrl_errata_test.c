@@ -7,12 +7,12 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `rom_ctrl` (P33).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-ROM_CTRL-001] (INTENDED_SECURITY_HARDENING / SPEC_DOC_ERRATA):
+ * - [rom_ctrl.sv:437-458] (INTENDED_SECURITY_HARDENING / SPEC_DOC_ERRATA):
  *   `ALERT_TEST.fatal` (`0x00`) emits a single one-shot alert handshake
  *   (`alert_test_set_d` clears on `alert_clr` in `prim_alert_sender.sv:175`)
  *   so `ALERT_CAUSE[60]` stays `0` after `RW1C` clear, rather than remaining
  *   permanently asserted until reset as `rom_ctrl.hjson:81` implies.
- * - [ERRATA-ROM_CTRL-002] (INTENDED_SECURITY_HARDENING):
+ * - [rom_ctrl.sv:183-197] (INTENDED_SECURITY_HARDENING):
  *   Reading the top 8 `EXP_DIGEST` words of the ROM window
  * (`0x0000ffe0..0x0000fffc`, scrambled with inverted Hsiao ECC bits by
  * `scramble_image.py:319-350`) passes corrupted `data_intg` through
@@ -20,7 +20,7 @@
  * Ibex Internal Load Integrity NMI
  *   (`mcause = 0xffffffe0`, `mtval = 0x0000fffc`) and setting
  *   `RV_CORE_IBEX.ERR_STATUS.fatal_intg_err` (`bit 8`).
- * - [ERRATA-ROM_CTRL-003] (INTENDED_SECURITY_HARDENING):
+ * - [rom_ctrl_reg_pkg.sv:115-134] (INTENDED_SECURITY_HARDENING):
  *   `ROM_CTRL_REGS_PERMIT` rejects sub-word writes (`sb`/`sh`) to read-only
  *   `DIGEST_0..7` and `EXP_DIGEST_0..7` (`PERMIT = 4'b1111`) with Store Access
  *   Fault (`d_error = 1`, `mcause = 7`), while accepting byte-0 `sb` writes to
@@ -89,10 +89,10 @@ static void shadow_write32(uint32_t addr, uint32_t val) {
 }
 
 bool test_main(void) {
-  // 1. Verify [ERRATA-ROM_CTRL-003] (INTENDED_SECURITY_HARDENING):
+  // 1. Verify [rom_ctrl_reg_pkg.sv:115-134] (INTENDED_SECURITY_HARDENING):
   //    ROM_CTRL_REGS_PERMIT sub-word write wr_err on read-only CSRs.
   LOG_INFO(
-      "Verifying [ERRATA-ROM_CTRL-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [rom_ctrl_reg_pkg.sv:115-134] (INTENDED_SECURITY_HARDENING): "
       "ROM_CTRL_REGS_PERMIT sub-word write faults on RO DIGEST/EXP_DIGEST...");
 
   uint32_t d0 =
@@ -129,11 +129,11 @@ bool test_main(void) {
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET, 0x55u);
   CHECK(store_access_fault_seen);
 
-  // 2. Verify [ERRATA-ROM_CTRL-001] (INTENDED_SECURITY_HARDENING):
+  // 2. Verify [rom_ctrl.sv:437-458] (INTENDED_SECURITY_HARDENING):
   //    ALERT_TEST.fatal emits a one-shot alert handshake (does not stay latched
   //    after RW1C clear of ALERT_CAUSE[60]).
   LOG_INFO(
-      "Verifying [ERRATA-ROM_CTRL-001] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [rom_ctrl.sv:437-458] (INTENDED_SECURITY_HARDENING): "
       "ALERT_TEST.fatal one-shot handshake & RW1C clear...");
 
   uint32_t en_addr = kAlertHandlerBase +
@@ -162,11 +162,11 @@ bool test_main(void) {
   shadow_write32(class_addr,
                  ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSD);
 
-  // 3. Verify [ERRATA-ROM_CTRL-002] (INTENDED_SECURITY_HARDENING):
+  // 3. Verify [rom_ctrl.sv:183-197] (INTENDED_SECURITY_HARDENING):
   //    Reading top 8 ROM words (0x0000ffe0..0x0000fffc) raises Ibex Load
   //    Integrity NMI (mcause = 0xffffffe0) and sets ERR_STATUS.fatal_intg_err.
   LOG_INFO(
-      "Verifying [ERRATA-ROM_CTRL-002] (INTENDED_SECURITY_HARDENING): Top 8 "
+      "Verifying [rom_ctrl.sv:183-197] (INTENDED_SECURITY_HARDENING): Top 8 "
       "ROM words 0x0000ffe0..0x0000fffc raise Ibex Load Integrity NMI...");
 
   uint32_t orig_pmpaddr0 = 0;
@@ -206,6 +206,6 @@ bool test_main(void) {
   CSR_WRITE(CSR_REG_PMPCFG0, orig_pmpcfg0);
   CSR_WRITE(CSR_REG_PMPADDR0, orig_pmpaddr0);
 
-  LOG_INFO("All [ERRATA-ROM_CTRL-001..003] checks confirmed!");
+  LOG_INFO("All [rom_ctrl.sv:437-458..003] checks confirmed!");
   return true;
 }

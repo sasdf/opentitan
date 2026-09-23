@@ -11,7 +11,7 @@
  * errata, specification errata, and security hardening behaviors on physical
  * CW340 FPGA silicon and QEMU (`sim_qemu`):
  *
- * - `[ERRATA-ADC_CTRL-001]` (`TRUE_SILICON_ERRATA` — `HIGH` / `HIGH (90%)`):
+ * - `[adc_ctrl_fsm.sv:60-72]` (`TRUE_SILICON_ERRATA` — `HIGH` / `HIGH (90%)`):
  *   Oneshot completion (`ONEST_DONE`) transitions `fsm_state_q` back to `PWRDN`
  *   (`0`) without clearing `ADC_EN_CTL.adc_enable` (`trigger_q == 1` in
  *   `adc_ctrl_fsm.sv:60-72, 208-213, 255-258`). Subsequent writes of
@@ -20,7 +20,7 @@
  *   fail to re-trigger oneshot conversion until software clears `ADC_EN_CTL`
  *   to `0` (or pulses `ADC_FSM_RST`).
  *
- * - `[ERRATA-ADC_CTRL-002]` (`SPEC_DOC_ERRATA` — `MEDIUM`):
+ * - `[adc_ctrl_core.sv:77-90]` (`SPEC_DOC_ERRATA` — `MEDIUM`):
  *   `ADC_CHN_VAL_0/1.adc_chn_value_intr` (`bits [27:18]`) is driven by
  *   `chn_val_intr_we = oneshot_mode ? oneshot_done : |match_pulse`
  *   (`adc_ctrl_core.sv:77-90`), latching on `ONEST_DONE` in oneshot mode and
@@ -28,7 +28,7 @@
  *   `adc_ctrl_fsm.sv:353-368`) even if a prior interrupt is already pending in
  *   `ADC_INTR_STATUS`.
  *
- * - `[ERRATA-ADC_CTRL-003]` (`SPEC_DOC_ERRATA` — `MEDIUM`):
+ * - `[adc_ctrl_fsm.sv:60-72]` (`SPEC_DOC_ERRATA` — `MEDIUM`):
  *   `ADC_FSM_RST.rst_en` (`adc_ctrl_fsm.sv:60-72, 175-184`) is a
  *   level-sensitive hold that forces `trigger_q <= 0` and holds `PWRDN` even
  *   when `ADC_EN_CTL = 0x3` is written; clearing `ADC_FSM_RST` (`1 -> 0`) while
@@ -36,14 +36,14 @@
  *   next `clk_aon_i` edge and launches conversion without re-writing
  *   `ADC_EN_CTL`.
  *
- * - `[ERRATA-ADC_CTRL-004]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
+ * - `[adc_ctrl_reg_pkg.sv:305-338]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
  *   Heterogeneous `ADC_CTRL_PERMIT[32]` byte-enable masks (`4'b0001`,
  *   `4'b0011`, `4'b1111` in `adc_ctrl_reg_pkg.sv:305-338`) reject narrow
  *   sub-word writes (`sb`/`sh`) to 4-byte CSRs (`ADC_PD_CTL`,
  *   `ADC_CHN0/1_FILTER_CTL_0..7`) with a synchronous Store Access Fault
  *   (`mcause = 7`) while dropping the write.
  *
- * - `[ERRATA-ADC_CTRL-005]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `MEDIUM
+ * - `[adc_ctrl_fsm.sv:19-20]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `MEDIUM
  * (65%)`): Unsigned subtraction `np_sample_cnt_thresh = cfg_np_sample_cnt_i -
  * 1'b1`
  *   (`16-bit`) and `lp_sample_cnt_thresh = cfg_lp_sample_cnt_i - 1'b1`
@@ -121,15 +121,15 @@ static void adc_ctrl_clean_reset(void) {
   busy_spin_micros(60);
 }
 
-static void test_errata_001_and_002_oneshot_retrigger_deadlock_and_latch(void) {
+static void test_001_and_oneshot_retrigger_deadlock_and_latch(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ADC_CTRL-001] (TRUE_SILICON_ERRATA): ONEST_DONE "
+      "Verifying [adc_ctrl_fsm.sv:60-72] (TRUE_SILICON_ERRATA): ONEST_DONE "
       "leaves trigger_q==1 blocking oneshot re-trigger...");
   adc_ctrl_clean_reset();
 
   // Poison ADC_CHN_VAL_0/1 cannot be done via SW (R/O), so we verify that
   // ONEST_DONE updates both adc_chn_value [11:2] and adc_chn_value_intr [27:18]
-  // ([ERRATA-ADC_CTRL-002]) and sets ADC_INTR_STATUS.ONESHOT (bit 9).
+  // ([adc_ctrl_core.sv:77-90]) and sets ADC_INTR_STATUS.ONESHOT (bit 9).
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_INTR_CTL_REG_OFFSET,
                    kOneshotIntrBit);
   abs_mmio_write32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0x3u);
@@ -147,12 +147,12 @@ static void test_errata_001_and_002_oneshot_retrigger_deadlock_and_latch(void) {
         "First oneshot conversion failed to assert ONESHOT interrupt");
   busy_spin_micros(50);
 
-  // Confirm [ERRATA-ADC_CTRL-001]: hardware returned fsm_state_q to PWRDN (0)
+  // Confirm [adc_ctrl_fsm.sv:60-72]: hardware returned fsm_state_q to PWRDN (0)
   // while leaving ADC_EN_CTL == 0x3 (adc_enable == 1, oneshot_mode == 1).
   CHECK(abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET) == 0x3u);
   CHECK(abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_FSM_STATE_REG_OFFSET) == 0u);
 
-  // Confirm [ERRATA-ADC_CTRL-002] (Oneshot latch): both adc_chn_value [11:2]
+  // Confirm [adc_ctrl_core.sv:77-90] (Oneshot latch): both adc_chn_value [11:2]
   // and adc_chn_value_intr [27:18] were latched on oneshot_done.
   uint32_t chn0_val =
       abs_mmio_read32(kAdcBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
@@ -194,13 +194,13 @@ static void test_errata_001_and_002_oneshot_retrigger_deadlock_and_latch(void) {
   CHECK((intr_status & kOneshotIntrBit) == kOneshotIntrBit,
         "Workaround (ADC_EN_CTL 0 -> 0x3) must re-trigger oneshot");
   LOG_INFO(
-      "[ERRATA-ADC_CTRL-001] confirmed: direct ADC_EN_CTL=0x3 re-write "
+      "[adc_ctrl_fsm.sv:60-72] confirmed: direct ADC_EN_CTL=0x3 re-write "
       "blocked by trigger_q==1; 0->0x3 toggle succeeds.");
 }
 
-static void test_errata_002_subsequent_filter_match_while_intr_pending(void) {
+static void test_subsequent_filter_match_while_intr_pending(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ADC_CTRL-002] (SPEC_DOC_ERRATA): new filter "
+      "Verifying [adc_ctrl_core.sv:77-90] (SPEC_DOC_ERRATA): new filter "
       "set transition (!stay_match) fires match_pulse & updates "
       "adc_chn_value_intr while prior interrupt is still pending...");
   adc_ctrl_clean_reset();
@@ -243,14 +243,14 @@ static void test_errata_002_subsequent_filter_match_while_intr_pending(void) {
   }
   CHECK((intr_status & 0x3u) == 0x3u);
   LOG_INFO(
-      "[ERRATA-ADC_CTRL-002] confirmed: subsequent debounced filter match "
+      "[adc_ctrl_core.sv:77-90] confirmed: subsequent debounced filter match "
       "fires while prior interrupt is pending (ADC_INTR_STATUS=0x%x).",
       intr_status);
 }
 
-static void test_errata_003_fsm_rst_level_gating_and_release_edge(void) {
+static void test_fsm_rst_level_gating_and_release_edge(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ADC_CTRL-003] (SPEC_DOC_ERRATA): ADC_FSM_RST "
+      "Verifying [adc_ctrl_fsm.sv:60-72] (SPEC_DOC_ERRATA): ADC_FSM_RST "
       "level-sensitive hold and automatic trigger_l2h rising edge on "
       "1->0 release...");
   adc_ctrl_clean_reset();
@@ -289,13 +289,13 @@ static void test_errata_003_fsm_rst_level_gating_and_release_edge(void) {
         "Releasing ADC_FSM_RST (1->0) while ADC_EN_CTL=0x3 must synthesize "
         "trigger_l2h and complete oneshot");
   LOG_INFO(
-      "[ERRATA-ADC_CTRL-003] confirmed: ADC_FSM_RST=1 blocks conversion "
+      "[adc_ctrl_fsm.sv:60-72] confirmed: ADC_FSM_RST=1 blocks conversion "
       "and releasing 1->0 auto-synthesizes trigger_l2h.");
 }
 
-static void test_errata_004_subword_write_permit_fault(void) {
+static void test_subword_write_permit_fault(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ADC_CTRL-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [adc_ctrl_reg_pkg.sv:305-338] (INTENDED_SECURITY_HARDENING): "
       "ADC_CTRL_PERMIT rejects sub-word writes to 4-byte CSRs with "
       "Store Access Fault (mcause=7)...");
   adc_ctrl_clean_reset();
@@ -331,14 +331,15 @@ static void test_errata_004_subword_write_permit_fault(void) {
         filt_expected);
 
   LOG_INFO(
-      "[ERRATA-ADC_CTRL-004] confirmed: sub-word writes to ADC_PD_CTL and "
+      "[adc_ctrl_reg_pkg.sv:305-338] confirmed: sub-word writes to ADC_PD_CTL "
+      "and "
       "ADC_CHN0_FILTER_CTL_0 fault with mcause=7 (faults=%u).",
       g_store_fault_count);
 }
 
-static void test_errata_005_zero_sample_cnt_underflow(void) {
+static void test_zero_sample_cnt_underflow(void) {
   LOG_INFO(
-      "Verifying [ERRATA-ADC_CTRL-005] (TRUE_SILICON_ERRATA): "
+      "Verifying [adc_ctrl_fsm.sv:19-20] (TRUE_SILICON_ERRATA): "
       "ADC_SAMPLE_CTL=0 underflows cfg_np_sample_cnt_i - 1 to 65535 "
       "(65,536 samples)...");
   adc_ctrl_clean_reset();
@@ -391,7 +392,7 @@ static void test_errata_005_zero_sample_cnt_underflow(void) {
   CHECK((filter_status & 0x1u) == 0x1u);
   adc_ctrl_clean_reset();
   LOG_INFO(
-      "[ERRATA-ADC_CTRL-005] confirmed: ADC_SAMPLE_CTL=0 underflows "
+      "[adc_ctrl_fsm.sv:19-20] confirmed: ADC_SAMPLE_CTL=0 underflows "
       "threshold to 65535 (and in-flight lower to 1 is bypassed when "
       "np_sample_cnt_q > 0); resetting FSM with ADC_SAMPLE_CTL=1 "
       "completes immediately.");
@@ -399,11 +400,11 @@ static void test_errata_005_zero_sample_cnt_underflow(void) {
 
 bool test_main(void) {
   LOG_INFO("Starting adc_ctrl hardware errata confirmation suite...");
-  test_errata_001_and_002_oneshot_retrigger_deadlock_and_latch();
-  test_errata_002_subsequent_filter_match_while_intr_pending();
-  test_errata_003_fsm_rst_level_gating_and_release_edge();
-  test_errata_004_subword_write_permit_fault();
-  test_errata_005_zero_sample_cnt_underflow();
+  test_001_and_oneshot_retrigger_deadlock_and_latch();
+  test_subsequent_filter_match_while_intr_pending();
+  test_fsm_rst_level_gating_and_release_edge();
+  test_subword_write_permit_fault();
+  test_zero_sample_cnt_underflow();
   LOG_INFO("All adc_ctrl errata checks confirmed on hardware!");
   return true;
 }

@@ -7,25 +7,27 @@
  * for `otbn` (`P03` — `/root/knowledge/errata/otbn.md`).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-OTBN-001] (TRUE_SILICON_ERRATA): Idle 32-bit host IMEM/DMEM reads
+ * - [otbn.sv:736-746] (TRUE_SILICON_ERRATA): Idle 32-bit host IMEM/DMEM reads
  *   (TL-UL Get) advance LOAD_CHECKSUM with wr_data=0, and StatusLocked writes
  *   also advance LOAD_CHECKSUM (`otbn.sv:736-746`).
- * - [ERRATA-OTBN-002] (SPEC_DOC_ERRATA): BN.ADDM reduces a + b >= MOD (yielding
- *   0 when a + b == MOD, `otbn_alu_bignum.sv:905-919` vs
+ * - [otbn_alu_bignum.sv:905-919] (SPEC_DOC_ERRATA): BN.ADDM reduces a + b >=
+ * MOD (yielding 0 when a + b == MOD, `otbn_alu_bignum.sv:905-919` vs
  * `bignum-insns.yml:116`) and dual-operand `x1` call stack reads pop once
  * (`otbn_rf_base.sv:105-134`).
- * - [ERRATA-OTBN-003] (INTENDED_SECURITY_HARDENING): Illegal host DMEM/IMEM
- *   read during BUSY_EXECUTE returns blanked 39'h0 (`ecc = 7'h00 != 7'h39`)
- *   before `locking_q` latches, raising Ibex Load Integrity NMI
+ * - [otbn.sv:451-477,691-720] (INTENDED_SECURITY_HARDENING): Illegal host
+ * DMEM/IMEM read during BUSY_EXECUTE returns blanked 39'h0 (`ecc = 7'h00 !=
+ * 7'h39`) before `locking_q` latches, raising Ibex Load Integrity NMI
  * (`FATAL_INTG_ERR`) and locking OTBN (`otbn.sv:451-477, 691-720`).
- * - [ERRATA-OTBN-004] & [ERRATA-OTBN-005] (INTENDED_SECURITY_HARDENING):
- *   In STATUS_LOCKED (`0xFF`), IMEM/DMEM reads return 0x00000000 with valid
+ * - [otbn.sv:146-158,798-806,892,926-995] &
+ * [otbn.sv:352,451-472,566,691-715,926-957] (INTENDED_SECURITY_HARDENING): In
+ * STATUS_LOCKED (`0xFF`), IMEM/DMEM reads return 0x00000000 with valid
  *   `SecdedInv3932ZeroEcc` (`7'h39`, no Ibex NMI), `ERR_BITS` and `INSN_CNT`
  *   remain writable (write-any-clears-to-zero), and `FATAL_ALERT_CAUSE` remains
  *   sticky set-only (`otbn.sv:146-158, 451-472, 926-995`).
- * - [ERRATA-OTBN-006] (INTENDED_SECURITY_HARDENING): Sub-word writes (`sb`) to
- *   IMEM/DMEM (`.ByteAccess(0)`) and narrow CSRs (`OTBN_PERMIT`) and accesses
- *   to unmapped offset `0x2c` (`addrmiss`) trigger synchronous TL-UL bus faults
+ * - [otbn.sv:371-383,610-622] (INTENDED_SECURITY_HARDENING): Sub-word writes
+ * (`sb`) to IMEM/DMEM (`.ByteAccess(0)`) and narrow CSRs (`OTBN_PERMIT`) and
+ * accesses to unmapped offset `0x2c` (`addrmiss`) trigger synchronous TL-UL bus
+ * faults
  *   (`mcause = 5 / 7`).
  */
 
@@ -138,7 +140,7 @@ bool test_main(void) {
   abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
 
   // -------------------------------------------------------------------------
-  // 1. [ERRATA-OTBN-002] (SPEC_DOC_ERRATA):
+  // 1. [otbn_alu_bignum.sv:905-919] (SPEC_DOC_ERRATA):
   //    (a) BN.ADDM reduces wrs1 + wrs2 >= MOD (`otbn_alu_bignum.sv:905-919`
   //        returns 0 when 60 + 40 == 100 == MOD, vs `bignum-insns.yml:116`
   //        stating strict `> MOD`).
@@ -146,7 +148,8 @@ bool test_main(void) {
   //        and pop is ordered before push (`otbn_rf_base.sv:105-134`).
   // -------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-OTBN-002] (SPEC_DOC_ERRATA): BN.ADDM >= MOD boundary "
+      "Verifying [otbn_alu_bignum.sv:905-919] (SPEC_DOC_ERRATA): BN.ADDM >= "
+      "MOD boundary "
       "& x1 call stack single-pop...");
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0xdeadbeefu);
   const uint32_t prog_bn_addm[] = {
@@ -163,7 +166,8 @@ bool test_main(void) {
   otbn_run_program(prog_bn_addm, ARRAYSIZE(prog_bn_addm));
   uint32_t addm_res = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
   CHECK(addm_res == 0u,
-        "[ERRATA-OTBN-002] BN.ADDM (60 + 40 == 100 == MOD) expected 0, got %u",
+        "[otbn_alu_bignum.sv:905-919] BN.ADDM (60 + 40 == 100 == MOD) expected "
+        "0, got %u",
         addm_res);
 
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0u);
@@ -177,64 +181,67 @@ bool test_main(void) {
   otbn_run_program(prog_x1_dual_read, ARRAYSIZE(prog_x1_dual_read));
   uint32_t err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
   uint32_t x2_val = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
-  CHECK(err_bits == 0u && x2_val == 28u,
-        "[ERRATA-OTBN-002] Expected x2=28 and ERR_BITS=0, got x2=%u, "
-        "ERR_BITS=0x%08x",
-        x2_val, err_bits);
+  CHECK(
+      err_bits == 0u && x2_val == 28u,
+      "[otbn_alu_bignum.sv:905-919] Expected x2=28 and ERR_BITS=0, got x2=%u, "
+      "ERR_BITS=0x%08x",
+      x2_val, err_bits);
 
   // -------------------------------------------------------------------------
-  // 2. [ERRATA-OTBN-006] (INTENDED_SECURITY_HARDENING):
+  // 2. [otbn.sv:371-383,610-622] (INTENDED_SECURITY_HARDENING):
   //    Sub-word writes (`sb`) to IMEM/DMEM (`.ByteAccess(0)`), narrow CSRs
   //    (`OTBN_PERMIT`), and accesses to unmapped offset `0x2c` (`addrmiss`)
   //    assert TL-UL `d_error = 1` (`mcause = 5 / 7`).
   // -------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-OTBN-006] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [otbn.sv:371-383,610-622] (INTENDED_SECURITY_HARDENING): "
       ".ByteAccess(0), "
       "OTBN_PERMIT, and addrmiss TL-UL bus faults...");
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0x12345678u);
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0xffu);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "[ERRATA-OTBN-006] sb to LOAD_CHECKSUM must raise MCAUSE=7");
+        "[otbn.sv:371-383,610-622] sb to LOAD_CHECKSUM must raise MCAUSE=7");
   CHECK(
       abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0x12345678u,
-      "[ERRATA-OTBN-006] sb to LOAD_CHECKSUM must not modify register");
+      "[otbn.sv:371-383,610-622] sb to LOAD_CHECKSUM must not modify register");
 
   g_fault_seen = false;
   (void)abs_mmio_read32(kOtbnBase + 0x2cu);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
-        "[ERRATA-OTBN-006] Read at unmapped 0x2c must raise MCAUSE=5");
+        "[otbn.sv:371-383,610-622] Read at unmapped 0x2c must raise MCAUSE=5");
 
   g_fault_seen = false;
   abs_mmio_write32(kOtbnBase + 0x2cu, 0u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "[ERRATA-OTBN-006] Write at unmapped 0x2c must raise MCAUSE=7");
+        "[otbn.sv:371-383,610-622] Write at unmapped 0x2c must raise MCAUSE=7");
 
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0x11u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "[ERRATA-OTBN-006] sb to IMEM (.ByteAccess(0)) must raise MCAUSE=7");
+        "[otbn.sv:371-383,610-622] sb to IMEM (.ByteAccess(0)) must raise "
+        "MCAUSE=7");
   g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x22u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "[ERRATA-OTBN-006] sb to DMEM (.ByteAccess(0)) must raise MCAUSE=7");
-  CHECK(
-      abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
-      "[ERRATA-OTBN-006] Sub-word write faults must not advance LOAD_CHECKSUM");
+        "[otbn.sv:371-383,610-622] sb to DMEM (.ByteAccess(0)) must raise "
+        "MCAUSE=7");
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
+        "[otbn.sv:371-383,610-622] Sub-word write faults must not advance "
+        "LOAD_CHECKSUM");
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0x89abcdefu,
-        "[ERRATA-OTBN-006] sb to DMEM must not modify word");
+        "[otbn.sv:371-383,610-622] sb to DMEM must not modify word");
 
   // -------------------------------------------------------------------------
-  // 3. [ERRATA-OTBN-001] (TRUE_SILICON_ERRATA — Part A):
+  // 3. [otbn.sv:736-746] (TRUE_SILICON_ERRATA — Part A):
   //    Idle 32-bit host reads (`TL-UL Get`) from IMEM[0] and DMEM[0] advance
   //    `LOAD_CHECKSUM` identically to writing `32'h00000000`
   //    (`otbn.sv:736-746`).
   // -------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-OTBN-001] (TRUE_SILICON_ERRATA): Idle 32-bit host "
+      "Verifying [otbn.sv:736-746] (TRUE_SILICON_ERRATA): Idle 32-bit host "
       "IMEM/DMEM read advances LOAD_CHECKSUM...");
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0u);
@@ -256,7 +263,7 @@ bool test_main(void) {
       abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET);
   CHECK(imem0_rd == 0xa5a5a5a5u && dmem0_rd == 0x5a5a5a5au);
   CHECK(crc_after_reads == crc_zero_writes,
-        "[ERRATA-OTBN-001] Idle IMEM[0]+DMEM[0] reads advanced LOAD_CHECKSUM "
+        "[otbn.sv:736-746] Idle IMEM[0]+DMEM[0] reads advanced LOAD_CHECKSUM "
         "to 0x%08x (expected 0x%08x)",
         crc_after_reads, crc_zero_writes);
 
@@ -269,8 +276,9 @@ bool test_main(void) {
   CHECK(expected_crc_12345678 != 0u);
 
   // -------------------------------------------------------------------------
-  // 4. [ERRATA-OTBN-003], [ERRATA-OTBN-004], [ERRATA-OTBN-005]
-  //    (INTENDED_SECURITY_HARDENING) & [ERRATA-OTBN-001] Part B (StatusLocked):
+  // 4. [otbn.sv:451-477,691-720], [otbn.sv:146-158,798-806,892,926-995],
+  // [otbn.sv:352,451-472,566,691-715,926-957]
+  //    (INTENDED_SECURITY_HARDENING) & [otbn.sv:736-746] Part B (StatusLocked):
   //    - Illegal host read from DMEM during BUSY_EXECUTE returns 39'h0
   //      (`ecc = 7'h00 != SecdedInv3932ZeroEcc = 7'h39`) before `locking_q`
   //      latches, triggering Ibex Load Integrity NMI (`FATAL_INTG_ERR`) and
@@ -281,13 +289,14 @@ bool test_main(void) {
   //      return `0x00000000` with valid `SecdedInv3932ZeroEcc` (`7'h39`, no
   //      Ibex NMI), while 32-bit host writes/reads still advance
   //      `LOAD_CHECKSUM`
-  //      (`[ERRATA-OTBN-001]` Part B).
+  //      (`[otbn.sv:736-746]` Part B).
   //    - In `STATUS == LOCKED`, `INSN_CNT` and `ERR_BITS` are write-any-clears
   //      to 0, while `FATAL_ALERT_CAUSE` remains sticky set-only.
   // -------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [ERRATA-OTBN-003..005] (INTENDED_SECURITY_HARDENING) & "
-      "[ERRATA-OTBN-001] StatusLocked LOAD_CHECKSUM...");
+      "Verifying [otbn.sv:451-477,691-720..005] (INTENDED_SECURITY_HARDENING) "
+      "& "
+      "[otbn.sv:736-746] StatusLocked LOAD_CHECKSUM...");
   const uint32_t prog_long_loop[] = {
       OTBN_LOOPI(1000, 0),
       OTBN_NOP(),
@@ -316,7 +325,8 @@ bool test_main(void) {
   }
 
   CHECK(g_load_integrity_nmi_seen,
-        "[ERRATA-OTBN-003] Illegal DMEM read during BUSY_EXECUTE must raise "
+        "[otbn.sv:451-477,691-720] Illegal DMEM read during BUSY_EXECUTE must "
+        "raise "
         "Ibex FATAL_INTG_ERR NMI");
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusLocked);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u);
@@ -325,9 +335,9 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_FATAL_ALERT_CAUSE_REG_OFFSET) ==
         (1u << OTBN_FATAL_ALERT_CAUSE_ILLEGAL_BUS_ACCESS_BIT));
 
-  // Note on [ERRATA-OTBN-005]: Although otbn.sv:466,707 wires
-  // `locking_q ? SecdedInv3932ZeroEcc : ...` intending to return 0 with valid
-  // ECC when locked, `locking_q` only asserts on Cycle 2 (1 cycle after
+  // Note on [otbn.sv:352,451-472,566,691-715,926-957]: Although otbn.sv:466,707
+  // wires `locking_q ? SecdedInv3932ZeroEcc : ...` intending to return 0 with
+  // valid ECC when locked, `locking_q` only asserts on Cycle 2 (1 cycle after
   // `dmem_dummy_response_q` on Cycle 1), and once in STATUS_LOCKED
   // (`busy_execute_q == 0`), `u_dmem`/`u_imem` wire `.intg_error_i(locking)`
   // which kills `rvalid_o` in `prim_ram_1p_scr.sv:379` while
@@ -335,7 +345,7 @@ bool test_main(void) {
   // immediately (`dmem_gnt_bus = dmem_req_bus`) and advance LOAD_CHECKSUM
   // while SRAM macro writes are suppressed by `intg_error_i(locking)`.
 
-  // Verify [ERRATA-OTBN-001] Part B: 32-bit writes in STATUS_LOCKED advance
+  // Verify [otbn.sv:736-746] Part B: 32-bit writes in STATUS_LOCKED advance
   // LOAD_CHECKSUM even though SRAM writes are blocked by `locking`.
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x12345678u);
@@ -343,8 +353,9 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) ==
         expected_crc_12345678);
 
-  // Verify [ERRATA-OTBN-004]: INTR_STATE, INSN_CNT, and ERR_BITS remain
-  // writable in STATUS_LOCKED, while FATAL_ALERT_CAUSE remains sticky.
+  // Verify [otbn.sv:146-158,798-806,892,926-995]: INTR_STATE, INSN_CNT, and
+  // ERR_BITS remain writable in STATUS_LOCKED, while FATAL_ALERT_CAUSE remains
+  // sticky.
   abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u);
 
@@ -356,6 +367,6 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_FATAL_ALERT_CAUSE_REG_OFFSET) ==
         (1u << OTBN_FATAL_ALERT_CAUSE_ILLEGAL_BUS_ACCESS_BIT));
 
-  LOG_INFO("All [ERRATA-OTBN-001..006] checks confirmed!");
+  LOG_INFO("All [otbn.sv:736-746..006] checks confirmed!");
   return true;
 }

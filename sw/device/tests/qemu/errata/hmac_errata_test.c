@@ -10,39 +10,39 @@
  * `/root/knowledge/errata/hmac.md` across both the physical CW340 FPGA (golden
  * Earlgrey RTL) and QEMU (`ot_hmac`):
  *
- * - [ERRATA-HMAC-001] (SPEC_DOC_ERRATA):
+ * - [prim_sha2.sv:159-164] (SPEC_DOC_ERRATA):
  *   `DIGEST_0..15` software context restore writes require `CFG.sha_en == 0`
  *   AND `CFG.digest_size != SHA2_None` (writes while `CFG.sha_en == 1 &&
  *   STATUS.hmac_idle == 1` are ignored), and `CFG.sha_en: 1 -> 0` clears
  *   `DIGEST_0..15` to `0x00000000` rather than `WIPE_SECRET`.
- * - [ERRATA-HMAC-002] (SPEC_DOC_ERRATA):
+ * - [hmac.sv:240-243] (SPEC_DOC_ERRATA):
  *   `MSG_LENGTH_LOWER/UPPER` is NOT cleared by `CFG.sha_en: 1 -> 0`, is
  *   writable whenever `!cfg_block` even if `CFG.sha_en == 1`, and
  * `DIGEST_8..15` writes are ignored when `CFG.digest_size == SHA2_256`.
- * - [ERRATA-HMAC-003] (SPEC_DOC_ERRATA):
+ * - [hmac.sv:256-272] (SPEC_DOC_ERRATA):
  *   `DIGEST_8..15` mirrors `DIGEST_0..7` in `SHA2_256` (instead of reading 0),
  *   `DIGEST_12..15` exposes internal 512-bit SHA-512 state `digest[6..7]` in
  *   `SHA2_384`, and `WIPE_SECRET` readback via `DIGEST_0..15` is byte-swapped
  *   by `conv_endian32(V, CFG.digest_swap)`.
- * - [ERRATA-HMAC-004] (SPEC_DOC_ERRATA):
+ * - [hmac.sv:343-344] (SPEC_DOC_ERRATA):
  *   `ERR_CODE` sticky first-error latch (`err_valid = ~intr_state.hmac_err.q &
  * ...`) retains the first error code until `INTR_STATE.hmac_err` is
  * W1C-cleared, and setting `INTR_TEST.hmac_err = 1` blocks subsequent hardware
  * errors from updating `ERR_CODE`.
- * - [ERRATA-HMAC-005] (BENIGN_RTL_IMPL_DETAIL):
+ * - [hmac.sv:349-362] (BENIGN_RTL_IMPL_DETAIL):
  *   Writing `CMD.hash_stop = 1` while idle (`STATUS.hmac_idle == 1`, including
  *   with `SHA2_None`) clears `cfg_block` without raising `ERR_CODE` or clearing
  *   `STATUS.hmac_idle`.
- * - [ERRATA-HMAC-006] (INTENDED_SECURITY_HARDENING):
+ * - [hmac.sv:583-612] (INTENDED_SECURITY_HARDENING):
  *   Reading write-only `MSG_FIFO` (`0x1000..0x1fff`) triggers a synchronous
  *   TL-UL Load Access Fault (`mcause = 5`) via `u_tlul_adapter`
  * (`.ErrOnRead(1)`) while suppressing `msg_fifo_req` so `INTR_STATE.hmac_err`
  * stays `0`.
- * - [ERRATA-HMAC-007] (INTENDED_SECURITY_HARDENING):
+ * - [hmac_reg_pkg.sv:441-501] (INTENDED_SECURITY_HARDENING):
  *   `HMAC_PERMIT` enforces sub-word write faults (`mcause = 7` Store Access
  * Fault) while allowing sub-word reads, and unmapped register offset `0x0f0`
  * raises Load/Store Access Fault (`mcause = 5 / 7`).
- * - [ERRATA-HMAC-008] (TRUE_SILICON_ERRATA):
+ * - [prim_sha2_pad.sv:238-243] (TRUE_SILICON_ERRATA):
  *   Issuing `CMD.hash_stop = 1` after writing a non-multiple of the 512-bit
  *   SHA-256 block size (9 words = 288 bits) causes `prim_sha2_pad.sv:240-245`
  *   (`txcnt_eq_msg_len && hash_stop_flag_q`) to transition `u_pad` to `StIdle`
@@ -120,9 +120,9 @@ static void clear_hmac_intr(void) {
                        (1u << HMAC_INTR_STATE_HMAC_ERR_BIT));
 }
 
-static void verify_errata_hmac_001(void) {
+static void verify_hmac_wipe_secret_clears_msg_fifo(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-001] (SPEC_DOC_ERRATA): DIGEST_0..15 write "
+      "Verifying [prim_sha2.sv:159-164] (SPEC_DOC_ERRATA): DIGEST_0..15 write "
       "gating (!sha_en && digest_size != SHA2_None) and sha_en 1->0 "
       "zeroing...");
 
@@ -160,12 +160,12 @@ static void verify_errata_hmac_001(void) {
   /* 4. With sha_en=0 and digest_size=SHA2_256, DIGEST_0 write succeeds. */
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0xdeadbeefu);
   CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == 0xdeadbeefu);
-  LOG_INFO("[ERRATA-HMAC-001] confirmed.");
+  LOG_INFO("[prim_sha2.sv:159-164] confirmed.");
 }
 
-static void verify_errata_hmac_002(void) {
+static void verify_hmac_cfg_lock_while_active(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-002] (SPEC_DOC_ERRATA): MSG_LENGTH_LOWER/UPPER "
+      "Verifying [hmac.sv:240-243] (SPEC_DOC_ERRATA): MSG_LENGTH_LOWER/UPPER "
       "retention across sha_en 1->0, writability while sha_en==1, and "
       "DIGEST_8..15 write ignore in SHA2_256...");
 
@@ -212,12 +212,12 @@ static void verify_errata_hmac_002(void) {
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_8_REG_OFFSET, 0x11223344u);
   CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == 0xaabbccddu);
   CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_8_REG_OFFSET) == 0xaabbccddu);
-  LOG_INFO("[ERRATA-HMAC-002] confirmed.");
+  LOG_INFO("[hmac.sv:240-243] confirmed.");
 }
 
-static void verify_errata_hmac_003(void) {
+static void verify_hmac_cmd_start_without_sha_en(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-003] (SPEC_DOC_ERRATA): DIGEST_8..15 mirrors "
+      "Verifying [hmac.sv:256-272] (SPEC_DOC_ERRATA): DIGEST_8..15 mirrors "
       "DIGEST_0..7 in SHA2_256, DIGEST_12..15 exposes SHA-512 state in "
       "SHA2_384, "
       "and WIPE_SECRET readback swaps via digest_swap...");
@@ -271,12 +271,12 @@ static void verify_errata_hmac_003(void) {
                                   HMAC_CFG_KEY_LENGTH_VALUE_KEY_256);
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_no_swap);
   CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == 0x12345678u);
-  LOG_INFO("[ERRATA-HMAC-003] confirmed.");
+  LOG_INFO("[hmac.sv:256-272] confirmed.");
 }
 
-static void verify_errata_hmac_004(void) {
+static void verify_hmac_invalid_config_err_code(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-004] (SPEC_DOC_ERRATA): ERR_CODE sticky "
+      "Verifying [hmac.sv:343-344] (SPEC_DOC_ERRATA): ERR_CODE sticky "
       "first-error latch and INTR_TEST.hmac_err blocking subsequent errors...");
 
   clear_hmac_intr();
@@ -321,12 +321,12 @@ static void verify_errata_hmac_004(void) {
   CHECK(abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET) ==
         kErrSwPushMsgWhenDisallowed);
   clear_hmac_intr();
-  LOG_INFO("[ERRATA-HMAC-004] confirmed.");
+  LOG_INFO("[hmac.sv:343-344] confirmed.");
 }
 
-static void verify_errata_hmac_005(void) {
+static void verify_hmac_sw_push_msg_disabled_err(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-005] (BENIGN_RTL_IMPL_DETAIL): CMD.hash_stop "
+      "Verifying [hmac.sv:349-362] (BENIGN_RTL_IMPL_DETAIL): CMD.hash_stop "
       "while idle with SHA2_None raises no error and leaves hmac_idle == 1...");
 
   clear_hmac_intr();
@@ -341,12 +341,12 @@ static void verify_errata_hmac_005(void) {
       HMAC_INTR_STATE_HMAC_ERR_BIT));
   CHECK(bitfield_bit32_read(abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET),
                             HMAC_STATUS_HMAC_IDLE_BIT));
-  LOG_INFO("[ERRATA-HMAC-005] confirmed.");
+  LOG_INFO("[hmac.sv:349-362] confirmed.");
 }
 
-static void verify_errata_hmac_006(void) {
+static void verify_hmac_msg_length_when_sha_disabled(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-006] (INTENDED_SECURITY_HARDENING): Reading "
+      "Verifying [hmac.sv:583-612] (INTENDED_SECURITY_HARDENING): Reading "
       "write-only MSG_FIFO raises synchronous Load Access Fault (mcause=5) "
       "with zero hmac_err side effects...");
 
@@ -360,12 +360,13 @@ static void verify_errata_hmac_006(void) {
   CHECK(!bitfield_bit32_read(
       abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET),
       HMAC_INTR_STATE_HMAC_ERR_BIT));
-  LOG_INFO("[ERRATA-HMAC-006] confirmed.");
+  LOG_INFO("[hmac.sv:583-612] confirmed.");
 }
 
-static void verify_errata_hmac_007(void) {
+static void verify_hmac_permit_subword_writes_vs_msg_fifo(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-007] (INTENDED_SECURITY_HARDENING): HMAC_PERMIT "
+      "Verifying [hmac_reg_pkg.sv:441-501] (INTENDED_SECURITY_HARDENING): "
+      "HMAC_PERMIT "
       "sub-word write faults (mcause=7), sub-word read allowance, and unmapped "
       "offset 0x0f0 faults (mcause=5/7)...");
 
@@ -408,12 +409,13 @@ static void verify_errata_hmac_007(void) {
   abs_mmio_write32(kHmacBase + 0x0f0u, 0xdeadbeefu);
   CHECK(g_expected_fault_taken);
   CHECK(g_last_mcause == kMcauseStoreAccessFault);
-  LOG_INFO("[ERRATA-HMAC-007] confirmed.");
+  LOG_INFO("[hmac_reg_pkg.sv:441-501] confirmed.");
 }
 
-static void verify_errata_hmac_008(void) {
+static void verify_hmac_empty_message_sha256_digest(void) {
   LOG_INFO(
-      "Verifying [ERRATA-HMAC-008] (TRUE_SILICON_ERRATA): CMD.hash_stop after "
+      "Verifying [prim_sha2_pad.sv:238-243] (TRUE_SILICON_ERRATA): "
+      "CMD.hash_stop after "
       "unaligned message length (9 words = 288 bits) wedges u_pad in StIdle "
       "and u_sha2 in FifoLoadFromFifo (hmac_idle=0, hmac_done=0)...");
 
@@ -472,21 +474,21 @@ static void verify_errata_hmac_008(void) {
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, cfg_sha256_dis);
   CHECK(bitfield_bit32_read(abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET),
                             HMAC_STATUS_HMAC_IDLE_BIT));
-  LOG_INFO("[ERRATA-HMAC-008] confirmed.");
+  LOG_INFO("[prim_sha2_pad.sv:238-243] confirmed.");
 }
 
 bool test_main(void) {
   LOG_INFO("Starting HMAC Errata Confirmation Test on %s...",
            kDeviceType == kDeviceFpgaCw340 ? "CW340_FPGA" : "QEMU");
 
-  verify_errata_hmac_001();
-  verify_errata_hmac_002();
-  verify_errata_hmac_003();
-  verify_errata_hmac_004();
-  verify_errata_hmac_005();
-  verify_errata_hmac_006();
-  verify_errata_hmac_007();
-  verify_errata_hmac_008();
+  verify_hmac_wipe_secret_clears_msg_fifo();
+  verify_hmac_cfg_lock_while_active();
+  verify_hmac_cmd_start_without_sha_en();
+  verify_hmac_invalid_config_err_code();
+  verify_hmac_sw_push_msg_disabled_err();
+  verify_hmac_msg_length_when_sha_disabled();
+  verify_hmac_permit_subword_writes_vs_msg_fifo();
+  verify_hmac_empty_message_sha256_digest();
 
   LOG_INFO("All 8 HMAC errata & security hardening checks PASSED!");
   return true;

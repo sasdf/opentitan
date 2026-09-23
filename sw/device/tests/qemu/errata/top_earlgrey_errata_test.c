@@ -9,7 +9,7 @@
  * Exercises and confirms all documented silicon / spec / architectural
  * behaviors in `/root/knowledge/errata/top_earlgrey.md` and
  * `/root/knowledge/errata/reggen_wo_read_and_ro_write_no_tlul_error.md`:
- * - [ERRATA-TOP_EARLGREY-001] (`INTENDED_SECURITY_HARDENING` /
+ * - [top_earlgrey.sv:2083-2085] (`INTENDED_SECURITY_HARDENING` /
  * `SPEC_DOC_ERRATA`): Although `u_sram_ctrl_ret_aon` (`0x40500000`)
  * instantiates the identical `sram_ctrl_regs_reg_top.sv` CSR block as
  * `u_sram_ctrl_main` (`0x411c0000`) with writable `EXEC_REGWEN` (`0x08`) and
@@ -21,7 +21,7 @@
  *   succeeds when `SRAM_CTRL_MAIN.EXEC == 0x6`, whereas instruction fetch from
  *   Retention SRAM (`0x40600000`) synchronously faults with Instruction Access
  *   Fault (`mcause = 1`) even when `SRAM_CTRL_RET_AON.EXEC == 0x6`!
- * - [ERRATA-TOP_EARLGREY-002] (`BENIGN_RTL_IMPL_DETAIL` / `E2`):
+ * - [top_earlgrey.sv:1499-1502] (`BENIGN_RTL_IMPL_DETAIL` / `E2`):
  *   `reggen`-generated `*_reg_top.sv` across Earlgrey peripherals returns `0`
  *   with `d_error = 0` (`mcause = 0`) on `SwAccessWO` reads (`CTRL`,
  *   `ALERT_TEST`) and silently ignores 32-bit full-word writes to `SwAccessRO`
@@ -110,9 +110,9 @@ static void call_fn_catching_instr_fault(uintptr_t target_fn) {
 
 static uint32_t s_main_sram_code_buf[4] __attribute__((aligned(16)));
 
-static void test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff(void) {
+static void test_top_earlgrey_asymmetric_sram_ifetch_tieoff(void) {
   LOG_INFO(
-      "Verifying [ERRATA-TOP_EARLGREY-001]: Asymmetric sram_ctrl_ret_aon vs "
+      "Verifying [top_earlgrey.sv:2083-2085]: Asymmetric sram_ctrl_ret_aon vs "
       "sram_ctrl_main ifetch tie-off despite writable EXEC=0x6 CSRs");
 
   // Unlock the address space for RWX in ePMP (PMP entry 7: NAPOT | L | R | W |
@@ -137,10 +137,10 @@ static void test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff(void) {
 
   CHECK_EQ(abs_mmio_read32(kSramMainRegsBase + SRAM_CTRL_EXEC_REG_OFFSET),
            (uint32_t)kMultiBitBool4True,
-           "[ERRATA-TOP_EARLGREY-001] Expected SRAM_CTRL_MAIN.EXEC == 0x6");
+           "[top_earlgrey.sv:2083-2085] Expected SRAM_CTRL_MAIN.EXEC == 0x6");
   CHECK_EQ(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET),
            (uint32_t)kMultiBitBool4True,
-           "[ERRATA-TOP_EARLGREY-001] Expected SRAM_CTRL_RET_AON.EXEC == 0x6 "
+           "[top_earlgrey.sv:2083-2085] Expected SRAM_CTRL_RET_AON.EXEC == 0x6 "
            "(writable CSR despite InstrExec=0)");
 
   // 2. Write `ret` (0x00008067) into Main SRAM and verify instruction fetch
@@ -152,9 +152,10 @@ static void test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff(void) {
   g_fault_count = 0;
   g_last_mcause = 0;
   call_fn_catching_instr_fault((uintptr_t)&s_main_sram_code_buf[0]);
-  CHECK_EQ(g_fault_count, 0u,
-           "[ERRATA-TOP_EARLGREY-001] Expected Main SRAM instruction fetch to "
-           "succeed when SRAM_CTRL_MAIN.EXEC == 0x6");
+  CHECK_EQ(
+      g_fault_count, 0u,
+      "[top_earlgrey.sv:2083-2085] Expected Main SRAM instruction fetch to "
+      "succeed when SRAM_CTRL_MAIN.EXEC == 0x6");
 
   // 3. Write the exact same `ret` (0x00008067) into Retention SRAM and verify
   // instruction fetch synchronously faults with Instruction Access Fault
@@ -172,14 +173,15 @@ static void test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff(void) {
   g_last_mepc = 0;
   call_fn_catching_instr_fault(ret_sram_code_addr);
   CHECK_EQ(g_fault_count, 1u,
-           "[ERRATA-TOP_EARLGREY-001] Expected Retention SRAM instruction "
+           "[top_earlgrey.sv:2083-2085] Expected Retention SRAM instruction "
            "fetch to fault even with SRAM_CTRL_RET_AON.EXEC == 0x6");
-  CHECK_EQ(g_last_mcause, (uint32_t)kRiscvInstrAccessFault,
-           "[ERRATA-TOP_EARLGREY-001] Expected mcause == 1 (Instruction Access "
-           "Fault), got %u",
-           g_last_mcause);
+  CHECK_EQ(
+      g_last_mcause, (uint32_t)kRiscvInstrAccessFault,
+      "[top_earlgrey.sv:2083-2085] Expected mcause == 1 (Instruction Access "
+      "Fault), got %u",
+      g_last_mcause);
   CHECK_EQ(g_last_mepc, (uint32_t)ret_sram_code_addr,
-           "[ERRATA-TOP_EARLGREY-001] Expected mepc == 0x%08x, got 0x%08x",
+           "[top_earlgrey.sv:2083-2085] Expected mepc == 0x%08x, got 0x%08x",
            (uint32_t)ret_sram_code_addr, g_last_mepc);
 
   // Restore original EXEC CSR values.
@@ -188,9 +190,10 @@ static void test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff(void) {
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET, orig_ret_exec);
 }
 
-static void test_errata_top_earlgrey_002_reggen_wo_read_and_ro_write(void) {
+static void test_top_earlgrey_reggen_wo_read_and_ro_write(void) {
   LOG_INFO(
-      "Verifying [ERRATA-TOP_EARLGREY-002]: reggen SwAccessWO reads return 0 & "
+      "Verifying [top_earlgrey.sv:1499-1502]: reggen SwAccessWO reads return 0 "
+      "& "
       "SwAccessRO full-word writes ignored with d_error=0 vs unmapped "
       "addrmiss");
 
@@ -204,8 +207,9 @@ static void test_errata_top_earlgrey_002_reggen_wo_read_and_ro_write(void) {
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET);
   uint32_t rstmgr_alert_test =
       abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET);
-  CHECK_EQ(g_fault_count, 0u,
-           "[ERRATA-TOP_EARLGREY-002] Reading SwAccessWO CSRs must not fault");
+  CHECK_EQ(
+      g_fault_count, 0u,
+      "[top_earlgrey.sv:1499-1502] Reading SwAccessWO CSRs must not fault");
   CHECK_EQ(main_ctrl, 0u, "Expected SRAM_CTRL_MAIN.CTRL (WO) read == 0");
   CHECK_EQ(ret_ctrl, 0u, "Expected SRAM_CTRL_RET_AON.CTRL (WO) read == 0");
   CHECK_EQ(rstmgr_alert_test, 0u,
@@ -226,9 +230,10 @@ static void test_errata_top_earlgrey_002_reggen_wo_read_and_ro_write(void) {
                    0xFFFFFFFFu);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET, 0xFFFFFFFFu);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET, 0xFFFFFFFFu);
-  CHECK_EQ(g_fault_count, 0u,
-           "[ERRATA-TOP_EARLGREY-002] Full-word writes to SwAccessRO CSRs must "
-           "not fault");
+  CHECK_EQ(
+      g_fault_count, 0u,
+      "[top_earlgrey.sv:1499-1502] Full-word writes to SwAccessRO CSRs must "
+      "not fault");
   CHECK_EQ(abs_mmio_read32(kSramMainRegsBase + SRAM_CTRL_STATUS_REG_OFFSET),
            main_status_before,
            "Expected SRAM_CTRL_MAIN.STATUS (RO) to remain unchanged");
@@ -260,8 +265,8 @@ bool test_main(void) {
   LOG_INFO(
       "Starting top_earlgrey CW340 FPGA & QEMU errata confirmation test (P37)");
 
-  test_errata_top_earlgrey_001_asymmetric_sram_ifetch_tieoff();
-  test_errata_top_earlgrey_002_reggen_wo_read_and_ro_write();
+  test_top_earlgrey_asymmetric_sram_ifetch_tieoff();
+  test_top_earlgrey_reggen_wo_read_and_ro_write();
 
   LOG_INFO("All top_earlgrey errata checks PASSED");
   return true;

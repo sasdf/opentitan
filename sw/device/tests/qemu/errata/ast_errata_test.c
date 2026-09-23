@@ -7,7 +7,7 @@
  * @brief CW340 FPGA & QEMU Errata Confirmation Test for `ast` (P19).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-AST-001] (TRUE_SILICON_ERRATA):
+ * - [ast.sv:861-877] (TRUE_SILICON_ERRATA):
  *   1) `REGA0` (`0x00`), `REGA1` (`0x04`), and `REGA28` (`0x70`) are described
  *      as "for OTP/ROM Write Testing" (and written by ROM during boot), yet
  *      have `SwAccessRO` (`.we(1'b0)` in `ast_reg_top.sv:252-305, 1035-1060`):
@@ -20,7 +20,7 @@
  * readback to `0x00000000` before and after 32-bit writes. 3) `REGA2..REGA27`,
  * `REGA29..REGA37`, and `REGB0..REGB4` (`0x200..0x210`) accept and retain full
  * 32-bit read-write values (`E4`).
- * - [ERRATA-AST-002] (INTENDED_SECURITY_HARDENING):
+ * - [ast_reg_pkg.sv:305-355] (INTENDED_SECURITY_HARDENING):
  *   1) `AST_PERMIT[0..43]` is `4'b1111` (`ast_reg_pkg.sv:305-355`), so any
  *      sub-word (8-bit or 16-bit) write to `REGA0`, `REGA2`, or `REGAL` raises
  *      a synchronous TL-UL bus fault (`d_error = 1`, Ibex Store Access Fault
@@ -79,9 +79,9 @@ void ottf_exception_handler(uint32_t *exc_info) {
   abort();
 }
 
-static void verify_errata_ast_001_rega_ro_and_regal_dead_readback(void) {
+static void verify_ast_rega_ro_and_regal_dead_readback(void) {
   LOG_INFO(
-      "Verifying [ERRATA-AST-001] (TRUE_SILICON_ERRATA): REGA0/1/28 SwAccessRO "
+      "Verifying [ast.sv:861-877] (TRUE_SILICON_ERRATA): REGA0/1/28 SwAccessRO "
       "& REGAL disconnected u_regal.qs() readback...");
 
   // 1. REGA0 (0x00), REGA1 (0x04), and REGA28 (0x70) are SwAccessRO:
@@ -119,7 +119,7 @@ static void verify_errata_ast_001_rega_ro_and_regal_dead_readback(void) {
   g_fault_seen = false;
   uint32_t regal_before = abs_mmio_read32(kAstBase + kAstRegalOffset);
   CHECK(regal_before == 0x00000000u,
-        "[ERRATA-AST-001] REGAL readback must be 0x00000000 (not 0x26), got "
+        "[ast.sv:861-877] REGAL readback must be 0x00000000 (not 0x26), got "
         "0x%08x",
         regal_before);
 
@@ -127,14 +127,15 @@ static void verify_errata_ast_001_rega_ro_and_regal_dead_readback(void) {
   uint32_t regal_after = abs_mmio_read32(kAstBase + kAstRegalOffset);
   CHECK(!g_fault_seen, "32-bit write/read on REGAL must not fault");
   CHECK(regal_after == 0x00000000u,
-        "[ERRATA-AST-001] REGAL readback after write must still be 0x00000000, "
+        "[ast.sv:861-877] REGAL readback after write must still be 0x00000000, "
         "got 0x%08x",
         regal_after);
 }
 
-static void verify_errata_ast_002_subword_wr_err_and_addrmiss(void) {
+static void verify_ast_subword_wr_err_and_addrmiss(void) {
   LOG_INFO(
-      "Verifying [ERRATA-AST-002] (INTENDED_SECURITY_HARDENING): AST_PERMIT "
+      "Verifying [ast_reg_pkg.sv:305-355] (INTENDED_SECURITY_HARDENING): "
+      "AST_PERMIT "
       "sub-word wr_err & unmapped aperture addrmiss...");
 
   uint32_t saved_rega2 = abs_mmio_read32(kAstBase + kAstRega2Offset);
@@ -194,8 +195,8 @@ static void verify_errata_ast_002_subword_wr_err_and_addrmiss(void) {
 }
 
 bool test_main(void) {
-  verify_errata_ast_001_rega_ro_and_regal_dead_readback();
-  verify_errata_ast_002_subword_wr_err_and_addrmiss();
-  LOG_INFO("All [ERRATA-AST-001..002] checks confirmed!");
+  verify_ast_rega_ro_and_regal_dead_readback();
+  verify_ast_subword_wr_err_and_addrmiss();
+  LOG_INFO("All [ast.sv:861-877..002] checks confirmed!");
   return true;
 }

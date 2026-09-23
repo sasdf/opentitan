@@ -11,7 +11,7 @@
  * errata, specification errata, and security hardening behaviors on physical
  * CW340 FPGA silicon and QEMU (`sim_qemu`):
  *
- * - `[ERRATA-PATTGEN-001]` (`SPEC_DOC_ERRATA` — `LOW` / `HIGH (95%)`):
+ * - `[pattgen_chan.sv:49-67]` (`SPEC_DOC_ERRATA` — `LOW` / `HIGH (95%)`):
  *   1. `pattgen_chan.sv:55-57` freezes operational shadow flops
  *      `inactive_level_pcl_q` and `inactive_level_pda_q` while `ENABLE_CHx = 1`
  *      (even after pattern completion `complete_q = 1`), while MMIO CSR writes
@@ -22,8 +22,8 @@
  *      contradicting `theory_of_operation.md:52` ("the pda data lines reset to
  *      zero").
  *
- * - `[ERRATA-PATTGEN-002]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `HIGH (90%)`):
- *   Disabling a channel mid-pattern (`CTRL.ENABLE_CHx = 0` while
+ * - `[pattgen_chan.sv:145-150]` (`TRUE_SILICON_ERRATA` — `MEDIUM` / `HIGH
+ * (90%)`): Disabling a channel mid-pattern (`CTRL.ENABLE_CHx = 0` while
  *   `complete_q == 0`) fails to clear `active_q` because
  *   `pattgen_chan.sv:145-150` defines
  *   `active_d = complete_q ? 1'b0 : enable ? 1'b1 : active_q`. This leaves
@@ -31,7 +31,7 @@
  *   `polarity_q` and `data_q[0]` instead of `INACTIVE_LEVEL_*` until a pattern
  *   is allowed to reach `complete_q == 1`.
  *
- * - `[ERRATA-PATTGEN-003]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
+ * - `[pattgen_reg_pkg.sv:180-193]` (`INTENDED_SECURITY_HARDENING` — `INFO`):
  *   `PATTGEN_PERMIT[11] = 4'b1111` (`pattgen_reg_pkg.sv:180-193`,
  *   `pattgen_reg_top.sv:875-889`) rejects 16-bit half-word writes (`sh`) to
  *   the shared `SIZE` (`0x2c`) register (Channel 0 at `[15:0]`, Channel 1 at
@@ -98,9 +98,9 @@ static void setup_pinmux_loopback(void) {
   abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0x0u);
 }
 
-static void test_errata_001_inactive_level_freeze_and_end_pda(void) {
+static void test_inactive_level_freeze_and_end_pda(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PATTGEN-001] (SPEC_DOC_ERRATA): "
+      "Verifying [pattgen_chan.sv:49-67] (SPEC_DOC_ERRATA): "
       "INACTIVE_LEVEL_* shadow freeze while ENABLE_CH0=1 & PDA at END...");
 
   const uint32_t kEn0 = 1u << PATTGEN_CTRL_ENABLE_CH0_BIT;
@@ -150,13 +150,13 @@ static void test_errata_001_inactive_level_freeze_and_end_pda(void) {
   abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
   CHECK(read_pda0_pcl0() == 0x0u);
   LOG_INFO(
-      "[ERRATA-PATTGEN-001] confirmed: INACTIVE_LEVEL_* frozen while "
+      "[pattgen_chan.sv:49-67] confirmed: INACTIVE_LEVEL_* frozen while "
       "ENABLE_CH0=1 and PDA outputs inactive_level_pda_q at END.");
 }
 
-static void test_errata_002_mid_pattern_disable_active_q_stuck(void) {
+static void test_mid_pattern_disable_active_q_stuck(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PATTGEN-002] (TRUE_SILICON_ERRATA): clearing "
+      "Verifying [pattgen_chan.sv:145-150] (TRUE_SILICON_ERRATA): clearing "
       "ENABLE_CH0 mid-pattern (complete_q==0) leaves active_q stuck at "
       "1...");
 
@@ -197,13 +197,13 @@ static void test_errata_002_mid_pattern_disable_active_q_stuck(void) {
   abs_mmio_write32(kPattgenBase + PATTGEN_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kPattgenBase + PATTGEN_INTR_STATE_REG_OFFSET, 0x3u);
   LOG_INFO(
-      "[ERRATA-PATTGEN-002] confirmed: mid-pattern disable leaves "
+      "[pattgen_chan.sv:145-150] confirmed: mid-pattern disable leaves "
       "active_q==1 (PDA0/PCL0=0x3); completion pulse clears active_q.");
 }
 
-static void test_errata_003_size_subword_write_bus_fault(void) {
+static void test_size_subword_write_bus_fault(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PATTGEN-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [pattgen_reg_pkg.sv:180-193] (INTENDED_SECURITY_HARDENING): "
       "16-bit half-word writes to shared SIZE (0x2c) fault with "
       "mcause=7...");
 
@@ -238,7 +238,8 @@ static void test_errata_003_size_subword_write_bus_fault(void) {
         kExpectedSize);
 
   LOG_INFO(
-      "[ERRATA-PATTGEN-003] confirmed: 16-bit half-word writes to shared "
+      "[pattgen_reg_pkg.sv:180-193] confirmed: 16-bit half-word writes to "
+      "shared "
       "SIZE fault with mcause=7 (faults=%u).",
       g_store_fault_count);
 }
@@ -246,9 +247,9 @@ static void test_errata_003_size_subword_write_bus_fault(void) {
 bool test_main(void) {
   LOG_INFO("Starting pattgen hardware errata confirmation suite...");
   setup_pinmux_loopback();
-  test_errata_001_inactive_level_freeze_and_end_pda();
-  test_errata_002_mid_pattern_disable_active_q_stuck();
-  test_errata_003_size_subword_write_bus_fault();
+  test_inactive_level_freeze_and_end_pda();
+  test_mid_pattern_disable_active_q_stuck();
+  test_size_subword_write_bus_fault();
   LOG_INFO("All pattgen errata checks confirmed on hardware!");
   return true;
 }

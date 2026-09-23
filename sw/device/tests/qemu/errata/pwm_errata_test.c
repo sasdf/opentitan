@@ -54,9 +54,10 @@ static inline uint32_t sample_pwm0(void) {
   return abs_mmio_read32(kGpioBase + GPIO_DATA_IN_REG_OFFSET) & 0x1u;
 }
 
-static void verify_errata_pwm_004_invert_when_disabled(void) {
+static void verify_pwm_invert_when_disabled(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWM-004] (SPEC_DOC_ERRATA / BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [pwm_chan.sv:182-186] (SPEC_DOC_ERRATA / "
+      "BENIGN_RTL_IMPL_DETAIL): "
       "INVERT drives pwm_o high even when PWM_EN=0 and CFG.CNTR_EN=0");
 
   abs_mmio_write32(kPwmBase + PWM_PWM_EN_REG_OFFSET, 0x0u);
@@ -76,12 +77,13 @@ static void verify_errata_pwm_004_invert_when_disabled(void) {
   abs_mmio_write32(kPwmBase + PWM_INVERT_REG_OFFSET, 0x0u);
   busy_spin_micros(30);
   CHECK(sample_pwm0() == 0u);
-  LOG_INFO("[ERRATA-PWM-004] confirmed: pwm_o=%u when INVERT=1, PWM_EN=0", 1u);
+  LOG_INFO("[pwm_chan.sv:182-186] confirmed: pwm_o=%u when INVERT=1, PWM_EN=0",
+           1u);
 }
 
-static void verify_errata_pwm_001_phase_ctr_clear_and_ungated_output(void) {
+static void verify_pwm_phase_ctr_clear_and_ungated_output(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWM-001] (TRUE_SILICON_ERRATA): "
+      "Verifying [pwm_core.sv:83-85] (TRUE_SILICON_ERRATA): "
       "phase_ctr_en = beat_end & (clr_phase_cntr | cntr_en) fails to reset "
       "phase_ctr_q when beat_ctr_q != clk_div and leaves pwm_o driven when "
       "CFG.CNTR_EN=0");
@@ -138,7 +140,7 @@ static void verify_errata_pwm_001_phase_ctr_clear_and_ungated_output(void) {
   uint32_t frozen_out = sample_pwm0();
   CHECK(frozen_out == 0u);
 
-  // Now apply the [ERRATA-PWM-001] workaround while CFG.CNTR_EN remains 0:
+  // Now apply the [pwm_core.sv:83-85] workaround while CFG.CNTR_EN remains 0:
   // Because the previous CFG write reset beat_ctr_q to 0, writing CFG = 0
   // (CLK_DIV = 0, CNTR_EN = 0) makes beat_end = (beat_ctr_q == clk_div) = (0 ==
   // 0) = 1, asserting phase_ctr_en = 1 and resetting phase_ctr_q to 0x0000! And
@@ -157,15 +159,16 @@ static void verify_errata_pwm_001_phase_ctr_clear_and_ungated_output(void) {
   CHECK(sample_pwm0() == 0u);
 
   LOG_INFO(
-      "[ERRATA-PWM-001] confirmed: CNTR_EN=0 with CLK_DIV=%u left phase_ctr_q "
+      "[pwm_core.sv:83-85] confirmed: CNTR_EN=0 with CLK_DIV=%u left "
+      "phase_ctr_q "
       "frozen at 0x8000 (pwm_o=%u), and CLK_DIV=0 reset phase_ctr_q to 0x0000 "
       "driving ungated pwm_o=%u while CNTR_EN=0",
       kClkDiv, frozen_out, reset_phase_out);
 }
 
-static void verify_errata_pwm_002_htbt_reload_requires_htbt_en_zero(void) {
+static void verify_pwm_htbt_reload_requires_htbt_en_zero(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWM-002] (TRUE_SILICON_ERRATA): "
+      "Verifying [pwm_chan.sv:144] (TRUE_SILICON_ERRATA): "
       "dc_htbt_q only reloads DUTY_CYCLE.A when HTBT_EN=0 (ignoring "
       "BLINK_EN=0)");
 
@@ -223,15 +226,15 @@ static void verify_errata_pwm_002_htbt_reload_requires_htbt_en_zero(void) {
   busy_spin_micros(30);
 
   LOG_INFO(
-      "[ERRATA-PWM-002] confirmed: stale dc_htbt_q drove pwm_o=%u when "
+      "[pwm_chan.sv:144] confirmed: stale dc_htbt_q drove pwm_o=%u when "
       "BLINK_EN=0->1 with HTBT_EN=1; clearing HTBT_EN=0 reloaded dc_htbt_q "
       "driving pwm_o=%u",
       stale_htbt_out, reloaded_htbt_out);
 }
 
-static void verify_errata_pwm_003_subword_write_permit_faults(void) {
+static void verify_pwm_subword_write_permit_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PWM-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [pwm_reg_pkg.sv:155-179] (INTENDED_SECURITY_HARDENING): "
       "PWM_PERMIT=4'b1111 rejects 16-bit/8-bit sub-word writes to DUTY_CYCLE, "
       "BLINK_PARAM, PWM_PARAM, and CFG with synchronous Store Access Fault "
       "(mcause=7)");
@@ -286,7 +289,8 @@ static void verify_errata_pwm_003_subword_write_permit_faults(void) {
 
   abs_mmio_write8(kPwmBase + PWM_INVERT_REG_OFFSET, 0x00u);
   LOG_INFO(
-      "[ERRATA-PWM-003] confirmed: all %u disallowed sub-word writes raised "
+      "[pwm_reg_pkg.sv:155-179] confirmed: all %u disallowed sub-word writes "
+      "raised "
       "synchronous Store Access Fault (mcause=7) without mutating CSRs",
       g_store_fault_count);
 }
@@ -298,11 +302,11 @@ bool test_main(void) {
   abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET,
                    kTopEarlgreyPinmuxInselIoa0);
 
-  verify_errata_pwm_004_invert_when_disabled();
-  verify_errata_pwm_001_phase_ctr_clear_and_ungated_output();
-  verify_errata_pwm_002_htbt_reload_requires_htbt_en_zero();
-  verify_errata_pwm_003_subword_write_permit_faults();
+  verify_pwm_invert_when_disabled();
+  verify_pwm_phase_ctr_clear_and_ungated_output();
+  verify_pwm_htbt_reload_requires_htbt_en_zero();
+  verify_pwm_subword_write_permit_faults();
 
-  LOG_INFO("All pwm errata checks ([ERRATA-PWM-001..004]) confirmed!");
+  LOG_INFO("All pwm errata checks ([pwm_core.sv:83-85..004]) confirmed!");
   return true;
 }

@@ -9,7 +9,7 @@
  * `/root/knowledge/errata/xbar_main_and_xbar_peri.md`).
  *
  * Empirically confirms on both physical CW340 FPGA silicon and QEMU:
- * - [ERRATA-XBAR-001] (`Category E2` / `INTENDED_SECURITY_HARDENING`):
+ * - [tl_peri_pkg.sv:26] (`Category E2` / `INTENDED_SECURITY_HARDENING`):
  *   Two-stage TileLink-UL bus error architecture (`SEC_CM: BUS.INTEGRITY`):
  *   1. Stage 1 (`xbar_main` & `xbar_peri` `tlul_err_resp`): Accesses to
  *      unmapped crossbar apertures (`0x40010000` in `xbar_peri`, `0x40320000`
@@ -81,9 +81,9 @@ static void expect_store_fault(uint32_t addr, uint32_t val) {
   CHECK(g_fault_count == before + 1);
 }
 
-static void test_errata_xbar_001_two_stage_decode_faults(void) {
+static void test_xbar_two_stage_decode_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-XBAR-001] (Category E2 / "
+      "Verifying [tl_peri_pkg.sv:26] (Category E2 / "
       "INTENDED_SECURITY_HARDENING): "
       "Two-stage xbar_main/xbar_peri ADDR_MASK vs *_reg_top.sv addrmiss "
       "faults");
@@ -140,14 +140,14 @@ static void test_errata_xbar_001_two_stage_decode_faults(void) {
   expect_store_fault(kSysrstBase + 0xfcu, 0u);
 
   LOG_INFO(
-      "[ERRATA-XBAR-001] Confirmed %u synchronous TL-UL bus faults across "
+      "[tl_peri_pkg.sv:26] Confirmed %u synchronous TL-UL bus faults across "
       "xbar_main/xbar_peri and pattgen/spi_host/sysrst_ctrl tail apertures",
       g_fault_count);
 }
 
 bool test_main(void) {
   LOG_INFO("=== xbar_main_and_xbar_peri Errata Confirmation Test Suite ===");
-  test_errata_xbar_001_two_stage_decode_faults();
+  test_xbar_two_stage_decode_faults();
   LOG_INFO("=== All xbar_main_and_xbar_peri Errata Checks PASSED ===");
   return true;
 }

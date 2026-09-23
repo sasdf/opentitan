@@ -13,7 +13,7 @@
  * on both physical CW340 FPGA silicon (`fpga_cw340_rom_with_fake_keys`) and
  * QEMU (`sim_qemu_rom_with_fake_keys`):
  *
- * - `[ERRATA-SYSRST_CTRL-001]` (`SPEC_DOC_ERRATA`):
+ * - `[sysrst_ctrl.sv:106-111]` (`SPEC_DOC_ERRATA`):
  *   1. `PIN_IN_VALUE` (`0x40`) samples raw uninverted `cio_*_in_i` inputs
  *      (`sysrst_ctrl_pin.sv:50-77`), unaffected by `KEY_INVERT_CTL` (`0x30`).
  *   2. Software writes to `KEY_INVERT_CTL` (`0x30`) while `KEY_INTR_CTL`
@@ -25,16 +25,16 @@
  *      selected input is already active (`in_i & cfg_in_sel == 0`) immediately
  *      fires `COMBO_INTR_STATUS` (`0xa4`) on the next AON cycle without
  *      requiring a fresh pin transition (`sysrst_ctrl_combo.sv:75-120`).
- * - `[ERRATA-SYSRST_CTRL-002]` (`SPEC_DOC_ERRATA`): `ULP_STATUS` (`0x28`,
+ * - `[sysrst_ctrl_ulp.sv:68-95]` (`SPEC_DOC_ERRATA`): `ULP_STATUS` (`0x28`,
  * `rw1c`) is driven by the single-cycle `event_detected_pulse_o` on `DetectSt
  * -> StableSt` (`sysrst_ctrl_detect.sv:180-211`), while `Sticky = 1` parks the
  *   FSM in `StableSt` (`event_detected_o = 1`). Consequently, `rw1c`-clearing
  *   `ULP_STATUS` while `ULP_CTL == 1` stays `0` (does NOT re-latch even while
  *   `ac_present_int == 1`), yet blocks any subsequent ULP trigger until
  *   `ULP_CTL` is cycled `1 -> 0 -> 1`.
- * - `[ERRATA-SYSRST_CTRL-003]` (`INTENDED_SECURITY_HARDENING`): Heterogeneous
- *   1/2/3/4-byte `SYSRST_CTRL_PERMIT[43]` byte-enable masks (`4'b0001`,
- *   `4'b0011`, `4'b0111` on `AUTO_BLOCK_DEBOUNCE_CTL`, `4'b1111` on
+ * - `[sysrst_ctrl_reg_pkg.sv:678-722]` (`INTENDED_SECURITY_HARDENING`):
+ * Heterogeneous 1/2/3/4-byte `SYSRST_CTRL_PERMIT[43]` byte-enable masks
+ * (`4'b0001`, `4'b0011`, `4'b0111` on `AUTO_BLOCK_DEBOUNCE_CTL`, `4'b1111` on
  *   `COM_*_DET_CTL_*`) raise synchronous Store Access Faults (`mcause = 7`) on
  *   narrower sub-word writes, while `PIN_OUT_CTL` (`0x38`) and `PIN_OUT_VALUE`
  *   (`0x3c`) remain writable after `REGWEN` (`0x10`, `rw0c`) is cleared to `0`.
@@ -106,7 +106,7 @@ bool test_main(void) {
       (pin_in_initial >> SYSRST_CTRL_PIN_IN_VALUE_KEY0_IN_BIT) & 1u;
 
   // =========================================================================
-  // Check 1: [ERRATA-SYSRST_CTRL-001] (SPEC_DOC_ERRATA)
+  // Check 1: [sysrst_ctrl.sv:106-111] (SPEC_DOC_ERRATA)
   // (a) `PIN_IN_VALUE` (`0x40`) reports raw uninverted `cio_*_in_i` pin levels
   //     regardless of `KEY_INVERT_CTL` (`0x30`).
   // (b) Flipping `KEY_INVERT_CTL` in software while `KEY_INTR_CTL` (`0x44`) is
@@ -116,7 +116,7 @@ bool test_main(void) {
   //     already active immediately triggers `COMBO_INTR_STATUS`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-SYSRST_CTRL-001] (SPEC_DOC_ERRATA): "
+      "Verifying [sysrst_ctrl.sv:106-111] (SPEC_DOC_ERRATA): "
       "Raw uninverted PIN_IN_VALUE vs KEY_INVERT_CTL, software-synthesized "
       "KEY_INTR_STATUS edges, and immediate COM_DET_CTL_0=0 combo trigger...");
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INTR_DEBOUNCE_CTL_REG_OFFSET,
@@ -131,7 +131,7 @@ bool test_main(void) {
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_KEY_INTR_STATUS_REG_OFFSET) ==
             0u,
-        "[ERRATA-SYSRST_CTRL-001] Expected KEY_INTR_STATUS == 0 before "
+        "[sysrst_ctrl.sv:106-111] Expected KEY_INTR_STATUS == 0 before "
         "KEY_INVERT_CTL write");
 
   // Flip KEY0_IN in KEY_INVERT_CTL while KEY_INTR_CTL is enabled:
@@ -142,7 +142,7 @@ bool test_main(void) {
   uint32_t pin_in_after_invert =
       abs_mmio_read32(kSysrstBase + SYSRST_CTRL_PIN_IN_VALUE_REG_OFFSET);
   CHECK(pin_in_after_invert == pin_in_initial,
-        "[ERRATA-SYSRST_CTRL-001] Expected PIN_IN_VALUE to remain raw "
+        "[sysrst_ctrl.sv:106-111] Expected PIN_IN_VALUE to remain raw "
         "uninverted (0x%08x), got 0x%08x",
         pin_in_initial, pin_in_after_invert);
 
@@ -151,7 +151,7 @@ bool test_main(void) {
   uint32_t intr_state =
       abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET);
   CHECK(key_intr_status != 0u && (intr_state & 0x1u) == 1u,
-        "[ERRATA-SYSRST_CTRL-001] Expected KEY_INVERT_CTL write while "
+        "[sysrst_ctrl.sv:106-111] Expected KEY_INVERT_CTL write while "
         "KEY_INTR_CTL enabled to synthesize edge and set KEY_INTR_STATUS "
         "(0x%x) & INTR_STATE (0x%x)",
         key_intr_status, intr_state);
@@ -185,7 +185,7 @@ bool test_main(void) {
   uint32_t combo_status_no_edge =
       abs_mmio_read32(kSysrstBase + SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET);
   CHECK(combo_status_no_edge == 0u,
-        "[ERRATA-SYSRST_CTRL-001] Expected COMBO_INTR_STATUS == 0 when "
+        "[sysrst_ctrl.sv:106-111] Expected COMBO_INTR_STATUS == 0 when "
         "COM_SEL_CTL_0=1 is written while key0_int is already 0 (trigger stays "
         "1->1), got 0x%x",
         combo_status_no_edge);
@@ -201,7 +201,7 @@ bool test_main(void) {
   uint32_t combo_status =
       abs_mmio_read32(kSysrstBase + SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET);
   CHECK((combo_status & 0x1u) == 1u,
-        "[ERRATA-SYSRST_CTRL-001] Expected COMBO_INTR_STATUS bit 0 == 1 after "
+        "[sysrst_ctrl.sv:106-111] Expected COMBO_INTR_STATUS bit 0 == 1 after "
         "KEY_INVERT_CTL synthesizes 1->0 key0_int edge, got 0x%x",
         combo_status);
 
@@ -220,7 +220,7 @@ bool test_main(void) {
   busy_spin_micros(60);
 
   // =========================================================================
-  // Check 2: [ERRATA-SYSRST_CTRL-002] (SPEC_DOC_ERRATA)
+  // Check 2: [sysrst_ctrl_ulp.sv:68-95] (SPEC_DOC_ERRATA)
   // `ULP_STATUS` (`0x28`) single-cycle `event_detected_pulse_o` vs `Sticky = 1`
   // `StableSt` park:
   // - Enabling `ULP_CTL = 1` with `ac_present_int == 1` sets `ULP_STATUS = 1`
@@ -231,7 +231,7 @@ bool test_main(void) {
   //   until `ULP_CTL` is toggled `1 -> 0 -> 1`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-SYSRST_CTRL-002] (SPEC_DOC_ERRATA): "
+      "Verifying [sysrst_ctrl_ulp.sv:68-95] (SPEC_DOC_ERRATA): "
       "ULP_STATUS rw1c single-pulse behavior vs Sticky=1 StableSt park "
       "requiring ULP_CTL 1->0->1 cycle...");
   uint32_t inv_ac_high =
@@ -246,10 +246,10 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 1u);
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 1u,
-        "[ERRATA-SYSRST_CTRL-002] Expected ULP_STATUS == 1 on initial ULP "
+        "[sysrst_ctrl_ulp.sv:68-95] Expected ULP_STATUS == 1 on initial ULP "
         "detection");
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) == 1u,
-        "[ERRATA-SYSRST_CTRL-002] Expected WKUP_STATUS == 1 on initial ULP "
+        "[sysrst_ctrl_ulp.sv:68-95] Expected WKUP_STATUS == 1 on initial ULP "
         "detection");
 
   // Clear ULP_STATUS and WKUP_STATUS (`rw1c`) WITHOUT clearing ULP_CTL:
@@ -257,7 +257,7 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 0u,
-        "[ERRATA-SYSRST_CTRL-002] Expected ULP_STATUS to stay 0 after rw1c "
+        "[sysrst_ctrl_ulp.sv:68-95] Expected ULP_STATUS to stay 0 after rw1c "
         "even while ULP_CTL==1 and ac_present_int==1");
 
   // Toggle ac_present_int 1 -> 0 -> 1 while ULP_CTL is still 1: because
@@ -270,7 +270,7 @@ bool test_main(void) {
                    inv_ac_high);
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 0u,
-        "[ERRATA-SYSRST_CTRL-002] Expected Sticky=1 StableSt to block new "
+        "[sysrst_ctrl_ulp.sv:68-95] Expected Sticky=1 StableSt to block new "
         "ULP_STATUS pulse until ULP_CTL is cleared to 0");
 
   // Now cycle ULP_CTL 1 -> 0 -> 1 and verify ULP_STATUS fires again:
@@ -279,7 +279,7 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 1u);
   busy_spin_micros(60);
   CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 1u,
-        "[ERRATA-SYSRST_CTRL-002] Expected ULP_STATUS == 1 after cycling "
+        "[sysrst_ctrl_ulp.sv:68-95] Expected ULP_STATUS == 1 after cycling "
         "ULP_CTL 1 -> 0 -> 1");
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET, 0u);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET, 0u);
@@ -288,12 +288,13 @@ bool test_main(void) {
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET, 1u);
 
   // =========================================================================
-  // Check 3: [ERRATA-SYSRST_CTRL-003] (INTENDED_SECURITY_HARDENING)
+  // Check 3: [sysrst_ctrl_reg_pkg.sv:678-722] (INTENDED_SECURITY_HARDENING)
   // Heterogeneous 1/2/3/4-byte `SYSRST_CTRL_PERMIT[43]` byte-enable masks &
   // `PIN_OUT_CTL` / `PIN_OUT_VALUE` ungated by `REGWEN = 0`.
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-SYSRST_CTRL-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [sysrst_ctrl_reg_pkg.sv:678-722] "
+      "(INTENDED_SECURITY_HARDENING): "
       "Heterogeneous SYSRST_CTRL_PERMIT (4'b0001/0011/0111/1111) sub-word "
       "write faults (mcause=7) & PIN_OUT_CTL/PIN_OUT_VALUE ungated by "
       "REGWEN...");
@@ -302,7 +303,8 @@ bool test_main(void) {
   *(volatile uint16_t *)(kSysrstBase +
                          SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET) = 0x0010u;
   CHECK(g_fault_count == 0u,
-        "[ERRATA-SYSRST_CTRL-003] Expected 16-bit sh to ULP_AC_DEBOUNCE_CTL "
+        "[sysrst_ctrl_reg_pkg.sv:678-722] Expected 16-bit sh to "
+        "ULP_AC_DEBOUNCE_CTL "
         "(permit 4'b0011) to succeed");
 
   // 8-bit sb write to ULP_AC_DEBOUNCE_CTL (0x18, permit 4'b0011) faults:
@@ -311,7 +313,8 @@ bool test_main(void) {
   abs_mmio_write8(kSysrstBase + SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET,
                   0x20u);
   CHECK(g_fault_count == 1u && g_last_mcause == 7u,
-        "[ERRATA-SYSRST_CTRL-003] Expected 8-bit sb to ULP_AC_DEBOUNCE_CTL "
+        "[sysrst_ctrl_reg_pkg.sv:678-722] Expected 8-bit sb to "
+        "ULP_AC_DEBOUNCE_CTL "
         "(permit 4'b0011) to trap with mcause=7");
 
   // 16-bit sh write to AUTO_BLOCK_DEBOUNCE_CTL (0x4c, permit 4'b0111) faults:
@@ -321,7 +324,7 @@ bool test_main(void) {
                          SYSRST_CTRL_AUTO_BLOCK_DEBOUNCE_CTL_REG_OFFSET) =
       0x0010u;
   CHECK(g_fault_count == 1u && g_last_mcause == 7u,
-        "[ERRATA-SYSRST_CTRL-003] Expected 16-bit sh to "
+        "[sysrst_ctrl_reg_pkg.sv:678-722] Expected 16-bit sh to "
         "AUTO_BLOCK_DEBOUNCE_CTL (permit 4'b0111) to trap with mcause=7");
 
   // 16-bit sh write to COM_DET_CTL_0 (0x84, permit 4'b1111) faults:
@@ -330,7 +333,7 @@ bool test_main(void) {
   *(volatile uint16_t *)(kSysrstBase + SYSRST_CTRL_COM_DET_CTL_0_REG_OFFSET) =
       0x0010u;
   CHECK(g_fault_count == 1u && g_last_mcause == 7u,
-        "[ERRATA-SYSRST_CTRL-003] Expected 16-bit sh to COM_DET_CTL_0 "
+        "[sysrst_ctrl_reg_pkg.sv:678-722] Expected 16-bit sh to COM_DET_CTL_0 "
         "(permit 4'b1111) to trap with mcause=7");
 
   // Clear REGWEN (`0x10`, rw0c) to 0 and verify `PIN_ALLOWED_CTL` is locked

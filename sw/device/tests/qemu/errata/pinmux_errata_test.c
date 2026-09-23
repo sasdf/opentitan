@@ -10,7 +10,7 @@
  * `/root/knowledge/errata/pinmux_wkup_cnt_th_zero_and_padsel_offset.md` across
  * both the physical CW340 FPGA (golden Earlgrey RTL) and QEMU (`ot_pinmux_eg`):
  *
- * - [ERRATA-PINMUX-003] (TRUE_SILICON_ERRATA):
+ * - [pinmux_wkup.sv:52] (TRUE_SILICON_ERRATA):
  *   In `pinmux_wkup.sv:52, 65-72`, `HighTimed` (`MODE = 3`) and `LowTimed`
  *   (`MODE = 4`) output `aon_wkup_pulse_o = cnt_eq_th` (`cnt_q >=
  * wkup_cnt_th_i`) WITHOUT gating by `cnt_en` (`filter_out_d` /
@@ -20,7 +20,7 @@
  * LOW `ConstantZero` in `TimedHigh` mode or HIGH `ConstantOne` in `TimedLow`
  * mode). Verified alongside the software workaround (`WKUP_DETECTOR_CNT_TH >=
  * 1`).
- * - [ERRATA-PINMUX-001] (BENIGN_RTL_IMPL_DETAIL):
+ * - [pinmux_wkup.sv:28-89] (BENIGN_RTL_IMPL_DETAIL):
  *   Continuous `filter_out_q` AON tracking while `WKUP_DETECTOR_EN == 0`
  *   (`pinmux_wkup.sv:81-89`) prevents false `Posedge` wakeups when enabling a
  *   detector on an already-high pin (`PADSEL = 1` `ConstantOne`), while MIO
@@ -28,13 +28,13 @@
  * `2+m=MIO[m]`) and `MIO/DIO_PAD_ATTR` WARL masks retain only `0x83` (`Bidir*`)
  * or `0x81`
  *   (`InputStd` DIO `10..13`).
- * - [ERRATA-PINMUX-002] (INTENDED_SECURITY_HARDENING):
+ * - [pinmux_reg_pkg.sv:2127-2696] (INTENDED_SECURITY_HARDENING):
  *   `PINMUX_PERMIT[568]` (`pinmux_reg_pkg.sv:2127-2696`) assigns permit
  * `4'b0111` (3 bytes required) to `MIO_PAD_ATTR` and `DIO_PAD_ATTR`, causing
  * 8-bit (`sb`) and 16-bit (`sh`) stores to raise a synchronous Store Access
  * Fault
  *   (`mcause = 7`) despite WARL only implementing bits `[7:0]` in byte 0.
- * - [ERRATA-PINMUX-004 / E4] (BENIGN_RTL_IMPL_DETAIL):
+ * - [pinmux.sv:127-143 / E4] (BENIGN_RTL_IMPL_DETAIL):
  *   1-cycle `ALERT_TEST` pulse and `rw0c` `*_REGWEN` write-gating on
  *   `MIO_PAD_SLEEP_MODE`, `DIO_PAD_SLEEP_MODE`, and `WKUP_DETECTOR_*`.
  */
@@ -87,9 +87,9 @@ void ottf_exception_handler(uint32_t *exc_info) {
   CHECK(false, "Unexpected exception mcause=0x%08x mepc=0x%08x", mcause, mepc);
 }
 
-static void verify_errata_pinmux_003_cnt_th_zero_hazard(void) {
+static void verify_pinmux_cnt_th_zero_hazard(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PINMUX-003] (TRUE_SILICON_ERRATA): TimedHigh/TimedLow "
+      "Verifying [pinmux_wkup.sv:52] (TRUE_SILICON_ERRATA): TimedHigh/TimedLow "
       "with WKUP_DETECTOR_CNT_TH == 0 triggers wakeup immediately regardless "
       "of pin polarity (pinmux_wkup.sv:52, 65-72)...");
 
@@ -112,7 +112,7 @@ static void verify_errata_pinmux_003_cnt_th_zero_hazard(void) {
 
   uint32_t cause = abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET);
   CHECK((cause & 0x1u) == 0x1u,
-        "[ERRATA-PINMUX-003] TimedHigh + CNT_TH=0 on ConstantZero (LOW) "
+        "[pinmux_wkup.sv:52] TimedHigh + CNT_TH=0 on ConstantZero (LOW) "
         "expected WKUP_CAUSE[0]=1, got 0x%x",
         cause);
 
@@ -137,7 +137,7 @@ static void verify_errata_pinmux_003_cnt_th_zero_hazard(void) {
 
   cause = abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET);
   CHECK((cause & 0x1u) == 0x1u,
-        "[ERRATA-PINMUX-003] TimedLow + CNT_TH=0 on ConstantOne (HIGH) "
+        "[pinmux_wkup.sv:52] TimedLow + CNT_TH=0 on ConstantOne (HIGH) "
         "expected WKUP_CAUSE[0]=1, got 0x%x",
         cause);
 
@@ -169,12 +169,12 @@ static void verify_errata_pinmux_003_cnt_th_zero_hazard(void) {
   busy_spin_micros(25);
   abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET, 0xfeu);
   busy_spin_micros(25);
-  LOG_INFO("[ERRATA-PINMUX-003] confirmed.");
+  LOG_INFO("[pinmux_wkup.sv:52] confirmed.");
 }
 
-static void verify_errata_pinmux_001_filter_and_warl(void) {
+static void verify_pinmux_filter_and_warl(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PINMUX-001] (BENIGN_RTL_IMPL_DETAIL): Continuous "
+      "Verifying [pinmux_wkup.sv:28-89] (BENIGN_RTL_IMPL_DETAIL): Continuous "
       "filter_out_q tracking while WKUP_DETECTOR_EN == 0, MIO PADSEL +2 "
       "offset, and MIO/DIO_PAD_ATTR WARL masks (0x83 / 0x81)...");
 
@@ -220,12 +220,12 @@ static void verify_errata_pinmux_001_filter_and_warl(void) {
   uint32_t sck_rb = abs_mmio_read32(kPinmuxBase + kDioSckOff);
   abs_mmio_write32(kPinmuxBase + kDioSckOff, orig_sck);
   CHECK((sck_rb & 0x00000081u) == 0x00000081u && (sck_rb & ~0x0000008du) == 0u);
-  LOG_INFO("[ERRATA-PINMUX-001] confirmed.");
+  LOG_INFO("[pinmux_wkup.sv:28-89] confirmed.");
 }
 
-static void verify_errata_pinmux_002_permit_subword_faults(void) {
+static void verify_pinmux_permit_subword_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PINMUX-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [pinmux_reg_pkg.sv:2127-2696] (INTENDED_SECURITY_HARDENING): "
       "PINMUX_PERMIT=4'b0111 rejects 8-bit/16-bit writes to MIO/DIO_PAD_ATTR "
       "with Store Access Fault (mcause=7) despite 1-byte WARL mask...");
 
@@ -258,12 +258,12 @@ static void verify_errata_pinmux_002_permit_subword_faults(void) {
   CHECK(abs_mmio_read32(kPinmuxBase + kMioOff) == 0x00000083u);
 
   abs_mmio_write32(kPinmuxBase + kMioOff, orig_mio);
-  LOG_INFO("[ERRATA-PINMUX-002] confirmed.");
+  LOG_INFO("[pinmux_reg_pkg.sv:2127-2696] confirmed.");
 }
 
-static void verify_errata_pinmux_004_alert_and_regwen(void) {
+static void verify_pinmux_alert_and_regwen(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PINMUX-004 / E4] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [pinmux.sv:127-143 / E4] (BENIGN_RTL_IMPL_DETAIL): "
       "1-cycle ALERT_TEST pulse and rw0c *_REGWEN write-gating...");
 
   dif_alert_handler_t alert_handler;
@@ -301,17 +301,17 @@ static void verify_errata_pinmux_004_alert_and_regwen(void) {
   abs_mmio_write32(kPinmuxBase + kThOff, 0x42u);
   busy_spin_micros(20);
   CHECK(abs_mmio_read32(kPinmuxBase + kThOff) == 0u);
-  LOG_INFO("[ERRATA-PINMUX-004 / E4] confirmed.");
+  LOG_INFO("[pinmux.sv:127-143 / E4] confirmed.");
 }
 
 bool test_main(void) {
   LOG_INFO("Starting PINMUX Errata Confirmation Test on %s...",
            kDeviceType == kDeviceFpgaCw340 ? "CW340_FPGA" : "QEMU");
 
-  verify_errata_pinmux_003_cnt_th_zero_hazard();
-  verify_errata_pinmux_001_filter_and_warl();
-  verify_errata_pinmux_002_permit_subword_faults();
-  verify_errata_pinmux_004_alert_and_regwen();
+  verify_pinmux_cnt_th_zero_hazard();
+  verify_pinmux_filter_and_warl();
+  verify_pinmux_permit_subword_faults();
+  verify_pinmux_alert_and_regwen();
 
   LOG_INFO("All PINMUX errata & security hardening checks PASSED!");
   return true;

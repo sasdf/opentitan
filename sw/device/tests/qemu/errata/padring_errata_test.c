@@ -28,7 +28,7 @@
  *      regardless of whether `oe_i == 1`. Verified on `IOA2`, `IOC10`, and
  *      dedicated bidirectional DIO pads `DIO[10]` (`ec_rst_l`) and `DIO[11]`
  *      (`flash_wp_l`) via `SYSRST_CTRL.PIN_IN_VALUE`.
- * - [ERRATA-PADRING-001] (BENIGN_RTL_IMPL_DETAIL):
+ * - [padring.sv:145-165,252-272] (BENIGN_RTL_IMPL_DETAIL):
  *   `prim_xilinx_ultrascale_pad_wrapper.sv:87-97` WARL attribute masks retain
  *   `0x83` (`invert`, `input_disable`, `virtual_od_en`) on `BidirStd` /
  *   `BidirOd` pads (`MIO[0..46]`, `DIO[10..11]`) and `0x81` (`invert`,
@@ -204,9 +204,9 @@ static void verify_padring_e2_01_mio_gpio_and_sysrst_loopback(void) {
   LOG_INFO("PADRING-E2-01 confirmed.");
 }
 
-static void verify_errata_padring_001_pad_type_warl_masks(void) {
+static void verify_padring_pad_type_warl_masks(void) {
   LOG_INFO(
-      "Verifying [ERRATA-PADRING-001] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [padring.sv:145-165,252-272] (BENIGN_RTL_IMPL_DETAIL): "
       "prim_xilinx_ultrascale_pad_wrapper.sv WARL masks (0x83 for BidirStd / "
       "BidirOd vs 0x81 for InputStd)...");
 
@@ -243,7 +243,7 @@ static void verify_errata_padring_001_pad_type_warl_masks(void) {
   abs_mmio_write32(kPinmuxBase + kSckDioOff, orig_sck);
   CHECK((sck_rb & 0x00000081u) == 0x00000081u && (sck_rb & 0x00000002u) == 0u);
 
-  LOG_INFO("[ERRATA-PADRING-001] confirmed.");
+  LOG_INFO("[padring.sv:145-165,252-272] confirmed.");
 }
 
 bool test_main(void) {
@@ -251,7 +251,7 @@ bool test_main(void) {
            kDeviceType == kDeviceFpgaCw340 ? "CW340_FPGA" : "QEMU");
 
   verify_padring_e2_01_mio_gpio_and_sysrst_loopback();
-  verify_errata_padring_001_pad_type_warl_masks();
+  verify_padring_pad_type_warl_masks();
 
   LOG_INFO("All PADRING errata & implementation checks PASSED!");
   return true;

@@ -98,7 +98,7 @@ static void expect_store8_fault(uint32_t addr, uint8_t val) {
 }
 
 /**
- * [ERRATA-LC_CTRL-001] (SPEC_DOC_ERRATA + INTENDED_SECURITY_HARDENING):
+ * [lc_ctrl.sv:140] (SPEC_DOC_ERRATA + INTENDED_SECURITY_HARDENING):
  * Verify that `CLAIM_TRANSITION_IF` resets to `0x69` (`kMultiBitBool8False`,
  * `lc_ctrl.sv:474-475`) rather than `0` (`programmers_guide.md:12`), stores
  * arbitrary 8-bit values when `tap_claim_transition_if_q == MuBi8False` while
@@ -107,9 +107,9 @@ static void expect_store8_fault(uint32_t addr, uint8_t val) {
  * `TRANSITION_TARGET`, and `OTP_VENDOR_TEST_CTRL` readbacks to `0` when
  * unclaimed without destroying the underlying flip-flops.
  */
-static void test_errata_lc_ctrl_001_claim_mutex_and_masking(void) {
+static void test_lc_ctrl_claim_mutex_and_masking(void) {
   LOG_INFO(
-      "Verifying [ERRATA-LC_CTRL-001] (SPEC_DOC_ERRATA): "
+      "Verifying [lc_ctrl.sv:140] (SPEC_DOC_ERRATA): "
       "CLAIM_TRANSITION_IF reset 0x69 (MuBi8False) and unclaimed read masking");
 
   CHECK(abs_mmio_read32(kLcCtrlBase +
@@ -118,7 +118,7 @@ static void test_errata_lc_ctrl_001_claim_mutex_and_masking(void) {
   uint32_t reset_claim =
       abs_mmio_read32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET);
   CHECK(reset_claim == (uint32_t)kMultiBitBool8False,
-        "[ERRATA-LC_CTRL-001] Expected CLAIM_TRANSITION_IF reset=0x69 "
+        "[lc_ctrl.sv:140] Expected CLAIM_TRANSITION_IF reset=0x69 "
         "(MuBi8False), got 0x%x",
         reset_claim);
   CHECK(
@@ -137,7 +137,7 @@ static void test_errata_lc_ctrl_001_claim_mutex_and_masking(void) {
     uint32_t rb =
         abs_mmio_read32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET);
     CHECK(rb == kNonTrueVals[i],
-          "[ERRATA-LC_CTRL-001] Expected CLAIM_TRANSITION_IF readback 0x%02x, "
+          "[lc_ctrl.sv:140] Expected CLAIM_TRANSITION_IF readback 0x%02x, "
           "got 0x%02x",
           kNonTrueVals[i], rb);
     CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_REGWEN_REG_OFFSET) ==
@@ -226,15 +226,16 @@ static void test_errata_lc_ctrl_001_claim_mutex_and_masking(void) {
 }
 
 /**
- * [ERRATA-LC_CTRL-002] (INTENDED_SECURITY_HARDENING):
+ * [lc_ctrl_state_decode.sv:50-66] (INTENDED_SECURITY_HARDENING):
  * Verify operational state decoding (`STATUS`, `LC_STATE`, `LC_TRANSITION_CNT`,
  * `LC_ID_STATE` 32-bit 8x4-bit nibbles `0x00000000` `BLANK` or `0x55555555`
  * `PERSONALIZED`), `SecVolatileRawUnlockEn = 0` (`VOLATILE_RAW_UNLOCK` bit
  * hardwired to `0`), and `EXT_CLOCK_EN` (`rw1s`) sticky behavior.
  */
-static void test_errata_lc_ctrl_002_state_decode_and_transition_ctrl(void) {
+static void test_lc_ctrl_state_decode_and_transition_ctrl(void) {
   LOG_INFO(
-      "Verifying [ERRATA-LC_CTRL-002] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [lc_ctrl_state_decode.sv:50-66] "
+      "(INTENDED_SECURITY_HARDENING): "
       "LC_STATE/LC_ID_STATE decoding and SecVolatileRawUnlockEn=0");
 
   uint32_t status = abs_mmio_read32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET);
@@ -272,9 +273,10 @@ static void test_errata_lc_ctrl_002_state_decode_and_transition_ctrl(void) {
    * permanently tied to `0`, while `EXT_CLOCK_EN` (bit 0) is `rw1s`. */
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET,
                    (1u << LC_CTRL_TRANSITION_CTRL_VOLATILE_RAW_UNLOCK_BIT));
-  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET) == 0u,
-        "[ERRATA-LC_CTRL-002] Expected VOLATILE_RAW_UNLOCK tied to 0 "
-        "(SecVolatileRawUnlockEn=0)");
+  CHECK(
+      abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET) == 0u,
+      "[lc_ctrl_state_decode.sv:50-66] Expected VOLATILE_RAW_UNLOCK tied to 0 "
+      "(SecVolatileRawUnlockEn=0)");
 
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_CTRL_REG_OFFSET,
                    (1u << LC_CTRL_TRANSITION_CTRL_EXT_CLOCK_EN_BIT) |
@@ -290,15 +292,15 @@ static void test_errata_lc_ctrl_002_state_decode_and_transition_ctrl(void) {
 }
 
 /**
- * [ERRATA-LC_CTRL-003] (INTENDED_SECURITY_HARDENING):
+ * [lc_ctrl.sv:359] (INTENDED_SECURITY_HARDENING):
  * Verify that `TRANSITION_TARGET` (`lc_ctrl.sv:359, 451-456`) stores any raw
  * 30-bit value unconditionally when `TRANSITION_REGWEN == 1` and returns it
  * verbatim (`val & 0x3fffffff`), deferring sparse replication validation until
  * `TRANSITION_CMD.START = 1`.
  */
-static void test_errata_lc_ctrl_003_unfiltered_transition_target(void) {
+static void test_lc_ctrl_unfiltered_transition_target(void) {
   LOG_INFO(
-      "Verifying [ERRATA-LC_CTRL-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [lc_ctrl.sv:359] (INTENDED_SECURITY_HARDENING): "
       "unfiltered 30-bit TRANSITION_TARGET storage & readback");
 
   const uint32_t kPatterns[] = {
@@ -310,23 +312,23 @@ static void test_errata_lc_ctrl_003_unfiltered_transition_target(void) {
     uint32_t rb =
         abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_TARGET_REG_OFFSET);
     CHECK(rb == (kPatterns[i] & 0x3fffffffu),
-          "[ERRATA-LC_CTRL-003] Expected TRANSITION_TARGET readback 0x%08x, "
+          "[lc_ctrl.sv:359] Expected TRANSITION_TARGET readback 0x%08x, "
           "got 0x%08x",
           kPatterns[i] & 0x3fffffffu, rb);
   }
 }
 
 /**
- * [ERRATA-LC_CTRL-004] (INTENDED_SECURITY_HARDENING):
+ * [lc_ctrl_reg_pkg.sv:341-377] (INTENDED_SECURITY_HARDENING):
  * Verify `LC_CTRL_PERMIT[35]` (`lc_ctrl_reg_pkg.sv:341-377`) sub-word write
  * byte-enable enforcement (`mcause = 7` on 1-byte `sb` to `TRANSITION_TOKEN_0`
  * or 2-byte `sh` to `TRANSITION_TARGET` where `permit = 4'b1111`, while
  * permitting 1-byte `sb` to `CLAIM_TRANSITION_IF` where `permit = 4'b0001`)
  * and `addrmiss` synchronous bus faults (`mcause = 5 / 7`) at offset `0x8c`.
  */
-static void test_errata_lc_ctrl_004_permit_and_addrmiss_faults(void) {
+static void test_lc_ctrl_permit_and_addrmiss_faults(void) {
   LOG_INFO(
-      "Verifying [ERRATA-LC_CTRL-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [lc_ctrl_reg_pkg.sv:341-377] (INTENDED_SECURITY_HARDENING): "
       "LC_CTRL_PERMIT[35] sub-word write faults and addrmiss at 0x8c");
 
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_TRANSITION_TOKEN_0_REG_OFFSET,
@@ -365,15 +367,15 @@ static void test_errata_lc_ctrl_004_permit_and_addrmiss_faults(void) {
 }
 
 /**
- * [ERRATA-LC_CTRL-005] (BENIGN_RTL_IMPL_DETAIL):
+ * [lc_ctrl.sv:573-606] (BENIGN_RTL_IMPL_DETAIL):
  * Verify that `ALERT_TEST` (`lc_ctrl.sv:573-606`) generates a 1-cycle transient
  * pulse (`q & qe`) so repeated writes to `ALERT_TEST` fire the alert each time
  * without sticking high, and verify `CLAIM_TRANSITION_IF_REGWEN` (`rw0c`)
  * locks `CLAIM_TRANSITION_IF` permanently.
  */
-static void test_errata_lc_ctrl_005_alert_test_pulse_and_regwen_lock(void) {
+static void test_lc_ctrl_alert_test_pulse_and_regwen_lock(void) {
   LOG_INFO(
-      "Verifying [ERRATA-LC_CTRL-005] (BENIGN_RTL_IMPL_DETAIL): "
+      "Verifying [lc_ctrl.sv:573-606] (BENIGN_RTL_IMPL_DETAIL): "
       "ALERT_TEST 1-cycle transient pulse and CLAIM_TRANSITION_IF_REGWEN lock");
 
   for (int i = 0; i < 2; ++i) {
@@ -402,11 +404,11 @@ static void test_errata_lc_ctrl_005_alert_test_pulse_and_regwen_lock(void) {
 
 bool test_main(void) {
   LOG_INFO("Starting lc_ctrl_errata_test (P23) on CW340 FPGA / QEMU...");
-  test_errata_lc_ctrl_001_claim_mutex_and_masking();
-  test_errata_lc_ctrl_002_state_decode_and_transition_ctrl();
-  test_errata_lc_ctrl_003_unfiltered_transition_target();
-  test_errata_lc_ctrl_004_permit_and_addrmiss_faults();
-  test_errata_lc_ctrl_005_alert_test_pulse_and_regwen_lock();
+  test_lc_ctrl_claim_mutex_and_masking();
+  test_lc_ctrl_state_decode_and_transition_ctrl();
+  test_lc_ctrl_unfiltered_transition_target();
+  test_lc_ctrl_permit_and_addrmiss_faults();
+  test_lc_ctrl_alert_test_pulse_and_regwen_lock();
   LOG_INFO("All lc_ctrl_errata_test checks PASSED!");
   return true;
 }

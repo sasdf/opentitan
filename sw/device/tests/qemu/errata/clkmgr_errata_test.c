@@ -13,29 +13,30 @@
  * physical CW340 FPGA silicon (`fpga_cw340_rom_with_fake_keys`) and QEMU
  * (`sim_qemu_rom_with_fake_keys`):
  *
- * - `[ERRATA-CLKMGR-001]` (`SPEC_DOC_ERRATA`): `clk_main` (`clk_src_sys`)
+ * - `[ast_clks_byp.sv:584-668]` (`SPEC_DOC_ERRATA`): `clk_main` (`clk_src_sys`)
  *   remains at full nominal speed (`100 MHz` / `500` cycles per AON tick) in
  *   low-speed external clock mode (`EXTCLK_CTRL.SEL = MuBi4True`,
  *   `HI_SPEED_SEL = MuBi4False`), whereas `clk_io` is divided by 2 (`48 MHz` /
  *   `240` cycles) and `clk_io_div2` / `clk_io_div4` step down their divisors
  *   (`ast_clks_byp.sv:584-657`, `clkmgr.sv:182-216`).
- * - `[ERRATA-CLKMGR-002]` (`SPEC_DOC_ERRATA`): Deep-sleep (`LOW_POWER_EXIT`)
- *   preserves `DomainAonSel` CSRs (`JITTER_ENABLE`, `*_MEAS_CTRL_SHADOWED`),
- *   EXCEPT AST dropping `calib_rdy` to `MuBi4False` during deep sleep unlocks
- *   `MEASURE_CTRL_REGWEN` (`rw0c`) back to `1` (`clkmgr.sv:555-558`) and resets
- *   all `*_MEAS_CTRL_EN` registers to `0x9` (`MuBi4False`,
- *   `clkmgr_meas_chk.sv:81-85`).
- * - `[ERRATA-CLKMGR-003]` (`INTENDED_SECURITY_HARDENING`): `JITTER_ENABLE`
+ * - `[top_earlgrey.sv:1829-1842]` (`SPEC_DOC_ERRATA`): Deep-sleep
+ * (`LOW_POWER_EXIT`) preserves `DomainAonSel` CSRs (`JITTER_ENABLE`,
+ * `*_MEAS_CTRL_SHADOWED`), EXCEPT AST dropping `calib_rdy` to `MuBi4False`
+ * during deep sleep unlocks `MEASURE_CTRL_REGWEN` (`rw0c`) back to `1`
+ * (`clkmgr.sv:555-558`) and resets all `*_MEAS_CTRL_EN` registers to `0x9`
+ * (`MuBi4False`, `clkmgr_meas_chk.sv:81-85`).
+ * - `[clkmgr_reg_top.sv:866-890]` (`INTENDED_SECURITY_HARDENING`):
+ * `JITTER_ENABLE`
  *   (`0x14`) ties `.wd` to `prim_mubi_pkg::MuBi4True` (`0x6`) and bypasses
  *   `JITTER_REGWEN` (`clkmgr_reg_top.sv:866-890`), so writing any value (even
  *   `0x9` or `0x0` with `JITTER_REGWEN = 0`) permanently latches
  *   `JITTER_ENABLE = 0x6` until reset.
- * - `[ERRATA-CLKMGR-004]` (`INTENDED_SECURITY_HARDENING`): `*_MEAS_CTRL_EN`
+ * - `[clkmgr.sv:572]` (`INTENDED_SECURITY_HARDENING`): `*_MEAS_CTRL_EN`
  *   evaluates `mubi4_test_true_loose` (`!= 0x9`, `clkmgr.sv:572`), so writing
  *   `0x0` enables measurement, and clearing `RECOV_ERR_CODE` (`rw1c`) while an
  *   out-of-bounds threshold remains enabled immediately re-asserts the fault on
  *   the next AON tick (`clkmgr_meas_chk.sv:43-61, 91-112`).
- * - `[ERRATA-CLKMGR-005]` (`INTENDED_SECURITY_HARDENING`): Asymmetric
+ * - `[clkmgr_reg_pkg.sv:365-388]` (`INTENDED_SECURITY_HARDENING`): Asymmetric
  *   `CLKMGR_PERMIT` byte-enable masks (`4'b0111` on 18/20-bit
  *   `IO/IO_DIV2/MAIN/USB_MEAS_CTRL_SHADOWED` vs `4'b0011` on 16-bit
  *   `IO_DIV4_MEAS_CTRL_SHADOWED`) cause 16-bit halfword stores (`sh`) to fault
@@ -124,7 +125,7 @@ bool test_main(void) {
   if (is_low_power_exit) {
     // =========================================================================
     // Phase 2 (Post-Deep-Sleep Wakeup):
-    // Verify [ERRATA-CLKMGR-002] (SPEC_DOC_ERRATA):
+    // Verify [top_earlgrey.sv:1829-1842] (SPEC_DOC_ERRATA):
     // Deep sleep preserves `DomainAonSel` CSRs (`JITTER_ENABLE = 0x6`,
     // `IO_DIV4_MEAS_CTRL_SHADOWED = kCustomIoDiv4MeasShadowed`), EXCEPT AST
     // dropping `calib_rdy` during deep sleep forces `MEASURE_CTRL_REGWEN`
@@ -132,7 +133,8 @@ bool test_main(void) {
     // (`MuBi4False`).
     // =========================================================================
     LOG_INFO(
-        "Verifying [ERRATA-CLKMGR-002] (SPEC_DOC_ERRATA) after LOW_POWER_EXIT: "
+        "Verifying [top_earlgrey.sv:1829-1842] (SPEC_DOC_ERRATA) after "
+        "LOW_POWER_EXIT: "
         "DomainAonSel retention of JITTER_ENABLE & IO_DIV4_MEAS_CTRL_SHADOWED "
         "vs calib_rdy unlocking MEASURE_CTRL_REGWEN (rw0c -> 1) and clearing "
         "IO_DIV4_MEAS_CTRL_EN -> 0x9...");
@@ -150,19 +152,23 @@ bool test_main(void) {
         abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET);
 
     CHECK(jitter_post_sleep == kMultiBitBool4True,
-          "[ERRATA-CLKMGR-002] Expected JITTER_ENABLE retained at 0x6 across "
+          "[top_earlgrey.sv:1829-1842] Expected JITTER_ENABLE retained at 0x6 "
+          "across "
           "deep sleep, got 0x%x",
           jitter_post_sleep);
     CHECK(io_div4_shadow_post_sleep == kCustomIoDiv4MeasShadowed,
-          "[ERRATA-CLKMGR-002] Expected IO_DIV4_MEAS_CTRL_SHADOWED retained at "
+          "[top_earlgrey.sv:1829-1842] Expected IO_DIV4_MEAS_CTRL_SHADOWED "
+          "retained at "
           "0x%08x across deep sleep, got 0x%08x",
           kCustomIoDiv4MeasShadowed, io_div4_shadow_post_sleep);
     CHECK((meas_regwen_post_sleep & 0x1u) == 1u,
-          "[ERRATA-CLKMGR-002] Expected calib_rdy=MuBi4False during deep sleep "
+          "[top_earlgrey.sv:1829-1842] Expected calib_rdy=MuBi4False during "
+          "deep sleep "
           "to unlock rw0c MEASURE_CTRL_REGWEN back to 1, got 0x%x",
           meas_regwen_post_sleep);
     CHECK(io_div4_en_post_sleep == kMultiBitBool4False,
-          "[ERRATA-CLKMGR-002] Expected calib_rdy=MuBi4False during deep sleep "
+          "[top_earlgrey.sv:1829-1842] Expected calib_rdy=MuBi4False during "
+          "deep sleep "
           "to reset IO_DIV4_MEAS_CTRL_EN to 0x9 (MuBi4False), got 0x%x",
           io_div4_en_post_sleep);
 
@@ -173,14 +179,14 @@ bool test_main(void) {
   LOG_INFO("Starting CLKMGR CW340/QEMU Errata Confirmation Test (P26)...");
 
   // =========================================================================
-  // Check 1: [ERRATA-CLKMGR-001] (SPEC_DOC_ERRATA)
+  // Check 1: [ast_clks_byp.sv:584-668] (SPEC_DOC_ERRATA)
   // `clk_main` (`clk_src_sys`) remains at full nominal speed (`500` cycles per
   // AON period) in low-speed external clock mode (`EXTCLK_CTRL.SEL =
   // MuBi4True`, `HI_SPEED_SEL = MuBi4False`), whereas `clk_io` is divided by 2
   // (`240` cycles).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CLKMGR-001] (SPEC_DOC_ERRATA): "
+      "Verifying [ast_clks_byp.sv:584-668] (SPEC_DOC_ERRATA): "
       "clk_main remains un-halved (500 cycles) while clk_io is halved (240 "
       "cycles) in low-speed external clock mode (HI_SPEED_SEL=MuBi4False)...");
   uint32_t delay_micros = 0;
@@ -212,7 +218,8 @@ bool test_main(void) {
   dif_clkmgr_recov_err_codes_t err_codes = 0;
   CHECK_DIF_OK(dif_clkmgr_recov_err_code_get_codes(&clkmgr, &err_codes));
   CHECK(err_codes == 0u,
-        "[ERRATA-CLKMGR-001] Expected 0 recov_err_code when measuring clk_io "
+        "[ast_clks_byp.sv:584-668] Expected 0 recov_err_code when measuring "
+        "clk_io "
         "at half rate (%u) and clk_main at full rate (%u), got 0x%x",
         io_div2_count, cpu_count, err_codes);
 
@@ -233,7 +240,8 @@ bool test_main(void) {
 
   CHECK_DIF_OK(dif_clkmgr_recov_err_code_get_codes(&clkmgr, &err_codes));
   CHECK((err_codes & kDifClkmgrRecovErrTypeMainMeas) != 0u,
-        "[ERRATA-CLKMGR-001] Expected MAIN_MEASURE_ERR when measuring clk_main "
+        "[ast_clks_byp.sv:584-668] Expected MAIN_MEASURE_ERR when measuring "
+        "clk_main "
         "at half speed (%u) in low-speed extclk mode, got 0x%x",
         cpu_half, err_codes);
 
@@ -241,14 +249,14 @@ bool test_main(void) {
   IBEX_SPIN_FOR(!did_extclk_settle(&clkmgr), kSettleDelayMicros);
 
   // =========================================================================
-  // Check 2: [ERRATA-CLKMGR-004] (INTENDED_SECURITY_HARDENING)
+  // Check 2: [clkmgr.sv:572] (INTENDED_SECURITY_HARDENING)
   // `*_MEAS_CTRL_EN` evaluates `mubi4_test_true_loose` (`!= 0x9`), so writing
   // `0x0` keeps measurement enabled, and clearing `RECOV_ERR_CODE` (`rw1c`)
   // while the out-of-bounds threshold remains enabled immediately re-asserts
   // `MAIN_MEASURE_ERR` on the next AON tick!
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CLKMGR-004] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [clkmgr.sv:572] (INTENDED_SECURITY_HARDENING): "
       "Loose mubi4_test_true_loose (!= 0x9) on MAIN_MEAS_CTRL_EN (0x0 keeps "
       "measurement enabled) & continuous RECOV_ERR_CODE re-assertion...");
   abs_mmio_write32(kClkmgrBase + CLKMGR_MAIN_MEAS_CTRL_EN_REG_OFFSET, 0x0u);
@@ -258,7 +266,7 @@ bool test_main(void) {
       abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET);
   CHECK((recov_after_zero_en &
          (1u << CLKMGR_RECOV_ERR_CODE_MAIN_MEASURE_ERR_BIT)) != 0u,
-        "[ERRATA-CLKMGR-004] Expected MAIN_MEASURE_ERR to re-assert when "
+        "[clkmgr.sv:572] Expected MAIN_MEASURE_ERR to re-assert when "
         "MAIN_MEAS_CTRL_EN == 0x0 (!= 0x9), got 0x%x",
         recov_after_zero_en);
 
@@ -272,12 +280,12 @@ bool test_main(void) {
   uint32_t recov_after_nine_en =
       abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET);
   CHECK(recov_after_nine_en == 0u,
-        "[ERRATA-CLKMGR-004] Expected RECOV_ERR_CODE == 0 after setting "
+        "[clkmgr.sv:572] Expected RECOV_ERR_CODE == 0 after setting "
         "MAIN_MEAS_CTRL_EN = 0x9 (MuBi4False), got 0x%x",
         recov_after_nine_en);
 
   // =========================================================================
-  // Check 3: [ERRATA-CLKMGR-005] (INTENDED_SECURITY_HARDENING)
+  // Check 3: [clkmgr_reg_pkg.sv:365-388] (INTENDED_SECURITY_HARDENING)
   // Asymmetric `CLKMGR_PERMIT` byte-enable masks (`4'b0111` on 20-bit
   // `IO_MEAS_CTRL_SHADOWED` vs `4'b0011` on 16-bit
   // `IO_DIV4_MEAS_CTRL_SHADOWED`):
@@ -286,18 +294,20 @@ bool test_main(void) {
   // `IO_DIV4_MEAS_CTRL_SHADOWED` (`0x38`).
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CLKMGR-005] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [clkmgr_reg_pkg.sv:365-388] (INTENDED_SECURITY_HARDENING): "
       "Asymmetric CLKMGR_PERMIT (4'b0111 vs 4'b0011) sub-word write fault "
       "(mcause=7) on IO_MEAS_CTRL_SHADOWED vs IO_DIV4_MEAS_CTRL_SHADOWED...");
   g_fault_count = 0;
   g_last_mcause = 0;
   *(volatile uint16_t *)(kClkmgrBase +
                          CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) = 0x59eau;
-  CHECK(g_fault_count == 1u,
-        "[ERRATA-CLKMGR-005] Expected 16-bit sh to IO_MEAS_CTRL_SHADOWED "
-        "(permit 4'b0111) to fault");
+  CHECK(
+      g_fault_count == 1u,
+      "[clkmgr_reg_pkg.sv:365-388] Expected 16-bit sh to IO_MEAS_CTRL_SHADOWED "
+      "(permit 4'b0111) to fault");
   CHECK(g_last_mcause == 7u,
-        "[ERRATA-CLKMGR-005] Expected Store Access Fault (mcause=7), got 0x%x",
+        "[clkmgr_reg_pkg.sv:365-388] Expected Store Access Fault (mcause=7), "
+        "got 0x%x",
         g_last_mcause);
 
   g_fault_count = 0;
@@ -308,32 +318,34 @@ bool test_main(void) {
                          CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) =
       (uint16_t)kCustomIoDiv4MeasShadowed;
   CHECK(g_fault_count == 0u,
-        "[ERRATA-CLKMGR-005] Expected 16-bit sh to IO_DIV4_MEAS_CTRL_SHADOWED "
+        "[clkmgr_reg_pkg.sv:365-388] Expected 16-bit sh to "
+        "IO_DIV4_MEAS_CTRL_SHADOWED "
         "(permit 4'b0011) to succeed without fault");
   CHECK(abs_mmio_read32(kClkmgrBase +
                         CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
             kCustomIoDiv4MeasShadowed,
-        "[ERRATA-CLKMGR-005] Expected 16-bit sh shadow write to commit "
+        "[clkmgr_reg_pkg.sv:365-388] Expected 16-bit sh shadow write to commit "
         "0x%08x",
         kCustomIoDiv4MeasShadowed);
 
   // =========================================================================
-  // Check 4: [ERRATA-CLKMGR-003] (INTENDED_SECURITY_HARDENING)
+  // Check 4: [clkmgr_reg_top.sv:866-890] (INTENDED_SECURITY_HARDENING)
   // `JITTER_ENABLE` (`0x14`) ties `.wd` to `prim_mubi_pkg::MuBi4True` (`0x6`)
   // and bypasses `JITTER_REGWEN` (`0x10`), so writing `kMultiBitBool4False`
   // (`0x9`) or `0x0` even with `JITTER_REGWEN == 0` permanently latches
   // `JITTER_ENABLE = 0x6` (`MuBi4True`)!
   // =========================================================================
   LOG_INFO(
-      "Verifying [ERRATA-CLKMGR-003] (INTENDED_SECURITY_HARDENING): "
+      "Verifying [clkmgr_reg_top.sv:866-890] (INTENDED_SECURITY_HARDENING): "
       "JITTER_ENABLE hardwired .wd(MuBi4True=0x6) ignoring write data (0x9) "
       "and bypassing JITTER_REGWEN=0...");
   abs_mmio_write32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 0u,
-        "[ERRATA-CLKMGR-003] Expected JITTER_REGWEN == 0 after rw0c clear");
+        "[clkmgr_reg_top.sv:866-890] Expected JITTER_REGWEN == 0 after rw0c "
+        "clear");
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET) ==
             kMultiBitBool4False,
-        "[ERRATA-CLKMGR-003] Expected initial JITTER_ENABLE == 0x9");
+        "[clkmgr_reg_top.sv:866-890] Expected initial JITTER_ENABLE == 0x9");
 
   // Write `kMultiBitBool4False` (`0x9`) while `JITTER_REGWEN == 0`:
   abs_mmio_write32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET,
@@ -341,31 +353,35 @@ bool test_main(void) {
   uint32_t jitter_after_false_wr =
       abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET);
   CHECK(jitter_after_false_wr == kMultiBitBool4True,
-        "[ERRATA-CLKMGR-003] Expected writing 0x9 (MuBi4False) with "
+        "[clkmgr_reg_top.sv:866-890] Expected writing 0x9 (MuBi4False) with "
         "JITTER_REGWEN==0 to latch JITTER_ENABLE = 0x6 (MuBi4True), got 0x%x",
         jitter_after_false_wr);
 
   // =========================================================================
-  // Check 5 Setup: Prepare for [ERRATA-CLKMGR-002] Deep-Sleep Transition
-  // Enable `IO_DIV4_MEAS_CTRL_EN = 0x6`, lock `MEASURE_CTRL_REGWEN = 0`
+  // Check 5 Setup: Prepare for [top_earlgrey.sv:1829-1842] Deep-Sleep
+  // Transition Enable `IO_DIV4_MEAS_CTRL_EN = 0x6`, lock `MEASURE_CTRL_REGWEN =
+  // 0`
   // (`rw0c`), and enter deep sleep (`domain_config = 0`) with an `aon_timer`
   // wakeup so Phase 2 can verify `DomainAonSel` retention vs `calib_rdy`
   // unlocking `MEASURE_CTRL_REGWEN` back to `1` and resetting
   // `IO_DIV4_MEAS_CTRL_EN` to `0x9`.
   // =========================================================================
   LOG_INFO(
-      "Preparing [ERRATA-CLKMGR-002]: Locking MEASURE_CTRL_REGWEN=0 (rw0c), "
+      "Preparing [top_earlgrey.sv:1829-1842]: Locking MEASURE_CTRL_REGWEN=0 "
+      "(rw0c), "
       "enabling IO_DIV4_MEAS_CTRL_EN=0x6, and entering deep sleep...");
   abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET,
                    kMultiBitBool4True);
   abs_mmio_write32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) ==
             0u,
-        "[ERRATA-CLKMGR-002] Expected MEASURE_CTRL_REGWEN == 0 before sleep");
-  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
-            kMultiBitBool4True,
-        "[ERRATA-CLKMGR-002] Expected IO_DIV4_MEAS_CTRL_EN == 0x6 before "
+        "[top_earlgrey.sv:1829-1842] Expected MEASURE_CTRL_REGWEN == 0 before "
         "sleep");
+  CHECK(
+      abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
+          kMultiBitBool4True,
+      "[top_earlgrey.sv:1829-1842] Expected IO_DIV4_MEAS_CTRL_EN == 0x6 before "
+      "sleep");
 
   CHECK_STATUS_OK(aon_timer_testutils_wakeup_config(&aon_timer, 10u));
   CHECK_STATUS_OK(pwrmgr_testutils_enable_low_power(
