@@ -647,6 +647,28 @@ opentitan_test(
 # Priority P22 Module: rstmgr
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p22_rstmgr ===
+opentitan_test(
+    name = "rstmgr_errata_test",
+    srcs = ["rstmgr_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/usbdev/data:usbdev_c_regs",
+        "//hw/top_earlgrey/ip_autogen/rstmgr:rstmgr_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:pinmux",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+        "//sw/device/silicon_creator/lib/drivers:retention_sram",
+    ],
+)
 # === END ERRATA TEST: p22_rstmgr ===
 #
 #
