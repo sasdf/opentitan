@@ -780,6 +780,23 @@ opentitan_test(
 # Priority P27 Module: alert_handler
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA TEST: p27_alert_handler ===
+opentitan_test(
+    name = "alert_handler_errata_test",
+    srcs = ["alert_handler_errata_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/ip/uart/data:uart_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA TEST: p27_alert_handler ===
 #
 #
