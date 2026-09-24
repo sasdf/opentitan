@@ -11,14 +11,14 @@
  *        `sw/device/lib/dif/dif_rom_ctrl.h`).
  *
  * Verified behaviors:
- * 1. `hw/ip/rom_ctrl/rtl/rom_ctrl_reg_pkg.sv:118-138` &
+ * 1. `hw/ip/rom_ctrl/rtl/rom_ctrl_reg_pkg.sv:122-141` &
  *    `hw/ip/rom_ctrl/rtl/rom_ctrl_regs_reg_top.sv:709-736`:
  *    `ROM_CTRL_REGS_PERMIT` rejects sub-word writes (`sb`/`sh`) to read-only
  *    `DIGEST_0..7` and `EXP_DIGEST_0..7` (`PERMIT = 4'b1111`) with a
  *    synchronous Store Access Fault (`d_error = 1`, `mcause = 7`), while
  *    accepting 32-bit writes (`sw`) to `DIGEST`/`EXP_DIGEST` and byte-0 writes
  *    (`sb`) to read-only `FATAL_ALERT_CAUSE` (`0x04`, `PERMIT = 4'b0001`).
- * 2. `hw/ip/rom_ctrl/rtl/rom_ctrl.sv:494-510` vs
+ * 2. `hw/ip/rom_ctrl/rtl/rom_ctrl.sv:503-519` vs
  *    `hw/ip/rom_ctrl/data/rom_ctrl.hjson:98-100`:
  *    Writing `1` to `ALERT_TEST.fatal` (`0x411e0000`) emits a single one-shot
  *    alert handshake (`kTopEarlgreyAlertIdRomCtrlFatal = 59` in `trunk-v2`)
@@ -43,8 +43,9 @@
  *    `0x00040000..0x0006ffff`) passes inverted Hsiao `(39,32)` ECC bits through
  *    `u_tl_adapter_rom` (`.EnableDataIntgPt(1)`) with `d_error = 0`, firing an
  *    asynchronous Ibex Internal Load Integrity NMI (`mcause = 0xffffffe0`,
- *    `mtval = 0x0006fffc`) and setting `RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR`
- *    (bit 8) while leaving `ROM_CTRL_FATAL_ALERT_CAUSE == 0`.
+ *    `mtval = 0x0006ffe0..0x0006fffc`) and setting
+ *    `RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR` (bit 8) while leaving
+ *    `ROM_CTRL_FATAL_ALERT_CAUSE == 0`.
  * 5. `hw/top_earlgrey/rtl/autogen/earlgrey_pd_main.sv:2516`,
  *    `hw/ip/rom_ctrl/rtl/rom_ctrl.sv:197`, and
  *    `hw/top_earlgrey/ip/xbar_main/rtl/autogen/xbar_main.sv:823-825`:
@@ -127,7 +128,7 @@ bool test_main(void) {
   LOG_INFO("Starting rom_ctrl Earlgrey v2 FPGA verification test...");
 
   // 1. Verify ROM_CTRL_REGS_PERMIT sub-word write wr_err on read-only CSRs
-  //    (hw/ip/rom_ctrl/rtl/rom_ctrl_reg_pkg.sv:118-138).
+  //    (hw/ip/rom_ctrl/rtl/rom_ctrl_reg_pkg.sv:122-141).
   uint32_t d0 =
       abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET);
   uint32_t e0 =
@@ -141,30 +142,48 @@ bool test_main(void) {
   CHECK(!store_access_fault_seen);
 
   // 8-bit write to RO FATAL_ALERT_CAUSE+0 (PERMIT = 4'b0001) succeeds with
-  // d_error=0, whereas +1 raises StoreAccessFault (mcause = 7).
+  // d_error=0, whereas bytes 1..3 (+1, +2, +3) raise StoreAccessFault
+  // (mcause = 7).
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET,
                   0x3u);
   CHECK(!store_access_fault_seen);
 
-  store_access_fault_seen = false;
-  abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET + 1u,
-                  0x1u);
-  CHECK(store_access_fault_seen);
+  for (uint32_t byte_off = 1u; byte_off <= 3u; ++byte_off) {
+    store_access_fault_seen = false;
+    abs_mmio_write8(
+        kRomCtrlRegsBase + ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET + byte_off,
+        0x1u);
+    CHECK(store_access_fault_seen);
+  }
 
-  // 8-bit write to RO DIGEST_0 and EXP_DIGEST_0 (PERMIT = 4'b1111) raises
-  // StoreAccessFault (mcause = 7).
+  // 8-bit (`sb`) and 16-bit (`sh`) writes to RO DIGEST_0 and EXP_DIGEST_0
+  // (PERMIT = 4'b1111) raise StoreAccessFault (mcause = 7).
   store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET, 0xaau);
   CHECK(store_access_fault_seen);
 
   store_access_fault_seen = false;
+  *(volatile uint16_t *)(uintptr_t)(kRomCtrlRegsBase +
+                                    ROM_CTRL_DIGEST_0_REG_OFFSET) = 0xbbccu;
+  CHECK(store_access_fault_seen);
+
+  store_access_fault_seen = false;
   abs_mmio_write8(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET, 0x55u);
   CHECK(store_access_fault_seen);
+
+  store_access_fault_seen = false;
+  *(volatile uint16_t *)(uintptr_t)(kRomCtrlRegsBase +
+                                    ROM_CTRL_EXP_DIGEST_0_REG_OFFSET) = 0xddeeu;
+  CHECK(store_access_fault_seen);
+
+  CHECK(abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_DIGEST_0_REG_OFFSET) == d0);
+  CHECK(abs_mmio_read32(kRomCtrlRegsBase + ROM_CTRL_EXP_DIGEST_0_REG_OFFSET) ==
+        e0);
   LOG_INFO("Confirmed ROM_CTRL_REGS_PERMIT sub-word write faults.");
 
   // 2. Verify ALERT_TEST.fatal one-shot handshake & RW1C clear on trunk-v2
-  //    (kTopEarlgreyAlertIdRomCtrlFatal = 59, rom_ctrl.sv:494-510).
+  //    (kTopEarlgreyAlertIdRomCtrlFatal = 59, rom_ctrl.sv:503-519).
   uint32_t en_addr = kAlertHandlerBase +
                      ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
                      kRomCtrlAlertId * sizeof(uint32_t);
@@ -209,6 +228,12 @@ bool test_main(void) {
   CHECK(alert_causes == (uint32_t)kDifRomCtrlFatalAlertCauseCheckerError);
   CHECK((uint32_t)kDifRomCtrlFatalAlertCauseIntegrityError ==
         (1u << ROM_CTRL_FATAL_ALERT_CAUSE_CHECKER_ERROR_BIT));
+  CHECK((((1u << ROM_CTRL_FATAL_ALERT_CAUSE_CHECKER_ERROR_BIT) &
+          (uint32_t)kDifRomCtrlFatalAlertCauseCheckerError) == 0u));
+  CHECK((((1u << ROM_CTRL_FATAL_ALERT_CAUSE_INTEGRITY_ERROR_BIT) &
+          (uint32_t)kDifRomCtrlFatalAlertCauseIntegrityError) == 0u));
+  CHECK((((1u << ROM_CTRL_FATAL_ALERT_CAUSE_CHECKER_ERROR_BIT) &
+          (uint32_t)kDifRomCtrlFatalAlertCauseIntegrityError) != 0u));
 
   dif_rom_ctrl_digest_t digest;
   dif_rom_ctrl_digest_t exp_digest;
@@ -220,8 +245,10 @@ bool test_main(void) {
   LOG_INFO("Confirmed dif_rom_ctrl_fatal_alert_cause_t enum collision.");
 
   // 4. Verify reading the top 8 EXP_DIGEST words of the 192 KiB v2 ROM
-  //    (0x0006ffe0..0x0006fffc) raises Ibex Internal Load Integrity NMI
-  //    (mcause = 0xffffffe0) and sets RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR.
+  //    (0x0006ffe0..0x0006fffc, word indices 49144..49151) raises Ibex Internal
+  //    Load Integrity NMI (mcause = 0xffffffe0) and sets
+  //    RV_CORE_IBEX.ERR_STATUS.FATAL_INTG_ERR, whereas word 49143 (0x0006ffdc)
+  //    immediately below EXP_DIGEST reads cleanly without fault.
   CHECK(kRomCtrlRomBase == 0x00040000u);
   CHECK(kRomCtrlRomSize == 0x00030000u);
 
@@ -230,27 +257,38 @@ bool test_main(void) {
       kIbexFatalHwErrAlertId * sizeof(uint32_t);
   shadow_write32(ibex_fatal_hw_en_addr, 0u);
 
-  uint32_t top_word_addr = kRomCtrlRomBase + kRomCtrlRomSize - sizeof(uint32_t);
-  CHECK(top_word_addr == 0x0006fffcu);
+  const uint32_t kExpDigestBase = kRomCtrlRomBase + kRomCtrlRomSize - 32u;
+  CHECK(kExpDigestBase == 0x0006ffe0u);
+
   load_integrity_fault_seen = false;
   load_access_fault_seen = false;
-  load_integrity_fault_mtval = 0u;
-  (void)abs_mmio_read32(top_word_addr);
+  (void)abs_mmio_read32(kExpDigestBase - sizeof(uint32_t));
   busy_spin_micros(5);
-  CHECK(load_integrity_fault_seen);
+  CHECK(!load_integrity_fault_seen);
   CHECK(!load_access_fault_seen);
-  CHECK(load_integrity_fault_mtval == top_word_addr);
 
-  uint32_t ibex_err_status =
-      abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET);
-  CHECK((ibex_err_status &
-         (1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT)) != 0u);
-  abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET,
-                   1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT);
-  CHECK(abs_mmio_read32(kRomCtrlRegsBase +
-                        ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET) == 0u);
-  LOG_INFO("Confirmed Ibex Load Integrity NMI (0xffffffe0) at 0x%08x.",
-           top_word_addr);
+  for (uint32_t i = 0u; i < 8u; ++i) {
+    uint32_t word_addr = kExpDigestBase + i * sizeof(uint32_t);
+    load_integrity_fault_seen = false;
+    load_access_fault_seen = false;
+    load_integrity_fault_mtval = 0u;
+    (void)abs_mmio_read32(word_addr);
+    busy_spin_micros(5);
+    CHECK(load_integrity_fault_seen);
+    CHECK(!load_access_fault_seen);
+    CHECK(load_integrity_fault_mtval == word_addr);
+
+    uint32_t ibex_err_status =
+        abs_mmio_read32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET);
+    CHECK((ibex_err_status &
+           (1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT)) != 0u);
+    abs_mmio_write32(kIbexBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET,
+                     1u << RV_CORE_IBEX_ERR_STATUS_FATAL_INTG_ERR_BIT);
+    CHECK(abs_mmio_read32(kRomCtrlRegsBase +
+                          ROM_CTRL_FATAL_ALERT_CAUSE_REG_OFFSET) == 0u);
+  }
+  LOG_INFO("Confirmed Ibex Load Integrity NMI (0xffffffe0) at 0x%08x..0x%08x.",
+           kExpDigestBase, kExpDigestBase + 28u);
 
   // 5. Verify reading 0x00070000 (word index 49152, 4 bytes above 0x0006fffc
   //    inside the 16-bit SramAw=16 index space) is intercepted by xbar_main

@@ -164,10 +164,12 @@ static void test_usbdev_rx_empty_and_devaddr_gated_by_enable(void) {
   CHECK(rx_empty == 0u);
 }
 
-static void test_usbdev_resume_link_active_no_sof_and_tx_osc(void) {
+static void test_usbdev_resume_link_active_no_sof_and_tx_osc(
+    const dif_pinmux_t *pinmux) {
   LOG_INFO(
       "Testing [usbdev_linkstate.sv:183-188, usb_fs_tx.sv:135-145]: "
-      "resume_link_active -> LinkActiveNoSOF(5) & tx_osc_test_mode");
+      "resume_link_active -> LinkActiveNoSOF(5), VBUS loss preservation & "
+      "tx_osc_test_mode");
 
   const uint32_t kDriveIdleJ = (1u << USBDEV_PHY_PINS_DRIVE_EN_BIT) |
                                (1u << USBDEV_PHY_PINS_DRIVE_OE_O_BIT) |
@@ -186,9 +188,12 @@ static void test_usbdev_resume_link_active_no_sof_and_tx_osc(void) {
   CHECK(link_state == 1u, "Expected link_state == LinkPowered (1), got %u",
         link_state);
 
+  const uint32_t kTestAddr = 0x2au;
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET,
                    (1u << USBDEV_USBCTRL_ENABLE_BIT) |
-                       (1u << USBDEV_USBCTRL_RESUME_LINK_ACTIVE_BIT));
+                       (1u << USBDEV_USBCTRL_RESUME_LINK_ACTIVE_BIT) |
+                       (kTestAddr << USBDEV_USBCTRL_DEVICE_ADDRESS_OFFSET));
+  abs_mmio_write32(kUsbdevBase + USBDEV_AVOUTBUFFER_REG_OFFSET, 0x3u);
   busy_spin_micros(20);
 
   usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
@@ -196,6 +201,41 @@ static void test_usbdev_resume_link_active_no_sof_and_tx_osc(void) {
                USBDEV_USBSTAT_LINK_STATE_MASK;
   CHECK(link_state == 5u, "Expected link_state == LinkActiveNoSOF (5), got %u",
         link_state);
+  CHECK(((usbstat >> USBDEV_USBSTAT_AV_OUT_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_OUT_DEPTH_MASK) == 1u);
+
+  // Simulate VBUS loss (UsbdevSense -> ConstantZero) while USBCTRL.enable == 1:
+  // link_state drops to LinkDisconnected (0) and sense == 0, while FIFOs
+  // (av_out_depth == 1) and USBCTRL.device_address (0x2a) are preserved.
+  CHECK_DIF_OK(
+      dif_pinmux_input_select(pinmux, kTopEarlgreyPinmuxPeripheralInUsbdevSense,
+                              kTopEarlgreyPinmuxInselConstantZero));
+  busy_spin_micros(20);
+  usbstat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  link_state = (usbstat >> USBDEV_USBSTAT_LINK_STATE_OFFSET) &
+               USBDEV_USBSTAT_LINK_STATE_MASK;
+  uint32_t usbctrl = abs_mmio_read32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET);
+  uint32_t devaddr = (usbctrl >> USBDEV_USBCTRL_DEVICE_ADDRESS_OFFSET) &
+                     USBDEV_USBCTRL_DEVICE_ADDRESS_MASK;
+  CHECK(((usbstat >> USBDEV_USBSTAT_SENSE_BIT) & 1u) == 0u);
+  CHECK(link_state == 0u, "Expected LinkDisconnected (0) on VBUS loss, got %u",
+        link_state);
+  CHECK(devaddr == kTestAddr,
+        "Expected VBUS loss to preserve device_address == 0x2a, got 0x%x",
+        devaddr);
+  CHECK(((usbstat >> USBDEV_USBSTAT_AV_OUT_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_OUT_DEPTH_MASK) == 1u,
+        "Expected VBUS loss to preserve AVOUTBUFFER depth == 1");
+
+  // Restore UsbdevSense -> ConstantOne and clear FIFO.
+  CHECK_DIF_OK(
+      dif_pinmux_input_select(pinmux, kTopEarlgreyPinmuxPeripheralInUsbdevSense,
+                              kTopEarlgreyPinmuxInselConstantOne));
+  abs_mmio_write32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET,
+                   (1u << USBDEV_FIFO_CTRL_AVOUT_RST_BIT) |
+                       (1u << USBDEV_FIFO_CTRL_AVSETUP_RST_BIT) |
+                       (1u << USBDEV_FIFO_CTRL_RX_RST_BIT));
+  busy_spin_micros(20);
 
   abs_mmio_write32(kUsbdevBase + USBDEV_PHY_PINS_DRIVE_REG_OFFSET, 0x0u);
   abs_mmio_write32(kUsbdevBase + USBDEV_PHY_CONFIG_REG_OFFSET,
@@ -288,26 +328,37 @@ static void test_usbdev_v2_rxenable_out_preserve_inversion_and_permit(void) {
                    1u << USBDEV_USBCTRL_ENABLE_BIT);
   busy_spin_micros(20);
 
-  // 1. Compare OUT_DATA_TOGGLE (0x3C) positive `mask` ([27:16] = 1 updates)
-  // against RXENABLE_OUT (0x28) inverted `preserve` ([27:16] = 1 preserves,
-  // 0 updates):
-  // Initialize OUT_DATA_TOGGLE to 0x005 (endpoints 0 and 2 = 1) using
-  // mask = 0xFFF.
+  // 1. Compare OUT_DATA_TOGGLE (0x3C) and IN_DATA_TOGGLE (0x40) positive `mask`
+  // ([27:16] = 1 updates) against RXENABLE_OUT (0x28) inverted `preserve`
+  // ([27:16] = 1 preserves, 0 updates):
+  // Initialize OUT_DATA_TOGGLE and IN_DATA_TOGGLE to 0x005 (endpoints 0 and 2 =
+  // 1) using mask = 0xFFF.
   CHECK_DIF_OK(dif_usbdev_data_toggle_out_write(&usbdev, 0x0FFFu, 0x0005u));
+  CHECK_DIF_OK(dif_usbdev_data_toggle_in_write(&usbdev, 0x0FFFu, 0x0005u));
   busy_spin_micros(10);
   uint16_t toggles = 0;
+  uint16_t in_toggles = 0;
   CHECK_DIF_OK(dif_usbdev_data_toggle_out_read(&usbdev, &toggles));
+  CHECK_DIF_OK(dif_usbdev_data_toggle_in_read(&usbdev, &in_toggles));
   CHECK(toggles == 0x0005u, "Expected toggles == 0x0005, got 0x%04x", toggles);
+  CHECK(in_toggles == 0x0005u, "Expected in_toggles == 0x0005, got 0x%04x",
+        in_toggles);
 
-  // Set endpoint 5 in OUT_DATA_TOGGLE using mask = (1 << 5), state = (1 << 5):
-  // endpoints 0 and 2 are preserved, and endpoint 5 becomes 1 (`0x0025`).
+  // Set endpoint 5 in OUT_DATA_TOGGLE and IN_DATA_TOGGLE using mask = (1 << 5),
+  // state = (1 << 5): endpoints 0 and 2 are preserved, and endpoint 5 becomes 1
+  // (`0x0025`).
   const uint32_t kMaskAndBit5 = ((1u << 5) << 16) | (1u << 5);
   abs_mmio_write32(kUsbdevBase + USBDEV_OUT_DATA_TOGGLE_REG_OFFSET,
                    kMaskAndBit5);
+  abs_mmio_write32(kUsbdevBase + USBDEV_IN_DATA_TOGGLE_REG_OFFSET,
+                   kMaskAndBit5);
   busy_spin_micros(10);
   CHECK_DIF_OK(dif_usbdev_data_toggle_out_read(&usbdev, &toggles));
+  CHECK_DIF_OK(dif_usbdev_data_toggle_in_read(&usbdev, &in_toggles));
   CHECK(toggles == 0x0025u,
         "OUT_DATA_TOGGLE.mask (1=update) must set ep5 and preserve ep0,ep2");
+  CHECK(in_toggles == 0x0025u,
+        "IN_DATA_TOGGLE.mask (1=update) must set ep5 and preserve ep0,ep2");
 
   // Now initialize RXENABLE_OUT to 0x005 (endpoints 0 and 2 enabled) using
   // preserve = 0x000 (update all 12 endpoints).
@@ -332,6 +383,10 @@ static void test_usbdev_v2_rxenable_out_preserve_inversion_and_permit(void) {
   // to enable ep5 while preserving ep0 and ep2, and that `preserve` (`wo`)
   // always reads back as `0` in `[27:16]`.
   abs_mmio_write32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET, 0x00000005u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET, 0x0FFF0000u);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET) >> 16) ==
+            0u,
+        "Expected RXENABLE_OUT.preserve (wo) [27:16] to read back 0");
   CHECK_DIF_OK(dif_usbdev_endpoint_out_enable(&usbdev, 5u, kDifToggleEnabled));
   rxenable_out = abs_mmio_read32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET);
   CHECK(rxenable_out == 0x00000025u,
@@ -374,6 +429,7 @@ static void test_usbdev_v2_rxenable_out_preserve_inversion_and_permit(void) {
   abs_mmio_write32(kUsbdevBase + USBDEV_SET_NAK_OUT_REG_OFFSET, 0u);
   abs_mmio_write32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET, 0u);
   CHECK_DIF_OK(dif_usbdev_data_toggle_out_write(&usbdev, 0x0FFFu, 0x0000u));
+  CHECK_DIF_OK(dif_usbdev_data_toggle_in_write(&usbdev, 0x0FFFu, 0x0000u));
 }
 
 bool test_main(void) {
@@ -387,7 +443,7 @@ bool test_main(void) {
   busy_spin_micros(20);
 
   test_usbdev_rx_empty_and_devaddr_gated_by_enable();
-  test_usbdev_resume_link_active_no_sof_and_tx_osc();
+  test_usbdev_resume_link_active_no_sof_and_tx_osc(&pinmux);
   test_usbdev_buffer_asymmetric_subword_and_csr_faults();
   test_usbdev_v2_rxenable_out_preserve_inversion_and_permit();
 

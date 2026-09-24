@@ -47,6 +47,7 @@
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/csr.h"
 #include "sw/device/lib/base/multibits.h"
+#include "sw/device/lib/dif/dif_alert_handler.h"
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -77,6 +78,7 @@ static volatile bool g_in_trap_test = false;
 static volatile uint32_t g_nmi_count = 0;
 static volatile uint32_t g_nmi_mcause = 0;
 static volatile uint32_t g_nmi_entry_mepc = 0;
+static volatile uint32_t g_nmi_state_on_entry = 0;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   uint32_t mcause = ibex_mcause_read();
@@ -127,10 +129,12 @@ void ottf_internal_isr(uint32_t *exc_info) {
   g_nmi_count++;
   CSR_READ(CSR_REG_MCAUSE, &g_nmi_mcause);
   CSR_READ(CSR_REG_MEPC, &g_nmi_entry_mepc);
+  g_nmi_state_on_entry =
+      abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_STATE_REG_OFFSET);
 
   // Stop and clear the watchdog bark source at AON_TIMER first, then wait for
   // the 2-stage synchronizer (`u_wdog_nmi_sync` in `rv_core_ibex.sv:343-350`)
-  // to deassert `wdog_irq_nm` before clearing `NMI_STATE.WDOG`.
+  // to deassert `wdog_irq_nm` before clearing `NMI_STATE`.
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WDOG_CTRL_REG_OFFSET, 0);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET,
                    (1u << AON_TIMER_INTR_STATE_WDOG_TIMER_BARK_BIT));
@@ -138,7 +142,8 @@ void ottf_internal_isr(uint32_t *exc_info) {
     asm volatile("nop");
   }
   abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_STATE_REG_OFFSET,
-                   (1u << RV_CORE_IBEX_NMI_STATE_WDOG_BIT));
+                   (1u << RV_CORE_IBEX_NMI_STATE_ALERT_BIT) |
+                       (1u << RV_CORE_IBEX_NMI_STATE_WDOG_BIT));
 }
 
 /**
@@ -151,15 +156,24 @@ void ottf_internal_isr(uint32_t *exc_info) {
 static void test_window_gap_and_subword_permits(void) {
   LOG_INFO("Test 1: DV_SIM_WINDOW, v2 unmapped gap (0x74..0x7F), and permits");
 
-  // Confirm shifted `FPGA_INFO` at `0x68` is readable without bus fault.
+  // Confirm shifted `FPGA_INFO` at `0x68`, `MCOUNTEREN_WRITABLE_REGWEN` at
+  // `0x6C`, and `MCOUNTEREN_WRITABLE` at `0x70` are readable without bus fault.
   g_expect_bus_fault = false;
+  uint32_t prev_faults = g_bus_fault_count;
   uint32_t fpga_info =
       abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_FPGA_INFO_REG_OFFSET);
+  uint32_t regwen_init = abs_mmio_read32(
+      kIbexCfgBase + RV_CORE_IBEX_MCOUNTEREN_WRITABLE_REGWEN_REG_OFFSET);
+  uint32_t writable_init = abs_mmio_read32(
+      kIbexCfgBase + RV_CORE_IBEX_MCOUNTEREN_WRITABLE_REG_OFFSET);
+  CHECK(g_bus_fault_count == prev_faults);
+  CHECK(regwen_init == 1u);
+  CHECK(writable_init == kMultiBitBool4True);
   LOG_INFO("  FPGA_INFO (0x68) = 0x%08x", fpga_info);
 
   // 1a. Unmapped decode gap in v2 is `0x74..0x7F` (3 words: `0x74`, `0x78`,
   // `0x7C`) between `MCOUNTEREN_WRITABLE` (`0x70`) and `DV_SIM_WINDOW`
-  // (`0x80`).
+  // (`0x80`), plus `0xA0..0xFF` after `DV_SIM_WINDOW`.
   for (uint32_t off = 0x74; off < 0x80; off += 4) {
     uint32_t prev = g_bus_fault_count;
     g_expect_bus_fault = true;
@@ -178,6 +192,22 @@ static void test_window_gap_and_subword_permits(void) {
           "Expected store fault at unmapped v2 gap offset 0x%02x", off);
     CHECK(g_last_mcause == 7, "Expected mcause=7 at 0x%02x, got %u", off,
           g_last_mcause);
+  }
+
+  // Also verify `0xA0` (`0xA0..0xFF` unmapped gap in `u_reg_cfg`,
+  // `addrmiss=1`).
+  {
+    uint32_t prev = g_bus_fault_count;
+    g_expect_bus_fault = true;
+    (void)abs_mmio_read32(kIbexCfgBase + 0xA0u);
+    g_expect_bus_fault = false;
+    CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 5);
+
+    prev = g_bus_fault_count;
+    g_expect_bus_fault = true;
+    abs_mmio_write32(kIbexCfgBase + 0xA0u, 0x12345678u);
+    g_expect_bus_fault = false;
+    CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7);
   }
 
   // 1b. `DV_SIM_WINDOW` (`0x80..0x9F`) routed to `u_sim_win_rsp`
@@ -201,7 +231,7 @@ static void test_window_gap_and_subword_permits(void) {
   }
 
   // 1c. Sub-word write enforcement (`RV_CORE_IBEX_CFG_PERMIT`):
-  // `IBUS_ADDR_MATCHING_0` (`0x1C`) has permit `4'b1111`, so `sb`/`sh` faults.
+  // `IBUS_ADDR_MATCHING_0` (`0x10`) has permit `4'b1111`, so `sb`/`sh` faults.
   abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_0_REG_OFFSET,
                    0x11223344u);
   uint32_t prev = g_bus_fault_count;
@@ -211,15 +241,26 @@ static void test_window_gap_and_subword_permits(void) {
   g_expect_bus_fault = false;
   CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7,
         "Expected sb fault on 4-byte permit CSR IBUS_ADDR_MATCHING_0");
+
+  prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  *(volatile uint16_t
+        *)(uintptr_t)(kIbexCfgBase +
+                      RV_CORE_IBEX_IBUS_ADDR_MATCHING_0_REG_OFFSET) = 0xBBCCu;
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7,
+        "Expected sh fault on 4-byte permit CSR IBUS_ADDR_MATCHING_0");
+
   CHECK(abs_mmio_read32(kIbexCfgBase +
                         RV_CORE_IBEX_IBUS_ADDR_MATCHING_0_REG_OFFSET) ==
             0x11223344u,
-        "Faulting sb must not mutate IBUS_ADDR_MATCHING_0");
+        "Faulting sb/sh must not mutate IBUS_ADDR_MATCHING_0");
   abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_0_REG_OFFSET,
                    0u);
 
-  // `MCOUNTEREN_WRITABLE` (`0x70`) has permit `4'b0001`, so `sb` to byte 0
-  // succeeds (`4'b0001 & ~4'b0001 == 0`), while `sb` to byte 1 (`0x71`) faults.
+  // `MCOUNTEREN_WRITABLE` (`0x70`) and `CHERIOT_ENA` (`0x60`) have permit
+  // `4'b0001`, so `sb` to byte 0 succeeds (`4'b0001 & ~4'b0001 == 0`), while
+  // `sb` to byte 1 (`+1`) faults (`mcause = 7`).
   g_expect_bus_fault = false;
   abs_mmio_write8(kIbexCfgBase + RV_CORE_IBEX_MCOUNTEREN_WRITABLE_REG_OFFSET,
                   kMultiBitBool4True);
@@ -235,29 +276,120 @@ static void test_window_gap_and_subword_permits(void) {
   g_expect_bus_fault = false;
   CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7,
         "Expected sb to byte 1 of MCOUNTEREN_WRITABLE to fault");
+
+  g_expect_bus_fault = false;
+  abs_mmio_write8(kIbexCfgBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
+                  kMultiBitBool4False);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET) ==
+        kMultiBitBool4False);
+
+  prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  abs_mmio_write8(kIbexCfgBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET + 1,
+                  0x00u);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7,
+        "Expected sb to byte 1 of CHERIOT_ENA to fault");
 }
 
 /**
  * Test 2 (Part A - v1 Erratum 002 on v2):
  * Verify `NMI_ENABLE` (`SwAccessW1S` irreversibility), `NMI_STATE`
- * (`SwAccessW1C` software-masking and edge re-latching), and 1-deep `mstack`
- * clobbering during an active M-mode trap handler.
+ * (`SwAccessW1C` software-masking and edge latching while `NMI_ENABLE == 0`),
+ * and 1-deep `mstack` clobbering during an active M-mode trap handler.
  */
 static void test_nmi_w1s_and_mstack_clobber(void) {
   LOG_INFO("Test 2: NMI_ENABLE W1S irreversibility and 1-deep mstack clobber");
 
-  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET,
-                   (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT));
-  CHECK((abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET) &
-         (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT)) != 0,
-        "NMI_ENABLE.WDOG_EN should be set");
+  // 2a. `_rom_start_boot` (`rom_start.S:166`) writes `NMI_ENABLE.WDOG_EN = 1`
+  // (`0x2`) at reset and leaves `NMI_ENABLE.ALERT_EN == 0` (`bit 0`). Verify
+  // `WDOG_EN == 1` persisted (`SwAccessW1S`) while `ALERT_EN == 0`.
+  uint32_t nmi_en_init =
+      abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET);
+  CHECK(nmi_en_init == (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT),
+        "Expected NMI_ENABLE == 0x2 (WDOG_EN=1 from ROM, ALERT_EN=0), got 0x%x",
+        nmi_en_init);
 
-  // Attempting to clear `NMI_ENABLE` by writing `0` or `1` fails
-  // (`SwAccessW1S`).
+  // Configure `alert_handler` Class A to pulse `esc_rx[0]` (`signal = 0`,
+  // connected to `rv_core_ibex.esc_tx_i`) on
+  // `kTopEarlgreyAlertIdRvCoreIbexRecovSwErr` while `NMI_ENABLE.ALERT_EN == 0`,
+  // proving `NMI_STATE.ALERT == 1` latches without firing an NMI (`g_nmi_count
+  // == 0`).
+  dif_alert_handler_t ah;
+  CHECK_DIF_OK(dif_alert_handler_init_from_dt(kDtAlertHandler, &ah));
+  dif_alert_handler_escalation_phase_t esc_phases[] = {
+      {.phase = kDifAlertHandlerClassStatePhase0,
+       .signal = 0,
+       .duration_cycles = 200},
+  };
+  dif_alert_handler_class_config_t class_a_cfg = {
+      .auto_lock_accumulation_counter = kDifToggleDisabled,
+      .accumulator_threshold = 0,
+      .irq_deadline_cycles = 0,
+      .escalation_phases = esc_phases,
+      .escalation_phases_len = 1,
+      .crashdump_escalation_phase = kDifAlertHandlerClassStatePhase1,
+  };
+  CHECK_DIF_OK(dif_alert_handler_configure_class(&ah, kDifAlertHandlerClassA,
+                                                 class_a_cfg, kDifToggleEnabled,
+                                                 kDifToggleDisabled));
+  CHECK_DIF_OK(dif_alert_handler_configure_alert(
+      &ah, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr, kDifAlertHandlerClassA,
+      kDifToggleEnabled, kDifToggleDisabled));
+
+  g_nmi_count = 0;
+  g_nmi_mcause = 0;
+  g_nmi_state_on_entry = 0;
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET,
+                   (1u << RV_CORE_IBEX_ALERT_TEST_RECOV_SW_ERR_BIT));
+
+  uint32_t nmi_state = 0;
+  for (int poll = 0; poll < 10000; ++poll) {
+    nmi_state =
+        abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_STATE_REG_OFFSET);
+    if (nmi_state & (1u << RV_CORE_IBEX_NMI_STATE_ALERT_BIT)) {
+      break;
+    }
+  }
+  // Clear Class A escalation and restore `RecovSwErr` alert back to Class D.
+  CHECK_DIF_OK(dif_alert_handler_escalation_clear(&ah, kDifAlertHandlerClassA));
+  CHECK_DIF_OK(dif_alert_handler_alert_acknowledge(
+      &ah, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));
+  CHECK_DIF_OK(dif_alert_handler_configure_alert(
+      &ah, kTopEarlgreyAlertIdRvCoreIbexRecovSwErr, kDifAlertHandlerClassD,
+      kDifToggleEnabled, kDifToggleDisabled));
+
+  CHECK(
+      (nmi_state & (1u << RV_CORE_IBEX_NMI_STATE_ALERT_BIT)) != 0u,
+      "Expected NMI_STATE.ALERT == 1 to latch while NMI_ENABLE.ALERT_EN == 0");
+  CHECK(g_nmi_count == 0u,
+        "Expected 0 NMIs while NMI_ENABLE.ALERT_EN == 0, got %u", g_nmi_count);
+
+  // 2b. Now set `NMI_ENABLE.ALERT_EN = 1` (`W1S`) without clearing
+  // `NMI_STATE.ALERT` first: verify the latched `NMI_STATE.ALERT == 1`
+  // immediately triggers `irq_nm` (`assign irq_nm = |(nmi_int & nmi_en)`,
+  // `mcause = 0x8000001F` with `NMI_STATE.ALERT == 1`).
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET,
+                   (1u << RV_CORE_IBEX_NMI_ENABLE_ALERT_EN_BIT));
+  for (int i = 0; i < 16; ++i) {
+    asm volatile("nop");
+  }
+  CHECK(g_nmi_count == 1u,
+        "Expected pending NMI_STATE.ALERT to immediately fire NMI on "
+        "NMI_ENABLE.ALERT_EN = 1");
+  CHECK(g_nmi_mcause == 0x8000001Fu,
+        "Expected NMI mcause=0x8000001F, got 0x%08x", g_nmi_mcause);
+  CHECK((g_nmi_state_on_entry & (1u << RV_CORE_IBEX_NMI_STATE_ALERT_BIT)) != 0u,
+        "Expected NMI_STATE.ALERT == 1 on alert NMI entry, got 0x%x",
+        g_nmi_state_on_entry);
+
+  // Attempting to clear `NMI_ENABLE` by writing `0` fails (`SwAccessW1S`):
+  // both `ALERT_EN` (`bit 0`) and `WDOG_EN` (`bit 1`) remain permanently set.
   abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET, 0u);
-  CHECK((abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET) &
-         (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT)) != 0,
-        "NMI_ENABLE.WDOG_EN must be irreversible (SwAccessW1S)");
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET) ==
+            ((1u << RV_CORE_IBEX_NMI_ENABLE_ALERT_EN_BIT) |
+             (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT)),
+        "NMI_ENABLE (0x3) must be irreversible (SwAccessW1S)");
 
   // Trigger a synchronous load fault at `0x80` (`DV_SIM_WINDOW`) while
   // `g_in_trap_test == true`. Inside `ottf_load_store_fault_handler`, fire an
@@ -290,11 +422,11 @@ static void test_sw_recov_err_and_rnd_data(void) {
             kMultiBitBool4False,
         "SW_RECOV_ERR should reset to MuBi4False (0x9)");
 
-  // Test a non-strict value (`0x0`, which is not `MuBi4False = 0x9` and not
-  // `MuBi4True = 0x6`) as well as `MuBi4True = 0x6`. Both satisfy
-  // `mubi4_test_true_loose` and auto-reset `SW_RECOV_ERR` back to `0x9`
-  // (`MuBi4False`) once `u_alert_sender[1]` asserts `alert_acks[1]`.
-  const uint32_t test_vals[] = {0x0u, kMultiBitBool4True};
+  // Test `MuBi4True` (`0x6`) and non-canonical 4-bit values (`0x0`, `0x1`,
+  // `0x7`, `0xF`). All 5 satisfy `mubi4_test_true_loose` (`!= 0x9`) and
+  // auto-reset `SW_RECOV_ERR` back to `0x9` (`MuBi4False`) once
+  // `u_alert_sender[1]` asserts `alert_acks[1]`.
+  const uint32_t test_vals[] = {0x0u, 0x1u, kMultiBitBool4True, 0x7u, 0xFu};
   for (size_t i = 0; i < sizeof(test_vals) / sizeof(test_vals[0]); ++i) {
     CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
         kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));

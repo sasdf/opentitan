@@ -78,7 +78,9 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
 }
 
 static void test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback(void) {
-  LOG_INFO("Testing and on trunk-v2...");
+  LOG_INFO(
+      "Testing AST SwAccessRO REGA0/1/28, v2 REGA38..52/REGB0..4 RW, and REGAL "
+      "readback...");
 
   // 1. REGA0 (0x00), REGA1 (0x04), and REGA28 (0x70) are read-only (SwAccessRO)
   // and silently ignore 32-bit writes, returning 0x00, 0x01, and 0x1c.
@@ -93,22 +95,32 @@ static void test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback(void) {
   CHECK(abs_mmio_read32(kAstBase + AST_REGA28_REG_OFFSET) == 0x1cu,
         "Expected REGA28 to remain 0x1c (SwAccessRO)");
 
-  // 2. New v2 REGA38..REGA52 (0x98..0xd0) are full 32-bit RW registers!
+  // 2. New v2 REGA38..REGA52 (0x98..0xd0, 15 registers) and REGB_0..REGB_4
+  // (0x200..0x210, 5 registers) are full 32-bit RW registers!
   // Note offset 0x98 was REGAL (WO, reading 0) in v1, and is now REGA38 (RW).
   CHECK(AST_REGA38_REG_OFFSET == 0x98u, "Expected REGA38 at 0x98");
   CHECK(AST_REGA52_REG_OFFSET == 0xd0u, "Expected REGA52 at 0xd0");
   CHECK(AST_REGAL_REG_OFFSET == 0xd4u, "Expected REGAL at 0xd4 in trunk-v2");
 
-  uint32_t orig_rega38 = abs_mmio_read32(kAstBase + AST_REGA38_REG_OFFSET);
-  uint32_t orig_rega52 = abs_mmio_read32(kAstBase + AST_REGA52_REG_OFFSET);
-  abs_mmio_write32(kAstBase + AST_REGA38_REG_OFFSET, 0x12345678u);
-  abs_mmio_write32(kAstBase + AST_REGA52_REG_OFFSET, 0x89abcdefu);
-  CHECK(abs_mmio_read32(kAstBase + AST_REGA38_REG_OFFSET) == 0x12345678u,
-        "Expected REGA38 (0x98) to read back 32-bit RW value");
-  CHECK(abs_mmio_read32(kAstBase + AST_REGA52_REG_OFFSET) == 0x89abcdefu,
-        "Expected REGA52 (0xd0) to read back 32-bit RW value");
-  abs_mmio_write32(kAstBase + AST_REGA38_REG_OFFSET, orig_rega38);
-  abs_mmio_write32(kAstBase + AST_REGA52_REG_OFFSET, orig_rega52);
+  for (uint32_t i = 0u; i < 15u; ++i) {
+    uint32_t off = AST_REGA38_REG_OFFSET + i * sizeof(uint32_t);
+    uint32_t orig = abs_mmio_read32(kAstBase + off);
+    uint32_t test_val = 0x12345670u + i;
+    abs_mmio_write32(kAstBase + off, test_val);
+    CHECK(abs_mmio_read32(kAstBase + off) == test_val,
+          "Expected REGA%u (0x%x) to read back 32-bit RW value", 38u + i, off);
+    abs_mmio_write32(kAstBase + off, orig);
+  }
+
+  for (uint32_t i = 0u; i < 5u; ++i) {
+    uint32_t off = AST_REGB_0_REG_OFFSET + i * sizeof(uint32_t);
+    uint32_t orig = abs_mmio_read32(kAstBase + off);
+    uint32_t test_val = 0x89abcde0u + i;
+    abs_mmio_write32(kAstBase + off, test_val);
+    CHECK(abs_mmio_read32(kAstBase + off) == test_val,
+          "Expected REGB_%u (0x%x) to read back 32-bit RW value", i, off);
+    abs_mmio_write32(kAstBase + off, orig);
+  }
 
   // 3. REGAL (0xd4) has hw2reg.regal.d = regal in ast_main.sv:154, yet
   // u_regal.qs() is unconnected (SwAccessWO), so REGAL always reads 0x00000000
@@ -127,31 +139,40 @@ static void test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback(void) {
 }
 
 static void test_v1_002_permit_subword_and_addrmiss_holes(void) {
-  LOG_INFO("Testing on trunk-v2...");
+  LOG_INFO(
+      "Testing AST_PERMIT[59]=4'b1111 sub-word faults & unmapped holes...");
 
-  // 1. Sub-word writes (sb/sh) to any AST register (REGA0, REGA2, REGAL, REGB0)
-  // fault with mcause = 7 (AST_PERMIT = 4'b1111 for all 59 registers).
-  const uint32_t kTestRegs[] = {
-      AST_REGA0_REG_OFFSET,
-      AST_REGA2_REG_OFFSET,
-      AST_REGAL_REG_OFFSET,
-      AST_REGB_0_REG_OFFSET,
-  };
-  for (size_t i = 0; i < 4u; ++i) {
+  // 1. Sub-word writes (sb/sh) to all 59 AST registers (REGA0..REGA52 at
+  // 0x00..0xd0, REGAL at 0xd4, and REGB0..REGB4 at 0x200..0x210) fault with
+  // mcause = 7 (AST_PERMIT = 4'b1111 for all 59 registers) and block we.
+  uint32_t orig_rega2 = abs_mmio_read32(kAstBase + AST_REGA2_REG_OFFSET);
+  uint32_t orig_regb0 = abs_mmio_read32(kAstBase + AST_REGB_0_REG_OFFSET);
+  abs_mmio_write32(kAstBase + AST_REGA2_REG_OFFSET, 0x55aa55aau);
+  abs_mmio_write32(kAstBase + AST_REGB_0_REG_OFFSET, 0xaa55aa55u);
+
+  for (uint32_t idx = 0u; idx < 59u; ++idx) {
+    uint32_t off =
+        (idx < 54u) ? (idx * sizeof(uint32_t))
+                    : (AST_REGB_0_REG_OFFSET + (idx - 54u) * sizeof(uint32_t));
     g_fault_count = 0;
     g_last_mcause = 0;
-    mmio_write8(kAstBase + kTestRegs[i], 0x11u);
+    mmio_write8(kAstBase + off, 0x11u);
     CHECK(g_fault_count == 1u && g_last_mcause == 7u,
-          "Expected sb to AST offset 0x%x to fault with mcause=7",
-          kTestRegs[i]);
+          "Expected sb to AST offset 0x%x to fault with mcause=7", off);
 
     g_fault_count = 0;
     g_last_mcause = 0;
-    mmio_write16(kAstBase + kTestRegs[i], 0x2233u);
+    mmio_write16(kAstBase + off, 0x2233u);
     CHECK(g_fault_count == 1u && g_last_mcause == 7u,
-          "Expected sh to AST offset 0x%x to fault with mcause=7",
-          kTestRegs[i]);
+          "Expected sh to AST offset 0x%x to fault with mcause=7", off);
   }
+
+  CHECK(abs_mmio_read32(kAstBase + AST_REGA2_REG_OFFSET) == 0x55aa55aau,
+        "Faulting sb/sh must block write-enable on REGA2");
+  CHECK(abs_mmio_read32(kAstBase + AST_REGB_0_REG_OFFSET) == 0xaa55aa55u,
+        "Faulting sb/sh must block write-enable on REGB_0");
+  abs_mmio_write32(kAstBase + AST_REGA2_REG_OFFSET, orig_rega2);
+  abs_mmio_write32(kAstBase + AST_REGB_0_REG_OFFSET, orig_regb0);
 
   // 2. Unmapped aperture holes 0xd8..0x1fc (between REGAL at 0xd4 and REGB0 at
   // 0x200) and 0x214..0x3fc (after REGB4 at 0x210) raise addrmiss faults.
