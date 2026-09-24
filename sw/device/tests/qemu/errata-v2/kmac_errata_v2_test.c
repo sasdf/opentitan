@@ -178,6 +178,33 @@ bool test_main(void) {
   CHECK_EQ(d_kmac_sha3, d_manual_hybrid,
            "Expected d_kmac_sha3 to match SHA3-256(bytepad(K, 136) || M)");
 
+  // Subcase 1B: kmac_en=1, mode=Shake (2), kstrength=L256 (2), PREFIX='KMAC'
+  // -> ERR_CODE == 0x00000000, kmac_err == 0 (computes non-standard
+  // SHAKE-256(bytepad(encode_string(K), 136) || M || right_encode(0))).
+  uint32_t cfg_3b = bitfield_field32_write(cfg_3a, KMAC_CFG_SHADOWED_MODE_FIELD,
+                                           KMAC_CFG_SHADOWED_MODE_VALUE_SHAKE);
+  write_cfg_shadowed(cfg_3b);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_absorb();
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x44332211u);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_PROCESS << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_squeeze();
+  uint32_t intr_3b = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
+  uint32_t err_3b = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t d_kmac_shake = read_unmasked_state_word(0);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_idle();
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
+  LOG_INFO("[kmac_errchk.sv:268 1B] d_kmac_shake=0x%08x, err_3b=0x%08x",
+           d_kmac_shake, err_3b);
+  CHECK_EQ(intr_3b & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT), 0u,
+           "Expected kmac_err == 0 when kmac_en=1, mode=Shake, PREFIX='KMAC'");
+  CHECK_EQ(err_3b, 0x00000000u,
+           "Expected ERR_CODE == 0x00000000 when kmac_en=1, mode=Shake");
+
   // Subcase 1C: kmac_en=1, mode=Sha3 (0), PREFIX=0 -> 0x07010000.
   abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0u);
   write_cfg_shadowed(cfg_3a);
