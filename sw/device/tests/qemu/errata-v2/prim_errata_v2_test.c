@@ -56,6 +56,8 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top/clkmgr_regs.h"
+#include "hw/top/csrng_regs.h"
+#include "hw/top/rv_core_ibex_regs.h"
 #include "hw/top/sram_ctrl_regs.h"
 #include "hw/top/uart_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
@@ -68,6 +70,8 @@ enum {
   kSramRetRegsBase = 0x40500000u,
   kSramMetaRegsBase = TOP_EARLGREY_SRAM_CTRL_META_REGS_BASE_ADDR,
   kSramMetaRamBase = TOP_EARLGREY_SRAM_CTRL_META_RAM_BASE_ADDR,
+  kCsrngBase = TOP_EARLGREY_CSRNG_BASE_ADDR,
+  kRvCoreIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
 };
 
 /**
@@ -157,13 +161,16 @@ static void test_prim_subreg_shadow_semantics(void) {
 }
 
 /**
- * Verify `prim_fifo_sync.sv` empty-pop pointer gating (`OutputZeroIfEmpty = 1`)
- * and synchronous `clr_i` reset on `UART1`.
+ * Verify `prim_fifo_sync.sv` empty-pop pointer gating (`OutputZeroIfEmpty =
+ * 1`), full-push pointer gating (`wready_o = ~full_o & ~under_rst`),
+ * `prim_packer_fifo.sv` (`pulled = rvalid_o & rready_i`), and synchronous
+ * `clr_i` reset.
  */
 static void test_prim_fifo_sync_semantics(void) {
   LOG_INFO(
-      "Verifying [prim_fifo_sync.sv:162, 181-182, 205-206]: empty pop gating "
-      "(OutputZeroIfEmpty=1) and synchronous clr_i reset on UART1");
+      "Verifying [prim_fifo_sync.sv:162, 181-182, 205-206] & "
+      "[prim_packer_fifo.sv:53-118]: empty pop, full push, packer unpack, and "
+      "clr_i reset");
 
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(
@@ -174,16 +181,17 @@ static void test_prim_fifo_sync_semantics(void) {
   CHECK((status & (1u << UART_STATUS_RXEMPTY_BIT)) != 0u);
   CHECK((status & (1u << UART_STATUS_TXEMPTY_BIT)) != 0u);
 
-  // Popping an empty prim_fifo_sync returns 0 (OutputZeroIfEmpty=1) and does
-  // not decrement/underflow rptr or depth_o.
+  // 1. Popping an empty prim_fifo_sync returns 0 (OutputZeroIfEmpty=1) and does
+  //    not decrement/underflow rptr or depth_o.
   uint32_t rdata_empty = abs_mmio_read32(kUart1Base + UART_RDATA_REG_OFFSET);
   CHECK(rdata_empty == 0u);
   uint32_t fifo_status =
       abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   CHECK(fifo_status == 0u);
 
-  // Push 4 bytes into TX FIFO while UART1.CTRL.TX == 0, then clear via TXRST
-  // (clr_i = 1).
+  // 2. Push 4 bytes into TX FIFO while UART1.CTRL.TX == 0, then fill to
+  //    Depth = 128 and push a 129th byte (`0xFF`) to verify `fifo_incr_wptr =
+  //    wvalid_i & wready_o` gates off pointer wrap/overflow when `full_o == 1`.
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x11u);
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x22u);
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x33u);
@@ -191,10 +199,67 @@ static void test_prim_fifo_sync_semantics(void) {
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 4u);
 
+  for (uint32_t i = 4u; i < 128u; ++i) {
+    abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, i);
+  }
+  fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
+  status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
+  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 128u);
+  CHECK((status & (1u << UART_STATUS_TXFULL_BIT)) != 0u);
+
+  // Push 129th byte when full: wready_o == 0, so TXLVL stays 128 and TXFULL ==
+  // 1
+  abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0xFFu);
+  fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
+  status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
+  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 128u);
+  CHECK((status & (1u << UART_STATUS_TXFULL_BIT)) != 0u);
+
   abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
                    (1u << UART_FIFO_CTRL_TXRST_BIT));
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 0u);
+
+  // 3. Exercise `prim_packer_fifo` (`u_prim_packer_fifo_sw_genbits` in CSRNG,
+  //    128-bit InW -> 32-bit OutW): empty read when rvalid_o == 0 is gated by
+  //    `pulled = rvalid_o & rready_i`, and a 128-bit GENERATE block unpacks
+  //    across exactly 4 32-bit pops before GENBITS_VLD drops to 0.
+  abs_mmio_write32(
+      kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+      (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+          (kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+          (kMultiBitBool4False << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+          (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
+  CHECK((abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET) & 1u) ==
+        0u);
+  (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  CHECK((abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET) & 1u) ==
+        0u);
+  // Instantiate (acmd=1, flag0=True) and Generate 1 block (acmd=3, glen=1).
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET,
+                   1u | (kMultiBitBool4True << 8));
+  while ((abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET) &
+          (1u << CSRNG_SW_CMD_STS_CMD_ACK_BIT)) == 0u) {
+  }
+  abs_mmio_write32(kCsrngBase + CSRNG_CMD_REQ_REG_OFFSET,
+                   3u | (kMultiBitBool4False << 8) | (1u << 12));
+  while ((abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET) & 1u) ==
+         0u) {
+  }
+  for (int w = 0; w < 3; ++w) {
+    (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+    CHECK((abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET) & 1u) ==
+          1u);
+  }
+  (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  CHECK((abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_VLD_REG_OFFSET) & 1u) ==
+        0u);
+  abs_mmio_write32(
+      kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+      (kMultiBitBool4False << CSRNG_CTRL_ENABLE_OFFSET) |
+          (kMultiBitBool4False << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+          (kMultiBitBool4False << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+          (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET));
 }
 
 /**
@@ -207,9 +272,9 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
       "Verifying [prim_mubi_pkg.sv:120-143] & [prim_ram_1p_scr.sv:249-281]: "
       "MuBi4 strict/loose decoding and 19-chunk non-power-of-2 SRAM_CTRL_META");
 
-  // Write non-canonical 0x0 to SRAM_CTRL_RET_AON.READBACK
-  // (mubi4_test_true_loose) and EXEC (mubi4_test_true_strict), then restore
-  // MuBi4False (0x9).
+  // 1. Write non-canonical 0x0 to SRAM_CTRL_RET_AON.READBACK
+  //    (mubi4_test_true_loose) and EXEC (mubi4_test_true_strict), then restore
+  //    MuBi4False (0x9).
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET, 0x0u);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET, 0x0u);
   CHECK(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) ==
@@ -220,8 +285,46 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
                    kMultiBitBool4False);
 
-  // Verify SRAM_CTRL_RET_AON RAM (0x40600000..0x40600ffc) and SRAM_CTRL_META
-  // CSRs (0x411a0000, MemSizeRam = 38912 = 19 * 2048 bytes, Depth = 9728).
+  // Also functionally verify `mubi4_test_true_loose(4'h0) == 1'b1` (`True`) vs
+  // `mubi4_test_true_strict(4'h0) == 1'b0` (`False`) on CLKMGR:
+  // - `CLKMGR_IO_MEAS_CTRL_EN` uses `mubi4_test_true_loose(val)`, so writing
+  //   `0x0` with out-of-range thresholds `10..20` enables measurement and sets
+  //   `CLKMGR_RECOV_ERR_CODE.IO_MEASURE_ERR`!
+  // - `CLKMGR_EXTCLK_CTRL.SEL` uses `mubi4_test_true_strict(val)`, so writing
+  //   `0x0` evaluates to `False` and leaves `CLKMGR_EXTCLK_STATUS == 0x9`!
+  uint32_t orig_io_shadow =
+      abs_mmio_read32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   (20u << 10) | 10u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   (20u << 10) | 10u);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdClkmgrRecovFault));
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET, 0x0u);
+  busy_spin_micros(250);
+  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
+         (1u << CLKMGR_RECOV_ERR_CODE_IO_MEASURE_ERR_BIT)) != 0u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET,
+                   kMultiBitBool4False);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   orig_io_shadow);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   orig_io_shadow);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET, 0x7ffu);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdClkmgrRecovFault));
+
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET,
+                   (kMultiBitBool4False << 4) | 0x0u);
+  busy_spin_micros(10);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_STATUS_REG_OFFSET) ==
+        kMultiBitBool4False);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET,
+                   (kMultiBitBool4False << 4) | kMultiBitBool4False);
+
+  // 2. Verify SRAM_CTRL_RET_AON RAM (0x40600000..0x40600ffc) and
+  //    SRAM_CTRL_META RAM (0x11000000 Chunk 0 and 0x11000800 Chunk 1,
+  //    MemSizeRam = 38912 = 19 * 2048 bytes, Depth = 9728).
   const uint32_t kRetWord0 = 0x40600e00u;
   const uint32_t kRetWord1 = 0x40600ffcu;
 
@@ -230,8 +333,25 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
 
   CHECK(abs_mmio_read32(kRetWord0) == 0xa5a50000u);
   CHECK(abs_mmio_read32(kRetWord1) == 0xa5a50012u);
+
+  // Initialize SRAM_CTRL_META and temporarily enable RV_CORE_IBEX.CHERIOT_ENA
+  // (0x6) so `u_cheriot` forwards accesses to Chunk 0 (`kSramMetaRamBase + 0`)
+  // and Chunk 1 (`kSramMetaRamBase + 0x800`) of `u_sram_ctrl_meta`.
+  abs_mmio_write32(kSramMetaRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   1u << SRAM_CTRL_CTRL_INIT_BIT);
+  while ((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
+          (1u << SRAM_CTRL_STATUS_INIT_DONE_BIT)) == 0u) {
+  }
+  abs_mmio_write32(kRvCoreIbexBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
+                   kMultiBitBool4True);
+  abs_mmio_write32(kSramMetaRamBase + 0x0u, 0x5a5a0000u);
+  abs_mmio_write32(kSramMetaRamBase + 0x800u, 0x5a5a0001u);
+  CHECK(abs_mmio_read32(kSramMetaRamBase + 0x0u) == 0x5a5a0000u);
+  CHECK(abs_mmio_read32(kSramMetaRamBase + 0x800u) == 0x5a5a0001u);
+  abs_mmio_write32(kRvCoreIbexBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
+                   kMultiBitBool4False);
   CHECK((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
-         0x3fu) == 0u);
+         0x1fu) == 0u);
 }
 
 bool test_main(void) {

@@ -140,7 +140,8 @@ static void test_sram_ifetch_and_v2_sec_sram(void) {
             kMultiBitBool4True,
         "Expected SRAM_CTRL_RET.EXEC (0x1c) == 0x6");
 
-  // 1a. Main SRAM (`0x10000000`) executes `ret` with 0 faults when EXEC=0x6.
+  // 1a. Main SRAM (`0x10000000`) executes `ret` with 0 faults when EXEC=0x6,
+  // and faults with `mcause = 1` when `SRAM_CTRL_MAIN.EXEC == 0x9`.
   s_main_sram_code_buf[0] = kRiscvRetInsn32;
   s_main_sram_code_buf[1] = kRiscvRetInsn32;
   icache_invalidate();
@@ -148,6 +149,18 @@ static void test_sram_ifetch_and_v2_sec_sram(void) {
   call_fn_catching_instr_fault((uintptr_t)&s_main_sram_code_buf[0]);
   CHECK(g_fault_count == 0u,
         "Expected Main SRAM instruction fetch to succeed with EXEC=0x6");
+
+  abs_mmio_write32(kSramMainRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
+                   kMultiBitBool4False);
+  icache_invalidate();
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  call_fn_catching_instr_fault((uintptr_t)&s_main_sram_code_buf[0]);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvInstrAccessFault,
+        "Expected Main SRAM ifetch to fault with mcause=1 when EXEC=0x9");
+  abs_mmio_write32(kSramMainRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
+                   kMultiBitBool4True);
+  icache_invalidate();
 
   // 1b. New in v2: Sec SRAM (`0x10020000`, `SramCtrlSecInstrExec=1`) executes
   // `ret` when `SRAM_CTRL_SEC.EXEC == 0x6`, and traps with `mcause = 1` when
@@ -273,9 +286,23 @@ static void test_reggen_wo_ro_and_xbar_decode_windows(void) {
   CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
         "Expected unmapped sram_ctrl offset 0x28 to fault with mcause=5");
 
-  // 2d. Power-of-two ADDR_MASK vs reg_top addrmiss (`SPI_HOST0` 0x38,
-  // `SYSRST_CTRL` 0xAC after `KEY_INTR_STATUS` at 0xA8) and removed v1
-  // `xbar_peri` apertures (`0x400e0000`, `0x40450000`, `0x40132000`).
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kSramMainRegsBase + 0x28u, 0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected unmapped sram_ctrl offset 0x28 store to fault with mcause=7");
+
+  // 2d. Verify mapped boundary CSRs (`0x40300034` in SPI_HOST0 and
+  // `0x404300A8` in SYSRST_CTRL) succeed with 0 faults, whereas `0x40300038`,
+  // `0x404300AC`, and removed v1 `xbar_peri` apertures (`0x400e0000`,
+  // `0x40450000`, `0x40132000`) fault with mcause=5 on load and mcause=7 on
+  // store.
+  g_fault_count = 0;
+  (void)abs_mmio_read32(kSpiHost0Base + 0x34u);
+  (void)abs_mmio_read32(kSysrstCtrlBase + 0xA8u);
+  CHECK(g_fault_count == 0u,
+        "Expected mapped SPI_HOST0+0x34 and SYSRST_CTRL+0xA8 reads to succeed");
+
   const uintptr_t fault_addrs[] = {
       kSpiHost0Base + 0x38u, kSysrstCtrlBase + 0xACu,
       0x400e0000u,  // Removed v1 PATTGEN aperture in xbar_peri
@@ -288,6 +315,13 @@ static void test_reggen_wo_ro_and_xbar_decode_windows(void) {
     (void)abs_mmio_read32(fault_addrs[i]);
     CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
           "Expected load fault (mcause=5) at 0x%08x", (uint32_t)fault_addrs[i]);
+
+    g_fault_count = 0;
+    g_last_mcause = 0;
+    abs_mmio_write32(fault_addrs[i], 0u);
+    CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+          "Expected store fault (mcause=7) at 0x%08x",
+          (uint32_t)fault_addrs[i]);
   }
 }
 
@@ -319,6 +353,12 @@ static void test_v2_sram_ctrl_meta_and_cheriot_xbar_integration(void) {
   LOG_INFO(
       "Test 3 [NEW_IN_V2]: u_sram_ctrl_meta (0x411a0000) vs u_cheriot "
       "(0x11000000 / 0x411b0000) top-level integration");
+
+  // Verify RV_CORE_IBEX.CHERIOT_ENA (0x411f0060) is at its reset default 0x9.
+  CHECK(
+      abs_mmio_read32(kRvCoreIbexBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET) ==
+          kMultiBitBool4False,
+      "Expected RV_CORE_IBEX.CHERIOT_ENA == 0x9 (MuBi4False)");
 
   // 3a. Trigger CTRL.INIT on u_sram_ctrl_meta (`0x411a0014`) and wait for
   // STATUS.INIT_DONE (bit 5 = 0x20), then verify READBACK (0x24) is writable.
@@ -378,14 +418,29 @@ static void test_v2_sram_ctrl_meta_and_cheriot_xbar_integration(void) {
         "Expected load at unmapped MetaNvmTagBase (0x11000c00) to fault with "
         "mcause=5");
 
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kCheriotRevbmBase + 0x0c00u, 0x12345678u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected store at unmapped MetaNvmTagBase (0x11000c00) to fault with "
+        "mcause=7");
+
   // 3d. `ADDR_SPACE_CHERIOT__REGS` (`0x411b0000`) has `ADDR_MASK = 0x3` (4
-  // bytes), so `0x411b0004` faults with `mcause = 5`.
+  // bytes), so `0x411b0004` faults with `mcause = 5` on load and `mcause = 7`
+  // on store.
   g_fault_count = 0;
   g_last_mcause = 0;
   (void)abs_mmio_read32(kCheriotRegsBase + 4u);
   CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
         "Expected load at 0x411b0004 (outside CHERIOT__REGS ADDR_MASK=0x3) to "
         "fault with mcause=5");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kCheriotRegsBase + 4u, 0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected store at 0x411b0004 (outside CHERIOT__REGS ADDR_MASK=0x3) to "
+        "fault with mcause=7");
 }
 
 bool test_main(void) {

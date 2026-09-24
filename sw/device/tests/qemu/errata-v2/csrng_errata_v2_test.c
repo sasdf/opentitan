@@ -111,9 +111,11 @@ static void test_v1_001_fips_force_enable_pfa_missing_from_recov_alert(void) {
       "  FIPS_FORCE_ENABLE=0x5 -> RECOV_ALERT_STS=0x%x, ALERT_CAUSE[26]=%u",
       recov_sts, alert_cause);
 
-  CHECK(bitfield_bit32_read(
-            recov_sts, CSRNG_RECOV_ALERT_STS_FIPS_FORCE_ENABLE_FIELD_ALERT_BIT),
-        "Expected RECOV_ALERT_STS bit 3 == 1");
+  CHECK(recov_sts == 0x8u &&
+            bitfield_bit32_read(
+                recov_sts,
+                CSRNG_RECOV_ALERT_STS_FIPS_FORCE_ENABLE_FIELD_ALERT_BIT),
+        "Expected RECOV_ALERT_STS == 0x8 (bit 3 == 1)");
   CHECK(alert_cause == 0u,
         "Expected ALERT_CAUSE[26] == 0 due to missing fips_force_enable_pfa in "
         "recov_alert_event");
@@ -176,10 +178,11 @@ static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
   LOG_INFO("  EDN0 invalid cmd seq -> RECOV_ALERT_STS=0x%x, HW_EXC_STS=0x%x",
            recov_sts, hw_exc_sts);
 
-  CHECK(
-      bitfield_bit32_read(
-          recov_sts, CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT),
-      "Expected CMD_STAGE_INVALID_CMD_SEQ_ALERT == 1");
+  CHECK(recov_sts == 0x2000u &&
+            bitfield_bit32_read(
+                recov_sts,
+                CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT),
+        "Expected RECOV_ALERT_STS == 0x2000 (CMD_STAGE_INVALID_CMD_SEQ_ALERT)");
   CHECK(hw_exc_sts == 0u,
         "Expected HW_EXC_STS == 0 due to continuous hw2reg.hw_exc_sts.de=1 "
         "overwrite");
@@ -206,43 +209,66 @@ static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
  * 1. In trunk-v2, ERR_CODE_TEST values 2..19, 23..24, 27 are dead no-ops
  *    (assigned to unused_err_code_test_bit in csrng_core.sv:1014-1015).
  * 2. When CTRL.ENABLE == kMultiBitBool4False, writing ERR_CODE_TEST = 20..22,
- *    25..26 still asserts INTR_STATE.cs_fatal_err = 1 while ERR_CODE remains 0!
+ *    25..26 still asserts INTR_STATE.cs_fatal_err = 1 (0x8) and fatal_alert_o
+ *    while ERR_CODE remains 0!
  */
 static void test_v1_003_err_code_test_disabled_gating_and_v2_dead_bits(void) {
   LOG_INFO(
       "Testing ERR_CODE_TEST dead bits and disabled gating on trunk-v2...");
   csrng_disable_and_clear();
 
-  // 1. Even when CSRNG is ENABLED, ERR_CODE_TEST = 23 and 24 (which were
-  //    DRBG_UPDBE_SM_ERR and DRBG_UPDOB_SM_ERR in v1) and 2..19, 27 are dead in
-  //    v2!
+  // 1. Even when CSRNG is ENABLED, all ERR_CODE_TEST indices 2..19, 23..24, 27
+  //    are dead no-ops in trunk-v2!
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
                    make_ctrl(kMultiBitBool4True, kMultiBitBool4True,
                              kMultiBitBool4False, kMultiBitBool4False));
-  const uint32_t dead_bits[] = {2u, 15u, 19u, 23u, 24u, 27u};
+  const uint32_t dead_bits[] = {2u,  3u,  4u,  5u,  6u,  7u,  8u,
+                                9u,  10u, 11u, 12u, 13u, 14u, 15u,
+                                16u, 17u, 18u, 19u, 23u, 24u, 27u};
   for (size_t i = 0; i < sizeof(dead_bits) / sizeof(dead_bits[0]); ++i) {
     abs_mmio_write32(kCsrngBase + CSRNG_ERR_CODE_TEST_REG_OFFSET, dead_bits[i]);
     uint32_t err_code = abs_mmio_read32(kCsrngBase + CSRNG_ERR_CODE_REG_OFFSET);
     uint32_t intr = abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET);
-    CHECK(err_code == 0u &&
-              !bitfield_bit32_read(intr, CSRNG_INTR_STATE_CS_FATAL_ERR_BIT),
+    CHECK(err_code == 0u && intr == 0u,
           "Expected ERR_CODE_TEST=%u to be a dead no-op in trunk-v2",
           dead_bits[i]);
   }
 
-  // 2. With CTRL.ENABLE = False, ERR_CODE_TEST = 20 (CMD_STAGE_SM_ERR) and
-  //    22 (CTR_DRBG_SM_ERR) fire INTR_STATE.cs_fatal_err = 1 while ERR_CODE
+  // 2. With CTRL.ENABLE = False, ERR_CODE_TEST = 20..22, 25..26 fire
+  //    INTR_STATE.cs_fatal_err = 1 (0x8) and fatal_alert_o = 1 while ERR_CODE
   //    stays 0!
   csrng_disable_and_clear();
-  abs_mmio_write32(kCsrngBase + CSRNG_ERR_CODE_TEST_REG_OFFSET, 22u);
-  uint32_t err_code = abs_mmio_read32(kCsrngBase + CSRNG_ERR_CODE_REG_OFFSET);
-  uint32_t intr = abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET);
-  LOG_INFO("  Disabled ERR_CODE_TEST=22 -> ERR_CODE=0x%x, INTR_STATE=0x%x",
-           err_code, intr);
-  CHECK(err_code == 0u, "Expected ERR_CODE == 0 when CTRL.ENABLE == False");
-  CHECK(bitfield_bit32_read(intr, CSRNG_INTR_STATE_CS_FATAL_ERR_BIT),
-        "Expected INTR_STATE.cs_fatal_err == 1 when ERR_CODE_TEST=22 while "
-        "disabled");
+  const uint32_t kCsrngFatalAlertId = kTopEarlgreyAlertIdCsrngFatalAlert;
+  abs_mmio_write32_shadowed(kAlertBase +
+                                ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
+                                kCsrngFatalAlertId * 4u,
+                            1u);
+  const uint32_t ungated_fatal_bits[] = {20u, 21u, 22u, 25u, 26u};
+  for (size_t i = 0;
+       i < sizeof(ungated_fatal_bits) / sizeof(ungated_fatal_bits[0]); ++i) {
+    abs_mmio_write32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET, 0xffffffffu);
+    abs_mmio_write32(kAlertBase + ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+                         kCsrngFatalAlertId * 4u,
+                     1u);
+    abs_mmio_write32(kCsrngBase + CSRNG_ERR_CODE_TEST_REG_OFFSET,
+                     ungated_fatal_bits[i]);
+    uint32_t err_code = abs_mmio_read32(kCsrngBase + CSRNG_ERR_CODE_REG_OFFSET);
+    uint32_t intr = abs_mmio_read32(kCsrngBase + CSRNG_INTR_STATE_REG_OFFSET);
+    uint32_t fatal_cause =
+        abs_mmio_read32(kAlertBase + ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+                        kCsrngFatalAlertId * 4u);
+    CHECK(err_code == 0u, "Expected ERR_CODE == 0 when CTRL.ENABLE == False");
+    CHECK(intr == 0x8u &&
+              bitfield_bit32_read(intr, CSRNG_INTR_STATE_CS_FATAL_ERR_BIT),
+          "Expected INTR_STATE == 0x8 (cs_fatal_err) when ERR_CODE_TEST=%u",
+          ungated_fatal_bits[i]);
+    CHECK(fatal_cause == 1u,
+          "Expected fatal_alert_o (ALERT_CAUSE[%u]) == 1 when ERR_CODE_TEST=%u",
+          kCsrngFatalAlertId, ungated_fatal_bits[i]);
+  }
+  abs_mmio_write32(kAlertBase + ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+                       kCsrngFatalAlertId * 4u,
+                   1u);
 
   csrng_disable_and_clear();
 }

@@ -161,6 +161,17 @@ static void run_post_wakeup_checks(const dif_clkmgr_t *clkmgr,
       dif_clkmgr_measure_counts_get_enable(clkmgr, main_clk, &main_en));
   CHECK(io_en == kDifToggleDisabled && main_en == kDifToggleDisabled,
         "Expected *_MEAS_CTRL_EN reset to MuBi4False (0x9) after deep sleep");
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 0u,
+        "Expected raw JITTER_REGWEN == 0 after deep sleep");
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) ==
+            1u,
+        "Expected raw MEASURE_CTRL_REGWEN == 1 after deep sleep");
+  CHECK(
+      abs_mmio_read32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET) ==
+              kMultiBitBool4False &&
+          abs_mmio_read32(kClkmgrBase + CLKMGR_MAIN_MEAS_CTRL_EN_REG_OFFSET) ==
+              kMultiBitBool4False,
+      "Expected raw IO_MEAS_CTRL_EN and MAIN_MEAS_CTRL_EN == 0x9");
 
   // -------------------------------------------------------------------------
   // Check 4: Verify JITTER_REGWEN lock still blocks JITTER_ENABLE writes
@@ -240,6 +251,11 @@ static void run_post_wakeup_checks(const dif_clkmgr_t *clkmgr,
   CHECK(!g_store_fault_seen,
         "Expected 16-bit sh to IO_DIV4_MEAS_CTRL_SHADOWED (PERMIT=4'b0011) to "
         "succeed without store fault");
+  CHECK(
+      abs_mmio_read32(kClkmgrBase +
+                      CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) == div4_val,
+      "Expected IO_DIV4_MEAS_CTRL_SHADOWED to update to 0x%x after 16-bit sh",
+      div4_val);
 
   // 16-bit halfword store to IO_MEAS_CTRL_SHADOWED (PERMIT = 4'b0111)
   // triggers a synchronous TL-UL bus error -> Store Access Fault (mcause = 7).
@@ -255,6 +271,9 @@ static void run_post_wakeup_checks(const dif_clkmgr_t *clkmgr,
         "Store Access Fault");
   CHECK(g_store_fault_mcause == 7, "Expected mcause == 7, got %u",
         g_store_fault_mcause);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) == bad_shadow,
+        "Expected rejected 16-bit sh not to modify IO_MEAS_CTRL_SHADOWED");
 }
 
 bool test_main(void) {
@@ -314,6 +333,9 @@ bool test_main(void) {
   uint32_t exp_main_nom = (uint32_t)dt_clock_frequency(kDtClockMain) / aon_hz;
   uint32_t exp_main_half = exp_main_nom / 2u;
   uint32_t var = 10u;
+  CHECK(exp_io_nom == 96u && exp_io_half == 48u && exp_main_nom == 96u &&
+            exp_main_half == 48u,
+        "Expected CW340 nominal=96 and halved=48 cycles/AON");
 
   LOG_INFO(
       "Phase 1: Testing asymmetric low-speed external clock division "
@@ -326,6 +348,11 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_clkmgr_external_clock_set_enabled(&clkmgr,
                                                      /*is_low_speed=*/true));
   CHECK_DIF_OK(dif_clkmgr_wait_for_ext_clk_switch(&clkmgr));
+  CHECK(
+      abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) ==
+          ((kMultiBitBool4False << CLKMGR_EXTCLK_CTRL_HI_SPEED_SEL_OFFSET) |
+           kMultiBitBool4True),
+      "Expected EXTCLK_CTRL == 0x96 (SEL=MuBi4True, HI_SPEED_SEL=MuBi4False)");
   busy_spin_micros(200);
 
   bool io_low_speed_err =

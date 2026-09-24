@@ -321,7 +321,16 @@ static void test_hmac_digest_write_gate_and_sha512_readback(void) {
   CHECK(abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) == 0x205u,
         "Expected MSG_LENGTH_LOWER to retain lower 3 bits [2:0] == 5");
 
-  // 2. Now clear CFG.SHA_EN = 0 and set CFG.DIGEST_SIZE = SHA2_512 (0x4).
+  // 2. Also verify `hmac.sv:252-265`: when `CFG == 0` (`CFG.SHA_EN == 0` AND
+  // `CFG.DIGEST_SIZE == SHA2_None`), writing `DIGEST_0` is ALSO silently
+  // dropped because `digest_sw_we` is gated by `digest_size != SHA2_None`!
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0x55667788u);
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == prev_d0,
+        "Expected DIGEST_0 write while CFG.SHA_EN==0 & DIGEST_SIZE==SHA2_None "
+        "to be silently dropped");
+
+  // 3. Now keep CFG.SHA_EN = 0 and set CFG.DIGEST_SIZE = SHA2_512 (0x4).
   // Note that `digest_size_started_q` is still `SHA2_256` from Test 3!
   abs_mmio_write32(
       kHmacBase + HMAC_CFG_REG_OFFSET,
@@ -377,28 +386,30 @@ static void test_hmac_digest_write_gate_and_sha512_readback(void) {
 
 /**
  * Test 5: `hmac.sv:598-618` `MSG_FIFO` `ErrOnRead=1` &
- * `hmac_reg_pkg.sv:522-580` `HMAC_PERMIT` Reading `HMAC_MSG_FIFO`
+ * `hmac_reg_pkg.sv:449-509` `HMAC_PERMIT` Reading `HMAC_MSG_FIFO`
  * (`0x41111000`) hits `tlul_adapter_sram`
  * (`ErrOnRead = 1`, `rvalid_i = 1'b0` in `hmac.sv:611-618`) and raises a
- * synchronous Load Access Fault (`mcause = 5`), and narrow sub-word writes to
- * `HMAC_KEY_0` (`HMAC_PERMIT[10] = 4'b1111`) or byte 2 of `HMAC_CFG`
- * (`HMAC_PERMIT[4] = 4'b0011`) raise a synchronous Store Access Fault
- * (`mcause = 7`).
+ * synchronous Load Access Fault (`mcause = 5`) without setting `ERR_CODE`, and
+ * narrow sub-word writes to `HMAC_KEY_0` (`HMAC_PERMIT[9] = 4'b1111`) or
+ * `HMAC_CFG` (`HMAC_PERMIT[4] = 4'b0011`) raise a synchronous Store Access
+ * Fault (`mcause = 7`).
  */
 static void test_hmac_msg_fifo_read_and_permit_faults(void) {
   LOG_INFO(
-      "Testing hmac.sv:598-618: MSG_FIFO ErrOnRead (mcause=5) & "
-      "HMAC_PERMIT sub-word write faults (mcause=7)");
+      "Testing hmac.sv:598-618 & hmac_reg_pkg.sv:449-509: MSG_FIFO ErrOnRead "
+      "(mcause=5, ERR_CODE=0) & HMAC_PERMIT sub-word write faults (mcause=7)");
 
   // 1. 32-bit load from HMAC_MSG_FIFO (0x41111000) -> Load Access Fault (mcause
-  // = 5)
+  // = 5) without setting HMAC_ERR_CODE.
   g_saw_bus_fault = false;
   g_last_mcause = 0;
   (void)abs_mmio_read32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET);
   CHECK(g_saw_bus_fault && g_last_mcause == 5u,
         "Expected Load Access Fault (mcause=5) on reading HMAC_MSG_FIFO");
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_ERR_CODE_REG_OFFSET) == 0u,
+        "Expected HMAC_ERR_CODE == 0 after MSG_FIFO read fault");
 
-  // 2. 1-byte store to HMAC_KEY_0 (0x28, HMAC_PERMIT[10] = 4'b1111) -> Store
+  // 2. 1-byte store to HMAC_KEY_0 (0x28, HMAC_PERMIT[9] = 4'b1111) -> Store
   // Access Fault (mcause = 7)
   g_saw_bus_fault = false;
   g_last_mcause = 0;
@@ -406,13 +417,25 @@ static void test_hmac_msg_fifo_read_and_permit_faults(void) {
   CHECK(g_saw_bus_fault && g_last_mcause == 7u,
         "Expected Store Access Fault (mcause=7) on 1-byte write to HMAC_KEY_0");
 
-  // 3. 1-byte store to byte 2 of HMAC_CFG (0x12, HMAC_PERMIT[4] = 4'b0011) ->
-  // Store Access Fault (mcause = 7)
+  // 3. 1-byte store to byte 0 and byte 2 of HMAC_CFG (0x10 / 0x12,
+  // HMAC_PERMIT[4] = 4'b0011) -> Store Access Fault (mcause = 7), whereas
+  // 2-byte halfword store (`sh`, reg_be = 4'b0011) to HMAC_CFG+0 succeeds!
+  g_saw_bus_fault = false;
+  g_last_mcause = 0;
+  abs_mmio_write8(kHmacBase + HMAC_CFG_REG_OFFSET, 0x01u);
+  CHECK(g_saw_bus_fault && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on 1-byte write to HMAC_CFG+0");
+
   g_saw_bus_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kHmacBase + HMAC_CFG_REG_OFFSET + 2u, 0x01u);
   CHECK(g_saw_bus_fault && g_last_mcause == 7u,
         "Expected Store Access Fault (mcause=7) on 1-byte write to HMAC_CFG+2");
+
+  g_saw_bus_fault = false;
+  *(volatile uint16_t *)(uintptr_t)(kHmacBase + HMAC_CFG_REG_OFFSET) = 0x0000u;
+  CHECK(!g_saw_bus_fault,
+        "Expected 2-byte sh to HMAC_CFG+0 (HMAC_PERMIT[4]=4'b0011) to succeed");
 }
 
 bool test_main(void) {
