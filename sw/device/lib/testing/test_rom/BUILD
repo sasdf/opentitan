@@ -253,6 +253,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
         "//hw/top_earlgrey:sim_dv": None,
+        "//hw/top_earlgrey:sim_qemu_test_rom": None,
         "//hw/top_earlgrey:sim_verilator": None,
         "//hw/top_darjeeling:sim_verilator": None,
     },
