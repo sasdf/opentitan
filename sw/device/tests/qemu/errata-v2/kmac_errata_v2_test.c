@@ -175,6 +175,9 @@ bool test_main(void) {
 
   LOG_INFO("[kmac_errchk.sv:268] d_kmac_sha3=0x%08x, d_manual_hybrid=0x%08x",
            d_kmac_sha3, d_manual_hybrid);
+  CHECK_EQ(d_kmac_sha3, 0x1f906f32u, "Expected d_kmac_sha3 == 0x1f906f32");
+  CHECK_EQ(d_manual_hybrid, 0x1f906f32u,
+           "Expected d_manual_hybrid == 0x1f906f32");
   CHECK_EQ(d_kmac_sha3, d_manual_hybrid,
            "Expected d_kmac_sha3 to match SHA3-256(bytepad(K, 136) || M)");
 
@@ -204,6 +207,7 @@ bool test_main(void) {
            "Expected kmac_err == 0 when kmac_en=1, mode=Shake, PREFIX='KMAC'");
   CHECK_EQ(err_3b, 0x00000000u,
            "Expected ERR_CODE == 0x00000000 when kmac_en=1, mode=Shake");
+  CHECK_EQ(d_kmac_shake, 0x4bfa3f48u, "Expected d_kmac_shake == 0x4bfa3f48");
 
   // Subcase 1C: kmac_en=1, mode=Sha3 (0), PREFIX=0 -> 0x07010000.
   abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0u);
@@ -211,10 +215,16 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
   uint32_t err_code_3c = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t intr_3c = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
+  uint32_t status_3c = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   LOG_INFO("[kmac_errchk.sv:268 1C] ERR_CODE=0x%08x when PREFIX=0, mode=Sha3",
            err_code_3c);
   CHECK_EQ(err_code_3c, 0x07010000u,
            "Expected ErrIncorrectFunctionName (0x07010000) in Sha3 mode");
+  CHECK((intr_3c & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) != 0u,
+        "Expected INTR_STATE.kmac_err == 1 on ErrIncorrectFunctionName");
+  CHECK((status_3c & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) != 0u,
+        "Expected STATUS.sha3_absorb == 1 despite ErrIncorrectFunctionName");
   wait_kmac_absorb();
   abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x44332211u);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -238,12 +248,15 @@ bool test_main(void) {
       "Verifying [kmac_app.sv:1049 & kmac_pkg.sv:382] SwPushedMsgFifo in "
       "StIdle on trunk-v2...");
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
-  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x11223344u);
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0xdeadbeefu);
   uint32_t err_code_idle =
       abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t intr_idle = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
   LOG_INFO("[kmac_app.sv:1049] SwPushedMsgFifo ERR_CODE=0x%08x", err_code_idle);
   CHECK_EQ(err_code_idle, 0x0200a514u,
            "Expected ERR_CODE 0x0200a514 in StIdle on trunk-v2");
+  CHECK((intr_idle & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) != 0u,
+        "Expected INTR_STATE.kmac_err == 1 on SwPushedMsgFifo");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    1u << KMAC_CMD_ERR_PROCESSED_BIT);
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
@@ -294,8 +307,12 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
   wait_kmac_absorb();
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x44332211u);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_RUN << KMAC_CMD_CMD_OFFSET);
+  uint32_t intr_005 = abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
+  CHECK((intr_005 & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) != 0u,
+        "Expected INTR_STATE.kmac_err == 1 on CMD.RUN in StAbsorb");
   CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET), 0x08040131u,
            "Expected ERR_CODE 0x08040131 on CMD.RUN in StAbsorb");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
@@ -306,15 +323,18 @@ bool test_main(void) {
   uint32_t status_005b = abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   CHECK((status_005b & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) != 0u,
         "Expected SHA3_ABSORB=1 to remain active after CMD.err_processed = 1");
-  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x64636261u);
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_PROCESS << KMAC_CMD_CMD_OFFSET);
   wait_kmac_squeeze();
   uint32_t sha3_kmac0_w0 = read_unmasked_state_word(0);
-  CHECK(sha3_kmac0_w0 != 0u, "Expected non-zero SHA3-256 digest word 0");
+  CHECK_EQ(sha3_kmac0_w0, 0xdc612a07u,
+           "Expected SHA3-256(0x44332211) digest word 0 == 0xdc612a07");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
   wait_kmac_idle();
+  CHECK_EQ(
+      abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET), 0x08040131u,
+      "Expected ERR_CODE 0x08040131 to remain sticky after hash completion");
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
   // =========================================================================
@@ -345,9 +365,17 @@ bool test_main(void) {
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
   uint32_t err_sideload = abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t intr_sideload =
+      abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
+  uint32_t status_sideload =
+      abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET);
   LOG_INFO("[kmac_app.sv:690] ErrKeyNotValid ERR_CODE=0x%08x", err_sideload);
   CHECK_EQ(err_sideload, 0x01000000u,
            "Expected ErrKeyNotValid (0x01000000) when sideload=1 without key");
+  CHECK((intr_sideload & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) != 0u,
+        "Expected INTR_STATE.kmac_err == 1 on ErrKeyNotValid");
+  CHECK((status_sideload & (1u << KMAC_STATUS_SHA3_ABSORB_BIT)) != 0u,
+        "Expected STATUS.sha3_absorb == 1 on ErrKeyNotValid");
 
   // Clear INTR_STATE before writing CMD.err_processed = 1 so we isolate pulses
   // generated by StErrorAwaitAbsorbed.
@@ -392,6 +420,8 @@ bool test_main(void) {
                    KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
   uint32_t err_after_done =
       abs_mmio_read32(kKmacBase + KMAC_ERR_CODE_REG_OFFSET);
+  uint32_t intr_after_done =
+      abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET);
   LOG_INFO(
       "[kmac_app.sv:783-785] Secondary ERR_CODE after CMD.done in StIdle: "
       "0x%08x",
@@ -399,6 +429,8 @@ bool test_main(void) {
   CHECK_EQ(err_after_done, 0x08040016u,
            "Expected secondary ErrSwCmdSequence (0x08040016) when issuing "
            "CMD.done after StErrorAwaitAbsorbed");
+  CHECK((intr_after_done & (1u << KMAC_INTR_STATE_KMAC_ERR_BIT)) != 0u,
+        "Expected INTR_STATE.kmac_err == 1 on secondary ErrSwCmdSequence");
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    1u << KMAC_CMD_ERR_PROCESSED_BIT);
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
