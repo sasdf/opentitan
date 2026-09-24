@@ -13,7 +13,7 @@
  *     `OP_STATUS == WIP` (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:476-478`).
  *   - `SIDELOAD_CLEAR` continuous level priority over
  *     `GEN_HW_OUT` (`OP_STATUS = DONE_SUCCESS` while holding `valid_q = 0`,
- *     causing KMAC sideload to fail with `ErrKeyNotValid = 0x5`,
+ *     causing KMAC sideload to fail with `ErrKeyNotValid = 0x1`,
  *     `hw/ip/keymgr_dpe/rtl/keymgr_dpe_sideload_key.sv:32-48`).
  *   - `data_valid_o` gating (`~invalid_op` at
  *     `hw/ip/keymgr_dpe/rtl/keymgr_dpe_ctrl.sv:284`) preserves existing
@@ -178,6 +178,16 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
   CHECK(abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET) ==
         ctrl_before);
 
+  g_saw_bus_fault = false;
+  g_last_mcause = 0;
+  *((volatile uint16_t *)(kKeymgrBase +
+                          KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET)) = 0x0000;
+  CHECK(g_saw_bus_fault,
+        "Expected Store Access Fault on 2-byte write to CONTROL_SHADOWED");
+  CHECK(g_last_mcause == 7, "Expected mcause == 7, got 0x%x", g_last_mcause);
+  CHECK(abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET) ==
+        ctrl_before);
+
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_SW_BINDING_0_REG_OFFSET,
                    0x13572468u);
   g_saw_bus_fault = false;
@@ -190,12 +200,34 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
   CHECK(abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_SW_BINDING_0_REG_OFFSET) ==
         0x13572468u);
 
+  const uint32_t kPermit0011Regs[] = {
+      KEYMGR_DPE_RESEED_INTERVAL_SHADOWED_REG_OFFSET,
+      KEYMGR_DPE_FAULT_STATUS_REG_OFFSET,
+      KEYMGR_DPE_DEBUG_REG_OFFSET,
+  };
+  for (size_t i = 0; i < ARRAYSIZE(kPermit0011Regs); ++i) {
+    g_saw_bus_fault = false;
+    g_last_mcause = 0;
+    *((volatile uint8_t *)(kKeymgrBase + kPermit0011Regs[i])) = 0x00;
+    CHECK(g_saw_bus_fault,
+          "Expected Store Access Fault on 1-byte write to offset 0x%x",
+          kPermit0011Regs[i]);
+    CHECK(g_last_mcause == 7, "Expected mcause == 7, got 0x%x", g_last_mcause);
+  }
+
   g_saw_bus_fault = false;
   g_last_mcause = 0;
   (void)*((volatile uint32_t *)(kKeymgrBase + 0xd8u));
   CHECK(g_saw_bus_fault,
         "Expected Load Access Fault on unmapped offset 0xd8 (addrmiss)");
   CHECK(g_last_mcause == 5, "Expected mcause == 5, got 0x%x", g_last_mcause);
+
+  g_saw_bus_fault = false;
+  g_last_mcause = 0;
+  *((volatile uint32_t *)(kKeymgrBase + 0xd8u)) = 0xdeadbeefu;
+  CHECK(g_saw_bus_fault,
+        "Expected Store Access Fault on unmapped offset 0xd8 (addrmiss)");
+  CHECK(g_last_mcause == 7, "Expected mcause == 7, got 0x%x", g_last_mcause);
 }
 
 /**
@@ -384,10 +416,12 @@ static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
   uint32_t ver_wen =
       abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_MAX_KEY_VER_REGWEN_REG_OFFSET);
 
-  // Attempt to overwrite SW_BINDING_0 and SLOT_POLICY while WIP (CFG_REGWEN==0)
+  // Attempt to overwrite SW_BINDING_0, SLOT_POLICY, and MAX_KEY_VER_SHADOWED
+  // while WIP (CFG_REGWEN==0).
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_SW_BINDING_0_REG_OFFSET,
                    0xdeadbeefu);
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_SLOT_POLICY_REG_OFFSET, 0x0u);
+  keymgr_write_shadowed(KEYMGR_DPE_MAX_KEY_VER_SHADOWED_REG_OFFSET, 99u);
 
   uint32_t err = 0;
   uint32_t st = keymgr_wait_done(&err);
@@ -406,14 +440,20 @@ static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
   CHECK(abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_SLOT_POLICY_REG_OFFSET) ==
         0x5u);
   CHECK(abs_mmio_read32(kKeymgrBase +
+                        KEYMGR_DPE_MAX_KEY_VER_SHADOWED_REG_OFFSET) == 10u);
+  CHECK(abs_mmio_read32(kKeymgrBase +
                         KEYMGR_DPE_SW_BINDING_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kKeymgrBase +
+                        KEYMGR_DPE_SLOT_POLICY_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kKeymgrBase +
+                        KEYMGR_DPE_MAX_KEY_VER_REGWEN_REG_OFFSET) == 1u);
 }
 
 /**
  * Test 5: (CONFIRMED_PRESENT_ON_V2)
  * `SIDELOAD_CLEAR` continuous level priority over `GEN_HW_OUT` reports
  * `OP_STATUS = DONE_SUCCESS` while holding `valid_q = 0` (`u_kmac_key`),
- * causing KMAC sideload operations to fail with `ErrKeyNotValid (0x5)`.
+ * causing KMAC sideload operations to fail with `ErrKeyNotValid (0x1)`.
  */
 static void test_errata_keymgr_004_sideload_clear_level_priority(
     dif_kmac_t *kmac) {
@@ -668,6 +708,25 @@ static void test_errata_v2_03_out_of_bounds_slot_truncation_aliasing(void) {
   // keymgr_dpe_input_checks.sv:88 ignores key_i.valid (unused_key_vld),
   // key_vld == 1 so INVALID_KMAC_INPUT and DEBUG.INVALID_KEY remain 0 even
   // though active_key_slot.valid == 0 triggers ERR_CODE.INVALID_OP (0x1).
+  CHECK((dbg & (1u << KEYMGR_DPE_DEBUG_INVALID_KEY_BIT)) == 0u);
+
+  // Also invoke ADVANCE on erased slot 2 (SLOT_SRC_SEL = 2, SLOT_DST_SEL = 2):
+  // because invalid_data[OpDpeAdvance] = ~key_vld | invalid_advance | ...
+  // (keymgr_dpe.sv:677) includes invalid_advance (~active_key_slot_o.valid),
+  // ERR_CODE is 0x3 (INVALID_OP | INVALID_KMAC_INPUT), while DEBUG.INVALID_KEY
+  // (hw2reg.debug.invalid_key.d = ~key_vld) still remains 0!
+  abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_DEBUG_REG_OFFSET, 0u);
+  keymgr_write_shadowed(
+      KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET,
+      keymgr_make_ctrl(KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE,
+                       KEYMGR_DPE_CONTROL_SHADOWED_DEST_SEL_VALUE_NONE, 2, 2,
+                       /*sw_binding_only=*/true));
+  abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_START_REG_OFFSET, 1u);
+  st = keymgr_wait_done(&err);
+  dbg = abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_DEBUG_REG_OFFSET);
+  CHECK(st == KEYMGR_DPE_OP_STATUS_STATUS_VALUE_DONE_ERROR);
+  CHECK(err == ((1u << KEYMGR_DPE_ERR_CODE_INVALID_OP_BIT) |
+                (1u << KEYMGR_DPE_ERR_CODE_INVALID_KMAC_INPUT_BIT)));
   CHECK((dbg & (1u << KEYMGR_DPE_DEBUG_INVALID_KEY_BIT)) == 0u);
 }
 
