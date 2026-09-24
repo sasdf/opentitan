@@ -135,7 +135,7 @@ void ottf_load_integrity_error_handler(uint32_t *exc_info) {
 }
 
 static uint32_t safe_read32(uint32_t addr, uint32_t expected_mcause) {
-  uint32_t val = 0;
+  uint32_t val = 0x11223344u;
   g_expected_fault_mcause = expected_mcause;
   asm volatile(
       "la   t0, 1f\n"
@@ -145,7 +145,7 @@ static uint32_t safe_read32(uint32_t addr, uint32_t expected_mcause) {
       "1:\n"
       "lw   %[val], 0(%[addr])\n"
       "2:\n"
-      : [val] "=&r"(val), [target] "=m"(g_fault_target_pc),
+      : [val] "+r"(val), [target] "=m"(g_fault_target_pc),
         [resume] "=m"(g_fault_resume_pc)
       : [addr] "r"(addr)
       : "t0", "memory");
@@ -381,16 +381,21 @@ bool test_main(void) {
   // Locate a word in 0x200..0x23c whose stale-key bits trigger an Ibex Load
   // Integrity NMI while READBACK = kMultiBitBool4True is active.
   uint32_t corrupt_addr = 0u;
+  uint32_t orig_word = 0u;
+  uint32_t fault_rd_val = 0u;
   for (uint32_t i = 0; i < 16u; ++i) {
     uint32_t candidate = kSramRetRamBase + 0x200u + (i * 4u);
     g_intg_nmi_count = 0;
-    (void)safe_read32(candidate, 0u);
+    uint32_t rd = safe_read32(candidate, 0u);
     if (g_intg_nmi_count == 1u) {
       corrupt_addr = candidate;
+      orig_word = 0xa5a50000u | i;
+      fault_rd_val = rd;
       break;
     }
   }
   CHECK(corrupt_addr != 0u);
+  CHECK(fault_rd_val == 0x11223344u);
 
   // Even though `corrupt_addr` just failed ECC on read and triggered an Ibex
   // Load Integrity NMI while `READBACK = kMultiBitBool4True` was enabled,
@@ -410,15 +415,31 @@ bool test_main(void) {
   CHECK(g_intg_nmi_count == 0u);
 
   // Read back the full 32-bit word at `corrupt_addr` with `READBACK =
-  // kMultiBitBool4True`: zero Load Integrity NMIs and `STATUS.READBACK_ERROR ==
-  // 0`!
+  // kMultiBitBool4True`: zero Load Integrity NMIs, upper 3 stale-key garbage
+  // bytes [31:8] laundered with a fresh valid ECC (`!= orig_word` and `!= 0`),
+  // low byte == 0x5a, and `STATUS.READBACK_ERROR == 0`!
   uint32_t laundered_word = safe_read32(corrupt_addr, 0u);
   CHECK(g_fault_count == 0u);
   CHECK(g_intg_nmi_count == 0u);
   CHECK((laundered_word & 0xffu) == 0x5au);
+  CHECK((laundered_word & 0xffffff00u) != (orig_word & 0xffffff00u));
+  CHECK((laundered_word & 0xffffff00u) != 0u);
   sram_status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
   CHECK((sram_status & (1u << SRAM_CTRL_STATUS_READBACK_ERROR_BIT)) == 0u);
   CHECK((sram_status & (1u << SRAM_CTRL_STATUS_BUS_INTEG_ERROR_BIT)) == 0u);
+
+  // Also verify loose mubi4_test_true_loose(rdback_en_q) (rdback_en_q != 4'h9)
+  // with non-strict READBACK = 0x0 (tlul_sram_byte.sv:302):
+  abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET, 0x0u);
+  CHECK((abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET) &
+         0xfu) == 0x0u);
+  safe_write8(corrupt_addr, 0xa5u, 0u);
+  uint32_t loose_rdback_word = safe_read32(corrupt_addr, 0u);
+  CHECK(g_intg_nmi_count == 0u);
+  CHECK((loose_rdback_word & 0xffu) == 0xa5u);
+  CHECK((loose_rdback_word & 0xffffff00u) == (laundered_word & 0xffffff00u));
+  sram_status = abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK((sram_status & (1u << SRAM_CTRL_STATUS_READBACK_ERROR_BIT)) == 0u);
 
   // Restore READBACK = kMultiBitBool4False.
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET,
