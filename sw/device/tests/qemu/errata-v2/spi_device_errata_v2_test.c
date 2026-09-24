@@ -5,13 +5,13 @@
 // Earlgrey v2 (`trunk-v2`) hardware errata & DIF consistency verification test
 // for `spi_device` (`TOP_EARLGREY_SPI_DEVICE_BASE_ADDR = 0x40050000`):
 //
-// 1. `FLASH_STATUS` (`0x4c`) `sys_csb_deasserted_pulse_i` readback gate
+// 1. `FLASH_STATUS` (`0x28`) `sys_csb_deasserted_pulse_i` readback gate
 //    (`hw/ip/spi_device/rtl/spid_status.sv:308-314` vs.
 //    `hw/ip/spi_device/data/spi_device.hjson:715-761`):
 //    `sys_status_o` (which feeds TL-UL software reads of `FLASH_STATUS`)
 //    updates only on `sys_csb_deasserted_pulse_i` (after >= 8 `SCK` clocks plus
 //    `CSb` deassertion), never while `CSb == 1` (`SCK` idle).
-// 2. `ADDR_MODE` (`0x44`) unconditional `PENDING` (`bit 31`) assertion
+// 2. `ADDR_MODE` (`0x20`) unconditional `PENDING` (`bit 31`) assertion
 //    (`hw/ip/spi_device/rtl/spid_addr_4b.sv:52-68, 92-117` vs.
 //    `hw/ip/spi_device/data/spi_device.hjson:696-711`):
 //    Writing `ADDR_MODE` asserts `PENDING` (`bit 31`) on every software write
@@ -27,8 +27,8 @@
 // 4. Directional (`ErrOnRead=1` / `ErrOnWrite=1`) and sub-word (`ByteAccess=0`)
 //    restrictions on `egress_buffer` (`0x1000..0x1d3f`) and `ingress_buffer`
 //    (`0x1e00..0x1fbf`) (`hw/ip/spi_device/rtl/spi_device.sv:1702-1776`).
-// 5. Sub-word CSR write faults via `SPI_DEVICE_PERMIT` (`FLASH_STATUS` byte 3
-//    `0x4f` and `TPM_ACCESS_1` byte 1 `0x169`)
+// 5. Sub-word CSR write faults via `SPI_DEVICE_PERMIT` (`FLASH_STATUS` `0x28`
+//    and `TPM_ACCESS_1` byte 1 `0x811`)
 //    (`hw/ip/spi_device/rtl/spi_device_reg_pkg.sv`).
 // 6. `dif_spi_device_get_flash_command_slot` copy-paste bug
 //    (`sw/device/lib/dif/dif_spi_device.c:550-554`):
@@ -192,6 +192,11 @@ static void test_addr_mode_unconditional_pending(mmio_region_t base) {
 
   // Restore staged sys_fw_new_addr_mode to 0.
   mmio_region_write32(base, SPI_DEVICE_ADDR_MODE_REG_OFFSET, 0u);
+  uint32_t after_restore_write =
+      mmio_region_read32(base, SPI_DEVICE_ADDR_MODE_REG_OFFSET);
+  CHECK(after_restore_write == (1u << SPI_DEVICE_ADDR_MODE_PENDING_BIT),
+        "Expected ADDR_MODE == 0x80000000 after restoring 0, got 0x%08x",
+        after_restore_write);
 }
 
 static void test_sram_window_holes_and_restrictions(mmio_region_t base) {
@@ -224,6 +229,9 @@ static void test_sram_window_holes_and_restrictions(mmio_region_t base) {
 
   // u_tlul2sram_ingress has .ErrOnWrite(1).
   expect_write32_fault(base, kIngressStart, 0xdeadbeefu);
+  expect_write32_fault(base, kIngressCmdFifoStart, 0xdeadbeefu);
+  expect_write32_fault(base, kIngressAddrFifoStart, 0xdeadbeefu);
+  expect_write32_fault(base, kIngressTpmWriteFifoStart, 0xdeadbeefu);
 }
 
 static void test_csr_subword_permit_masks(mmio_region_t base) {
@@ -242,7 +250,7 @@ static void test_csr_subword_permit_masks(mmio_region_t base) {
   // TPM_ACCESS_1 (0x810, index 63) has SPI_DEVICE_PERMIT[63] = 4'b0001 (1 byte
   // for locality 4), so an 8-bit write to byte 0 (0x810, reg_be=4'b0001)
   // succeeds, whereas an 8-bit write to byte 1 (0x811, reg_be=4'b0010) or an
-  // 8-bit write to byte 0 of TPM_ACCESS_0 (0x80c, index 62,
+  // 8-bit / 16-bit write to byte 0 of TPM_ACCESS_0 (0x80c, index 62,
   // SPI_DEVICE_PERMIT[62] = 4'b1111) faults with mcause=7.
   prev_faults = g_fault_count;
   mmio_region_write8(base, SPI_DEVICE_TPM_ACCESS_1_REG_OFFSET, 0x00u);
@@ -250,6 +258,11 @@ static void test_csr_subword_permit_masks(mmio_region_t base) {
         "8-bit write to TPM_ACCESS_1 byte 0 (PERMIT=4'b0001) must succeed");
   expect_write8_fault(base, SPI_DEVICE_TPM_ACCESS_1_REG_OFFSET + 1u, 0x00u);
   expect_write8_fault(base, SPI_DEVICE_TPM_ACCESS_0_REG_OFFSET, 0x00u);
+  expect_write16_fault(base, SPI_DEVICE_TPM_ACCESS_0_REG_OFFSET, 0x0000u);
+  expect_write8_fault(base, SPI_DEVICE_CMD_INFO_WRDI_REG_OFFSET, 0x00u);
+  expect_write16_fault(base, SPI_DEVICE_CMD_INFO_WRDI_REG_OFFSET, 0x0000u);
+  expect_write8_fault(base, SPI_DEVICE_TPM_CAP_REG_OFFSET, 0x00u);
+  expect_write16_fault(base, SPI_DEVICE_TPM_CAP_REG_OFFSET, 0x0000u);
 }
 
 static void test_dif_get_flash_command_slot_swap_bug(mmio_region_t base) {
@@ -354,8 +367,9 @@ static void test_sram_1r1w_ingress_uninitialized_parity_faults(
   // Every word in 0x1f80..0x1fbf therefore retains uninitialized all-zero BRAM
   // bits (36'h0 -> syndrome 7'h78 != 0 -> rerror_o[1]=1 -> d_error=1) and
   // raises a synchronous Load Access Fault (mcause=5) on CPU read!
-  expect_read32_fault(base, kIngressTpmWriteFifoStart);          // 0x1f80
-  expect_read32_fault(base, kIngressTpmWriteFifoStart + 0x3cu);  // 0x1fbc
+  for (uint32_t i = 0; i < 16u; ++i) {
+    expect_read32_fault(base, kIngressTpmWriteFifoStart + i * sizeof(uint32_t));
+  }
 }
 
 bool test_main(void) {
