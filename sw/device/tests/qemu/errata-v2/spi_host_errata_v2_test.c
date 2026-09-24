@@ -150,6 +150,40 @@ static void test_sw_rst_and_spien0_cmd_queue(void) {
   abs_mmio_write32(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET, 0u);
   abs_mmio_write32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET, 0x3fu);
 
+  // While CONTROL.SPIEN == 0 and CMDQD < 4, invalid CSID (>= NumCS = 1) sets
+  // ERROR_STATUS.CSIDINVAL = 1 AND still enqueues into u_cmd_queue (CMDQD = 1)
+  // because u_cmd_queue.command_valid_i is wired to command_valid un-gated by
+  // ~error_csid_inval (spi_host.sv:255-260, 313):
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CSID_REG_OFFSET, 1u);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, cmd_rdonly);
+  uint32_t err_sts =
+      abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
+  status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CSIDINVAL_BIT) &&
+            bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 1u,
+        "Expected CSID=1 command while SPIEN=0 to set CSIDINVAL=1 and CMDQD=1 "
+        "(err=0x%x, status=0x%08x)",
+        err_sts, status);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CSID_REG_OFFSET, 0u);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET, 0x3fu);
+
+  // While CONTROL.SPIEN == 0 and CMDQD < 4, invalid SPEED/DIRECTION (Dual +
+  // RdWr) sets ERROR_STATUS.CMDINVAL = 1 (and CMDBUSY = 0) AND increments
+  // CMDQD to 2:
+  uint32_t cmd_inval_dual_rdwr = (3u << SPI_HOST_COMMAND_DIRECTION_OFFSET) |
+                                 (2u << SPI_HOST_COMMAND_SPEED_OFFSET);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET,
+                   cmd_inval_dual_rdwr);
+  err_sts = abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
+  status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDINVAL_BIT) &&
+            !bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDBUSY_BIT) &&
+            bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 2u,
+        "Expected Dual+RdWr command while SPIEN=0 and CMDQD<4 to set "
+        "CMDINVAL=1, CMDBUSY=0, and CMDQD=2 (err=0x%x, status=0x%08x)",
+        err_sts, status);
+  spi_host_sw_reset_and_clear();
+
   for (int i = 0; i < 4; ++i) {
     abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, cmd_rdonly);
   }
@@ -160,12 +194,9 @@ static void test_sw_rst_and_spien0_cmd_queue(void) {
         "(status=0x%08x)",
         status);
 
-  uint32_t cmd_inval_dual_rdwr = (3u << SPI_HOST_COMMAND_DIRECTION_OFFSET) |
-                                 (2u << SPI_HOST_COMMAND_SPEED_OFFSET);
   abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET,
                    cmd_inval_dual_rdwr);
-  uint32_t err_sts =
-      abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
+  err_sts = abs_mmio_read32(kSpiHostBase + SPI_HOST_ERROR_STATUS_REG_OFFSET);
   CHECK(bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDBUSY_BIT) &&
             !bitfield_bit32_read(err_sts, SPI_HOST_ERROR_STATUS_CMDINVAL_BIT),
         "Expected 5th invalid command to set CMD_BUSY=1 and mask CMDINVAL=0 "
@@ -182,6 +213,24 @@ static void test_permit_and_window_faults(void) {
   abs_mmio_write8(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET, 0u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
         "Expected sb to CONTROL (PERMIT=4'b1111) to fault with mcause=7");
+
+  g_load_store_fault = false;
+  g_last_mcause = 0;
+  abs_mmio_write8(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET, 0u);
+  CHECK(g_load_store_fault && g_last_mcause == 7u,
+        "Expected sb to STATUS (PERMIT=4'b1111) to fault with mcause=7");
+
+  g_load_store_fault = false;
+  g_last_mcause = 0;
+  abs_mmio_write8(kSpiHostBase + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+  CHECK(g_load_store_fault && g_last_mcause == 7u,
+        "Expected sb to CONFIGOPTS (PERMIT=4'b1111) to fault with mcause=7");
+
+  g_load_store_fault = false;
+  g_last_mcause = 0;
+  abs_mmio_write8(kSpiHostBase + SPI_HOST_CSID_REG_OFFSET, 0u);
+  CHECK(g_load_store_fault && g_last_mcause == 7u,
+        "Expected sb to CSID (PERMIT=4'b1111) to fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
@@ -222,6 +271,17 @@ static void test_permit_and_window_faults(void) {
   CHECK(!g_load_store_fault &&
             bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) == 1u,
         "Expected sb to TXDATA (0x28) to succeed and increment TXQD to 1");
+
+  g_load_store_fault = false;
+  asm volatile("sh %0, 0(%1)"
+               :
+               : "r"((uint16_t)0x5a3cu),
+                 "r"(kSpiHostBase + SPI_HOST_TXDATA_REG_OFFSET)
+               : "memory");
+  status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  CHECK(!g_load_store_fault &&
+            bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) == 2u,
+        "Expected sh to TXDATA (0x28) to succeed and increment TXQD to 2");
 }
 
 static void test_v2_dif_start_transaction_zero_len_underflow_and_csaat(void) {
@@ -264,10 +324,18 @@ static void test_v2_dif_start_transaction_zero_len_underflow_and_csaat(void) {
         status);
 
   // Part B: Calling dif_spi_host_start_transaction() with a 2-segment array
-  // {Opcode, Dummy(length=0)} while SPIEN=0 queues segments[0] (Opcode) with
-  // CSAAT = 1 (because i=0 != length-1) and then skips segments[1] in
-  // issue_dummy() without issuing any CSAAT=0 command, leaving only 1 command
-  // in u_cmd_queue with CSAAT=1!
+  // {Opcode, Dummy(length=0)}:
+  // 1) With SPIEN=0, verify issue_dummy() skips segments[1], queuing only 1
+  //    command (CMDQD=1, TXQD=1).
+  // 2) With SPIEN=1, verify segments[0] (Opcode) was issued with CSAAT = 1
+  //    (because i=0 != length-1), leaving spi_host_fsm in IdleCSBActive after
+  //    the Opcode completes: when CONFIGOPTS is changed (CLKDIV=0xffff) and an
+  //    empty-TX WrOnly command is written, IdleCSBActive ignores config_changed
+  //    (spi_host_fsm.sv:213-232) and transitions directly to InternalClkLow
+  //    (byte_starting_cpha0=1 -> immediate STATUS.TXSTALL=1, ACTIVE=0,
+  //    CMDQD=1), whereas after a 1-segment {Opcode} (CSAAT=0 -> Idle), Idle
+  //    detects config_changed=1 and transitions to CSBSwitch (STATUS.TXSTALL=0,
+  //    ACTIVE=1, CMDQD=0).
   spi_host_sw_reset_and_clear();
   dif_spi_host_segment_t two_segs[2] = {
       {
@@ -295,6 +363,53 @@ static void test_v2_dif_start_transaction_zero_len_underflow_and_csaat(void) {
         "CSAAT=1 on Opcode (CMDQD=%u, TXQD=%u)",
         bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD),
         bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD));
+
+  // Enable SPIEN=1 so the queued CSAAT=1 Opcode executes and leaves state_q in
+  // IdleCSBActive:
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET,
+                   1u << SPI_HOST_CONTROL_SPIEN_BIT);
+  do {
+    status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  } while (bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) != 0u ||
+           bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) != 0u ||
+           bitfield_bit32_read(status, SPI_HOST_STATUS_ACTIVE_BIT));
+
+  uint32_t cmd_wronly = (2u << SPI_HOST_COMMAND_DIRECTION_OFFSET);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONFIGOPTS_REG_OFFSET,
+                   0xffffu << SPI_HOST_CONFIGOPTS_CLKDIV_OFFSET);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, cmd_wronly);
+  status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(status, SPI_HOST_STATUS_TXSTALL_BIT) &&
+            !bitfield_bit32_read(status, SPI_HOST_STATUS_ACTIVE_BIT) &&
+            bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 1u,
+        "Expected IdleCSBActive (from leaked CSAAT=1) to ignore config_changed "
+        "and immediately stall on empty-TX WrOnly (status=0x%08x)",
+        status);
+
+  // Control comparison: 1-segment {Opcode} sets CSAAT=0, returning to Idle, so
+  // changing CONFIGOPTS (CLKDIV=0xffff) and issuing empty-TX WrOnly enters
+  // CSBSwitch (TXSTALL=0, ACTIVE=1, CMDQD=0):
+  spi_host_sw_reset_and_clear();
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONFIGOPTS_REG_OFFSET, 0u);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONTROL_REG_OFFSET,
+                   1u << SPI_HOST_CONTROL_SPIEN_BIT);
+  CHECK_DIF_OK(dif_spi_host_start_transaction(&spi_host, 0u, &two_segs[0], 1u));
+  do {
+    status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  } while (bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) != 0u ||
+           bitfield_field32_read(status, SPI_HOST_STATUS_TXQD_FIELD) != 0u ||
+           bitfield_bit32_read(status, SPI_HOST_STATUS_ACTIVE_BIT));
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_CONFIGOPTS_REG_OFFSET,
+                   0xffffu << SPI_HOST_CONFIGOPTS_CLKDIV_OFFSET);
+  abs_mmio_write32(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, cmd_wronly);
+  status = abs_mmio_read32(kSpiHostBase + SPI_HOST_STATUS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(status, SPI_HOST_STATUS_TXSTALL_BIT) &&
+            bitfield_bit32_read(status, SPI_HOST_STATUS_ACTIVE_BIT) &&
+            bitfield_field32_read(status, SPI_HOST_STATUS_CMDQD_FIELD) == 0u,
+        "Expected Idle (from CSAAT=0) to transition to CSBSwitch (TXSTALL=0, "
+        "ACTIVE=1, CMDQD=0), got status=0x%08x",
+        status);
 }
 
 bool test_main(void) {
