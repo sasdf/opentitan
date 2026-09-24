@@ -72,7 +72,11 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kPlicBase + RV_PLIC_PRIO_0_REG_OFFSET) == 0x3u);
   abs_mmio_write32(kPlicBase + RV_PLIC_PRIO_0_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kPlicBase + RV_PLIC_PRIO_0_REG_OFFSET) == 0u);
-  LOG_INFO("Confirmed PRIO_0 2-bit RW flip-flop.");
+  abs_mmio_write32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET, 1u);
+  CHECK((abs_mmio_read32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET) & 1u) == 1u);
+  abs_mmio_write32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET, 0u);
+  CHECK((abs_mmio_read32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET) & 1u) == 0u);
+  LOG_INFO("Confirmed PRIO_0 and IE0_0[0] RW flip-flops.");
 
   // 2. Verify CC0 (0x48200004) claims and clears IP for enabled pending
   //    interrupts even when PRIO[s] == 0 or PRIO[s] <= THRESHOLD0, while
@@ -125,7 +129,7 @@ bool test_main(void) {
   LOG_INFO("Confirmed CC0 claim with PRIO==0 / PRIO<=THRESHOLD0 & 8-bit CC0.");
 
   // 3. Verify asymmetric RV_PLIC_PERMIT sub-word write faults and unmapped
-  //    aperture addrmiss faults (rv_plic_reg_pkg.sv:1415-1609).
+  //    aperture addrmiss faults (rv_plic_reg_pkg.sv:493-694).
   load_fault_count = 0;
   (void)abs_mmio_read32(kPlicBase + 0x002018u);  // IE0_6 (unmapped)
   CHECK(load_fault_count == 1u);
