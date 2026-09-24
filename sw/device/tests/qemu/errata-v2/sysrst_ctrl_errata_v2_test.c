@@ -154,6 +154,10 @@ bool test_main(void) {
   CHECK(pin_allowed_init == 0x82u,
         "[sysrst_ctrl.hjson:396-470] Expected PIN_ALLOWED_CTL reset value "
         "0x82 (EC_RST_L_0=1, FLASH_WP_L_0=1; EC_RST_L_1=0, FLASH_WP_L_1=0)");
+  CHECK(pin_out_ctl_init == 0x82u,
+        "[sysrst_ctrl.hjson:475-527] Expected PIN_OUT_CTL reset value 0x82");
+  CHECK(pin_out_val_init == 0x00u,
+        "[sysrst_ctrl.hjson:532-580] Expected PIN_OUT_VALUE reset value 0x00");
   CHECK((pin_allowed_init &
          (1u << SYSRST_CTRL_PIN_ALLOWED_CTL_EC_RST_L_1_BIT)) == 0u,
         "[sysrst_ctrl.hjson:156] Expected EC_RST_L_1 to reset to 0");
@@ -484,19 +488,35 @@ bool test_main(void) {
       "write faults (mcause=7) & PIN_OUT_CTL/PIN_OUT_VALUE ungated by "
       "REGWEN...");
   g_fault_count = 0;
+  abs_mmio_write8(kSysrstBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET, 0x01u);
+  CHECK(g_fault_count == 0u &&
+            abs_mmio_read32(kSysrstBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET) ==
+                0x01u,
+        "[sysrst_ctrl_reg_pkg.sv:522-566] Expected 8-bit sb to PIN_OUT_CTL "
+        "(permit 4'b0001) to succeed with readback 0x01");
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET, 0x00u);
+
+  g_fault_count = 0;
   *(volatile uint16_t *)(kSysrstBase +
                          SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET) = 0x0010u;
-  CHECK(g_fault_count == 0u,
+  CHECK(g_fault_count == 0u &&
+            abs_mmio_read32(kSysrstBase +
+                            SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET) ==
+                0x0010u,
         "[sysrst_ctrl_reg_pkg.sv:522-566] Expected 16-bit sh to "
-        "ULP_AC_DEBOUNCE_CTL (permit 4'b0011) to succeed");
+        "ULP_AC_DEBOUNCE_CTL (permit 4'b0011) to succeed with value 0x0010");
 
   g_fault_count = 0;
   g_last_mcause = 0;
   abs_mmio_write8(kSysrstBase + SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET,
                   0x20u);
-  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u &&
+            abs_mmio_read32(kSysrstBase +
+                            SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET) ==
+                0x0010u,
         "[sysrst_ctrl_reg_pkg.sv:522-566] Expected 8-bit sb to "
-        "ULP_AC_DEBOUNCE_CTL (permit 4'b0011) to trap with mcause=7");
+        "ULP_AC_DEBOUNCE_CTL (permit 4'b0011) to trap with mcause=7 and leave "
+        "0x0010");
 
   g_fault_count = 0;
   g_last_mcause = 0;
