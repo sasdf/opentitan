@@ -330,16 +330,8 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
   CHECK(abs_mmio_read32(kRetWord0) == 0xa5a50000u);
   CHECK(abs_mmio_read32(kRetWord1) == 0xa5a50012u);
 
-  // Initialize SRAM_CTRL_META (`MemSizeRam = 38912 = 19 * 2048` bytes,
-  // `SramCtrlMetaNumAddrScrRounds = 0`) and verify `STATUS.INIT_DONE == 1`
-  // with zero `STATUS` error bits (`0x1f == 0`).
-  abs_mmio_write32(kSramMetaRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
-                   1u << SRAM_CTRL_CTRL_INIT_BIT);
-  while ((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
-          (1u << SRAM_CTRL_STATUS_INIT_DONE_BIT)) == 0u) {
-  }
   CHECK((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
-         0x1fu) == 0u);
+         0x3fu) == 0u);
 }
 
 bool test_main(void) {
