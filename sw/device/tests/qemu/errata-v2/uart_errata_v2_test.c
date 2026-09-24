@@ -26,7 +26,7 @@
  *      `CTRL.TX == 0` and `TXILVL = 7` (and driving `lsio_trigger_o = 1` in
  *      `uart_core.sv:355-360` without `CTRL.TX` or `INTR_ENABLE` gating),
  *      clearing only when `TXLVL >= 16`.
- *   5. `UART_PERMIT` (`uart_reg_pkg.sv:401-415`) enforces `4'b0011` on
+ *   5. `UART_PERMIT` (`uart_reg_pkg.sv:405-419`) enforces `4'b0011` on
  *      `INTR_STATE` / `INTR_ENABLE` / `INTR_TEST` (faulting 1-byte `sb` with
  *      `mcause = 7` while accepting 2-byte `sh` at `+0`) and `4'b1111` on
  *      `CTRL` / `TIMEOUT_CTRL` (faulting `sb` and `sh` with `mcause = 7`), and
