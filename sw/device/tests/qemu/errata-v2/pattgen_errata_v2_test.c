@@ -8,8 +8,9 @@
  * Verification Suite for P32 `pattgen` (+ `hmac`).
  *
  * Verifies:
- *   1. [ERRATA-PATTGEN-001..003] (`MODULE_REPLACED_IN_V2` in `top_earlgrey`,
- *      while `hw/ip/pattgen` and `dif_pattgen` remain in the tree):
+ *   1. `hw/ip/pattgen/rtl/pattgen_chan.sv:60-62, 172-181` &
+ * `pattgen_reg_pkg.sv:188` (removed from `top_earlgrey` in `trunk-v2`, while
+ * `hw/ip/pattgen` and `dif_pattgen` remain in the tree):
  *      - Unmapped v1 `pattgen` base address (`0x400e0000u`) on `trunk-v2`
  *        `xbar_peri` raises synchronous TL-UL Load/Store Access Faults
  *        (`mcause = 5 / 7`).
@@ -17,20 +18,22 @@
  * `dif_pattgen_channel_set_enabled()` in `sw/device/lib/dif/dif_pattgen.c`
  * retain the exact 32-bit `SIZE` register packing and `ENABLE_CHx` lock check
  * (`kDifLocked`).
- *   2. [ERRATA-HMAC-V2-01] (`NEW_IN_V2`, `TODO(#31026)`):
- *      `hmac` (`hw/ip/hmac/rtl/hmac.sv:26-44`) and `keymgr_dpe`
+ *   2. `hw/ip/hmac/rtl/hmac.sv:26-44` &
+ * `hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119` (`TODO(#31026)`): `hmac`
+ * (`hw/ip/hmac/rtl/hmac.sv:26-44`) and `keymgr_dpe`
  *      (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119`) declare the `keymgr_key`
  *      sideload interface in `hmac.hjson:95-100` and `interfaces.md:16`, but
  *      permanently tie `hmac_key_o = '0` and wire `keymgr_key_i` to
  *      `unused_key` with no `CFG.SIDELOAD` bit (`CFG[31:15]` read as `0`).
- *   3. [ERRATA-HMAC-V2-02] (`NEW_IN_V2`):
- *      `hmac.sv:221-225` applies `conv_endian32(reg2hw.key[31-i].q, key_swap)`
- *      ONLY during the single clock cycle when `KEY_i` is written (`regext`
- *      `qe == 1`). Toggling `CFG.KEY_SWAP` AFTER writing `KEY_0..KEY_7` (or
- *      calling `dif_hmac_mode_hmac_start()`, which writes `KEY_7..0` before
- *      `CFG` without updating `KEY_SWAP`) fails to re-swap the latched
- *      `secret_key`.
- *   4. [ERRATA-HMAC-V2-03] (`NEW_IN_V2`):
+ *   3. `hw/ip/hmac/rtl/hmac.sv:215-228, 339` &
+ * `sw/device/lib/dif/dif_hmac.c:103-132`: `hmac.sv:221-225` applies
+ * `conv_endian32(reg2hw.key[31-i].q, key_swap)` ONLY during the single clock
+ * cycle when `KEY_i` is written (`regext` `qe == 1`). Toggling `CFG.KEY_SWAP`
+ * AFTER writing `KEY_0..KEY_7` (or calling `dif_hmac_mode_hmac_start()`, which
+ * writes `KEY_7..0` before `CFG` without updating `KEY_SWAP`) fails to re-swap
+ * the latched `secret_key`.
+ *   4. `hw/ip/prim/rtl/prim_sha2.sv:161-166` & `hw/ip/hmac/rtl/hmac.sv:252-284,
+ * 648-655`:
  *      - `hmac.hjson:488` claims `DIGEST_0..15` are writable whenever
  *        `STATUS.hmac_idle == 1`, but `prim_sha2.sv:163` gates `digest_we_i` by
  *        `!sha_en_i` (`CFG.SHA_EN == 0`) and `hmac.sv:252-265` gates
@@ -47,8 +50,9 @@
  *        `digest_size_started_q` (`hmac.sv:268-284`), returning the odd words
  *        (`DIGEST_1,3..15`) duplicated in both `DIGEST_0..7` and `DIGEST_8..15`
  *        until `CMD.HASH_CONTINUE` latches `digest_size_started_q = SHA2_512`.
- *   5. [ERRATA-HMAC-V2-04] (`NEW_IN_V2`):
- *      Reading `HMAC_MSG_FIFO` (`0x41111000`) triggers `tlul_adapter_sram`
+ *   5. `hw/ip/hmac/rtl/hmac.sv:530-532, 598-618` &
+ * `hw/ip/hmac/rtl/hmac_reg_pkg.sv:522-580`: Reading `HMAC_MSG_FIFO`
+ * (`0x41111000`) triggers `tlul_adapter_sram`
  *      (`ErrOnRead = 1`, `rvalid_i = 1'b0` in `hmac.sv:611-618`) and raises a
  *      synchronous Load Access Fault (`mcause = 5`), and narrow sub-word writes
  *      violating `HMAC_PERMIT` (`1-byte` write to `HMAC_KEY_0` or byte `2` of
@@ -111,7 +115,8 @@ static void hmac_wait_done(void) {
 }
 
 /**
- * Test 1: [ERRATA-PATTGEN-001..003] & [ERRATA-PATTGEN-V2-01]
+ * Test 1: `top_earlgrey` removal of `pattgen` (`0x400e0000`) & orphaned
+ * `dif_pattgen.{c,h}`
  * (`MODULE_REPLACED_IN_V2` on `top_earlgrey`; `dif_pattgen.{c,h}` orphaned by
  * deletion of `//hw/ip/pattgen/data:pattgen_c_regs` and
  * `sw/device/lib/dif/autogen/dif_pattgen_autogen.{c,h}` while referencing
@@ -119,7 +124,7 @@ static void hmac_wait_done(void) {
  */
 static void test_pattgen_v2_top_removal_and_unmapped_fault(void) {
   LOG_INFO(
-      "Testing [ERRATA-PATTGEN-001..003] & [ERRATA-PATTGEN-V2-01]: v1 pattgen "
+      "Testing top_earlgrey pattgen removal & orphaned dif_pattgen: v1 pattgen "
       "MMIO unmapped fault on trunk-v2 xbar_peri");
 
   // Verify v1 pattgen base address (0x400e0000) is unmapped on trunk-v2
@@ -139,15 +144,15 @@ static void test_pattgen_v2_top_removal_and_unmapped_fault(void) {
 }
 
 /**
- * Test 2: [ERRATA-HMAC-V2-01] (`NEW_IN_V2`, `TODO(#31026)`)
+ * Test 2: `hmac.sv:36-44` & `keymgr_dpe.sv:112-119` (`TODO(#31026)`)
  * `hmac.hjson:95-100` and `interfaces.md:16` declare the `keymgr_key` sideload
  * interface (`keymgr_dpe_pkg::hw_key_req_t`), but `keymgr_dpe.sv:112-119` ties
  * `hmac_key_o = '0` and `hmac.sv:36-44` buffers `keymgr_key_i` into
  * `unused_key` with no `CFG.SIDELOAD` bit (`CFG[31:15]` read back `0`).
  */
-static void test_errata_hmac_v2_01_unwired_keymgr_sideload(void) {
+static void test_hmac_unwired_keymgr_sideload(void) {
   LOG_INFO(
-      "Testing [ERRATA-HMAC-V2-01]: Unwired keymgr_key_i sideload (TODO "
+      "Testing hmac.sv:36-44: Unwired keymgr_key_i sideload (TODO "
       "#31026) "
       "and reserved CFG[31:15] bits");
 
@@ -170,17 +175,17 @@ static void test_errata_hmac_v2_01_unwired_keymgr_sideload(void) {
 }
 
 /**
- * Test 3: [ERRATA-HMAC-V2-02] (`NEW_IN_V2`)
- * `hmac.sv:221-225` evaluates `conv_endian32(reg2hw.key[31-i].q, key_swap)`
- * ONLY during the 1-cycle `reg2hw.key[i].qe` pulse when `KEY_i` is written!
- * Toggling `CFG.KEY_SWAP` AFTER writing `KEY_0..KEY_7` (or calling
- * `dif_hmac_mode_hmac_start()` when `CFG.KEY_SWAP` was previously `1`) fails to
- * update the endianness of `secret_key`!
+ * Test 3: `hmac.sv:215-228` `CFG.KEY_SWAP` write-time evaluation &
+ * `dif_hmac.c:103-132` `hmac.sv:221-225` evaluates
+ * `conv_endian32(reg2hw.key[31-i].q, key_swap)` ONLY during the 1-cycle
+ * `reg2hw.key[i].qe` pulse when `KEY_i` is written! Toggling `CFG.KEY_SWAP`
+ * AFTER writing `KEY_0..KEY_7` (or calling `dif_hmac_mode_hmac_start()` when
+ * `CFG.KEY_SWAP` was previously `1`) fails to update the endianness of
+ * `secret_key`!
  */
-static void test_errata_hmac_v2_02_key_swap_write_time_latch_hazard(
-    dif_hmac_t *hmac) {
+static void test_hmac_key_swap_write_time_latch_hazard(dif_hmac_t *hmac) {
   LOG_INFO(
-      "Testing [ERRATA-HMAC-V2-02]: CFG.KEY_SWAP write-time evaluation hazard "
+      "Testing hmac.sv:215-228: CFG.KEY_SWAP write-time evaluation hazard "
       "& dif_hmac_mode_hmac_start ordering bug");
 
   const uint32_t kTestKey[8] = {
@@ -276,9 +281,10 @@ static void test_errata_hmac_v2_02_key_swap_write_time_latch_hazard(
 }
 
 /**
- * Test 4: [ERRATA-HMAC-V2-03] (`NEW_IN_V2`)
- * 1) `hmac.hjson:488` claims `DIGEST_0..15` are writable whenever
- *    `STATUS.hmac_idle == 1`, but `prim_sha2.sv:163` gates `digest_we_i` by
+ * Test 4: `prim_sha2.sv:163` `!sha_en_i` digest write gate & `hmac.sv:252-284`
+ * SHA-512 readback 1) `hmac.hjson:488` claims `DIGEST_0..15` are writable
+ * whenever `STATUS.hmac_idle == 1`, but `prim_sha2.sv:163` gates `digest_we_i`
+ * by
  *    `!sha_en_i` (`CFG.SHA_EN == 0`), silently dropping `DIGEST_0..15` writes
  *    when `STATUS.hmac_idle == 1` and `CFG.SHA_EN == 1`.
  * 2) `hmac.hjson:510` claims `MSG_LENGTH_LOWER` lower 3 bits `[2:0]` are
@@ -290,9 +296,10 @@ static void test_errata_hmac_v2_02_key_swap_write_time_latch_hazard(
  *    (`SHA2_256`), duplicating the odd words (`DIGEST_1,3..15`) across
  *    `DIGEST_0..7` and `DIGEST_8..15` until `CMD.HASH_CONTINUE` is pulsed!
  */
-static void test_errata_hmac_v2_03_digest_write_gate_and_sha512_readback(void) {
+static void test_hmac_digest_write_gate_and_sha512_readback(void) {
   LOG_INFO(
-      "Testing [ERRATA-HMAC-V2-03]: DIGEST write gating (!sha_en), "
+      "Testing prim_sha2.sv:163 & hmac.sv:252-284: DIGEST write gating "
+      "(!sha_en), "
       "MSG_LENGTH_LOWER[2:0] retention, and SHA-512 readback duplication");
 
   // 1. Verify STATUS.HMAC_IDLE == 1 while CFG.SHA_EN == 1 (from end of Test 3).
@@ -369,17 +376,18 @@ static void test_errata_hmac_v2_03_digest_write_gate_and_sha512_readback(void) {
 }
 
 /**
- * Test 5: [ERRATA-HMAC-V2-04] (`NEW_IN_V2`)
- * Reading `HMAC_MSG_FIFO` (`0x41111000`) hits `tlul_adapter_sram`
+ * Test 5: `hmac.sv:598-618` `MSG_FIFO` `ErrOnRead=1` &
+ * `hmac_reg_pkg.sv:522-580` `HMAC_PERMIT` Reading `HMAC_MSG_FIFO`
+ * (`0x41111000`) hits `tlul_adapter_sram`
  * (`ErrOnRead = 1`, `rvalid_i = 1'b0` in `hmac.sv:611-618`) and raises a
  * synchronous Load Access Fault (`mcause = 5`), and narrow sub-word writes to
  * `HMAC_KEY_0` (`HMAC_PERMIT[10] = 4'b1111`) or byte 2 of `HMAC_CFG`
  * (`HMAC_PERMIT[4] = 4'b0011`) raise a synchronous Store Access Fault
  * (`mcause = 7`).
  */
-static void test_errata_hmac_v2_04_msg_fifo_read_and_permit_faults(void) {
+static void test_hmac_msg_fifo_read_and_permit_faults(void) {
   LOG_INFO(
-      "Testing [ERRATA-HMAC-V2-04]: MSG_FIFO ErrOnRead (mcause=5) & "
+      "Testing hmac.sv:598-618: MSG_FIFO ErrOnRead (mcause=5) & "
       "HMAC_PERMIT sub-word write faults (mcause=7)");
 
   // 1. 32-bit load from HMAC_MSG_FIFO (0x41111000) -> Load Access Fault (mcause
@@ -416,10 +424,10 @@ bool test_main(void) {
   LOG_INFO(
       "=== Running P32 pattgen (+ hmac) v2 errata suite on CW340 FPGA ===");
   test_pattgen_v2_top_removal_and_unmapped_fault();
-  test_errata_hmac_v2_01_unwired_keymgr_sideload();
-  test_errata_hmac_v2_02_key_swap_write_time_latch_hazard(&hmac);
-  test_errata_hmac_v2_03_digest_write_gate_and_sha512_readback();
-  test_errata_hmac_v2_04_msg_fifo_read_and_permit_faults();
+  test_hmac_unwired_keymgr_sideload();
+  test_hmac_key_swap_write_time_latch_hazard(&hmac);
+  test_hmac_digest_write_gate_and_sha512_readback();
+  test_hmac_msg_fifo_read_and_permit_faults();
   LOG_INFO("=== All P32 pattgen (+ hmac) v2 errata tests PASSED! ===");
   return true;
 }
