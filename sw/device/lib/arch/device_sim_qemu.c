@@ -4,21 +4,10 @@
 
 #include <stdbool.h>
 
-#include "hw/top/dt/rv_core_ibex.h"  // Generated
 #include "sw/device/lib/arch/device.h"
 #include "sw/device/lib/base/macros.h"
 #include "sw/device/silicon_creator/lib/drivers/ibex.h"
 #include "sw/device/silicon_creator/lib/drivers/uart.h"
-
-#include "hw/top/rv_core_ibex_regs.h"  // Generated
-
-// Use the first dt_rv_core_ibex_t enum, i.e. the first Ibex core instance.
-static const dt_rv_core_ibex_t kRvCoreIbexDt = (dt_rv_core_ibex_t)0;
-static_assert(kDtRvCoreIbexCount == 1, "Only single core tops are supported");
-
-static inline uintptr_t rv_core_ibex_base(void) {
-  return (uintptr_t)dt_rv_core_ibex_primary_reg_block(kRvCoreIbexDt);
-}
 
 /**
  * @file
@@ -62,8 +51,6 @@ const uint32_t kUartBaud1M50 =
 const uint32_t kAstCheckPollCpuCycles =
     CALCULATE_AST_CHECK_POLL_CPU_CYCLES(kClockFreqCpuHz);
 
-uintptr_t device_test_status_address(void) {
-  return rv_core_ibex_base() + RV_CORE_IBEX_DV_SIM_WINDOW_REG_OFFSET;
-}
+uintptr_t device_test_status_address(void) { return 0; }
 
 uintptr_t device_log_bypass_uart_address(void) { return 0; }
