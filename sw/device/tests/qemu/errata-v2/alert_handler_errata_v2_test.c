@@ -96,6 +96,13 @@ static void test_alert_handler_class_en_gated_by_esc_enables(void) {
       abs_mmio_read32(loc_cause5_addr), 1u,
       "[alert_handler_reg_wrap.sv:193-213] Expected LOC_ALERT_CAUSE[5] == 1");
   CHECK_EQ(
+      (abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET) >>
+       ALERT_HANDLER_INTR_STATE_CLASSB_BIT) &
+          1u,
+      1u,
+      "[alert_handler_reg_wrap.sv:73] Expected INTR_STATE.CLASSB == 1 even "
+      "when class_en == 0");
+  CHECK_EQ(
       abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSB_ACCUM_CNT_REG_OFFSET),
       0u,
       "[alert_handler_reg_wrap.sv:193-213] Expected CLASSB_ACCUM_CNT == 0 when "
