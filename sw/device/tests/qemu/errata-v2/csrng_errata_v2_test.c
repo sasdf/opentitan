@@ -182,6 +182,20 @@ static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
         "overwrite");
 
   csrng_disable_and_clear();
+  uint32_t sts_disabled =
+      abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(sts_disabled, CSRNG_SW_CMD_STS_CMD_RDY_BIT),
+        "Expected SW_CMD_STS.CMD_RDY (bit 1) == 0 when disabled");
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   make_ctrl(kMultiBitBool4True, kMultiBitBool4True,
+                             kMultiBitBool4False, kMultiBitBool4False));
+  csrng_send_sw_cmd(2u, 0u, kMultiBitBool4True, 0u, NULL);
+  uint32_t sts_err = abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
+  CHECK(bitfield_field32_read(sts_err, CSRNG_SW_CMD_STS_CMD_STS_FIELD) == 3u,
+        "Expected 3-bit SW_CMD_STS.CMD_STS (bits [5:3]) == 3 "
+        "(CMD_STS_INVALID_CMD_SEQ), got 0x%x",
+        sts_err);
+  csrng_disable_and_clear();
 }
 
 /**
