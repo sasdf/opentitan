@@ -178,6 +178,10 @@ static void otbn_run_program(const uint32_t *insns, size_t count) {
   otbn_wait_for_settled_status();
 }
 
+static inline void mmio_write16(uint32_t addr, uint16_t val) {
+  *(volatile uint16_t *)addr = val;
+}
+
 bool test_main(void) {
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
   otbn_wait_for_settled_status();
@@ -245,27 +249,47 @@ bool test_main(void) {
   abs_mmio_write8(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0xffu);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
         "sb to LOAD_CHECKSUM must raise MCAUSE=7");
+  g_fault_seen = false;
+  mmio_write16(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0xffffu);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+        "sh to LOAD_CHECKSUM must raise MCAUSE=7");
   CHECK(
       abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0x12345678u,
-      "sb to LOAD_CHECKSUM must not modify register");
+      "sb/sh to LOAD_CHECKSUM must not modify register");
 
+  const uint32_t kPermit32Offsets[] = {
+      OTBN_INSN_CNT_REG_OFFSET,  OTBN_ERR_BITS_REG_OFFSET,
+      OTBN_SCRATCH_0_REG_OFFSET, OTBN_SCRATCH_1_REG_OFFSET,
+      OTBN_SCRATCH_2_REG_OFFSET, OTBN_SCRATCH_3_REG_OFFSET,
+  };
   abs_mmio_write32(kOtbnBase + OTBN_SCRATCH_0_REG_OFFSET, 0xcafebabeu);
-  g_fault_seen = false;
-  abs_mmio_write8(kOtbnBase + OTBN_SCRATCH_0_REG_OFFSET, 0x00u);
-  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "sb to SCRATCH_0 (OTBN_PERMIT=4'b1111) must raise MCAUSE=7");
+  for (size_t i = 0; i < ARRAYSIZE(kPermit32Offsets); ++i) {
+    g_fault_seen = false;
+    abs_mmio_write8(kOtbnBase + kPermit32Offsets[i], 0x00u);
+    CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+          "sb to offset 0x%x (OTBN_PERMIT=4'b1111) must raise MCAUSE=7",
+          kPermit32Offsets[i]);
+    g_fault_seen = false;
+    mmio_write16(kOtbnBase + kPermit32Offsets[i], 0x0000u);
+    CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+          "sh to offset 0x%x (OTBN_PERMIT=4'b1111) must raise MCAUSE=7",
+          kPermit32Offsets[i]);
+  }
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_SCRATCH_0_REG_OFFSET) == 0xcafebabeu,
-        "sb to SCRATCH_0 must not modify register");
+        "sb/sh to SCRATCH_0 must not modify register");
 
-  g_fault_seen = false;
-  (void)abs_mmio_read32(kOtbnBase + 0x2cu);
-  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
-        "Read at unmapped 0x2c must raise MCAUSE=5");
+  const uint32_t kUnmappedOffsets[] = {0x2cu, 0x2010u};
+  for (size_t i = 0; i < ARRAYSIZE(kUnmappedOffsets); ++i) {
+    g_fault_seen = false;
+    (void)abs_mmio_read32(kOtbnBase + kUnmappedOffsets[i]);
+    CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+          "Read at unmapped 0x%x must raise MCAUSE=5", kUnmappedOffsets[i]);
 
-  g_fault_seen = false;
-  abs_mmio_write32(kOtbnBase + 0x2cu, 0u);
-  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
-        "Write at unmapped 0x2c must raise MCAUSE=7");
+    g_fault_seen = false;
+    abs_mmio_write32(kOtbnBase + kUnmappedOffsets[i], 0u);
+    CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+          "Write at unmapped 0x%x must raise MCAUSE=7", kUnmappedOffsets[i]);
+  }
 
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
@@ -274,13 +298,21 @@ bool test_main(void) {
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
         "sb to IMEM (.ByteAccess(0)) must raise MCAUSE=7");
   g_fault_seen = false;
+  mmio_write16(kOtbnBase + OTBN_IMEM_REG_OFFSET, 0x1122u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+        "sh to IMEM (.ByteAccess(0)) must raise MCAUSE=7");
+  g_fault_seen = false;
   abs_mmio_write8(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x22u);
   CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
         "sb to DMEM (.ByteAccess(0)) must raise MCAUSE=7");
+  g_fault_seen = false;
+  mmio_write16(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x3344u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+        "sh to DMEM (.ByteAccess(0)) must raise MCAUSE=7");
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u,
         "Sub-word write faults must not advance LOAD_CHECKSUM");
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET) == 0x89abcdefu,
-        "sb to DMEM must not modify word");
+        "sb/sh to DMEM must not modify word");
 
   // -------------------------------------------------------------------------
   // 3. [otbn.sv:788-801]:
@@ -428,7 +460,9 @@ bool test_main(void) {
         "Expected ERR_BITS=0x100 (MAI_SOFTWARE_ERROR bit 8) on MAI_CTRL "
         "reserved bit write, got 0x%08x",
         (uint32_t)dif_err_bits);
-  abs_mmio_write32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0xffffffffu);
+  // Keep ERR_BITS = 0x100 (MAI_SOFTWARE_ERROR) non-zero entering STATUS_PAUSED
+  // (err_bits_q is only updated on err_bits_clear | done_core, otbn.sv:999) so
+  // we can verify that host writes to ERR_BITS while paused are ignored!
 
   // -------------------------------------------------------------------------
   // 6. [NEW IN V2 + V1] [otbn.sv:169-175, 451, 484-522, 705, 788-792]:
@@ -436,7 +470,8 @@ bool test_main(void) {
   //    - Execute a program with `WFI` when `CTRL.WFI_ENABLED == 1`.
   //    - Verify `STATUS == kStatusPaused` (`0x05`) and `INTR_STATE.done == 1`.
   //    - While paused (`wfi_pending == 1`, `is_not_running_q == 0`), verify
-  //      host writes to `INSN_CNT` are ignored (`INSN_CNT` remains `2`).
+  //      host writes to `INSN_CNT` and `ERR_BITS` are ignored (`INSN_CNT`
+  //      remains `2` and `ERR_BITS` remains `0x100`).
   //    - While paused (`dmem_access_core == 0` so DMEM is unlocked for host
   //      writes, but `imem_access_core == 1` because `wfi_pending == 1`),
   //      `mem_crc_data_in_valid = ~(dmem_access_core | imem_access_core) & ...`
@@ -458,8 +493,9 @@ bool test_main(void) {
   // -------------------------------------------------------------------------
   LOG_INFO(
       "Verifying [NEW IN V2 + V1: otbn.sv:169-175, 451, 705, 788-792]: "
-      "STATUS_PAUSED (0x05) DMEM write LOAD_CHECKSUM bypass, INSN_CNT write "
-      "lockout, and IMEM read Ibex Integrity NMI -> STATUS_LOCKED (0xFF)...");
+      "STATUS_PAUSED (0x05) DMEM write LOAD_CHECKSUM bypass, INSN_CNT/ERR_BITS "
+      "write lockout, and IMEM read Ibex Integrity NMI -> STATUS_LOCKED "
+      "(0xFF)...");
   CHECK_DIF_OK(dif_otbn_set_ctrl_wfi_enable(&otbn, true));
   abs_mmio_write32(kOtbnBase + OTBN_INSN_CNT_REG_OFFSET, 0u);
   const uint32_t prog_wfi_pause[] = {
@@ -487,11 +523,17 @@ bool test_main(void) {
   CHECK(paused_insn_cnt == 2u, "Expected INSN_CNT=2 before WFI pause, got %u",
         paused_insn_cnt);
 
-  // Attempt to clear INSN_CNT while STATUS == PAUSED (0x05): ignored because
-  // is_not_running_d includes wfi_pending (otbn.sv:171-175).
+  // Attempt to clear INSN_CNT and ERR_BITS while STATUS == PAUSED (0x05): both
+  // writes are ignored because is_not_running_d includes wfi_pending
+  // (otbn.sv:171-175, 997, 1065).
   abs_mmio_write32(kOtbnBase + OTBN_INSN_CNT_REG_OFFSET, 0u);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_INSN_CNT_REG_OFFSET) == 2u,
         "Host write to INSN_CNT in STATUS_PAUSED must be ignored");
+  abs_mmio_write32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET) ==
+            (1u << OTBN_ERR_BITS_MAI_SOFTWARE_ERROR_BIT),
+        "Host write to ERR_BITS in STATUS_PAUSED must be ignored (expected "
+        "0x100)");
 
   // Clear LOAD_CHECKSUM, read DMEM[0] (0x42), and write 0x99887766 to DMEM[0]
   // while STATUS == PAUSED (0x05): because imem_access_core == 1 (wfi_pending),
