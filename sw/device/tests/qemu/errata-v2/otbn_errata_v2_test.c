@@ -51,8 +51,10 @@
  *      (a) `is_not_running_q` is `0`, so host writes to `INSN_CNT` and
  *          `ERR_BITS` are ignored while paused (unlike `STATUS_LOCKED` `0xFF`
  *          where `is_not_running_q == 1` allows clearing both);
- *      (b) `dmem_access_core` is `0`, so host 32-bit `DMEM` reads while paused
- *          advance/corrupt `LOAD_CHECKSUM` with `wr_data = 0`;
+ *      (b) `dmem_access_core` is `0` while `imem_access_core` is `1`
+ *          (`wfi_pending == 1`), which forces `mem_crc_data_in_valid` to `0`
+ *          for both reads and writes, so host 32-bit `DMEM` writes while paused
+ *          modify `DMEM` in SRAM while bypassing `LOAD_CHECKSUM`;
  *      (c) `imem_access_core` is `1` (`wfi_pending == 1`), so a host `IMEM`
  *          read while `STATUS_PAUSED` (`0x05`) returns blanked `39'h0`
  *          (`ecc = 7'h00 != SecdedInv3932ZeroEcc = 7'h39`) before `locking_q`
