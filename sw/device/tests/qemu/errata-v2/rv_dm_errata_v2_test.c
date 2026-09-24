@@ -87,7 +87,9 @@
 
 #include "sw/device/lib/base/abs_mmio.h"
 #include "sw/device/lib/base/csr.h"
+#include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/base/multibits.h"
+#include "sw/device/lib/dif/dif_rv_dm.h"
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
@@ -214,6 +216,9 @@ static void test_rv_dm_regs_decode_and_permit(void) {
 static void test_rv_dm_mem_late_debug_gate(void) {
   LOG_INFO("Test 2: RV_DM.MEM u_tlul_lc_gate_rom vs OTP DIS_RV_DM_LATE_DEBUG");
 
+  dif_rv_dm_t rv_dm;
+  CHECK_DIF_OK(dif_rv_dm_init(mmio_region_from_addr(kRvDmRegsBase), &rv_dm));
+
   uint32_t lc_state =
       abs_mmio_read32(kLcCtrlBase + LC_CTRL_LC_STATE_REG_OFFSET);
   while ((abs_mmio_read32(kOtpCtrlBase + OTP_CTRL_STATUS_REG_OFFSET) &
@@ -235,10 +240,12 @@ static void test_rv_dm_mem_late_debug_gate(void) {
       0xffu;
   LOG_INFO("LC_STATE=0x%08x, HW_CFG1[0]=0x%08x, DIS_RV_DM_LATE_DEBUG=0x%02x",
            lc_state, hw_cfg1_word0, dis_rv_dm_late_debug);
+  CHECK(lc_state == 0x2739ce73u);
+  CHECK(hw_cfg1_word0 == 0x00969696u);
+  CHECK(dis_rv_dm_late_debug == (uint32_t)kMultiBitBool8True);
 
-  // Set LATE_DEBUG_ENABLE to kMultiBitBool32False (0x69696969).
-  CHECK(probe_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
-                      kMultiBitBool32False) == 0u);
+  // Set LATE_DEBUG_ENABLE to kMultiBitBool32False (0x69696969) via DIF.
+  CHECK_DIF_OK(dif_rv_dm_late_debug_configure(&rv_dm, kDifToggleDisabled));
   CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
         (uint32_t)kMultiBitBool32False);
 
@@ -247,23 +254,14 @@ static void test_rv_dm_mem_late_debug_gate(void) {
   //     (mubi8_test_true_strict(otp_dis_rv_dm_late_debug[k]) ||
   //      mubi32_test_true_strict(late_debug_enable[k])) ?
   //     lc_hw_debug_en_raw[k] : lc_dft_en_raw[k];
-  // When HW_CFG1.DIS_RV_DM_LATE_DEBUG is kMultiBitBool8True (0x96, as fused in
-  // trunk-v2 `hw/top_earlgrey/data/otp/BUILD:232`), `otp_dis_rv_dm_late_debug`
-  // overrides `LATE_DEBUG_ENABLE = kMultiBitBool32False` and keeps
-  // `u_tlul_lc_gate_rom` open (`mcause = 0`).
+  // Because HW_CFG1.DIS_RV_DM_LATE_DEBUG is kMultiBitBool8True (0x96),
+  // `otp_dis_rv_dm_late_debug` overrides `LATE_DEBUG_ENABLE =
+  // kMultiBitBool32False` and keeps `u_tlul_lc_gate_rom` open (`mcause = 0`).
   uint32_t whereto = 0;
-  if (dis_rv_dm_late_debug == (uint32_t)kMultiBitBool8True) {
-    CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, &whereto) ==
-          0u);
-  } else {
-    CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, NULL) ==
-          kMcauseLoadAccessFault);
-  }
+  CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, &whereto) == 0u);
 
-  // Enable LATE_DEBUG_ENABLE = kMultiBitBool32True (0x96969696) so RV_DM.MEM is
-  // unconditionally open regardless of OTP DIS_RV_DM_LATE_DEBUG.
-  CHECK(probe_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
-                      kMultiBitBool32True) == 0u);
+  // Enable LATE_DEBUG_ENABLE = kMultiBitBool32True (0x96969696) via DIF.
+  CHECK_DIF_OK(dif_rv_dm_late_debug_configure(&rv_dm, kDifToggleEnabled));
   CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
         (uint32_t)kMultiBitBool32True);
   CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, &whereto) == 0u);
@@ -289,6 +287,10 @@ static void test_rv_dm_mem_stride_and_regions(void) {
   CHECK(probe_write32(kRvDmMemBase + 0x104u, 0u) == kMcauseStoreAccessFault);
   CHECK(probe_read32(kRvDmMemBase + 0x10cu, NULL) == kMcauseLoadAccessFault);
   CHECK(probe_write32(kRvDmMemBase + 0x10cu, 0u) == kMcauseStoreAccessFault);
+  CHECK(probe_read32(kRvDmMemBase + 0x114u, NULL) == kMcauseLoadAccessFault);
+  CHECK(probe_write32(kRvDmMemBase + 0x114u, 0u) == kMcauseStoreAccessFault);
+  CHECK(probe_read32(kRvDmMemBase + 0x11cu, NULL) == kMcauseLoadAccessFault);
+  CHECK(probe_write32(kRvDmMemBase + 0x11cu, 0u) == kMcauseStoreAccessFault);
 
   // ABSTRACTCMD (0x338..0x35c), PROGRAM_BUFFER (0x360..0x37c), and DATA0/1
   // (0x380..0x384) are mapped and readable without fault.
@@ -301,8 +303,11 @@ static void test_rv_dm_mem_stride_and_regions(void) {
 
   // Unmapped gaps (0x000, 0x304, 0x388) fault with Load/Store Access Fault.
   CHECK(probe_read32(kRvDmMemBase + 0x000u, NULL) == kMcauseLoadAccessFault);
+  CHECK(probe_write32(kRvDmMemBase + 0x000u, 0u) == kMcauseStoreAccessFault);
   CHECK(probe_read32(kRvDmMemBase + 0x304u, NULL) == kMcauseLoadAccessFault);
+  CHECK(probe_write32(kRvDmMemBase + 0x304u, 0u) == kMcauseStoreAccessFault);
   CHECK(probe_read32(kRvDmMemBase + 0x388u, NULL) == kMcauseLoadAccessFault);
+  CHECK(probe_write32(kRvDmMemBase + 0x388u, 0u) == kMcauseStoreAccessFault);
 }
 
 /**
@@ -316,10 +321,16 @@ static void test_rv_dm_mem_ro_write_err_behavior(void) {
       "ROM");
 
   uint32_t whereto_before = 0;
+  uint32_t acmd0_before = 0;
+  uint32_t progbuf0_before = 0;
   uint32_t flags0_before = 0;
   uint32_t rom0_before = 0;
   CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET,
                      &whereto_before) == 0u);
+  CHECK(probe_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_0_REG_OFFSET,
+                     &acmd0_before) == 0u);
+  CHECK(probe_read32(kRvDmMemBase + RV_DM_PROGRAM_BUFFER_0_REG_OFFSET,
+                     &progbuf0_before) == 0u);
   CHECK(probe_read32(kRvDmMemBase + RV_DM_FLAGS_0_REG_OFFSET, &flags0_before) ==
         0u);
   CHECK(probe_read32(kRvDmMemBase + kRvDmRom0Offset, &rom0_before) == 0u);
@@ -337,12 +348,18 @@ static void test_rv_dm_mem_ro_write_err_behavior(void) {
         0u);
   CHECK(abs_mmio_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET) ==
         whereto_before);
+  CHECK(abs_mmio_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_0_REG_OFFSET) ==
+        acmd0_before);
+  CHECK(abs_mmio_read32(kRvDmMemBase + RV_DM_PROGRAM_BUFFER_0_REG_OFFSET) ==
+        progbuf0_before);
   CHECK(abs_mmio_read32(kRvDmMemBase + RV_DM_FLAGS_0_REG_OFFSET) ==
         flags0_before);
 
   // Sub-word `sb`/`sh` writes (`be_i != 4'b1111`) to those same regions fault
   // with Store Access Fault (mcause = 7).
   CHECK(probe_write8(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, 0x55u) ==
+        kMcauseStoreAccessFault);
+  CHECK(probe_write8(kRvDmMemBase + RV_DM_ABSTRACTCMD_0_REG_OFFSET, 0x55u) ==
         kMcauseStoreAccessFault);
   CHECK(probe_write16(kRvDmMemBase + RV_DM_PROGRAM_BUFFER_0_REG_OFFSET,
                       0x5555u) == kMcauseStoreAccessFault);
@@ -359,24 +376,14 @@ static void test_rv_dm_mem_ro_write_err_behavior(void) {
 /**
  * Test 5: `DATAADDR_0`/`DATAADDR_1` (`0x380..0x387`) Synchronous Zero-Clamp
  * Under `!dmcontrol_q.dmactive` (`dm_csrs.sv:612, 627, 647`) + Sub-Word Write
- * Fault (`dm_mem.sv:396`), and `ABSTRACTCMD_1..9` (`0x33c..0x35c`) Non-Zero
- * Reset Instructions (`dm_mem.sv:425-437` vs. `rv_dm.hjson` `resval: "0"`).
+ * Fault (`dm_mem.sv:396`), and `ABSTRACTCMD_0..9` (`0x338..0x35c`) Reset
+ * Instructions (`dm_mem.sv:425-437` vs. `rv_dm.hjson` `resval: "0"`).
  */
 static void test_rv_dm_data_dmactive_clamp_and_abstractcmd_resval(void) {
   LOG_INFO(
       "Test 5: DATA0/1 !dmactive zero-clamp + sb/sh fault and ABSTRACTCMD "
       "non-zero resvals");
 
-  // 1. In `rv_dm.hjson:249-280`, DATAADDR_0 (0x380) and DATAADDR_1 (0x384) are
-  // declared `swaccess: "rw"`. On the TL-UL `mem` bus (`dm_mem.sv:277-295,
-  // 396`), 32-bit `sw` writes (`be_i = 4'b1111`) complete without bus error
-  // (`err_d = 0`, `mcause = 0`), whereas sub-word `sb`/`sh` writes (`be_i !=
-  // 4'b1111`) fault with Store Access Fault (`err_d = 1`, `mcause = 7`).
-  // However, inside `dm_csrs.sv:612, 627, 647`, `if (!dmcontrol_q.dmactive)
-  // data_q <= '0;` synchronously clamps `data_q` to 0 on every clock cycle
-  // whenever `dmcontrol.dmactive == 0` (which cannot be set by the CPU on
-  // `top_earlgrey` because `UseDmiInterface = 1` omits `rv_dm_dbg_reg_top`),
-  // discarding all 32-bit CPU writes to DATAADDR_0/1!
   CHECK(probe_write32(kRvDmMemBase + kRvDmData0Offset, 0x11223344u) == 0u);
   CHECK(probe_write32(kRvDmMemBase + kRvDmData1Offset, 0xaabbccddu) == 0u);
   CHECK(abs_mmio_read32(kRvDmMemBase + kRvDmData0Offset) == 0x00000000u);
@@ -388,21 +395,22 @@ static void test_rv_dm_data_dmactive_clamp_and_abstractcmd_resval(void) {
         kMcauseStoreAccessFault);
   CHECK(abs_mmio_read32(kRvDmMemBase + kRvDmData0Offset) == 0x00000000u);
 
-  // 2. In `rv_dm.hjson:122-205`, `ABSTRACTCMD_0..9` (`0x338..0x35c`) are all
-  // specified with `resval: "0"`. However, `dm_mem.sv:425-437` combinationally
-  // drives `abstract_cmd` with non-zero RISC-V instructions (`auipc`, `srli`,
-  // `slli`, `nop` = 0x00000013, `csrr`, `ebreak` = 0x00100073).
-  uint32_t acmd1 =
-      abs_mmio_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_1_REG_OFFSET);
-  uint32_t acmd4 =
-      abs_mmio_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_4_REG_OFFSET);
-  uint32_t acmd9 =
-      abs_mmio_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_9_REG_OFFSET);
-  LOG_INFO("ABSTRACTCMD_1=0x%08x, ABSTRACTCMD_4=0x%08x, ABSTRACTCMD_9=0x%08x",
-           acmd1, acmd4, acmd9);
-  CHECK(acmd1 == 0x00000517u);  // auipc a0, 0
-  CHECK(acmd4 == 0x00000013u);  // nop (addi x0, x0, 0)
-  CHECK(acmd9 == 0x00100073u);  // ebreak
+  // Verify all 10 ABSTRACTCMD_0..9 words against dm_mem.sv:425-437.
+  uint32_t acmd[10];
+  for (uint32_t i = 0; i < 10u; ++i) {
+    acmd[i] = abs_mmio_read32(kRvDmMemBase + RV_DM_ABSTRACTCMD_0_REG_OFFSET +
+                              (i * 4u));
+  }
+  CHECK(acmd[0] == 0x00000000u);  // dm::illegal()
+  CHECK(acmd[1] == 0x00000517u);  // dm::auipc(a0, 0)
+  CHECK(acmd[2] == 0x00c55513u);  // dm::srli(a0, a0, 12)
+  CHECK(acmd[3] == 0x00c51513u);  // dm::slli(a0, a0, 12)
+  CHECK(acmd[4] == 0x00000013u);  // dm::nop()
+  CHECK(acmd[5] == 0x00000013u);  // dm::nop()
+  CHECK(acmd[6] == 0x00000013u);  // dm::nop()
+  CHECK(acmd[7] == 0x00000013u);  // dm::nop()
+  CHECK(acmd[8] == 0x7b302573u);  // dm::csrr(CSR_DSCRATCH1, a0)
+  CHECK(acmd[9] == 0x00100073u);  // dm::ebreak()
 }
 
 bool test_main(void) {

@@ -497,6 +497,7 @@ opentitan_test(
         "//sw/device/lib/base:abs_mmio",
         "//sw/device/lib/base:csr",
         "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:rv_dm",
         "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",

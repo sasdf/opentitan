@@ -362,8 +362,9 @@ static void test_v2_zeroize_cmd_access_error_and_rdata_blanking(void) {
         "Expected kDifOtpCtrlErrorLockedAccess for DAI error cause, got %u",
         dif_status.causes[kDifOtpCtrlPartitionDaiError]);
 
-  // Recover DAI error by issuing a valid DAI read of HW_CFG0.
-  clear_otp_irqs();
+  // Recover DAI error by issuing a valid DAI read of HW_CFG0: verify that
+  // otp_ctrl_dai.sv:285 (IdleSt) clears ERR_CODE_11 (0) and STATUS.DAI_ERROR
+  // (STATUS == 0x100) while sticky W1C INTR_STATE.otp_error (0x3) remains set.
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_ADDRESS_REG_OFFSET,
                    kHwCfg0Offset);
   abs_mmio_write32(kOtpCoreBase + OTP_CTRL_DIRECT_ACCESS_CMD_REG_OFFSET,
@@ -372,7 +373,16 @@ static void test_v2_zeroize_cmd_access_error_and_rdata_blanking(void) {
   CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_11_REG_OFFSET) ==
             OTP_CTRL_ERR_CODE_0_ERR_CODE_0_VALUE_NO_ERROR,
         "Valid DAI read must clear ERR_CODE_11 back to NoError");
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_STATUS_REG_OFFSET) ==
+            (1u << OTP_CTRL_STATUS_DAI_IDLE_BIT),
+        "Valid DAI read must clear STATUS.DAI_ERROR back to 0 (0x100)");
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET) ==
+            ((1u << OTP_CTRL_INTR_STATE_OTP_OPERATION_DONE_BIT) |
+             (1u << OTP_CTRL_INTR_STATE_OTP_ERROR_BIT)),
+        "Sticky W1C INTR_STATE.otp_error must remain 1 after valid DAI read");
   clear_otp_irqs();
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET) == 0u,
+        "Expected INTR_STATE == 0 after W1C clear");
   check_no_otp_alerts();
 }
 
@@ -526,6 +536,33 @@ static void test_read_locked_window_and_unbuf_sw_digest_and_dai_errata(void) {
             abs_mmio_read32(kOtpCoreBase + OTP_CTRL_INTR_STATE_REG_OFFSET),
             OTP_CTRL_INTR_STATE_OTP_ERROR_BIT),
         "Expected INTR_STATE.otp_error = 1 on SW digest window read");
+
+  // Verify that reading unlocked OWNER_SW_CFG via SW_CFG_WINDOW succeeds with
+  // 0 faults and ERR_CODE_2 == 0, while VENDOR_TEST's ERR_CODE_0 == 5,
+  // PARTITION_STATUS_0.VENDOR_TEST_ERROR == 1, and STATUS.PARTITION_ERROR == 1
+  // remain set.
+  access_fault_count = 0;
+  expect_access_fault = false;
+  uint32_t owner_word =
+      *(volatile uint32_t *)(kOtpSwCfgBase + kOwnerSwCfgOffset);
+  (void)owner_word;
+  CHECK(access_fault_count == 0,
+        "Unlocked OWNER_SW_CFG window read must not fault");
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_2_REG_OFFSET) ==
+            OTP_CTRL_ERR_CODE_0_ERR_CODE_0_VALUE_NO_ERROR,
+        "Expected ERR_CODE_2 (OWNER_SW_CFG) == 0");
+  CHECK(abs_mmio_read32(kOtpCoreBase + OTP_CTRL_ERR_CODE_0_REG_OFFSET) ==
+            OTP_CTRL_ERR_CODE_0_ERR_CODE_0_VALUE_ACCESS_ERROR,
+        "Expected ERR_CODE_0 (VENDOR_TEST) to remain AccessError (5)");
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kOtpCoreBase +
+                            OTP_CTRL_PARTITION_STATUS_0_REG_OFFSET),
+            OTP_CTRL_PARTITION_STATUS_0_VENDOR_TEST_ERROR_BIT),
+        "Expected PARTITION_STATUS_0.VENDOR_TEST_ERROR to remain 1");
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kOtpCoreBase + OTP_CTRL_STATUS_REG_OFFSET),
+            OTP_CTRL_STATUS_PARTITION_ERROR_BIT),
+        "Expected STATUS.PARTITION_ERROR to remain 1");
 
   // 6c. Reading VENDOR_TEST's 64-bit SW digest (0x38) via DAI is ALSO blocked
   // by VENDOR_TEST_READ_LOCK = 0 (`otp_ctrl_dai.sv:336-342` only exempts
