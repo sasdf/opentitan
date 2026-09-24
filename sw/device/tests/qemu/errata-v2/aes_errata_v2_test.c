@@ -225,6 +225,10 @@ bool test_main(void) {
         "[aes_control_fsm.sv:1059-1063] Expected OUTPUT_LOST == 1 after "
         "DATA_OUT_CLEAR on unread output in automatic mode, got 0x%08x",
         st_after);
+  CHECK(st_after == 0x00000015u,
+        "Expected STATUS == 0x00000015 (IDLE | INPUT_READY | OUTPUT_LOST) "
+        "after DATA_OUT_CLEAR, got 0x%08x",
+        st_after);
 
   // =========================================================================
   // Check 2 & 3: [aes_ctrl_reg_shadowed.sv:71-122 / aes_control_fsm.sv:1000]
@@ -239,13 +243,41 @@ bool test_main(void) {
       "Check 3 [aes_ctrl_reg_shadowed.sv:71-75 / aes_control_fsm.sv:1000]: "
       "Staged 1st write and mismatched 2nd write to CTRL_SHADOWED clear "
       "STATUS...");
-  // First, note OUTPUT_LOST is currently 1 from Check 1. Perform a single
-  // (staged) write to CTRL_SHADOWED followed by a mismatched 2nd write:
+  // Establish OUTPUT_VALID == 1, OUTPUT_LOST == 1, and INPUT_READY == 0
+  // while keeping aes_ctrl_cs == CTRL_IDLE (IDLE == 1):
+  // 1) Encrypt a block while OUTPUT_LOST == 1 so OUTPUT_VALID = 1,
+  //    OUTPUT_LOST = 1, IDLE = 1 (0x1d).
+  // 2) Write a single KEY_SHARE0_0 word (key_init_ready -> 0, keeping
+  //    CTRL_IDLE) and all 4 DATA_IN_0..3 words so INPUT_READY -> 0 (0x19).
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4u,
+                     kPlaintext128[i]);
+  }
+  while ((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+          (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u) {
+  }
+  wait_aes_idle();
+  abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET, kKey128[0]);
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4u,
+                     kPlaintext128[i]);
+  }
+  uint32_t st_pre_staged = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
+  CHECK((st_pre_staged & (1u << AES_STATUS_OUTPUT_VALID_BIT)) != 0u &&
+            (st_pre_staged & (1u << AES_STATUS_OUTPUT_LOST_BIT)) != 0u &&
+            (st_pre_staged & (1u << AES_STATUS_INPUT_READY_BIT)) == 0u,
+        "Expected OUTPUT_VALID=1, OUTPUT_LOST=1, INPUT_READY=0 before staged "
+        "write, got 0x%08x",
+        st_pre_staged);
+  // Perform a single (staged) write to CTRL_SHADOWED:
   abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET, ctrl_auto_ecb128);
   uint32_t st_staged = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
-  CHECK((st_staged & (1u << AES_STATUS_OUTPUT_LOST_BIT)) == 0u,
-        "[aes_control_fsm.sv:1000] Expected staged 1st write to CTRL_SHADOWED "
-        "to immediately clear OUTPUT_LOST, got 0x%08x",
+  CHECK((st_staged & (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u &&
+            (st_staged & (1u << AES_STATUS_OUTPUT_LOST_BIT)) == 0u &&
+            (st_staged & (1u << AES_STATUS_INPUT_READY_BIT)) != 0u,
+        "[aes_control_fsm.sv:1007] Expected staged 1st write to CTRL_SHADOWED "
+        "to immediately clear OUTPUT_VALID=0, OUTPUT_LOST=0, and set "
+        "INPUT_READY=1, got 0x%08x",
         st_staged);
   // Trigger a shadow update error with a mismatched 2nd write:
   abs_mmio_write32(kAesBase + AES_CTRL_SHADOWED_REG_OFFSET,
@@ -342,6 +374,12 @@ bool test_main(void) {
                     AES_CTRL_SHADOWED_KEY_LEN_VALUE_AES_128, /*sideload=*/false,
                     /*manual=*/true);
   write_ctrl_shadowed(ctrl_manual_cbc128);
+  for (uint32_t i = 0; i < 8u; ++i) {
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
+                     kKey128[i]);
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE1_0_REG_OFFSET + i * 4u, 0u);
+  }
+  wait_aes_idle();
   const uint32_t kKnownIv[4] = {0x10203040u, 0x50607080u, 0x90a0b0c0u,
                                 0xd0e0f001u};
   for (uint32_t i = 0; i < 4u; ++i) {
@@ -359,13 +397,28 @@ bool test_main(void) {
          0u) {
   }
 
-  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
-                   1u << AES_TRIGGER_PRNG_RESEED_BIT);
+  // Drain any buffered entropy words in EDN0/AES sync FIFOs until PRNG_RESEED
+  // genuinely stalls waiting for EDN0 (holding STATUS.IDLE == 0 indefinitely):
+  for (uint32_t drain = 0; drain < 16u; ++drain) {
+    abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                     1u << AES_TRIGGER_PRNG_RESEED_BIT);
+    busy_spin_micros(10);
+    if ((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+         (1u << AES_STATUS_IDLE_BIT)) == 0u) {
+      break;
+    }
+  }
   uint32_t st_reseed = abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET);
   CHECK((st_reseed & (1u << AES_STATUS_IDLE_BIT)) == 0u,
         "Expected STATUS.IDLE == 0 during stalled PRNG_RESEED, got 0x%08x",
         st_reseed);
 
+  for (uint32_t i = 0; i < 8u; ++i) {
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE0_0_REG_OFFSET + i * 4u,
+                     0xdeadbeefu);
+    abs_mmio_write32(kAesBase + AES_KEY_SHARE1_0_REG_OFFSET + i * 4u,
+                     0xdeadbeefu);
+  }
   for (uint32_t i = 0; i < 4u; ++i) {
     abs_mmio_write32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u, 0xdeadbeefu);
     abs_mmio_write32(kAesBase + AES_DATA_IN_0_REG_OFFSET + i * 4u,
@@ -403,6 +456,26 @@ bool test_main(void) {
          (1u << AES_STATUS_INPUT_READY_BIT)) == 0u,
         "[aes_control_fsm.sv:337-360] DATA_IN_0..3 writes while IDLE==0 were "
         "accepted (INPUT_READY == 0)");
+  // Prove KEY_SHARE0/1 writes during IDLE == 0 were also dropped and DATA_IN
+  // retained kPlaintext128 by setting IV = 0 and triggering manual CBC
+  // encryption:
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kAesBase + AES_IV_0_REG_OFFSET + i * 4u, 0u);
+  }
+  abs_mmio_write32(kAesBase + AES_TRIGGER_REG_OFFSET,
+                   1u << AES_TRIGGER_START_BIT);
+  while ((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+          (1u << AES_STATUS_OUTPUT_VALID_BIT)) == 0u) {
+  }
+  for (uint32_t i = 0; i < 4u; ++i) {
+    uint32_t ct =
+        abs_mmio_read32(kAesBase + AES_DATA_OUT_0_REG_OFFSET + i * 4u);
+    CHECK(ct == kExpectedCipher128[i],
+          "[aes_control_fsm.sv:337-360] Expected KEY_SHARE writes during "
+          "IDLE==0 to be dropped and DATA_IN retained (word %u: got 0x%08x, "
+          "expected 0x%08x)",
+          i, ct, kExpectedCipher128[i]);
+  }
 
   // =========================================================================
   // Check 7: [aes_reg_pkg.sv:397-433] (CONFIRMED_PRESENT_ON_V2)
