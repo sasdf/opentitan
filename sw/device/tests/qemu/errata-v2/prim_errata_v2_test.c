@@ -199,20 +199,19 @@ static void test_prim_fifo_sync_semantics(void) {
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 4u);
 
-  for (uint32_t i = 4u; i < 128u; ++i) {
+  for (uint32_t i = 4u; i < 32u; ++i) {
     abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, i);
   }
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
-  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 128u);
+  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 32u);
   CHECK((status & (1u << UART_STATUS_TXFULL_BIT)) != 0u);
 
-  // Push 129th byte when full: wready_o == 0, so TXLVL stays 128 and TXFULL ==
-  // 1
+  // Push 33rd byte when full: wready_o == 0, so TXLVL stays 32 and TXFULL == 1
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0xFFu);
   fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
   status = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
-  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 128u);
+  CHECK((fifo_status & UART_FIFO_STATUS_TXLVL_MASK) == 32u);
   CHECK((status & (1u << UART_STATUS_TXFULL_BIT)) != 0u);
 
   abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
