@@ -7,8 +7,8 @@
 //
 // 1. Bidirectional self-loopback double-XOR cancellation of MIO_PAD_ATTR.INVERT
 //    (hw/top_earlgrey/ip_autogen/gpio/rtl/gpio.sv:115-120,
-//    prim_xilinx_ultrascale_pad_wrapper.sv:76, 97), MIO_PERIPH_INSEL
-//    ConstantZero/ConstantOne bypass (pinmux.sv:470-475), and
+//    hw/ip/prim_xilinx_ultrascale/rtl/prim_pad_wrapper.sv:49-50, 76, 95, 98),
+//    MIO_PERIPH_INSEL ConstantZero/ConstantOne bypass (pinmux.sv:470-475), and
 //    MIO_PAD_ATTR.INPUT_DISABLE (0x80) pre-invert zero clamp.
 // 2. GPIO_PERMIT[18]
 // (hw/top_earlgrey/ip_autogen/gpio/rtl/gpio_reg_pkg.sv:283-302)

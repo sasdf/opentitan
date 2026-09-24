@@ -65,7 +65,7 @@ static void rv_timer_reset_clean(void) {
 }
 
 // -----------------------------------------------------------------------------
-// 1. [rv_timer_reg_top.sv:585, timer_core.sv:32-39]:
+// 1. [rv_timer_reg_top.sv:587, timer_core.sv:31-43]:
 //    CFG0 is writable while CTRL.active0 == 1, and lowering CFG0.prescale
 //    below the in-flight tick_count misses (tick_count == prescaler) while
 //    asserting tick = active & (tick_count >= prescaler) on every clock cycle
@@ -158,7 +158,7 @@ static void test_step_zero_combinational_intr(void) {
 }
 
 // -----------------------------------------------------------------------------
-// 3. [rv_timer_reg_top.sv:538, rv_timer.hjson:129]:
+// 3. [rv_timer_reg_top.sv:540, rv_timer.hjson:129]:
 //    Unmapped skipto offset hole (0x008..0x0fc) asserts addrmiss = 1
 //    (tl_o.d_error = 1), raising Load/Store Access Faults (mcause = 5/7).
 // -----------------------------------------------------------------------------
@@ -181,7 +181,7 @@ static void test_unmapped_skipto_hole_bus_error(void) {
 }
 
 // -----------------------------------------------------------------------------
-// 4. [rv_timer_reg_pkg.sv:146-157, rv_timer_reg_top.sv:555-567]:
+// 4. [rv_timer_reg_pkg.sv:146-157, rv_timer_reg_top.sv:557-569]:
 //    RV_TIMER_PERMIT[5] = 4'b0111 on CFG0 (0x10c) rejects all sub-word stores
 //    (sh to CFG0.prescale or sb to CFG0.step) with Store Access Fault
 //    (mcause=7).
@@ -216,12 +216,12 @@ static void test_cfg0_3byte_permit_subword_fault(void) {
 
 // -----------------------------------------------------------------------------
 // 5. NEW_IN_V2 [programmers_guide.md:50-68, dif_rv_timer.c:153-180,
-//    rv_timer.sv:66,73-74]:
+//    rv_timer.sv:75,82-83]:
 //    In trunk-v2, programmers_guide.md:50-68 added a 3-write mtime update
 //    sequence (using non-existent RV_TIMER_TIMER_V_LOWER0_0_REG_OFFSET /
 //    RV_TIMER_TIMER_V_UPPER0_0_REG_OFFSET macro names) and noted that mtimecmp
 //    must be written after mtime to clear pending interrupts because
-//    mtimecmp_update (rv_timer.sv:66) only pulses on COMPARE_LOWER0_0 /
+//    mtimecmp_update (rv_timer.sv:75) only pulses on COMPARE_LOWER0_0 /
 //    COMPARE_UPPER0_0 writes. However, dif_rv_timer_counter_write()
 //    (dif_rv_timer.c:153-180) neither uses the 3-write sequence nor writes
 //    COMPARE_* or INTR_STATE0, so rewinding mtime below mtimecmp via
@@ -252,7 +252,7 @@ static void test_v2_mtime_rewind_sticky_intr_and_dif_counter_write(void) {
 
   // Even though mtime (10) < mtimecmp (400), INTR_STATE0 remains stuck at 1!
   CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u,
-        "[dif_rv_timer.c:153-180, rv_timer.sv:66,73-74] Expected INTR_STATE0 "
+        "[dif_rv_timer.c:153-180, rv_timer.sv:75,82-83] Expected INTR_STATE0 "
         "to remain sticky 1 after dif_rv_timer_counter_write(10 < 400)");
 
   // Executing the programmers_guide.md:58-60 3-write mtime sequence
