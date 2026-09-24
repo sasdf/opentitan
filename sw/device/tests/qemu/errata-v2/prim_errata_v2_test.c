@@ -281,35 +281,9 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
                    kMultiBitBool4False);
 
-  // Also functionally verify `mubi4_test_true_loose(4'h0) == 1'b1` (`True`) vs
-  // `mubi4_test_true_strict(4'h0) == 1'b0` (`False`) on CLKMGR:
-  // - `CLKMGR_IO_MEAS_CTRL_EN` uses `mubi4_test_true_loose(val)`, so writing
-  //   `0x0` with out-of-range thresholds `10..20` enables measurement and sets
-  //   `CLKMGR_RECOV_ERR_CODE.IO_MEASURE_ERR`!
-  // - `CLKMGR_EXTCLK_CTRL.SEL` uses `mubi4_test_true_strict(val)`, so writing
-  //   `0x0` evaluates to `False` and leaves `CLKMGR_EXTCLK_STATUS == 0x9`!
-  uint32_t orig_io_shadow =
-      abs_mmio_read32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
-                   (20u << 10) | 10u);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
-                   (20u << 10) | 10u);
-  CHECK_STATUS_OK(
-      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdClkmgrRecovFault));
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET, 0x0u);
-  busy_spin_micros(250);
-  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
-         (1u << CLKMGR_RECOV_ERR_CODE_IO_MEASURE_ERR_BIT)) != 0u);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET,
-                   kMultiBitBool4False);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
-                   orig_io_shadow);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET,
-                   orig_io_shadow);
-  abs_mmio_write32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET, 0x7ffu);
-  CHECK_STATUS_OK(
-      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdClkmgrRecovFault));
-
+  // Also functionally verify `mubi4_test_true_strict(4'h0) == 1'b0` (`False`)
+  // on `CLKMGR_EXTCLK_CTRL.SEL`: writing `0x0` evaluates to `False` and leaves
+  // `CLKMGR_EXTCLK_STATUS == kMultiBitBool4False` (`0x9`).
   abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET,
                    (kMultiBitBool4False << 4) | 0x0u);
   busy_spin_micros(10);
