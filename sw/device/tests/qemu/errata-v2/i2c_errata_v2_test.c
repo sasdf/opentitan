@@ -34,14 +34,14 @@
  *      immediately firing `INTR_STATE.SDA_INTERFERENCE = 1`,
  *      `CONTROLLER_EVENTS.ARBITRATION_LOST = 1`, and
  *      `INTR_STATE.CONTROLLER_HALT = 1`.
- * 3. `[i2c_core.sv:337-342, 428, i2c_controller_fsm.sv:617-650]`
+ * 3. `[i2c_core.sv:337-342, 428, i2c_controller_fsm.sv:424-426, 617-652]`
  *    (`SPEC_DOC_ERRATA`):
  *    - `FDATA` (`fmt_fifo`) and `TXDATA` (`tx_fifo`) accept preloaded entries
  *      while `CTRL.ENABLEHOST == 0` / `CTRL.ENABLETARGET == 0`,
  *      `STATUS.HOSTIDLE` stays `1` while `CTRL.ENABLEHOST == 0` even with
  *      `FMTLVL > 0`, and `VAL` (`0x38`) shifts in `0xffffffff` in 16 idle
  *      cycles and reflects `OVRD` (`0x34`).
- * 4. `[i2c_controller_fsm.sv:500-525, 843-848, i2c_target_fsm.sv:323-328]`
+ * 4. `[i2c_controller_fsm.sv:497-531, 843-850, i2c_target_fsm.sv:325-329]`
  *    (`SPEC_DOC_ERRATA`):
  *    - `FDATA` with `READB = 1`, `RCONT = 1`, and `STOP = 1` executes `ACK` +
  *      `STOP` and triggers `INTR_STATE.UNEXP_STOP = 1` on the Target FSM
@@ -50,7 +50,7 @@
  *      edge `!nack_transaction_q && nack_transaction_d` (`+1` per NACKed
  *      transaction even when `ACQDATA` records both `SIGNAL_NACK` and
  *      `SIGNAL_NACK_STOP`), clears to `0` on read, and ignores writes.
- * 5. `[i2c_reg_pkg.sv:548-581]` (`INTENDED_SECURITY_HARDENING`):
+ * 5. `[i2c_reg_pkg.sv:794-827]` (`INTENDED_SECURITY_HARDENING`):
  *    - `I2C_PERMIT[32]` enforces 1/2/3/4-byte write masks (`4'b0001`,
  *      `4'b0011`, `4'b0111`, `4'b1111`), trapping narrower sub-word stores
  *      with `mcause = 7` while permitting sub-word reads (`lb`/`lh`).
@@ -216,11 +216,12 @@ static void test_i2c_fifo_preload_hostidle_val_and_ovrd_interference(void) {
            2u,
            "[i2c_core.sv:337-342] Expected FMTLVL == 2 when ENABLEHOST == 0");
   CHECK_EQ(bitfield_field32_read(t_status, I2C_TARGET_FIFO_STATUS_TXLVL_FIELD),
-           2u, "[i2c_core.sv:428] Expected TXLVL == 2 when ENABLETARGET == 0");
+           2u, "[i2c_core.sv:429] Expected TXLVL == 2 when ENABLETARGET == 0");
   CHECK(!bitfield_bit32_read(status, I2C_STATUS_FMTEMPTY_BIT),
         "Expected STATUS.FMTEMPTY == 0");
   CHECK(bitfield_bit32_read(status, I2C_STATUS_HOSTIDLE_BIT),
-        "[i2c_controller_fsm.sv:617-650] Expected STATUS.HOSTIDLE == 1 when "
+        "[i2c_controller_fsm.sv:424-426, 617-652] Expected STATUS.HOSTIDLE == "
+        "1 when "
         "ENABLEHOST == 0 even with FMTLVL == 2");
 
   // Flush FIFOs.
@@ -360,8 +361,8 @@ static void test_i2c_ovrd_interference_when_enabled(void) {
 
 static void test_i2c_readb_rcont_stop_and_nack_count(void) {
   LOG_INFO(
-      "Verifying [i2c_controller_fsm.sv:500-525] & "
-      "[i2c_target_fsm.sv:326-328]: FDATA READB+RCONT+STOP "
+      "Verifying [i2c_controller_fsm.sv:497-531, 843-850] & "
+      "[i2c_target_fsm.sv:328-329]: FDATA READB+RCONT+STOP "
       "-> UNEXP_STOP & TARGET_NACK_COUNT single increment per transaction...");
 
   dif_pinmux_t pinmux;
@@ -432,22 +433,24 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
 
   uint32_t intr = abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET);
   CHECK(bitfield_bit32_read(intr, I2C_INTR_STATE_CMD_COMPLETE_BIT),
-        "[i2c_controller_fsm.sv:500-525] Expected CMD_COMPLETE after READB + "
+        "[i2c_controller_fsm.sv:497-531, 843-850] Expected CMD_COMPLETE after "
+        "READB + "
         "RCONT + STOP");
   CHECK(bitfield_bit32_read(intr, I2C_INTR_STATE_UNEXP_STOP_BIT),
-        "[i2c_controller_fsm.sv:500-525] Expected INTR_STATE.UNEXP_STOP == 1 "
+        "[i2c_controller_fsm.sv:497-531, 843-850] Expected "
+        "INTR_STATE.UNEXP_STOP == 1 "
         "after READB + RCONT + STOP");
   CHECK_EQ(abs_mmio_read32(kI2c0Base + I2C_RDATA_REG_OFFSET) & 0xFFu, 0xA5u,
            "Expected RDATA == 0xA5");
 
-  // Verify [i2c_target_fsm.sv:326-328]: TARGET_NACK_COUNT (0x68) is
+  // Verify [i2c_target_fsm.sv:328-329]: TARGET_NACK_COUNT (0x68) is
   // SwAccessRC (ignores writes), increments by +1 (not +2) when a NACKed
   // target transaction records both AcqNack and AcqNackStop in ACQDATA, and
   // clears to 0 on read.
   abs_mmio_write32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET, 0xFFFFFFFFu);
   CHECK_EQ(
       abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET), 0u,
-      "[i2c_target_fsm.sv:326-328] Expected TARGET_NACK_COUNT == 0 after write "
+      "[i2c_target_fsm.sv:328-329] Expected TARGET_NACK_COUNT == 0 after write "
       "(SwAccessRC)");
 
   // Reset FIFOs, enable ACK_CTRL_EN = 1 with NBYTES = 0 and TARGET_TIMEOUT_CTRL
@@ -479,11 +482,12 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
   uint32_t nack_cnt_second_read =
       abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET);
   CHECK_EQ(nack_cnt_first_read, 1u,
-           "[i2c_target_fsm.sv:327] Expected TARGET_NACK_COUNT == 1 after "
+           "[i2c_target_fsm.sv:328-329] Expected TARGET_NACK_COUNT == 1 after "
            "single NACKed target transaction (AcqNack + AcqNackStop)");
-  CHECK_EQ(nack_cnt_second_read, 0u,
-           "[i2c_target_fsm.sv:327] Expected TARGET_NACK_COUNT to clear to 0 "
-           "on read (SwAccessRC)");
+  CHECK_EQ(
+      nack_cnt_second_read, 0u,
+      "[i2c_target_fsm.sv:328-329] Expected TARGET_NACK_COUNT to clear to 0 "
+      "on read (SwAccessRC)");
   abs_mmio_write32(kI2c0Base + I2C_TARGET_TIMEOUT_CTRL_REG_OFFSET, 0u);
 
   abs_mmio_write32(kI2c0Base + I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0xFFFFFFFFu);
@@ -499,7 +503,7 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
 
 static void test_i2c_permit_subword_writes_vs_reads(void) {
   LOG_INFO(
-      "Verifying [i2c_reg_pkg.sv:548-581]: I2C_PERMIT[32] sub-word write "
+      "Verifying [i2c_reg_pkg.sv:794-827]: I2C_PERMIT[32] sub-word write "
       "faults vs sub-word reads...");
 
   abs_mmio_write32(kI2c0Base + I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0x01020304u);
@@ -509,7 +513,7 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
       *(const volatile uint16_t *)(uintptr_t)(kI2c0Base +
                                               I2C_HOST_FIFO_CONFIG_REG_OFFSET);
   CHECK_EQ(g_fault_count, 0u,
-           "[i2c_reg_pkg.sv:548-581] Sub-word reads from HOST_FIFO_CONFIG must "
+           "[i2c_reg_pkg.sv:794-827] Sub-word reads from HOST_FIFO_CONFIG must "
            "not fault");
   CHECK_EQ(b0, 0x04u, "Byte 0 mismatch");
   CHECK_EQ(h0, 0x0304u, "Halfword 0 mismatch");
@@ -518,7 +522,7 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   g_last_mcause = 0;
   abs_mmio_write8(kI2c0Base + I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0x55u);
   CHECK_EQ(g_fault_count, 1u,
-           "[i2c_reg_pkg.sv:548-581] Expected sb to HOST_FIFO_CONFIG (4'b1111) "
+           "[i2c_reg_pkg.sv:794-827] Expected sb to HOST_FIFO_CONFIG (4'b1111) "
            "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -528,7 +532,7 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   *(volatile uint16_t *)(uintptr_t)(kI2c0Base +
                                     I2C_HOST_FIFO_CONFIG_REG_OFFSET) = 0x0007u;
   CHECK_EQ(g_fault_count, 1u,
-           "[i2c_reg_pkg.sv:548-581] Expected sh to HOST_FIFO_CONFIG (4'b1111) "
+           "[i2c_reg_pkg.sv:794-827] Expected sh to HOST_FIFO_CONFIG (4'b1111) "
            "to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -541,7 +545,7 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   *(volatile uint16_t *)(uintptr_t)(kI2c0Base +
                                     I2C_HOST_TIMEOUT_CTRL_REG_OFFSET) = 0x6789u;
   CHECK_EQ(g_fault_count, 1u,
-           "[i2c_reg_pkg.sv:548-581] Expected sh to HOST_TIMEOUT_CTRL "
+           "[i2c_reg_pkg.sv:794-827] Expected sh to HOST_TIMEOUT_CTRL "
            "(4'b0111) to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -551,7 +555,7 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   abs_mmio_write8(kI2c0Base + I2C_INTR_ENABLE_REG_OFFSET, 0x15u);
   CHECK_EQ(
       g_fault_count, 1u,
-      "[i2c_reg_pkg.sv:548-581] Expected sb to INTR_ENABLE (4'b0011) to trap");
+      "[i2c_reg_pkg.sv:794-827] Expected sb to INTR_ENABLE (4'b0011) to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
 
