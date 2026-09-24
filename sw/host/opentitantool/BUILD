@@ -56,6 +56,7 @@ rust_binary(
         "//sw/host/ot_certs",
         "//sw/host/ot_hal",
         "//sw/host/ot_transports/chipwhisperer",
+        "//sw/host/ot_transports/qemu",
         "//sw/host/ot_transports/verilator",
         "//sw/host/sphincsplus",
         "//util:bfv_decoder",

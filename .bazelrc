@@ -129,7 +129,7 @@ build --@rules_rust//rust/toolchain/channel=nightly
 # Configure the rust 'clippy' linter.
 build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
 build --output_groups=+clippy_checks
-build --@rules_rust//:clippy_flags="-Wclippy::undocumented_unsafe_blocks,-Dwarnings"
+build --@rules_rust//:clippy_flags="-Aclippy::bool_assert_comparison,-Aclippy::uninlined_format_args,-Aclippy::needless_lifetimes,-Aclippy::precedence,-Wclippy::undocumented_unsafe_blocks,-Dwarnings"
 
 # Import site-specific configuration.
 try-import .bazelrc-site
@@ -139,6 +139,8 @@ build --flag_alias=ckms_cert_endorsement=//sw/device/silicon_creator/manuf/skus/
 
 # cquery output option.
 cquery --output=files
+
+common --legacy_external_runfiles
 
 # When test suites are specified in `bazel test`, only build the ones matching the tag filters.
 # This prevents having to build Verilator or an FPGA bitstream when not needed.
@@ -160,3 +162,7 @@ build --incompatible_strict_action_env
 # Therefore we need to make /sys writable, otherwise the code will fallback to directly manipulating the hub
 # using control operations which may confuse the kernel and lead to hard to debug problems.
 test --sandbox_writable_path=/sys/
+
+# Optional config to run QEMU tests with the bundled coverage-instrumented QEMU binary
+# (--config=qemu_coverage), emitting per-test .gcda files to TEST_UNDECLARED_OUTPUTS_DIR/gcov.
+test:qemu_coverage --test_env=OT_QEMU_COVERAGE=1

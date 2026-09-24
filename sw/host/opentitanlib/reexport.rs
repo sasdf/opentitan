@@ -8,6 +8,7 @@ extern crate ot_transport_dediprog;
 extern crate ot_transport_ftdi;
 extern crate ot_transport_hyperdebug;
 extern crate ot_transport_proxy;
+extern crate ot_transport_qemu;
 extern crate ot_transport_ti50emulator;
 extern crate ot_transport_verilator;
 

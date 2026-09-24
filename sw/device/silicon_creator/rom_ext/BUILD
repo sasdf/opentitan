@@ -357,6 +357,7 @@ ROM_EXT_FEATURES = [
         exec_env = ["//hw/top_earlgrey:fpga_cw340"] if slot == "virtual" else [
             "//hw/top_earlgrey:fpga_cw340",
             "//hw/top_earlgrey:sim_dv_base",
+            "//hw/top_earlgrey:sim_qemu_base",
             "//hw/top_earlgrey:sim_verilator_base",
             "//hw/top_earlgrey:silicon_creator",
         ],

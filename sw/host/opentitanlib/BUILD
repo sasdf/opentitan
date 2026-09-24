@@ -313,6 +313,7 @@ rust_library(
         "//sw/host/ot_transports/ftdi",
         "//sw/host/ot_transports/hyperdebug",
         "//sw/host/ot_transports/proxy",
+        "//sw/host/ot_transports/qemu",
         "//sw/host/ot_transports/ti50emulator",
         "//sw/host/ot_transports/verilator",
     ],

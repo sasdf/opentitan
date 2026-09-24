@@ -1,0 +1,2092 @@
+// Copyright lowRISC contributors (OpenTitan project).
+// Licensed under the Apache License, Version 2.0, see LICENSE for details.
+// SPDX-License-Identifier: Apache-2.0
+
+use anyhow::{Context, anyhow};
+use serialport::TTYPort;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
+use thiserror::Error;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned, byteorder::little_endian};
+
+use opentitanlib::io::gpio::{GpioPin, PinMode, PullMode};
+use opentitanlib::io::usb::{UsbContext as OtUsbContext, UsbDevice, desc};
+
+/// Pin-like interface for controlling USB VBUS.
+pub struct QemuVbusSense {
+    pub usbdev: RefCell<TTYPort>,
+    pub asserted: Cell<bool>,
+}
+
+impl QemuVbusSense {
+    pub fn new(usbdev: TTYPort) -> QemuVbusSense {
+        QemuVbusSense {
+            usbdev: RefCell::new(usbdev),
+            asserted: Cell::new(false),
+        }
+    }
+}
+
+impl GpioPin for QemuVbusSense {
+    fn read(&self) -> anyhow::Result<bool> {
+        Ok(self.asserted.get())
+    }
+
+    fn write(&self, value: bool) -> anyhow::Result<()> {
+        if value == self.asserted.get() {
+            return Ok(());
+        }
+
+        let cmd = if value { "vbus_on" } else { "vbus_off" };
+        writeln!(*self.usbdev.borrow_mut(), "{}", cmd)?;
+
+        self.asserted.set(value);
+
+        Ok(())
+    }
+
+    fn set_mode(&self, _mode: PinMode) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn set_pull_mode(&self, _mode: PullMode) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn set(
+        &self,
+        _mode: Option<PinMode>,
+        value: Option<bool>,
+        _pull: Option<PullMode>,
+        _analog_value: Option<f32>,
+    ) -> anyhow::Result<()> {
+        if let Some(value) = value {
+            return self.write(value);
+        }
+
+        Ok(())
+    }
+}
+
+/// Standard USB mask for EP IN in Setup packets.
+const USBDEV_TRANSFER_EP_IN: u8 = 1 << 7;
+
+// Every device must be able to handle 8 bytes packets.
+const USB_FS_SAFE_PACKET_SIZE: u16 = 8;
+
+// Some standard request types.
+const USB_REQ_TYPE_OUT: u8 = 0;
+const USB_REQ_TYPE_IN: u8 = 0x80;
+const USB_REQ_TYPE_STANDARD: u8 = 0;
+const USB_REQ_TYPE_DEVICE: u8 = 0;
+const USB_REQ_TYPE_INTF: u8 = 1;
+
+// Some standard USB requests.
+const USB_SET_ADDRESS: u8 = 5;
+const USB_GET_DESCRIPTOR: u8 = 6;
+const USB_SET_CONFIGURATION: u8 = 9;
+const USB_SET_INTERFACE: u8 = 11;
+
+// Some standard descriptor types.
+const USB_DEVICE_DESCRIPTOR: u8 = 1;
+const USB_CONFIG_DESCRIPTOR: u8 = 2;
+
+// Location of the bMaxPacketSize field in the device descriptor.
+const USB_DEV_DESC_MAX_PACKET_SIZE_OFFSET: usize = 7;
+
+#[derive(Debug)]
+struct InTransferWaiter {
+    state: std::sync::Mutex<(bool, Option<UsbResult<Vec<u8>>>)>,
+    cvar: std::sync::Condvar,
+}
+
+impl InTransferWaiter {
+    fn new() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            state: std::sync::Mutex::new((false, None)),
+            cvar: std::sync::Condvar::new(),
+        })
+    }
+
+    fn complete(&self, res: UsbResult<Vec<u8>>) -> Option<UsbResult<Vec<u8>>> {
+        let mut guard = self.state.lock().unwrap();
+        if guard.0 {
+            Some(res)
+        } else {
+            guard.1 = Some(res);
+            self.cvar.notify_one();
+            None
+        }
+    }
+
+    fn wait_timeout(&self, timeout: Duration) -> anyhow::Result<UsbResult<Vec<u8>>> {
+        let guard = self.state.lock().unwrap();
+        let (mut guard, _) = self
+            .cvar
+            .wait_timeout_while(guard, timeout, |s| s.1.is_none())
+            .unwrap();
+        if let Some(res) = guard.1.take() {
+            Ok(res)
+        } else {
+            guard.0 = true;
+            Err(mpsc::RecvTimeoutError::Timeout.into())
+        }
+    }
+}
+
+/// Events sent by otlib to the virtual host thread.
+#[derive(Debug)]
+enum HostChannelEvent {
+    /// A message was sent by QEMU to the host.
+    QemuMessage { cmd: u32, id: u32, data: Vec<u8> },
+    /// Request information about the currently plugged device.
+    /// The information is immediately sent back over the channel.
+    GetDeviceInfo {
+        answer: mpsc::Sender<Option<DeviceInfo>>,
+    },
+    /// Request to be notified on any device change (connection or disconnection).
+    NotifyDeviceChange {
+        answer: mpsc::Sender<Option<DeviceInfo>>,
+    },
+    /// Send a SETUP packet.
+    SendSetup {
+        generation: u32,
+        ep: u8,
+        setup: [u8; 8],
+    },
+    /// Submit OUT transfer. Channel will be notified on completion.
+    SubmitOutTransfer {
+        generation: u32,
+        ep: u8,
+        data: Vec<u8>,
+        answer: mpsc::Sender<UsbResult<usize>>,
+    },
+    /// Submit IN transfer. Channel will be notified on completion.
+    SubmitInTransfer {
+        generation: u32,
+        ep: u8,
+        length: usize,
+        answer: std::sync::Arc<InTransferWaiter>,
+    },
+    /// Send a bus reset to the device.
+    Reset,
+    /// Suspend the device.
+    Suspend,
+    /// Resume the device.
+    Resume,
+}
+
+/// Minimal virtual USB host to drive the QEMU usbdev.
+pub struct QemuUsbHost {
+    /// Sender to notify the virtual host thread of various events
+    /// from the otlib side.
+    host_channel: mpsc::Sender<HostChannelEvent>,
+}
+
+impl QemuUsbHost {
+    pub fn new(usbdev: TTYPort) -> QemuUsbHost {
+        let (send, recv) = mpsc::channel();
+        let send_thread = send.clone();
+        thread::spawn(move || {
+            let mut host_thread = QemuHostThread::new(usbdev, send_thread, recv);
+            if let Err(UsbError::Other(err)) = host_thread.run() {
+                log::error!("QEMU USB host failed with error: {err:?}");
+            };
+        });
+
+        QemuUsbHost { host_channel: send }
+    }
+
+    /// Try to obtain information about the QEMU device connected.
+    /// This is non-blocking.
+    fn device_info(&self) -> UsbResult<Option<DeviceInfo>> {
+        let (send, recv) = mpsc::channel();
+        self.host_channel
+            .send(HostChannelEvent::GetDeviceInfo { answer: send })?;
+        Ok(recv.recv()?)
+    }
+
+    /// Wait for a device change or a timeout. Return an error if no
+    /// changes occurred within the time limit.
+    fn wait_device_change(&self, timeout: Duration) -> UsbResult<Option<DeviceInfo>> {
+        let (send, recv) = mpsc::channel();
+        self.host_channel
+            .send(HostChannelEvent::NotifyDeviceChange { answer: send })?;
+        Ok(recv.recv_timeout(timeout)?)
+    }
+
+    fn device_matches_filter(
+        &self,
+        device: &QemuUsbDevice,
+        usb_vid_pid: Option<(u16, u16)>,
+        usb_protocol: Option<(u8, u8, u8)>,
+        usb_serial: Option<&str>,
+    ) -> UsbResult<bool> {
+        // Parsing cannot fail because it was parsed during enumeration.
+        if let Some((usb_vid, usb_pid)) = usb_vid_pid
+            && (device.get_vendor_id() != usb_vid || device.get_product_id() != usb_pid)
+        {
+            return Ok(false);
+        }
+
+        if let Some((class, subclass, protocol)) = usb_protocol {
+            // Failure should never occur to get the active descriptor since
+            // it is cached.
+            let config = device.active_configuration()?;
+            let mut found = false;
+            for intf in config.interface_alt_settings() {
+                if let Ok(desc) = intf.descriptor()
+                    && desc.class == class
+                    && desc.subclass == subclass
+                    && desc.protocol == protocol
+                {
+                    found = true;
+                }
+            }
+            if !found {
+                return Ok(false);
+            }
+        }
+
+        if let Some(_usb_serial) = usb_serial {
+            log::error!("matching by serial number is not implemented yet");
+        }
+        Ok(true)
+    }
+
+    fn device_by_filter_with_timeout(
+        &self,
+        usb_vid_pid: Option<(u16, u16)>,
+        usb_protocol: Option<(u8, u8, u8)>,
+        usb_serial: Option<&str>,
+        timeout: Duration,
+    ) -> anyhow::Result<Box<dyn UsbDevice>> {
+        let deadline = Instant::now() + timeout;
+        let mut cur_dev_info = self.device_info()?;
+
+        loop {
+            if let Some(dev_info) = cur_dev_info.take() {
+                let dev = QemuUsbDevice::new(self, dev_info);
+                match self.device_matches_filter(&dev, usb_vid_pid, usb_protocol, usb_serial) {
+                    Ok(true) => return Ok(Box::new(dev)),
+                    Ok(false) => (),
+                    Err(err) => {
+                        log::error!("{err:?}");
+                    }
+                }
+            }
+            let now = Instant::now();
+            if now > deadline {
+                return Err(anyhow!("no device found"));
+            }
+            // If the device did not match our expectation, wait until
+            // a new device shows up.
+            log::info!("wait for device change");
+            cur_dev_info = self.wait_device_change(deadline - now)?;
+        }
+    }
+}
+
+impl OtUsbContext for QemuUsbHost {
+    fn device_by_id_with_timeout(
+        &self,
+        usb_vid: u16,
+        usb_pid: u16,
+        usb_serial: Option<&str>,
+        timeout: Duration,
+    ) -> anyhow::Result<Box<dyn UsbDevice>> {
+        self.device_by_filter_with_timeout(Some((usb_vid, usb_pid)), None, usb_serial, timeout)
+    }
+
+    fn device_by_interface_with_timeout(
+        &self,
+        class: u8,
+        subclass: u8,
+        protocol: u8,
+        usb_serial: Option<&str>,
+        timeout: Duration,
+    ) -> anyhow::Result<Box<dyn UsbDevice>> {
+        self.device_by_filter_with_timeout(
+            None,
+            Some((class, subclass, protocol)),
+            usb_serial,
+            timeout,
+        )
+    }
+}
+
+#[derive(Debug)]
+struct QemuUsbDevice {
+    dev_info: DeviceInfo,
+    /// Active configuration *index*.
+    active_cfg_idx: usize,
+    timeout: Duration,
+    host_channel: mpsc::Sender<HostChannelEvent>,
+}
+
+impl QemuUsbDevice {
+    fn new(host: &QemuUsbHost, dev_info: DeviceInfo) -> Self {
+        QemuUsbDevice {
+            dev_info,
+            // The host always set the first available configuration.
+            active_cfg_idx: 0,
+            // Operations should be reasonably fast with QEMU.
+            timeout: Duration::from_secs(5),
+            host_channel: host.host_channel.clone(),
+        }
+    }
+}
+
+impl UsbDevice for QemuUsbDevice {
+    fn get_parent(&self) -> anyhow::Result<Box<dyn UsbDevice>> {
+        Ok(Box::new(QemuUsbHub::new(self.host_channel.clone())))
+    }
+
+    fn get_vendor_id(&self) -> u16 {
+        // This cannot fail, the device descriptor was parsed during enumeration.
+        desc::DeviceDescriptor::ref_from_bytes(&self.dev_info.dev_desc)
+            .unwrap()
+            .vendor_id
+            .into()
+    }
+
+    /// Return the PID of the device.
+    fn get_product_id(&self) -> u16 {
+        // This cannot fail, the device descriptor was parsed during enumeration.
+        desc::DeviceDescriptor::ref_from_bytes(&self.dev_info.dev_desc)
+            .unwrap()
+            .product_id
+            .into()
+    }
+
+    /// Gets the serial number of the device.
+    fn get_serial_number(&self) -> Option<&str> {
+        // TODO
+        None
+    }
+
+    /// Set the active configuration.
+    fn set_active_configuration(&self, config: u8) -> anyhow::Result<()> {
+        let _ = self
+            .write_control(
+                USB_REQ_TYPE_OUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                USB_SET_CONFIGURATION,
+                config as u16,
+                0,
+                &[],
+            )
+            .context(format!("failed to set active configuration {config}"))?;
+        Ok(())
+    }
+
+    /// Claim an interface for use with the kernel.
+    fn claim_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Release a previously claimed interface to the kernel.
+    fn release_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Set an interface alternate setting.
+    fn set_alternate_setting(&self, iface: u8, setting: u8) -> anyhow::Result<()> {
+        // TODO validate setting with the configuration
+        let _ = self
+            .write_control(
+                USB_REQ_TYPE_OUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_INTF,
+                USB_SET_INTERFACE,
+                setting as u16,
+                iface as u16,
+                &[],
+            )
+            .context(format!("failed to set interface {iface} setting {setting}"))?;
+        Ok(())
+    }
+
+    /// Check whether a kernel driver currently controls the device.
+    fn kernel_driver_active(&self, _iface: u8) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+
+    /// Detach the kernel driver from the device.
+    fn detach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Attach the kernel driver to the device.
+    fn attach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn device_descriptor(&self) -> desc::Device<'_> {
+        desc::Device::new(&self.dev_info.dev_desc)
+    }
+
+    /// Return the currently active configuration's descriptor.
+    fn active_configuration(&self) -> anyhow::Result<desc::Configuration<'_>> {
+        Ok(desc::Configuration::new(
+            &self.dev_info.configurations[self.active_cfg_idx],
+        ))
+    }
+
+    /// Return the device's bus number.
+    fn bus_number(&self) -> u8 {
+        0
+    }
+
+    fn address(&self) -> u8 {
+        self.dev_info.address
+    }
+
+    /// Return the sequence of port numbers from the root down to the device.
+    fn port_numbers(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(vec![0])
+    }
+
+    /// Return a string descriptor in ASCII.
+    fn read_string_descriptor_ascii(&self, idx: u8) -> anyhow::Result<String> {
+        let mut buf = [0u8; 256];
+        let len = self.read_control(
+            USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+            USB_GET_DESCRIPTOR,
+            (3u16 << 8) | (idx as u16),
+            0x0409,
+            &mut buf,
+        )?;
+        anyhow::ensure!(len >= 2 && buf[1] == 3, "invalid string descriptor");
+        let str_len = std::cmp::min(len, buf[0] as usize);
+        let u16_words: Vec<u16> = buf[2..str_len]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        Ok(String::from_utf16_lossy(&u16_words))
+    }
+
+    /// Reset the device.
+    ///
+    /// Note that this UsbDevice handle will most likely become invalid
+    /// after resetting the device and a new one has to be obtained.
+    fn reset(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Reset)
+            .context("failed to send RESET")
+    }
+
+    fn suspend(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Suspend)
+            .context("failed to send SUSPEND")
+    }
+
+    fn resume(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Resume)
+            .context("failed to send RESUME")
+    }
+
+    /// Get the default timeout for operations.
+    fn get_timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    /// Issue a USB control request with optional host-to-device data.
+    fn write_control_timeout(
+        &self,
+        request_type: u8,
+        request: u8,
+        value: u16,
+        index: u16,
+        buf: &[u8],
+        timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let length: u16 = buf
+            .len()
+            .try_into()
+            .context("buffer too large for control transfer")?;
+        self.host_channel
+            .send(HostChannelEvent::SendSetup {
+                generation: self.dev_info.generation,
+                ep: 0,
+                setup: [
+                    request_type,
+                    request,
+                    value as u8,
+                    (value >> 8) as u8,
+                    index as u8,
+                    (index >> 8) as u8,
+                    length as u8,
+                    (length >> 8) as u8,
+                ],
+            })
+            .context("failed to send SETUP packet")?;
+        // Optional data stage.
+        let sent_length = if length > 0 {
+            let (send, recv) = mpsc::channel();
+            self.host_channel
+                .send(HostChannelEvent::SubmitOutTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    data: buf.to_vec(),
+                    answer: send,
+                })
+                .context("failed to submit OUT transfer for control data stage")?;
+            recv.recv_timeout(timeout)??
+        } else {
+            0
+        };
+        // Status stage.
+        let waiter = InTransferWaiter::new();
+        self.host_channel
+            .send(HostChannelEvent::SubmitInTransfer {
+                generation: self.dev_info.generation,
+                ep: 0,
+                length: 0,
+                answer: std::sync::Arc::clone(&waiter),
+            })
+            .context("failed to submit IN transfer for control status stage")?;
+        let _ = waiter.wait_timeout(timeout)??;
+        Ok(sent_length)
+    }
+
+    /// Issue a USB control request with optional device-to-host data.
+    fn read_control_timeout(
+        &self,
+        request_type: u8,
+        request: u8,
+        value: u16,
+        index: u16,
+        buf: &mut [u8],
+        timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let length: u16 = buf
+            .len()
+            .try_into()
+            .context("buffer too large for control transfer")?;
+        self.host_channel
+            .send(HostChannelEvent::SendSetup {
+                generation: self.dev_info.generation,
+                ep: 0,
+                setup: [
+                    request_type,
+                    request,
+                    value as u8,
+                    (value >> 8) as u8,
+                    index as u8,
+                    (index >> 8) as u8,
+                    length as u8,
+                    (length >> 8) as u8,
+                ],
+            })
+            .context("failed to send SETUP packet")?;
+        // Optional data stage.
+        let recv_size = if length > 0 {
+            let waiter = InTransferWaiter::new();
+            self.host_channel
+                .send(HostChannelEvent::SubmitInTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    length: buf.len(),
+                    answer: std::sync::Arc::clone(&waiter),
+                })
+                .context("failed to submit IN transfer for control data stage")?;
+            let recv_data = waiter.wait_timeout(timeout)??;
+            assert!(recv_data.len() <= buf.len());
+            buf[0..recv_data.len()].copy_from_slice(&recv_data);
+            recv_data.len()
+        } else {
+            0
+        };
+        // Status stage: OUT if there was an IN data stage (length > 0), IN if no-data control (length == 0).
+        if length > 0 {
+            let (send, recv) = mpsc::channel();
+            self.host_channel
+                .send(HostChannelEvent::SubmitOutTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    data: vec![],
+                    answer: send,
+                })
+                .context("failed to submit OUT transfer for control status stage")?;
+            let _ = recv.recv_timeout(timeout)??;
+        } else {
+            let waiter = InTransferWaiter::new();
+            self.host_channel
+                .send(HostChannelEvent::SubmitInTransfer {
+                    generation: self.dev_info.generation,
+                    ep: 0,
+                    length: 0,
+                    answer: std::sync::Arc::clone(&waiter),
+                })
+                .context("failed to submit IN transfer for no-data control status stage")?;
+            let _ = waiter.wait_timeout(timeout)??;
+        }
+        Ok(recv_size)
+    }
+
+    /// Read bulk data bytes to given USB endpoint.
+    fn read_bulk_timeout(
+        &self,
+        endpoint: u8,
+        data: &mut [u8],
+        timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let ep = endpoint & !USBDEV_TRANSFER_EP_IN;
+        let waiter = InTransferWaiter::new();
+        self.host_channel
+            .send(HostChannelEvent::SubmitInTransfer {
+                generation: self.dev_info.generation,
+                ep,
+                length: data.len(),
+                answer: std::sync::Arc::clone(&waiter),
+            })
+            .context("failed to submit IN transfer for bulk read")?;
+        let recv_data = waiter.wait_timeout(timeout)??;
+        let copy_len = std::cmp::min(data.len(), recv_data.len());
+        data[..copy_len].copy_from_slice(&recv_data[..copy_len]);
+        Ok(copy_len)
+    }
+
+    /// Write bulk data bytes to given USB endpoint.
+    fn write_bulk_timeout(
+        &self,
+        endpoint: u8,
+        data: &[u8],
+        timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let ep = endpoint & !USBDEV_TRANSFER_EP_IN;
+        let (send, recv) = mpsc::channel();
+        self.host_channel
+            .send(HostChannelEvent::SubmitOutTransfer {
+                generation: self.dev_info.generation,
+                ep,
+                data: data.to_vec(),
+                answer: send,
+            })
+            .context("failed to submit OUT transfer for bulk write")?;
+        let sent_size = recv.recv_timeout(timeout)??;
+        Ok(sent_size)
+    }
+}
+
+/// Virtual USB hub parent device for QEMU USBDEV.
+pub struct QemuUsbHub {
+    host_channel: mpsc::Sender<HostChannelEvent>,
+    port_status: std::cell::Cell<u16>,
+}
+
+const HUB_DEVICE_DESC: [u8; 18] = [
+    18, // bLength
+    1,  // bDescriptorType (Device)
+    0x00, 0x02, // bcdUSB (2.00)
+    9,    // bDeviceClass (LIBUSB_CLASS_HUB)
+    0,    // bDeviceSubClass
+    0,    // bDeviceProtocol
+    64,   // bMaxPacketSize0
+    0x6b, 0x1d, // idVendor (Linux Foundation)
+    0x02, 0x00, // idProduct
+    0x00, 0x01, // bcdDevice
+    0,    // iManufacturer
+    0,    // iProduct
+    0,    // iSerialNumber
+    1,    // bNumConfigurations
+];
+
+impl QemuUsbHub {
+    fn new(host_channel: mpsc::Sender<HostChannelEvent>) -> Self {
+        Self {
+            host_channel,
+            port_status: std::cell::Cell::new(0x0103),
+        }
+    }
+}
+
+impl UsbDevice for QemuUsbHub {
+    fn get_parent(&self) -> anyhow::Result<Box<dyn UsbDevice>> {
+        Err(anyhow!("this is the root USB device"))
+    }
+
+    fn get_vendor_id(&self) -> u16 {
+        0x1d6b
+    }
+
+    fn get_product_id(&self) -> u16 {
+        0x0002
+    }
+
+    fn get_serial_number(&self) -> Option<&str> {
+        None
+    }
+
+    fn set_active_configuration(&self, _config: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn claim_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn release_interface(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn set_alternate_setting(&self, _iface: u8, _setting: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn kernel_driver_active(&self, _iface: u8) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+
+    fn detach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn attach_kernel_driver(&self, _iface: u8) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn device_descriptor(&self) -> desc::Device<'_> {
+        desc::Device::new(&HUB_DEVICE_DESC)
+    }
+
+    fn active_configuration(&self) -> anyhow::Result<desc::Configuration<'_>> {
+        anyhow::bail!("active_configuration not supported on QemuUsbHub")
+    }
+
+    fn bus_number(&self) -> u8 {
+        0
+    }
+
+    fn address(&self) -> u8 {
+        1
+    }
+
+    fn port_numbers(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(vec![])
+    }
+
+    fn read_string_descriptor_ascii(&self, _idx: u8) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
+    fn reset(&self) -> anyhow::Result<()> {
+        self.host_channel
+            .send(HostChannelEvent::Reset)
+            .context("failed to send RESET")
+    }
+
+    fn get_timeout(&self) -> Duration {
+        Duration::from_secs(1)
+    }
+
+    fn write_control_timeout(
+        &self,
+        _request_type: u8,
+        request: u8,
+        value: u16,
+        _index: u16,
+        _buf: &[u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        // Standard USB Hub port feature selectors (USB 2.0 Spec Table 11-17):
+        // PORT_SUSPEND = 2, PORT_RESET = 4, PORT_POWER = 8
+        // LIBUSB_REQUEST_CLEAR_FEATURE = 1, LIBUSB_REQUEST_SET_FEATURE = 3
+        let set_feature = request == 3;
+        let mask = 1u16.checked_shl(value as u32).unwrap_or(0);
+        if set_feature {
+            self.port_status.set(self.port_status.get() | mask);
+        } else {
+            self.port_status.set(self.port_status.get() & !mask);
+        }
+        match (value, set_feature) {
+            (2, true) => self
+                .host_channel
+                .send(HostChannelEvent::Suspend)
+                .context("failed to send SUSPEND")?,
+            (2, false) => self
+                .host_channel
+                .send(HostChannelEvent::Resume)
+                .context("failed to send RESUME")?,
+            (4, true) => self
+                .host_channel
+                .send(HostChannelEvent::Reset)
+                .context("failed to send RESET")?,
+            _ => {}
+        }
+        Ok(0)
+    }
+
+    fn read_control_timeout(
+        &self,
+        _request_type: u8,
+        _request: u8,
+        _value: u16,
+        _index: u16,
+        buf: &mut [u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        let status = self.port_status.get().to_le_bytes();
+        let copy_len = std::cmp::min(buf.len(), 4);
+        let bytes = [status[0], status[1], 0, 0];
+        buf[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        Ok(copy_len)
+    }
+
+    fn read_bulk_timeout(
+        &self,
+        _endpoint: u8,
+        _data: &mut [u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        anyhow::bail!("read_bulk_timeout not supported on QemuUsbHub")
+    }
+
+    fn write_bulk_timeout(
+        &self,
+        _endpoint: u8,
+        _data: &[u8],
+        _timeout: Duration,
+    ) -> anyhow::Result<usize> {
+        anyhow::bail!("write_bulk_timeout not supported on QemuUsbHub")
+    }
+}
+
+/// USBDEV Command, see QEMU documentation.
+#[repr(u32)]
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum QemuUsbdevCmd {
+    Invalid = 0,
+    Hello = 1,
+    VbusOn = 2,
+    VbusOff = 3,
+    Connect = 4,
+    Disconnect = 5,
+    Reset = 6,
+    Resume = 7,
+    Suspend = 8,
+    Setup = 9,
+    Transfer = 10,
+    Complete = 11,
+    Cancel = 12,
+}
+
+impl From<QemuUsbdevCmd> for u32 {
+    fn from(v: QemuUsbdevCmd) -> u32 {
+        v as u32
+    }
+}
+
+impl TryFrom<u32> for QemuUsbdevCmd {
+    type Error = anyhow::Error;
+    fn try_from(v: u32) -> anyhow::Result<Self> {
+        match v {
+            0 => Ok(Self::Invalid),
+            1 => Ok(Self::Hello),
+            2 => Ok(Self::VbusOn),
+            3 => Ok(Self::VbusOff),
+            4 => Ok(Self::Connect),
+            5 => Ok(Self::Disconnect),
+            6 => Ok(Self::Reset),
+            7 => Ok(Self::Resume),
+            8 => Ok(Self::Suspend),
+            9 => Ok(Self::Setup),
+            10 => Ok(Self::Transfer),
+            11 => Ok(Self::Complete),
+            12 => Ok(Self::Cancel),
+            _ => Err(anyhow!("Invalid QemuUsbdevCmd: {v}")),
+        }
+    }
+}
+
+/// USBDEV packet header, see QEMU documentation.
+#[derive(Clone, FromBytes, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevPacketHeader {
+    command: little_endian::U32,
+    size: little_endian::U32,
+    id: little_endian::U32,
+}
+
+/// USBDEV hello payload, see QEMU documentation.
+#[derive(Clone, IntoBytes, FromBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevHelloPayload {
+    magic: [u8; 4],
+    major_version: little_endian::U16,
+    minor_version: little_endian::U16,
+}
+
+/// USBDEV setup payload, see QEMU documentation.
+#[derive(Clone, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevSetupPayload {
+    address: u8,
+    endpoint: u8,
+    reserved: [u8; 2],
+    setup: [u8; 8],
+}
+
+/// USBDEV transfer flags, see QEMU documentation.
+#[repr(u8)]
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum QemuUsbdevTransferFlags {
+    Zlp = 1 << 0,
+}
+
+impl From<QemuUsbdevTransferFlags> for u8 {
+    fn from(v: QemuUsbdevTransferFlags) -> u8 {
+        v as u8
+    }
+}
+
+/// USBDEV transfer payload, see QEMU documentation.
+#[derive(Clone, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevTransferPayload {
+    address: u8,
+    endpoint: u8,
+    max_packet_size: little_endian::U16,
+    flags: u8,
+    reserved: [u8; 3],
+    transfer_size: little_endian::U32,
+}
+
+/// USBDEV transfer status, see QEMU documentation.
+#[repr(u8)]
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum QemuUsbdevTransferStatus {
+    Success = 0,
+    Stalled = 1,
+    Cancelled = 2,
+    Error = 3,
+}
+
+impl TryFrom<u8> for QemuUsbdevTransferStatus {
+    type Error = anyhow::Error;
+    fn try_from(v: u8) -> anyhow::Result<Self> {
+        match v {
+            0 => Ok(Self::Success),
+            1 => Ok(Self::Stalled),
+            2 => Ok(Self::Cancelled),
+            3 => Ok(Self::Error),
+            _ => Err(anyhow!("Invalid QemuUsbdevTransferStatus: {v}")),
+        }
+    }
+}
+
+/// USBDEV complete payload, see QEMU documentation.
+#[derive(Clone, FromBytes, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevCompletePayload {
+    status: u8,
+    reserved: [u8; 3],
+    xfer_size: little_endian::U32,
+}
+
+/// USBDEV cancel payload, see QEMU documentation.
+#[derive(Clone, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+pub struct QemuUsbdevCancelPayload {
+    transfer_id: little_endian::U32,
+}
+
+/// Represents a packet ID.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+struct PacketId(u32);
+
+/// This structure records an event received from QEMU on the chardev.
+/// It only parses the packet header and passes the rest of the payload
+/// as-is.
+#[derive(Debug)]
+struct QemuUsbdevEvent {
+    cmd: QemuUsbdevCmd,
+    id: PacketId,
+    data: Vec<u8>,
+}
+
+/// This structure records a complete event received from QEMU on the chardev.
+/// The complete payload is parsed and the received data is stored as-is.
+#[derive(Debug)]
+struct QemuUsbdevCompleteEvent {
+    id: PacketId,
+    status: QemuUsbdevTransferStatus,
+    // Temporary until we have a more complete stack that uses this field.
+    #[allow(dead_code)]
+    xfer_size: u32,
+    data: Vec<u8>,
+}
+
+/// Standard USB Setup packet.
+#[derive(Clone, IntoBytes, KnownLayout, Immutable, Unaligned)]
+#[repr(C)]
+struct UsbSetupPacket {
+    req_type: u8,
+    request: u8,
+    value: little_endian::U16,
+    index: little_endian::U16,
+    length: little_endian::U16,
+}
+
+#[derive(Error, Debug)]
+enum UsbError {
+    /// Shutdown was requested.
+    #[error("USB host was told to shutdown")]
+    Shutdown,
+    /// Device disconnected.
+    #[error("USB device was disconnected")]
+    Disconnected,
+    /// Operation timed out
+    #[error("Operation timed out")]
+    Timeout,
+    /// Transfer failed.
+    #[error("USB transfer failed with error {0:?}, context is {1:?}")]
+    TransferFailed(QemuUsbdevTransferStatus, anyhow::Error),
+    /// Other error not worth tracking precisely.
+    #[error("{0:?}")]
+    Other(#[from] anyhow::Error),
+}
+
+/// Error type used when waiting for a specific QEMU event
+/// that could get interrupted in some way.
+type UsbResult<T> = Result<T, UsbError>;
+
+trait UsbContext<T, E> {
+    fn maybe_context<C>(self, context: C) -> Result<T, E>
+    where
+        C: std::fmt::Display + Send + Sync + 'static;
+}
+
+impl<T> UsbContext<T, UsbError> for UsbResult<T> {
+    fn maybe_context<C>(self, ctx: C) -> UsbResult<T>
+    where
+        C: std::fmt::Display + Send + Sync + 'static,
+    {
+        let Err(err) = self else { return self };
+        Err(match err {
+            UsbError::TransferFailed(status, err) => {
+                UsbError::TransferFailed(status, err.context(ctx))
+            }
+            UsbError::Other(err) => UsbError::Other(err.context(ctx)),
+            err => err,
+        })
+    }
+}
+
+impl From<mpsc::SendError<HostChannelEvent>> for UsbError {
+    fn from(_value: mpsc::SendError<HostChannelEvent>) -> UsbError {
+        UsbError::Shutdown
+    }
+}
+
+impl From<mpsc::RecvError> for UsbError {
+    fn from(_value: mpsc::RecvError) -> UsbError {
+        UsbError::Shutdown
+    }
+}
+
+impl From<mpsc::RecvTimeoutError> for UsbError {
+    fn from(value: mpsc::RecvTimeoutError) -> UsbError {
+        match value {
+            mpsc::RecvTimeoutError::Timeout => UsbError::Timeout,
+            mpsc::RecvTimeoutError::Disconnected => UsbError::Shutdown,
+        }
+    }
+}
+
+/// This structure represents an enumerated and configured device.
+#[derive(Clone, Debug)]
+// Temporary until we have a more complete stack that uses this field.
+#[allow(dead_code)]
+struct DeviceInfo {
+    dev_desc: Vec<u8>,
+    address: u8,
+    configurations: Vec<Vec<u8>>,
+    /// The generation increases one each disconnect, to distinguish
+    /// devices which may disconnect and reconnect.
+    generation: u32,
+}
+
+/// This structure represents an enumerated and configured device.
+#[derive(Clone, Debug)]
+struct ControlIn {
+    addr: u8,
+    ep: u8,
+    req_type: u8,
+    req: u8,
+    value: u16,
+    index: u16,
+    length: usize,
+    max_pkt_size: u16,
+}
+
+/// This structure represents an enumerated and configured device.
+#[derive(Clone, Debug)]
+struct ControlOut<'a> {
+    addr: u8,
+    ep: u8,
+    req_type: u8,
+    req: u8,
+    value: u16,
+    index: u16,
+    max_pkt_size: u16,
+    data: &'a [u8],
+}
+
+/// This structure holds the state of the USB host thread.
+struct QemuHostThread {
+    /// Communication channel to QEMU USBDEV.
+    usbdev: TTYPort,
+    /// Channel to receive/send events from otlib and reader.
+    channel_recv: mpsc::Receiver<HostChannelEvent>,
+    channel_send: mpsc::Sender<HostChannelEvent>,
+    /// Next ID.
+    next_id: u32,
+    /// List of pending channels that should be notified on a
+    /// device change.
+    pending_dev_changes: Vec<mpsc::Sender<Option<DeviceInfo>>>,
+    /// Pending IN transfers.
+    pending_in_transfers: HashMap<PacketId, (u8, std::sync::Arc<InTransferWaiter>)>,
+    /// Active IN transfer ID per endpoint index.
+    active_ep_in: HashMap<u8, PacketId>,
+    /// Completed IN transfer buffered when caller timed out before completion arrived.
+    completed_ep_in: HashMap<u8, UsbResult<Vec<u8>>>,
+    /// Pending Out transfers.
+    pending_out_transfers: HashMap<PacketId, mpsc::Sender<UsbResult<usize>>>,
+}
+
+impl QemuHostThread {
+    const USBDEV_HELLO_MAGIC: [u8; 4] = *b"UDCX";
+    const USBDEV_HELLO_MAJOR: u16 = 1;
+    const USBDEV_HELLO_MINOR: u16 = 0;
+
+    // How much time to wait after a SET_ADDRESS before moving on
+    // to the rest of the enumeration sequence.
+    // The specification requires that the device be ready after 2ms
+    // but there is no guarantee that QEMU is running at a similiar
+    // speed as the host so this delay is quite conservative.
+    const SET_ADDRESS_WAIT_DELAY_MS: u64 = 10;
+
+    fn new(
+        usbdev: TTYPort,
+        channel_send: mpsc::Sender<HostChannelEvent>,
+        channel_recv: mpsc::Receiver<HostChannelEvent>,
+    ) -> Self {
+        QemuHostThread {
+            usbdev,
+            channel_recv,
+            channel_send,
+            next_id: 0,
+            pending_dev_changes: Vec::new(),
+            pending_in_transfers: HashMap::new(),
+            active_ep_in: HashMap::new(),
+            completed_ep_in: HashMap::new(),
+            pending_out_transfers: HashMap::new(),
+        }
+    }
+
+    /// Send a message to the QEMU USBDEV driver. On success, return the ID
+    /// of the packet.
+    fn blocking_write_all<T: Write>(write: &mut T, buf: &[u8]) -> anyhow::Result<()> {
+        let mut pos = 0usize;
+        while pos < buf.len() {
+            match write.write(&buf[pos..]) {
+                Ok(amount) => pos += amount,
+                Err(err)
+                    if err.kind() == std::io::ErrorKind::TimedOut
+                        || err.kind() == std::io::ErrorKind::WouldBlock
+                        || err.kind() == std::io::ErrorKind::Interrupted =>
+                {
+                    continue;
+                }
+                err => {
+                    err?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn send_packet(&mut self, cmd: QemuUsbdevCmd, data: &[&[u8]]) -> UsbResult<PacketId> {
+        let tot_len: usize = data.as_ref().iter().map(|data| data.len()).sum();
+        let hdr = QemuUsbdevPacketHeader {
+            command: u32::from(cmd).into(),
+            size: (tot_len as u32).into(),
+            id: self.next_id.into(),
+        };
+
+        let pkt_id = self.next_id;
+        self.next_id += 1;
+
+        Self::blocking_write_all(&mut self.usbdev, hdr.as_bytes())
+            .context("Failed to write packet header to usbdev tty")?;
+        for data in data {
+            Self::blocking_write_all(&mut self.usbdev, data)
+                .context("Failed to write packet data to usbdev tty")?;
+        }
+        self.usbdev.flush().context("Failed to flush usbdev tty")?;
+        Ok(PacketId(pkt_id))
+    }
+
+    /// Send a Hello command and return the ID.
+    fn send_hello(&mut self) -> UsbResult<PacketId> {
+        let hello = QemuUsbdevHelloPayload {
+            magic: Self::USBDEV_HELLO_MAGIC,
+            major_version: Self::USBDEV_HELLO_MAJOR.into(),
+            minor_version: Self::USBDEV_HELLO_MINOR.into(),
+        };
+
+        self.send_packet(QemuUsbdevCmd::Hello, &[hello.as_bytes()])
+    }
+
+    /// Send a Setup command and return the ID.
+    fn send_setup(&mut self, addr: u8, ep: u8, setup: &[u8; 8]) -> UsbResult<PacketId> {
+        let setup_cmd = QemuUsbdevSetupPayload {
+            address: addr,
+            endpoint: ep,
+            reserved: [0u8; 2],
+            setup: *setup,
+        };
+        self.send_packet(QemuUsbdevCmd::Setup, &[setup_cmd.as_bytes()])
+    }
+
+    /// Send a Transfer command and return the ID.
+    fn send_transfer_internal(
+        &mut self,
+        addr: u8,
+        ep: u8,
+        flags: u8,
+        max_pkt_size: u16,
+        transfer_size: u32,
+        data: &[u8],
+    ) -> UsbResult<PacketId> {
+        let xfer_cmd = QemuUsbdevTransferPayload {
+            address: addr,
+            endpoint: ep,
+            max_packet_size: max_pkt_size.into(),
+            flags,
+            reserved: [0u8; 3],
+            transfer_size: transfer_size.into(),
+        };
+
+        self.send_packet(QemuUsbdevCmd::Transfer, &[xfer_cmd.as_bytes(), data])
+    }
+
+    fn _send_cancel(&mut self, xfer_id: PacketId) -> UsbResult<PacketId> {
+        let cancel_cmd = QemuUsbdevCancelPayload {
+            transfer_id: xfer_id.0.into(),
+        };
+
+        self.send_packet(QemuUsbdevCmd::Cancel, &[cancel_cmd.as_bytes()])
+    }
+
+    /// Helper function to send a Transfer IN command and return the ID.
+    fn send_transfer_in(
+        &mut self,
+        addr: u8,
+        ep: u8,
+        max_pkt_size: u16,
+        transfer_size: usize,
+    ) -> UsbResult<PacketId> {
+        self.send_transfer_internal(
+            addr,
+            ep | USBDEV_TRANSFER_EP_IN,
+            /* flags */ 0,
+            max_pkt_size,
+            transfer_size as u32,
+            &[],
+        )
+    }
+
+    /// Helper function to send a Transfer OUT command and return the ID.
+    fn send_transfer_out(
+        &mut self,
+        addr: u8,
+        ep: u8,
+        zlp: bool,
+        max_pkt_size: u16,
+        data: &[u8],
+    ) -> UsbResult<PacketId> {
+        let flags: u8 = if zlp {
+            QemuUsbdevTransferFlags::Zlp.into()
+        } else {
+            0
+        };
+        self.send_transfer_internal(addr, ep, flags, max_pkt_size, data.len() as u32, data)
+    }
+
+    /// Send a Setup command followed by a Transfer IN command of the requested length.
+    /// Return the ID of the expected Complete event corresponding to the data IN.
+    fn send_control_in(&mut self, control: &ControlIn) -> UsbResult<PacketId> {
+        let setup = UsbSetupPacket {
+            req_type: control.req_type,
+            request: control.req,
+            value: control.value.into(),
+            index: control.index.into(),
+            length: u16::try_from(control.length)
+                .context("control IN length does not fit in 16 bits")?
+                .into(),
+        };
+        let _ = self
+            .send_setup(
+                control.addr,
+                control.ep,
+                setup.as_bytes().try_into().unwrap(),
+            )
+            .maybe_context("Failed to send SETUP for control in")?;
+        self.send_transfer_in(
+            control.addr,
+            control.ep,
+            control.max_pkt_size,
+            control.length,
+        )
+    }
+
+    /// Send a Setup command followed by a Transfer OUT command of the required length.
+    /// Return the ID of the expected Complete event corresponding to the data OUT, or
+    /// None if there is no data stage.
+    fn send_control_out<'a>(&mut self, control: &ControlOut<'a>) -> UsbResult<Option<PacketId>> {
+        let setup = UsbSetupPacket {
+            req_type: control.req_type,
+            request: control.req,
+            value: control.value.into(),
+            index: control.index.into(),
+            length: u16::try_from(control.data.len())
+                .context("control OUT length does not fit in 16 bits")?
+                .into(),
+        };
+        let _ = self
+            .send_setup(
+                control.addr,
+                control.ep,
+                setup.as_bytes().try_into().unwrap(),
+            )
+            .maybe_context("Failed to send SETUP for control in")?;
+        if control.data.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(self.send_transfer_out(
+            control.addr,
+            control.ep,
+            /* zlp */ false,
+            control.max_pkt_size,
+            control.data,
+        )?))
+    }
+
+    /// Wait for a QEMU command and return its payload. Return an error if something goes
+    /// wrong. Other requests will be handled assuming the context of a device enumerating.
+    fn wait_qemu_event(&mut self) -> UsbResult<QemuUsbdevEvent> {
+        loop {
+            let Ok(event) = self.channel_recv.recv() else {
+                return Err(UsbError::Shutdown);
+            };
+            match event {
+                HostChannelEvent::QemuMessage { cmd, id, data } => {
+                    let cmd = QemuUsbdevCmd::try_from(cmd)
+                        .with_context(|| format!("Unknown command {cmd} from USBDEV"))?;
+                    return Ok(QemuUsbdevEvent {
+                        cmd,
+                        id: PacketId(id),
+                        data,
+                    });
+                }
+                HostChannelEvent::GetDeviceInfo { answer } => {
+                    // There is no device connected. Ignore errors (ie the other end disconnected).
+                    let _ = answer.send(None);
+                }
+                HostChannelEvent::NotifyDeviceChange { answer } => {
+                    self.pending_dev_changes.push(answer)
+                }
+                _ => {
+                    log::error!("ignore unexpected message during enumeration: {event:?}")
+                }
+            }
+        }
+    }
+
+    /// Wait for a HELLO packet and return the payload. Return an error if something goes
+    /// wrong or an unexpected packet is received.
+    fn wait_hello(&mut self, expected_id: PacketId) -> UsbResult<QemuUsbdevHelloPayload> {
+        let QemuUsbdevEvent { cmd, id, data } = self.wait_qemu_event()?;
+        if cmd != QemuUsbdevCmd::Hello {
+            Err(anyhow!("Expected a HELLO event, got {cmd:?}"))?;
+        }
+        if id != expected_id {
+            Err(anyhow!("Expected HELLO with {expected_id:?}, got {id:?}"))?;
+        }
+        let (payload, data) = QemuUsbdevHelloPayload::read_from_prefix(&data)
+            .map_err(|err| anyhow!("{err:?}"))
+            .context("Could not parse HELLO payload")?;
+        if !data.is_empty() {
+            Err(anyhow!(
+                "HELLO payload is larger than expected by {} bytes",
+                data.len()
+            ))?;
+        }
+        if payload.magic != Self::USBDEV_HELLO_MAGIC {
+            Err(anyhow!(
+                "HELLO payload has the wrong magic bytes: {:?}",
+                payload.magic
+            ))?;
+        }
+        Ok(payload)
+    }
+
+    /// Wait for a CONNECT packet and return the ID. Return an error if something goes
+    /// wrong or an unexpected packet is received.
+    fn wait_connect(&mut self) -> UsbResult<PacketId> {
+        let QemuUsbdevEvent { cmd, id, data } = self.wait_qemu_event()?;
+        // If the device was previously disconnected, the only valid event that the device
+        // can send is a CONNECT event.
+        if cmd != QemuUsbdevCmd::Connect {
+            Err(anyhow!("Expected a CONNECT event, got {cmd:?}"))?;
+        }
+        if !data.is_empty() {
+            Err(anyhow!("CONNECT payload is non-empty"))?;
+        }
+        Ok(id)
+    }
+
+    /// Wait for a COMPLETE packet and return the data. Return an error if something goes
+    /// wrong.
+    fn wait_complete(&mut self) -> UsbResult<QemuUsbdevCompleteEvent> {
+        let QemuUsbdevEvent { cmd, id, data } = self.wait_qemu_event()?;
+
+        match cmd {
+            QemuUsbdevCmd::Disconnect => Err(UsbError::Disconnected),
+            QemuUsbdevCmd::Complete => {
+                let (payload, data) = QemuUsbdevCompletePayload::read_from_prefix(&data)
+                    .map_err(|err| anyhow!("{err:?}"))
+                    .context("Could not parse Complete payload")?;
+                // FIXME here it is somewhat inefficient because we are taking a slice of the
+                // data and turning into back into vector...
+                Ok(QemuUsbdevCompleteEvent {
+                    id,
+                    status: QemuUsbdevTransferStatus::try_from(payload.status).with_context(
+                        || format!("Unknown transfer status {} from USBDEV", payload.status),
+                    )?,
+                    xfer_size: payload.xfer_size.into(),
+                    data: data.to_vec(),
+                })
+            }
+            _ => Err(anyhow!("unexpected event {cmd:?}").into()),
+        }
+    }
+
+    /// Perform a full control IN transaction:
+    /// - send a Setup
+    /// - send a Transfer IN
+    /// - wait for data IN
+    /// - send a Transfer OUT (status stage)
+    /// - wait for status
+    fn send_and_wait_control_in(&mut self, control: &ControlIn) -> UsbResult<Vec<u8>> {
+        let expected_id = self
+            .send_control_in(control)
+            .context("Failed to send control IN transfer")?;
+        let QemuUsbdevCompleteEvent {
+            id, status, data, ..
+        } = self
+            .wait_complete()
+            .context("Failed to receive control IN data")?;
+        if id != expected_id {
+            Err(anyhow!(
+                "Expected control IN data complete command ID with {expected_id:?}, got {id:?}"
+            ))?;
+        }
+        if data.len() > control.length {
+            Err(anyhow!(
+                "Device returned too much data for control IN transfer (expected {}, got {})",
+                control.length,
+                data.len()
+            ))?;
+        }
+        /* Return early if the transfer failed, no need for a status stage */
+        if status != QemuUsbdevTransferStatus::Success {
+            return Err(UsbError::TransferFailed(
+                status,
+                anyhow!("control IN data transfer failed"),
+            ));
+        }
+        /* Status stage */
+        let expected_id = self
+            .send_transfer_out(
+                control.addr,
+                control.ep,
+                /* zlp */ true,
+                control.max_pkt_size,
+                &[],
+            )
+            .maybe_context("Failed to send control IN status packet")?;
+        let QemuUsbdevCompleteEvent { id, status, .. } = self
+            .wait_complete()
+            .maybe_context("Failed to receive control IN status")?;
+        if status != QemuUsbdevTransferStatus::Success {
+            return Err(UsbError::TransferFailed(
+                status,
+                anyhow!("control IN status transfer failed"),
+            ));
+        }
+        if id != expected_id {
+            Err(anyhow!(
+                "Expected control IN status complete command ID with {expected_id:?}, got {id:?}"
+            ))?;
+        }
+        Ok(data)
+    }
+
+    /// Perform a full control OUT transaction:
+    /// - send a Setup
+    /// - send a Transfer OUT (if any)
+    /// - send a Transfer IN (status stage)
+    /// - wait for status
+    fn send_and_wait_control_out<'a>(&mut self, control: &ControlOut<'a>) -> UsbResult<()> {
+        let expected_id = self
+            .send_control_out(control)
+            .context("Failed to send control OUT transfer")?;
+        // Wait for data stage to complete if any.
+        if let Some(expected_id) = expected_id {
+            let QemuUsbdevCompleteEvent { id, status, .. } = self
+                .wait_complete()
+                .context("Failed to send control OUT data")?;
+            if id != expected_id {
+                Err(anyhow!(
+                    "Expected control OUT data complete command ID with {expected_id:?}, got {id:?}"
+                ))?;
+            }
+            /* Return early if the transfer failed, no need for a status stage */
+            if status != QemuUsbdevTransferStatus::Success {
+                return Err(UsbError::TransferFailed(
+                    status,
+                    anyhow!("control OUT data transfer failed"),
+                ));
+            }
+        }
+        /* Status stage */
+        let expected_id = self
+            .send_transfer_in(control.addr, control.ep, control.max_pkt_size, 0)
+            .maybe_context("Failed to send control OUT status packet")?;
+        let QemuUsbdevCompleteEvent { id, status, .. } = self
+            .wait_complete()
+            .maybe_context("Failed to receive control OUT status")?;
+        if status != QemuUsbdevTransferStatus::Success {
+            return Err(UsbError::TransferFailed(
+                status,
+                anyhow!("control OUT status transfer failed"),
+            ));
+        }
+        if id != expected_id {
+            Err(anyhow!(
+                "Expected control OUT status complete command ID with {expected_id:?}, got {id:?}"
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Perform a full enumeration sequence, retrieving the
+    /// device and config descriptors, as well as assigning
+    /// an address to the device.
+    fn enumerate_device(&mut self, generation: u32) -> UsbResult<DeviceInfo> {
+        std::thread::sleep(Duration::from_millis(5));
+        // Send a reset to the device.
+        let _ = self
+            .send_packet(QemuUsbdevCmd::Reset, &[])
+            .maybe_context("Failed to send RESET command")?;
+
+        // Start a typical enumeration sequence by asking for the first 8 bytes
+        // of the device descriptor.
+        let trunc_dev_desc = self
+            .send_and_wait_control_in(&ControlIn {
+                addr: 0,
+                ep: 0,
+                req_type: USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                req: USB_GET_DESCRIPTOR,
+                value: (USB_DEVICE_DESCRIPTOR as u16) << 8,
+                index: 0,
+                length: USB_FS_SAFE_PACKET_SIZE.into(),
+                max_pkt_size: USB_FS_SAFE_PACKET_SIZE,
+            })
+            .maybe_context("Failed to send GET_DESC(device, 8 bytes)")?;
+        let max_packet_size = trunc_dev_desc[USB_DEV_DESC_MAX_PACKET_SIZE_OFFSET] as u16;
+        log::info!("USB Host: device report a maximum packet size of {max_packet_size} on EP0");
+        // TODO sanity check max packet size
+
+        // Assign an address to the device.
+        let address = 42; // Arbitrary number.
+        self.send_and_wait_control_out(&ControlOut {
+            addr: 0,
+            ep: 0,
+            req_type: USB_REQ_TYPE_OUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+            req: USB_SET_ADDRESS,
+            value: address as u16,
+            index: 0,
+            max_pkt_size: max_packet_size,
+            data: &[],
+        })
+        .maybe_context("Failed to send SET_ADDRESS")?;
+        log::info!("USB Host: device accepted address {address:?}");
+
+        // Give time to the device to update its address.
+        std::thread::sleep(Duration::from_millis(Self::SET_ADDRESS_WAIT_DELAY_MS));
+
+        // Retrieve the full device descriptor.
+        let dev_desc = self
+            .send_and_wait_control_in(&ControlIn {
+                addr: address,
+                ep: 0,
+                req_type: USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                req: USB_GET_DESCRIPTOR,
+                value: (USB_DEVICE_DESCRIPTOR as u16) << 8,
+                index: 0,
+                length: size_of::<desc::DeviceDescriptor>(),
+                max_pkt_size: max_packet_size,
+            })
+            .maybe_context("Failed to send GET_DESC(device, all bytes)")?;
+        // Extract number of configurations.
+        let num_config = desc::DeviceDescriptor::ref_from_bytes(&dev_desc)
+            .map_err(|_err| anyhow!("Cannot parse device descriptor"))?
+            .num_config;
+
+        // Retrieve all configurations descriptors.
+        let mut configurations = Vec::new();
+        let mut first_config_val = None;
+        for config_idx in 0..num_config {
+            // Retrieve just the configuration descriptor first.
+            let config_desc = self
+                .send_and_wait_control_in(&ControlIn {
+                    addr: address,
+                    ep: 0,
+                    req_type: USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                    req: USB_GET_DESCRIPTOR,
+                    value: (USB_CONFIG_DESCRIPTOR as u16) << 8 | config_idx as u16,
+                    index: 0,
+                    length: size_of::<desc::ConfigurationDescriptor>(),
+                    max_pkt_size: max_packet_size,
+                })
+                .maybe_context(format!("Failed to send GET_DESC(config desc {config_idx})"))?;
+            // Parse and extract the size of the full configuration.
+            let parsed_desc = desc::ConfigurationDescriptor::ref_from_bytes(&config_desc)
+                .map_err(|_err| anyhow!("Cannot parse config descriptor"))?;
+            let tot_len = parsed_desc.tot_length;
+            // Remember the configuration value for later.
+            if first_config_val.is_none() {
+                first_config_val = Some(parsed_desc.config_val);
+            }
+            // Retrieve full configuration.
+            let full_config = self
+                .send_and_wait_control_in(&ControlIn {
+                    addr: address,
+                    ep: 0,
+                    req_type: USB_REQ_TYPE_IN | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                    req: USB_GET_DESCRIPTOR,
+                    value: (USB_CONFIG_DESCRIPTOR as u16) << 8 | config_idx as u16,
+                    index: 0,
+                    length: tot_len.into(),
+                    max_pkt_size: max_packet_size,
+                })
+                .maybe_context(format!("Failed to send GET_DESC(full config {config_idx})"))?;
+            configurations.push(full_config);
+        }
+
+        // Set the first available configuration.
+        if let Some(first_config_val) = first_config_val {
+            self.send_and_wait_control_out(&ControlOut {
+                addr: address,
+                ep: 0,
+                req_type: USB_REQ_TYPE_OUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+                req: USB_SET_CONFIGURATION,
+                value: first_config_val as u16,
+                index: 0,
+                max_pkt_size: max_packet_size,
+                data: &[],
+            })
+            .maybe_context("Failed to send SET_CONFIGURATION")?;
+        } else {
+            log::error!("USB host: device has no configurations")
+        }
+        log::info!("USB Host: device configured");
+
+        Ok(DeviceInfo {
+            dev_desc,
+            address,
+            configurations,
+            generation,
+        })
+    }
+
+    fn endpoint_max_pkt_size(&self, dev_info: &DeviceInfo, ep: u8, dir_in: bool) -> UsbResult<u16> {
+        if ep == 0 {
+            return Ok(desc::DeviceDescriptor::ref_from_bytes(&dev_info.dev_desc)
+                .unwrap()
+                .max_pkt_size as u16);
+        }
+        let target_addr = (ep & 0x7f) | if dir_in { 0x80 } else { 0x00 };
+        for cfg_bytes in &dev_info.configurations {
+            let config = desc::Configuration::new(cfg_bytes);
+            for intf in config.interface_alt_settings() {
+                for endpoint in intf.endpoints() {
+                    if let Ok(desc) = endpoint.descriptor()
+                        && desc.addr == target_addr
+                    {
+                        return Ok(desc.max_pkt_size.get());
+                    }
+                }
+            }
+        }
+        Ok(64)
+    }
+
+    fn submit_in_transfer(
+        &mut self,
+        dev_info: &DeviceInfo,
+        generation: u32,
+        ep: u8,
+        length: usize,
+    ) -> UsbResult<PacketId> {
+        // If generation has changed, device must have disconnected.
+        if generation != dev_info.generation {
+            return Err(UsbError::Disconnected);
+        }
+        let mps = self
+            .endpoint_max_pkt_size(dev_info, ep, true)
+            .maybe_context(format!("Cannot find max packet size for EP{ep}IN"))?;
+        self.send_transfer_in(dev_info.address, ep, mps, length)
+    }
+
+    fn submit_out_transfer(
+        &mut self,
+        dev_info: &DeviceInfo,
+        generation: u32,
+        ep: u8,
+        data: &[u8],
+    ) -> UsbResult<PacketId> {
+        // If generation has changed, device must have disconnected.
+        if generation != dev_info.generation {
+            return Err(UsbError::Disconnected);
+        }
+        let mps = self
+            .endpoint_max_pkt_size(dev_info, ep, false)
+            .maybe_context(format!("Cannot find max packet size for EP{ep}OUT"))?;
+        self.send_transfer_out(dev_info.address, ep, false, mps, data)
+    }
+
+    fn handle_complete(
+        &mut self,
+        _dev_info: &DeviceInfo,
+        id: PacketId,
+        status: QemuUsbdevTransferStatus,
+        xfer_size: usize,
+        data: Vec<u8>,
+    ) -> UsbResult<()> {
+        // Check if this matches a pending IN transfer.
+        if let Some((ep_idx, answer)) = self.pending_in_transfers.remove(&id) {
+            self.active_ep_in.remove(&ep_idx);
+            let res = match status {
+                QemuUsbdevTransferStatus::Success => Ok(data),
+                _ => Err(anyhow!("Transfer failed: {status:?}").into()),
+            };
+            // If receiver timed out, buffer the result for the next read on this endpoint.
+            if let Some(unsent_res) = answer.complete(res) {
+                self.completed_ep_in.insert(ep_idx, unsent_res);
+            }
+        } else if let Some(answer) = self.pending_out_transfers.remove(&id) {
+            let res = match status {
+                QemuUsbdevTransferStatus::Success => Ok(xfer_size),
+                _ => Err(anyhow!("Transfer failed: {status:?}").into()),
+            };
+            // Ignore send error if receiver has disconnected.
+            let _ = answer.send(res);
+        } else {
+            log::debug!(
+                "USB Host: ignore complete event (ID {id:?}), does not match any known pending transfer"
+            );
+        }
+        Ok(())
+    }
+
+    /// Serve requests for the device until it disconnects .
+    fn serve_device_requests(&mut self, mut dev_info: DeviceInfo) -> UsbResult<()> {
+        self.pending_in_transfers.clear();
+        self.active_ep_in.clear();
+        self.completed_ep_in.clear();
+        self.pending_out_transfers.clear();
+        loop {
+            let Ok(event) = self.channel_recv.recv() else {
+                return Err(UsbError::Shutdown);
+            };
+            match event {
+                HostChannelEvent::QemuMessage { cmd, id, data } => {
+                    let cmd = QemuUsbdevCmd::try_from(cmd)
+                        .with_context(|| format!("Unknown command {cmd} from USBDEV"))?;
+                    match cmd {
+                        QemuUsbdevCmd::Disconnect => return Err(UsbError::Disconnected),
+                        QemuUsbdevCmd::Complete => {
+                            let (payload, data) =
+                                QemuUsbdevCompletePayload::read_from_prefix(&data)
+                                    .map_err(|err| anyhow!("{err:?}"))
+                                    .context("Could not parse Complete payload")?;
+                            self.handle_complete(
+                                &dev_info,
+                                PacketId(id),
+                                QemuUsbdevTransferStatus::try_from(payload.status).with_context(
+                                    || {
+                                        format!(
+                                            "Unknown transfer status {} from USBDEV",
+                                            payload.status
+                                        )
+                                    },
+                                )?,
+                                u32::from(payload.xfer_size) as usize,
+                                data.to_vec(),
+                            )?;
+                        }
+                        cmd => {
+                            log::error!(
+                                "ignoring unexpected QEMU event: {cmd:?}, id={id}, data={data:?}"
+                            );
+                        }
+                    }
+                }
+                HostChannelEvent::GetDeviceInfo { answer } => {
+                    // If the device was reset (address == 0), wait for re-enumeration before
+                    // reporting it as a configured device to new callers.
+                    let info = if dev_info.address != 0 {
+                        Some(dev_info.clone())
+                    } else {
+                        None
+                    };
+                    let _ = answer.send(info);
+                }
+                HostChannelEvent::NotifyDeviceChange { answer } => {
+                    self.pending_dev_changes.push(answer)
+                }
+                HostChannelEvent::SendSetup {
+                    generation,
+                    ep,
+                    setup,
+                } => {
+                    if generation == dev_info.generation {
+                        self.send_setup(dev_info.address, ep, &setup)
+                            .maybe_context("Failed to send SETUP")?;
+                    } else {
+                        log::debug!("Ignore SendSetup for disconnected device");
+                    }
+                }
+                HostChannelEvent::SubmitOutTransfer {
+                    generation,
+                    ep,
+                    data,
+                    answer,
+                } => {
+                    match self.submit_out_transfer(&dev_info, generation, ep, &data) {
+                        Ok(pkt_id) => {
+                            if self.pending_out_transfers.insert(pkt_id, answer).is_some() {
+                                log::error!("USB Host: internal error: packet ID reused?!");
+                            }
+                        }
+                        Err(err) => {
+                            // Ignore error if we know the sender has already disconnected.
+                            let _ = answer.send(Err(err));
+                        }
+                    }
+                }
+                HostChannelEvent::SubmitInTransfer {
+                    generation,
+                    ep,
+                    length,
+                    answer,
+                } => {
+                    let ep_idx = ep & 0x7f;
+                    if let Some(res) = self.completed_ep_in.remove(&ep_idx) {
+                        if let Some(unsent_res) = answer.complete(res) {
+                            self.completed_ep_in.insert(ep_idx, unsent_res);
+                        }
+                    } else if let Some(&pkt_id) = self.active_ep_in.get(&ep_idx) {
+                        self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
+                    } else {
+                        match self.submit_in_transfer(&dev_info, generation, ep_idx, length) {
+                            Ok(pkt_id) => {
+                                self.active_ep_in.insert(ep_idx, pkt_id);
+                                self.pending_in_transfers.insert(pkt_id, (ep_idx, answer));
+                            }
+                            Err(err) => {
+                                let _ = answer.complete(Err(err));
+                            }
+                        }
+                    }
+                }
+                HostChannelEvent::Reset => {
+                    self.pending_in_transfers.clear();
+                    self.active_ep_in.clear();
+                    self.completed_ep_in.clear();
+                    self.pending_out_transfers.clear();
+                    dev_info.address = 0;
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Reset, &[])
+                        .maybe_context("Failed to send RESET")?;
+                }
+                HostChannelEvent::Suspend => {
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Suspend, &[])
+                        .maybe_context("Failed to send SUSPEND")?;
+                }
+                HostChannelEvent::Resume => {
+                    let _ = self
+                        .send_packet(QemuUsbdevCmd::Resume, &[])
+                        .maybe_context("Failed to send RESUME")?;
+                }
+            }
+        }
+    }
+
+    fn notify_device_change(&mut self, dev_info: Option<DeviceInfo>) {
+        for send in &self.pending_dev_changes {
+            // Ignore errors (receiver might have disconnected after a timeout).
+            let _ = send.send(dev_info.clone());
+        }
+        self.pending_dev_changes.clear();
+    }
+
+    /// This thread simulates a USB host. It can react to events sent by otlib
+    /// over the channel.
+    fn run(&mut self) -> UsbResult<()> {
+        log::debug!("USB host: thread started");
+        // We spawn a thread just to listen to events sent by QEMU USBDEV.
+        // Those will be sent to the same channel otlib uses to gives us
+        // requests.
+
+        let usbdev_for_reader = self
+            .usbdev
+            .try_clone_native()
+            .expect("Could not clone TTYPort for reading");
+        let channel_send_for_reader = self.channel_send.clone();
+        thread::spawn(move || {
+            if let Err(res) =
+                Self::host_qemu_reader_thread(usbdev_for_reader, channel_send_for_reader)
+            {
+                // Ignore errors coming for the mpsc channel because they indicate that
+                // the host thread shut down and the reader couldn't send a message.
+                match res.downcast::<mpsc::SendError<HostChannelEvent>>() {
+                    Ok(_) => (),
+                    Err(err) => log::error!("QEMU reader failed with error: {err:?}"),
+                }
+            }
+        });
+
+        // Send HELLO.
+        let id = self
+            .send_hello()
+            .maybe_context("Failed to send HELLO packet")?;
+        // Expect HELLO back.
+        let hello = self
+            .wait_hello(id)
+            .maybe_context("Failed waiting for an HELLO packet")?;
+        log::info!(
+            "USB host: device is using protocol version {}.{}",
+            hello.major_version,
+            hello.minor_version
+        );
+
+        // Power on VBUS.
+        let _ = self
+            .send_packet(QemuUsbdevCmd::VbusOn, &[])
+            .maybe_context("Failed to send VBUS_ON command")?;
+
+        let mut generation = 0u32;
+        loop {
+            // Wait for device to connect.
+            let _id = self
+                .wait_connect()
+                .context("Failed while waiting for a device to connect")?;
+
+            log::info!("USB Host: device connected");
+
+            // Perform enumeration and get back the descriptors.
+            generation += 1;
+            let dev_info = match self.enumerate_device(generation) {
+                Err(UsbError::Shutdown) => return Ok(()),
+                Err(UsbError::Disconnected) => {
+                    log::info!("USB Host: device disconnected");
+                    continue;
+                }
+                Err(err) => {
+                    log::error!("USB host: failed to enumerate device: {err:?}");
+                    continue;
+                }
+                Ok(dev_info) => dev_info,
+            };
+            log::info!("USB Host: device configured: {dev_info:?}");
+
+            self.notify_device_change(Some(dev_info.clone()));
+
+            // Handle messages until the device disconnects.
+            match self.serve_device_requests(dev_info) {
+                Err(UsbError::Shutdown) => return Ok(()),
+                Err(UsbError::Disconnected) | Ok(()) => {
+                    log::info!("USB Host: device disconnected");
+                }
+                Err(err) => {
+                    log::error!("USB host: an error occurred: {err:?}");
+                    // Pretend that device has disconnected.
+                }
+            }
+            self.notify_device_change(None);
+        }
+    }
+
+    fn blocking_read_exact<T: Read>(read: &mut T, buf: &mut [u8]) -> anyhow::Result<()> {
+        let mut pos = 0usize;
+        while pos < buf.len() {
+            match read.read(&mut buf[pos..]) {
+                Ok(amount) => pos += amount,
+                Err(err)
+                    if err.kind() == std::io::ErrorKind::TimedOut
+                        || err.kind() == std::io::ErrorKind::Interrupted =>
+                {
+                    continue;
+                }
+                err => {
+                    err?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// This thread is responsible for receiving messages from QEMU (following the usbdev
+    /// protocol). When done, it sends a message to the virtual host channel with the content.
+    fn host_qemu_reader_thread(
+        mut usbdev: TTYPort,
+        channel_send: mpsc::Sender<HostChannelEvent>,
+    ) -> anyhow::Result<()> {
+        log::debug!("USB host: QEMU reader thread started");
+
+        loop {
+            // Wait for a header.
+            let mut hdr = [0u8; size_of::<QemuUsbdevPacketHeader>()];
+            Self::blocking_read_exact(&mut usbdev, &mut hdr)
+                .context("Failed to read a packet header from QEMU")?;
+            let hdr = QemuUsbdevPacketHeader::ref_from_bytes(&hdr).unwrap();
+            // TODO sanity check the size
+
+            let mut data = vec![0; Into::<u32>::into(hdr.size) as usize];
+            Self::blocking_read_exact(&mut usbdev, &mut data)
+                .context("Failed to read a packet data from QEMU")?;
+
+            channel_send
+                .send(HostChannelEvent::QemuMessage {
+                    cmd: hdr.command.into(),
+                    id: hdr.id.into(),
+                    data,
+                })
+                .context("Failed to send a message to the host thread")?;
+        }
+    }
+}

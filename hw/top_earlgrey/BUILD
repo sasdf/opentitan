@@ -65,6 +65,13 @@ CLEAR_MANIFEST = manifest(d = {
 
 sim_qemu(
     name = "sim_qemu_base",
+    args = [
+        "--rcfile=",
+        "--logging=info",
+        "--interface={interface}",
+        "--qemu-monitor-socket=qemu-monitor",
+        "--qemu-quit",
+    ],
     design = "earlgrey",
     exec_env = "sim_qemu_base",
     libs = [
@@ -74,7 +81,28 @@ sim_qemu(
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
     otp = "//hw/top_earlgrey/data/otp:img_rma",
+    param = {
+        "interface": "qemu",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+    },
     slot_spec = EARLGREY_SLOTS,
+    test_cmd = """
+        --exec="transport init"
+        {bootstrap_cmd}
+        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+        no-op
+    """,
+)
+
+sim_qemu(
+    name = "sim_qemu_test_rom",
+    testonly = True,
+    base = ":sim_qemu_base",
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "test_key_0"},
+    exec_env = "sim_qemu_test_rom",
+    manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+    rom = "//sw/device/lib/testing/test_rom:test_rom",
 )
 
 sim_qemu(
@@ -85,6 +113,66 @@ sim_qemu(
     exec_env = "sim_qemu_rom_with_fake_keys",
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     rom = "//sw/device/silicon_creator/rom:mask_rom",
+)
+
+sim_qemu(
+    name = "sim_qemu_sival",
+    testonly = True,
+    base = ":sim_qemu_base",
+    ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+    exec_env = "sim_qemu_sival",
+    manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+    otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_prod_manuf_personalized",
+    rom = "//sw/device/silicon_creator/rom:mask_rom",
+    spx_key = {"//sw/device/silicon_creator/rom/keys/fake/spx:spx_keyset": "prod_key_0"},
+)
+
+sim_qemu(
+    name = "sim_qemu_rom_ext",
+    testonly = True,
+    base = ":sim_qemu_base",
+    ecdsa_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:ecdsa_keyset": "app_prod_0"},
+    exec_env = "sim_qemu_rom_ext",
+    libs = [
+        "//sw/device/lib/arch:boot_stage_owner",
+        "//sw/device/lib/arch:sim_qemu",
+        "//hw/top_earlgrey/sw/dt:sim_qemu",
+    ],
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_a",
+    manifest = "//sw/device/silicon_owner:manifest",
+    otp = "//sw/device/silicon_creator/rom_ext/e2e:otp_img_secret2_locked_rma",
+    param = {
+        "interface": "qemu",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+    },
+    rom = "//sw/device/silicon_creator/rom:mask_rom",
+    rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
+)
+
+sim_qemu(
+    name = "sim_qemu_sival_rom_ext",
+    testonly = True,
+    base = ":sim_qemu_base",
+    ecdsa_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:ecdsa_keyset": "app_prod_0"},
+    exec_env = "sim_qemu_sival_rom_ext",
+    libs = [
+        "//sw/device/lib/arch:boot_stage_owner",
+        "//sw/device/lib/arch:sim_qemu",
+        "//hw/top_earlgrey/sw/dt:sim_qemu",
+    ],
+    linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_a",
+    manifest = "//sw/device/silicon_owner:manifest",
+    otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_prod_manuf_personalized",
+    param = {
+        "interface": "qemu",
+        "exit_success": DEFAULT_TEST_SUCCESS_MSG,
+        "exit_failure": DEFAULT_TEST_FAILURE_MSG,
+        "assemble": "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+    },
+    rom = "//sw/device/silicon_creator/rom:mask_rom",
+    rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_dice_x509_slot_a",
 )
 
 ###########################################################################
