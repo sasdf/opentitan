@@ -81,7 +81,7 @@ static void reset_entropy_complex_enable_csrng(void) {
 
 static void verify_edn_permit_and_addrmiss_faults(void) {
   LOG_INFO(
-      "Verifying [edn_reg_pkg.sv:371] & [edn_reg_top.sv:1371-1406]: "
+      "Verifying [edn_reg_pkg.sv:371] & [edn_reg_top.sv:1406-1428]: "
       "EDN_PERMIT sub-word write faults (mcause=7) and unmapped 0x48..0x7c "
       "addrmiss faults (mcause=5/7)");
 
@@ -118,13 +118,13 @@ static void verify_edn_permit_and_addrmiss_faults(void) {
   CHECK(g_last_mcause == (uint32_t)kIbexExcStoreAccessFault);
 
   LOG_INFO(
-      "[edn_reg_pkg.sv:371] & [edn_reg_top.sv:1371-1406] confirmed: faults=%u",
+      "[edn_reg_pkg.sv:371] & [edn_reg_top.sv:1406-1428] confirmed: faults=%u",
       g_access_fault_count);
 }
 
 static void verify_edn_recov_alert_sts_rw0c_mubi_preserve(void) {
   LOG_INFO(
-      "Verifying [edn_core.sv:187-285] & [edn_reg_top.sv:1174-1289]: "
+      "Verifying [edn_core.sv:421-485,691-695] & [edn_reg_top.sv:1174-1289]: "
       "RECOV_ALERT_STS *_FIELD_ALERT bits (0..3) ignore rw0c clears while "
       "CTRL holds invalid mubi4_t");
 
@@ -134,7 +134,7 @@ static void verify_edn_recov_alert_sts_rw0c_mubi_preserve(void) {
   CHECK((recov_before & 0xfu) == 0xfu);
 
   // Attempt rw0c clear while CTRL still contains 0x0000: continuous .de = 1'b1,
-  // .d = 1'b1 in edn_core.sv:187-285 overrides software rw0c clear!
+  // .d = 1'b1 in edn_core.sv:421-485,691-695 overrides software rw0c clear!
   abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0x00000000u);
   uint32_t recov_during =
       abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET);
@@ -148,14 +148,15 @@ static void verify_edn_recov_alert_sts_rw0c_mubi_preserve(void) {
   CHECK(recov_after == 0u);
 
   LOG_INFO(
-      "[edn_core.sv:187-285] confirmed: RECOV_ALERT_STS remained 0x%x during "
+      "[edn_core.sv:421-485,691-695] confirmed: RECOV_ALERT_STS remained 0x%x "
+      "during "
       "rw0c clear with invalid CTRL, cleared to 0x%x after CTRL repair",
       recov_during, recov_after);
 }
 
 static void verify_edn_cmd_fifo_rst_continuous_clear(void) {
   LOG_INFO(
-      "Verifying [edn_core.sv:238-246,650,672]: CTRL.CMD_FIFO_RST == 0x6 "
+      "Verifying [edn_core.sv:449-451,659,678]: CTRL.CMD_FIFO_RST == 0x6 "
       "continuously holds replay FIFOs cleared and drops writes");
 
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x6996u);
@@ -168,7 +169,7 @@ static void verify_edn_cmd_fifo_rst_continuous_clear(void) {
 
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
   LOG_INFO(
-      "[edn_core.sv:238-246,650,672] confirmed: 20 writes while "
+      "[edn_core.sv:449-451,659,678] confirmed: 20 writes while "
       "CMD_FIFO_RST=0x6 produced ERR_CODE=0x%x",
       err_code);
 }
