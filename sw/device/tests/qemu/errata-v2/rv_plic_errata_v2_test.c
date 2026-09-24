@@ -133,6 +133,9 @@ bool test_main(void) {
   load_fault_count = 0;
   (void)abs_mmio_read32(kPlicBase + 0x002018u);  // IE0_6 (unmapped)
   CHECK(load_fault_count == 1u);
+  store_fault_count = 0;
+  abs_mmio_write32(kPlicBase + 0x002018u, 1u);  // IE0_6 (unmapped)
+  CHECK(store_fault_count == 1u);
 
   store_fault_count = 0;
   abs_mmio_write8(kPlicBase + RV_PLIC_PRIO_1_REG_OFFSET, 0x2u);
@@ -146,6 +149,11 @@ bool test_main(void) {
 
   store_fault_count = 0;
   abs_mmio_write8(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET, 0xffu);
+  CHECK(store_fault_count == 1u);
+  CHECK(abs_mmio_read32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET) == 0u);
+
+  store_fault_count = 0;
+  *((volatile uint16_t *)(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET)) = 0xffffu;
   CHECK(store_fault_count == 1u);
   CHECK(abs_mmio_read32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET) == 0u);
   LOG_INFO("Confirmed RV_PLIC_PERMIT sub-word rules and IE0_6 addrmiss.");
@@ -166,9 +174,21 @@ bool test_main(void) {
   load_fault_count = 0;
   (void)abs_mmio_read32(kPlicBase + 0x0002e0u);  // PRIO_184 (unmapped in v2)
   CHECK(load_fault_count == 1u);
+  store_fault_count = 0;
+  abs_mmio_write32(kPlicBase + 0x0002e0u, 0x3u);  // PRIO_184 (unmapped in v2)
+  CHECK(store_fault_count == 1u);
+
   load_fault_count = 0;
   (void)abs_mmio_read32(kPlicBase + 0x0002e4u);  // PRIO_185 (unmapped in v2)
   CHECK(load_fault_count == 1u);
+  store_fault_count = 0;
+  abs_mmio_write32(kPlicBase + 0x0002e4u, 0x3u);  // PRIO_185 (unmapped in v2)
+  CHECK(store_fault_count == 1u);
+
+  store_fault_count = 0;
+  abs_mmio_write8(kPlicBase + RV_PLIC_IE0_5_REG_OFFSET, 0xffu);
+  CHECK(store_fault_count == 1u);
+  CHECK(abs_mmio_read32(kPlicBase + RV_PLIC_IE0_5_REG_OFFSET) == 0u);
 
   store_fault_count = 0;
   *((volatile uint16_t *)(kPlicBase + RV_PLIC_IE0_5_REG_OFFSET)) = 0xffffu;
@@ -198,10 +218,32 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_rv_plic_irq_set_enabled(&plic, 0, 0, kDifToggleDisabled));
   CHECK_DIF_OK(dif_rv_plic_irq_set_priority(&plic, 0, 0u));
 
-  // Verify dif_rv_plic_irq_complete() accepts out-of-range complete_data >= 184
-  // (0xdeadba00 | kTestIrqId) and returns kDifOk.
+  // Re-assert UART1 tx_watermark (src_i[10] == 1), enable IE0_0[10], claim
+  // IRQ 10 via dif_rv_plic_irq_claim(), and verify dif_rv_plic_irq_complete()
+  // accepts out-of-range complete_data >= 184 (0xdeadba00 | kTestIrqId) and
+  // completes IRQ 10 via 8-bit truncation in u_cc0 (IP_0[10] re-latches to 1).
+  abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 1u);
+  abs_mmio_write32(kUart1Base + UART_INTR_TEST_REG_OFFSET, 1u);
+  abs_mmio_write32(prio_reg, 1u);
+  abs_mmio_write32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET, irq_bit);
+  CHECK((abs_mmio_read32(kPlicBase + RV_PLIC_IP_0_REG_OFFSET) & irq_bit) != 0u);
+
+  dif_rv_plic_irq_id_t claimed_id = 0;
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(&plic, 0, &claimed_id));
+  CHECK(claimed_id == kTestIrqId);
+  CHECK((abs_mmio_read32(kPlicBase + RV_PLIC_IP_0_REG_OFFSET) & irq_bit) == 0u);
+
   CHECK_DIF_OK(dif_rv_plic_irq_complete(
       &plic, 0, (dif_rv_plic_irq_id_t)(0xdeadba00u | (uint32_t)kTestIrqId)));
+  CHECK((abs_mmio_read32(kPlicBase + RV_PLIC_IP_0_REG_OFFSET) & irq_bit) != 0u);
+
+  // Clean up claimed/pending UART1 IRQ 10 state.
+  abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, UINT32_MAX);
+  CHECK_DIF_OK(dif_rv_plic_irq_claim(&plic, 0, &claimed_id));
+  CHECK_DIF_OK(dif_rv_plic_irq_complete(&plic, 0, claimed_id));
+  abs_mmio_write32(kPlicBase + RV_PLIC_IE0_0_REG_OFFSET, 0u);
+  abs_mmio_write32(prio_reg, 0u);
   LOG_INFO("Confirmed dif_rv_plic irq=0 and out-of-range complete_data.");
 
   LOG_INFO("All rv_plic Earlgrey v2 FPGA checks PASSED!");
