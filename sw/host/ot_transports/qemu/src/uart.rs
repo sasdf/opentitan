@@ -13,8 +13,8 @@ use serialport::Parity;
 use crate::monitor::Monitor;
 use opentitanlib::io::console::ConsoleDevice;
 use opentitanlib::io::uart::flow::SoftwareFlowControl;
-use opentitanlib::io::uart::{FlowControl, Uart};
 use opentitanlib::io::uart::serial::SerialPortUart;
+use opentitanlib::io::uart::{FlowControl, Uart};
 
 pub struct QemuUart {
     /// Connection to the QEMU monitor which can control the emulator.
