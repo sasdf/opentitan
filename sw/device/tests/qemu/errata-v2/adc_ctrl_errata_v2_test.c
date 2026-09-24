@@ -263,8 +263,45 @@ static void test_chn_val_intr_overwrite_and_oneshot_latch(void) {
   uint32_t chn0_intr = bitfield_field32_read(
       chn0_val, ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_FIELD);
   CHECK(chn0_intr == chn0_cur,
-        "Expected adc_chn_value_intr (%u) to match latest sample (%u)",
+        "Expected chn0 adc_chn_value_intr (%u) to match latest sample (%u)",
         chn0_intr, chn0_cur);
+
+  uint32_t chn1_val =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET);
+  uint32_t chn1_cur = bitfield_field32_read(
+      chn1_val, ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_1_FIELD);
+  uint32_t chn1_intr = bitfield_field32_read(
+      chn1_val, ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_INTR_1_FIELD);
+  CHECK(chn1_intr == chn1_cur,
+        "Expected chn1 adc_chn_value_intr (%u) to match latest sample (%u)",
+        chn1_intr, chn1_cur);
+
+  // Also verify oneshot_done latches adc_chn_value_intr == adc_chn_value on
+  // both ADC_CHN_VAL_0 and ADC_CHN_VAL_1:
+  adc_ctrl_full_reset_and_clean();
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET, pd_ctl);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_INTR_CTL_REG_OFFSET,
+                   1u << ADC_CTRL_ADC_INTR_CTL_ONESHOT_EN_BIT);
+  sync_aon();
+  uint32_t en_oneshot = (1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT) |
+                        (1u << ADC_CTRL_ADC_EN_CTL_ONESHOT_MODE_BIT);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, en_oneshot);
+  CHECK(wait_for_intr_status_mask(1u << ADC_CTRL_ADC_INTR_STATUS_ONESHOT_BIT,
+                                  kPollTimeoutUs),
+        "Oneshot conversion in Test 2 did not complete");
+  sync_aon();
+  chn0_val = abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
+  chn1_val = abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET);
+  CHECK(bitfield_field32_read(
+            chn0_val, ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_FIELD) ==
+            bitfield_field32_read(chn0_val,
+                                  ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_0_FIELD),
+        "Expected oneshot_done to latch ADC_CHN_VAL_0.adc_chn_value_intr");
+  CHECK(bitfield_field32_read(
+            chn1_val, ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_INTR_1_FIELD) ==
+            bitfield_field32_read(chn1_val,
+                                  ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_1_FIELD),
+        "Expected oneshot_done to latch ADC_CHN_VAL_1.adc_chn_value_intr");
 }
 
 static void test_fsm_rst_level_hold_and_release_retrigger(void) {
@@ -326,7 +363,8 @@ static void test_subword_write_permit_faults(void) {
   LOG_INFO("Test 4: Sub-word write permit mask Store Access Faults (mcause=7)");
   adc_ctrl_full_reset_and_clean();
 
-  // 1. ADC_PD_CTL has permit mask 4'b1111 (full 32-bit word required).
+  // 1. ADC_PD_CTL has permit mask 4'b1111 (full 32-bit word required):
+  //    both sb and sh fault with mcause = 7 without mutating ADC_PD_CTL.
   uint32_t orig_pd =
       abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET);
   g_fault_seen = false;
@@ -338,10 +376,34 @@ static void test_subword_write_permit_faults(void) {
       abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) == orig_pd,
       "Rejected byte write must not mutate ADC_PD_CTL");
 
-  // 2. ADC_CHN0_FILTER_CTL_0 has permit mask 4'b1111 (full 32-bit word).
+  g_fault_seen = false;
+  g_fault_mcause = 0;
+  *(volatile uint16_t *)(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) =
+      0x0101u;
+  CHECK(g_fault_seen && g_fault_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on halfword write to "
+        "ADC_PD_CTL");
+  CHECK(
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET) == orig_pd,
+      "Rejected halfword write must not mutate ADC_PD_CTL");
+
+  // 2. ADC_CHN0_FILTER_CTL_0 has permit mask 4'b1111 (full 32-bit word):
+  //    both sb and sh fault with mcause = 7 without mutating the register.
   uint32_t filter_val = pack_filter(true, false, 0x12u, 0x34u);
   abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
                    filter_val);
+  g_fault_seen = false;
+  g_fault_mcause = 0;
+  abs_mmio_write8(kAdcCtrlBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
+                  0x00u);
+  CHECK(g_fault_seen && g_fault_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on byte write to "
+        "ADC_CHN0_FILTER_CTL_0");
+  CHECK(
+      abs_mmio_read32(kAdcCtrlBase +
+                      ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET) == filter_val,
+      "Rejected byte write must not mutate ADC_CHN0_FILTER_CTL_0");
+
   g_fault_seen = false;
   g_fault_mcause = 0;
   *(volatile uint16_t *)(kAdcCtrlBase +
@@ -354,8 +416,24 @@ static void test_subword_write_permit_faults(void) {
                       ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET) == filter_val,
       "Rejected halfword write must not mutate ADC_CHN0_FILTER_CTL_0");
 
-  // 3. ADC_LP_SAMPLE_CTL has permit mask 4'b0001 (8-bit field): byte write at
-  // offset +0 succeeds without fault!
+  // 3. ADC_SAMPLE_CTL (0x18) has permit mask 4'b0011: sb faults with mcause=7
+  //    whereas sh succeeds without fault!
+  g_fault_seen = false;
+  g_fault_mcause = 0;
+  abs_mmio_write8(kAdcCtrlBase + ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 0x04u);
+  CHECK(g_fault_seen && g_fault_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) on byte write to "
+        "ADC_SAMPLE_CTL (permit 4'b0011)");
+  g_fault_seen = false;
+  *(volatile uint16_t *)(kAdcCtrlBase + ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET) =
+      0x0123u;
+  CHECK(!g_fault_seen &&
+            abs_mmio_read32(kAdcCtrlBase +
+                            ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET) == 0x0123u,
+        "Halfword write to ADC_SAMPLE_CTL (permit 4'b0011) must succeed");
+
+  // 4. ADC_LP_SAMPLE_CTL (0x14) and ADC_EN_CTL (0x0c) have permit mask 4'b0001:
+  //    byte write at offset +0 succeeds without fault!
   g_fault_seen = false;
   abs_mmio_write8(kAdcCtrlBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET, 0x05u);
   CHECK(!g_fault_seen,
@@ -363,6 +441,13 @@ static void test_subword_write_permit_faults(void) {
   CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) ==
             0x05u,
         "ADC_LP_SAMPLE_CTL should update to 5");
+
+  g_fault_seen = false;
+  abs_mmio_write8(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0x00u);
+  CHECK(!g_fault_seen &&
+            abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET) ==
+                0x00u,
+        "Byte write to ADC_EN_CTL (permit 4'b0001) must succeed");
 }
 
 static void test_sample_cnt_zero_underflow_and_inflight_reduction(void) {
@@ -399,6 +484,28 @@ static void test_sample_cnt_zero_underflow_and_inflight_reduction(void) {
   CHECK((filter_st & (1u << ADC_CTRL_FILTER_STATUS_TRANS_BIT)) == 0u,
         "Expected LP_SAMPLE_CNT=0 to underflow to 255 and not transition to NP "
         "after ~10 samples, got FILTER_STATUS=0x%x",
+        filter_st);
+
+  // Control comparison: LP_SAMPLE_CNT = 1 transitions LP -> NP (TRANS = 1)
+  // within the same 1500 us window, while NP_SAMPLE_CNT = 0 (16'h0000 ->
+  // 16'hFFFF) prevents FILTER_STATUS.MATCH from firing after 1500 us!
+  adc_ctrl_full_reset_and_clean();
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET, pd_ctl);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET, 1u);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 0u);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
+                   catch_all);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET,
+                   catch_all);
+  sync_aon();
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                   1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT);
+  busy_spin_micros(1500);
+  filter_st = abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET);
+  CHECK((filter_st & (1u << ADC_CTRL_FILTER_STATUS_TRANS_BIT)) != 0u &&
+            (filter_st & 0xFFu) == 0u,
+        "Expected LP_SAMPLE_CNT=1 to set TRANS=1 while NP_SAMPLE_CNT=0 "
+        "(underflow to 65535) keeps MATCH=0 after 1500us, got 0x%x",
         filter_st);
 
   // Also verify in-flight NP_SAMPLE_CNT reduction bypass:
@@ -467,6 +574,20 @@ static void test_intr_ctl_gates_status_while_chn_val_and_fsm_rst_behave(void) {
   CHECK(
       abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET) == 0u,
       "ADC_INTR_STATUS.ONESHOT must remain 0 when ADC_INTR_CTL.ONESHOT_EN==0");
+  uint32_t chn0_part_a =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
+  uint32_t chn1_part_a =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET);
+  CHECK(bitfield_field32_read(
+            chn0_part_a, ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_FIELD) ==
+            bitfield_field32_read(chn0_part_a,
+                                  ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_0_FIELD),
+        "Expected ADC_CHN_VAL_0.adc_chn_value_intr latched in Part A");
+  CHECK(bitfield_field32_read(
+            chn1_part_a, ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_INTR_1_FIELD) ==
+            bitfield_field32_read(chn1_part_a,
+                                  ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_1_FIELD),
+        "Expected ADC_CHN_VAL_1.adc_chn_value_intr latched in Part A");
 
   // Part B: Run LP->NP filter match with ADC_INTR_CTL == 0.
   // FILTER_STATUS latches both TRANS and MATCH, and ADC_CHN_VAL_0/1 latches
@@ -503,19 +624,36 @@ static void test_intr_ctl_gates_status_while_chn_val_and_fsm_rst_behave(void) {
   // Part C: Assert ADC_FSM_RST = 1 after stopping ADC_EN_CTL.
   // In adc_ctrl_fsm.sv:144-149, cfg_fsm_rst_i clears chn0_val_o <= 0 alongside
   // chn0_val_we_o <= 0, so adc_chn_val_o[0].adc_chn_value.de is 0 and the
-  // register-file flop ADC_CHN_VAL_0 retains its sampled value!
-  uint32_t chn0_before_rst =
-      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
+  // register-file flops ADC_CHN_VAL_0/1 retain their sampled values!
   abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
   sync_aon();
+  uint32_t chn0_before_rst =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
+  uint32_t chn1_before_rst =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET);
+  CHECK(
+      bitfield_field32_read(
+          chn0_before_rst, ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_INTR_0_FIELD) ==
+          bitfield_field32_read(chn0_before_rst,
+                                ADC_CTRL_ADC_CHN_VAL_0_ADC_CHN_VALUE_0_FIELD),
+      "Expected ADC_CHN_VAL_0.adc_chn_value_intr latched in Part B");
+  CHECK(
+      bitfield_field32_read(
+          chn1_before_rst, ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_INTR_1_FIELD) ==
+          bitfield_field32_read(chn1_before_rst,
+                                ADC_CTRL_ADC_CHN_VAL_1_ADC_CHN_VALUE_1_FIELD),
+      "Expected ADC_CHN_VAL_1.adc_chn_value_intr latched in Part B");
+
   abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 1u);
   sync_aon();
   uint32_t chn0_after_rst =
       abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_0_REG_OFFSET);
-  CHECK(chn0_after_rst == chn0_before_rst,
-        "Expected ADC_CHN_VAL_0 (0x%x) to be preserved across ADC_FSM_RST "
-        "(0x%x)",
-        chn0_before_rst, chn0_after_rst);
+  uint32_t chn1_after_rst =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_ADC_CHN_VAL_1_REG_OFFSET);
+  CHECK(chn0_after_rst == chn0_before_rst && chn1_after_rst == chn1_before_rst,
+        "Expected ADC_CHN_VAL_0 (0x%x->0x%x) and ADC_CHN_VAL_1 (0x%x->0x%x) "
+        "to be preserved across ADC_FSM_RST",
+        chn0_before_rst, chn0_after_rst, chn1_before_rst, chn1_after_rst);
   abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_FSM_RST_REG_OFFSET, 0u);
   sync_aon();
 }
