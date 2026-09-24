@@ -281,6 +281,20 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_EXEC_REG_OFFSET,
                    kMultiBitBool4False);
 
+  // Also functionally verify `mubi4_test_true_loose(4'h0) == 1'b1` (`True`)
+  // on `RV_CORE_IBEX.SW_RECOV_ERR` (`0x411f0004`, `rv_core_ibex.sv:1051,
+  // 1060`): writing non-canonical `0x0` evaluates `mubi4_test_true_loose(4'h0)
+  // == 1'b1`, which triggers `alert_events[1]` (`alert_acks[1] = 1`) and
+  // hardware-resets `SW_RECOV_ERR` back to `kMultiBitBool4False` (`0x9`).
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));
+  abs_mmio_write32(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR + 0x4u, 0x0u);
+  busy_spin_micros(10);
+  CHECK(abs_mmio_read32(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR + 0x4u) ==
+        kMultiBitBool4False);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdRvCoreIbexRecovSwErr));
+
   // Also functionally verify `mubi4_test_true_strict(4'h0) == 1'b0` (`False`)
   // on `CLKMGR_EXTCLK_CTRL.SEL`: writing `0x0` evaluates to `False` and leaves
   // `CLKMGR_EXTCLK_STATUS == kMultiBitBool4False` (`0x9`).
