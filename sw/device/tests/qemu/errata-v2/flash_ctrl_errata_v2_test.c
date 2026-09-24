@@ -344,15 +344,19 @@ bool test_main(void) {
         0u);
 
   // Push word 1 and word 2 -> stays in `StErr` (`OP_STATUS == 0x2`,
-  // `CTRL_REGWEN == 0`) until word 3 is pushed!
+  // `ERR_CODE == 0x4`, `CTRL_REGWEN == 0`) until word 3 is pushed!
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x22222222u);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET) ==
         (1u << RRAM_CTRL_OP_STATUS_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
         0u);
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x33333333u);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET) ==
         (1u << RRAM_CTRL_OP_STATUS_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
         0u);
 
@@ -360,6 +364,8 @@ bool test_main(void) {
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x44444444u);
   CHECK(wait_op_done() == ((1u << RRAM_CTRL_OP_STATUS_DONE_BIT) |
                            (1u << RRAM_CTRL_OP_STATUS_ERR_BIT)));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
         1u);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_ADDR_REG_OFFSET) ==
