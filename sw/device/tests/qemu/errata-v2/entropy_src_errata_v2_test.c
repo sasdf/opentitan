@@ -175,7 +175,7 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
 
-  // [ERRATA-ENTROPY_SRC-009]: Verify ~alert_threshold_inv is independently
+  // Verify ~alert_threshold_inv is independently
   // compared against any_fail_count via logical OR in alert_threshold_fail.
   // Configure ALERT_THRESHOLD = 0xfffeffff (alert_threshold = 0xffff,
   // alert_threshold_inv = 0xfffe -> ~alert_threshold_inv = 0x0001) and
@@ -237,7 +237,7 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
 
-  // [ERRATA-ENTROPY_SRC-007]: Verify FW_OV_SHA3_START is gated off and does not
+  // Verify FW_OV_SHA3_START is gated off and does not
   // enter FWInsertMsg (0x059) or FWInsertStart (0x0c3) when
   // FW_OV_ENTROPY_INSERT == False.
   abs_mmio_write32(
@@ -261,7 +261,7 @@ bool test_main(void) {
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    kMultiBitBool4False);
 
-  // [ERRATA-ENTROPY_SRC-010]: Verify INTR_STATE.ES_ENTROPY_VALID stays 0 when
+  // Verify INTR_STATE.ES_ENTROPY_VALID stays 0 when
   // CONF.ENTROPY_DATA_REG_ENABLE == False even when ES_ROUTE == True and
   // DEBUG_STATUS.ENTROPY_FIFO_DEPTH == 1.
   uint32_t conf_no_data_reg =
@@ -459,7 +459,7 @@ bool test_main(void) {
         "MAIN_SM_STATE == 0x0c3 (FWInsertStart), MAIN_SM_IDLE == 0, and "
         "ENTROPY_FIFO_DEPTH == 1 after SHA3 completion");
 
-  // [ERRATA-ENTROPY_SRC-006]: Writing FW_OV_SHA3_START = kMultiBitBool4False
+  // Writing FW_OV_SHA3_START = kMultiBitBool4False
   // while in FWInsertStart (0x0c3) is a no-op (stays in 0x0c3).
   abs_mmio_write32(kEsBase + ENTROPY_SRC_FW_OV_SHA3_START_REG_OFFSET,
                    kMultiBitBool4False);
@@ -473,7 +473,7 @@ bool test_main(void) {
   for (int i = 1; i < 11; ++i) {
     (void)abs_mmio_read32(kEsBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
   }
-  // [ERRATA-ENTROPY_SRC-007]: ENTROPY_FIFO_DEPTH stays 1 across reads 1..11
+  // ENTROPY_FIFO_DEPTH stays 1 across reads 1..11
   // and only decrements to 0 on the 12th read (swread_done).
   debug_status = abs_mmio_read32(kEsBase + ENTROPY_SRC_DEBUG_STATUS_REG_OFFSET);
   CHECK_EQ(bitfield_field32_read(
@@ -526,7 +526,7 @@ bool test_main(void) {
     (void)abs_mmio_read32(kEsBase + ENTROPY_SRC_ENTROPY_DATA_REG_OFFSET);
   }
   CHECK_EQ(seed3_w0, 0x5ba7630cu,
-           "[ERRATA-ENTROPY_SRC-002] Expected empty-message SHA3-384 digest "
+           "Expected empty-message SHA3-384 digest "
            "word 0 == 0x5ba7630c, got 0x%08x",
            seed3_w0);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET, 0xfu);
