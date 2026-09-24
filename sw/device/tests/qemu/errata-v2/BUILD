@@ -1057,6 +1057,28 @@ opentitan_test(
     ],
 )
 # === END ERRATA-V2 TEST: p35_tlul ===
+# === BEGIN ERRATA-V2 TEST: p36_prim ===
+opentitan_test(
+    name = "prim_errata_v2_test",
+    srcs = ["prim_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top:clkmgr_c_regs",
+        "//hw/top:sram_ctrl_c_regs",
+        "//hw/top:uart_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
+# === END ERRATA-V2 TEST: p36_prim ===
 # === END ERRATA-V2 TEST: p36_xbar_main_and_xbar_peri ===
 
 # ----------------------------------------------------------------------------
