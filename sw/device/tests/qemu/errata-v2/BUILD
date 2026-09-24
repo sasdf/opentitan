@@ -369,6 +369,30 @@ opentitan_test(
 # Priority P17 Module: rv_dm
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p17_rv_dm ===
+opentitan_test(
+    name = "rv_dm_errata_v2_test",
+    srcs = ["rv_dm_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    deps = [
+        "//hw/top:lc_ctrl_c_regs",
+        "//hw/top:otp_ctrl_c_regs",
+        "//hw/top:rv_dm_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p17_rv_dm ===
 
 # ----------------------------------------------------------------------------
