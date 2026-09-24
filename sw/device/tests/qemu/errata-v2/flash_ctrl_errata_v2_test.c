@@ -252,9 +252,12 @@ bool test_main(void) {
                            (1u << RRAM_CTRL_OP_STATUS_ERR_BIT)));
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_ADDR_REG_OFFSET) ==
         0x210u);
-  CHECK(!bitfield_bit32_read(
-      abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET),
-      RRAM_CTRL_INTR_STATE_CORR_ERR_BIT));
+  uint32_t intr_state =
+      abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_OP_DONE_BIT));
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_CORR_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
   clear_rram_status();
@@ -308,7 +311,8 @@ bool test_main(void) {
       "Verifying [rram_ctrl_arb.sv:355] & [rram_ctrl_wr.sv:137, 153-160]: "
       "Silent WR_FIFO drop in StIdle & StErr dummy word drain");
   g_fault_count = 0;
-  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0xdeadbeefu);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x11223344u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x55667788u);
   CHECK(g_fault_count == 0u);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CURR_FIFO_LVL_REG_OFFSET) ==
         0u);
@@ -329,17 +333,30 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
         0u);
 
-  // Push word 0 -> MP_ERR is detected (`OP_STATUS.ERR = 1`), but `DONE` stays 0
-  // in `StErr`!
+  // Push word 0 -> MP_ERR is detected (`OP_STATUS.ERR = 1`, `ERR_CODE = 0x4`),
+  // but `DONE` stays 0 and `CTRL_REGWEN` stays 0 in `StErr`!
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x11111111u);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET) ==
+        (1u << RRAM_CTRL_OP_STATUS_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
+        0u);
+
+  // Push word 1 and word 2 -> stays in `StErr` (`OP_STATUS == 0x2`,
+  // `CTRL_REGWEN == 0`) until word 3 is pushed!
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x22222222u);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET) ==
+        (1u << RRAM_CTRL_OP_STATUS_ERR_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
+        0u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x33333333u);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET) ==
         (1u << RRAM_CTRL_OP_STATUS_ERR_BIT));
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET) ==
         0u);
 
-  // Push remaining 3 dummy words -> drains `StErr` and asserts `OP_STATUS.DONE`
-  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x22222222u);
-  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x33333333u);
+  // Push word 3 -> drains `StErr` and asserts `OP_STATUS.DONE`
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x44444444u);
   CHECK(wait_op_done() == ((1u << RRAM_CTRL_OP_STATUS_DONE_BIT) |
                            (1u << RRAM_CTRL_OP_STATUS_ERR_BIT)));
@@ -535,6 +552,22 @@ bool test_main(void) {
                kIbexExcStoreAccessFault);
   CHECK(g_fault_count == 1u);
   CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_count = 0;
+  fault_write8(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0x00u,
+               kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_count = 0;
+  fault_write8(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET + 1u, 0x00u,
+               kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_count = 0;
+  abs_mmio_write8(kRramCoreBase + RRAM_CTRL_CTRL_REGWEN_REG_OFFSET, 1u);
+  CHECK(g_fault_count == 0u);
 
   // ---------------------------------------------------------------------------
   // 7. [rram_macro_prim_reg_top.sv] (`0x41018000`):
