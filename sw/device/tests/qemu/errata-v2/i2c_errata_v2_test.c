@@ -441,13 +441,51 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
            "Expected RDATA == 0xA5");
 
   // Verify [i2c_target_fsm.sv:326-328]: TARGET_NACK_COUNT (0x68) is
-  // SwAccessRC (ignores writes) and HOST_TIMEOUT_CTRL (0x60) masks to 20 bits
-  // (0x000fffff).
+  // SwAccessRC (ignores writes), increments by +1 (not +2) when a NACKed
+  // target transaction records both AcqNack and AcqNackStop in ACQDATA, and
+  // clears to 0 on read.
   abs_mmio_write32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET, 0xFFFFFFFFu);
   CHECK_EQ(
       abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET), 0u,
       "[i2c_target_fsm.sv:326-328] Expected TARGET_NACK_COUNT == 0 after write "
       "(SwAccessRC)");
+
+  // Reset FIFOs, enable ACK_CTRL_EN = 1 with NBYTES = 0 and TARGET_TIMEOUT_CTRL
+  // (EN = 1, VAL = 20) so the target NACKs data byte 0x55 in StretchAcqFull,
+  // and issue START + write address (0x33 << 1 | 0) followed by NAKOK | STOP |
+  // 0x55.
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_TIMEOUT_CTRL_REG_OFFSET,
+                   (1u << I2C_TARGET_TIMEOUT_CTRL_EN_BIT) | 20u);
+  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET,
+                   (1u << I2C_CTRL_ENABLEHOST_BIT) |
+                       (1u << I2C_CTRL_ENABLETARGET_BIT) |
+                       (1u << I2C_CTRL_ACK_CTRL_EN_BIT));
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
+                   (1u << I2C_FDATA_START_BIT) | (0x33u << 1));
+  abs_mmio_write32(
+      kI2c0Base + I2C_FDATA_REG_OFFSET,
+      (1u << I2C_FDATA_NAKOK_BIT) | (1u << I2C_FDATA_STOP_BIT) | 0x55u);
+  for (int i = 0; i < 5000; ++i) {
+    uint32_t st = abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET);
+    if ((st & kDoneMask) == kDoneMask) {
+      break;
+    }
+    busy_spin_micros(2);
+  }
+  uint32_t nack_cnt_first_read =
+      abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET);
+  uint32_t nack_cnt_second_read =
+      abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET);
+  CHECK_EQ(nack_cnt_first_read, 1u,
+           "[i2c_target_fsm.sv:327] Expected TARGET_NACK_COUNT == 1 after "
+           "single NACKed target transaction (AcqNack + AcqNackStop)");
+  CHECK_EQ(nack_cnt_second_read, 0u,
+           "[i2c_target_fsm.sv:327] Expected TARGET_NACK_COUNT to clear to 0 "
+           "on read (SwAccessRC)");
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_TIMEOUT_CTRL_REG_OFFSET, 0u);
+
   abs_mmio_write32(kI2c0Base + I2C_HOST_TIMEOUT_CTRL_REG_OFFSET, 0xFFFFFFFFu);
   CHECK_EQ(abs_mmio_read32(kI2c0Base + I2C_HOST_TIMEOUT_CTRL_REG_OFFSET),
            0x000FFFFFu,
