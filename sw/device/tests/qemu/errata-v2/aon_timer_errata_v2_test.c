@@ -30,7 +30,7 @@
  *    `WKUP_COUNT_LO >= WKUP_THOLD_LO` while `PRESCALER = 200` does not assert
  *    `WKUP_CAUSE` or `INTR_STATE.wkup_timer_expired` until `prescale_count_q`
  *    reaches `200`.
- * 4. [hw/ip/aon_timer/rtl/aon_timer_reg_pkg.sv:191-206 &
+ * 4. [hw/ip/aon_timer/rtl/aon_timer_reg_pkg.sv:200-215 &
  *    aon_timer_reg_top.sv:1171-1187]:
  *    `AON_TIMER_PERMIT` allows 8-bit (`sb`) writes to `WDOG_CTRL` (`0x1c`,
  *    `4'b0001`), requires >=16-bit (`sh`/`sw`) writes to `WKUP_CTRL` (`0x04`,
@@ -154,16 +154,17 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_aon_timer_init(mmio_region_from_addr(kAonTimerBase), &aon));
 
   // =========================================================================
-  // 1. [NEW IN V2 + V1: aon_timer_reg_top.sv:374, 579, 767, 1069 &
-  //     prim_reg_cdc_arb.sv:71-95, 199-212]
+  // 1. [NEW IN V2 + V1: aon_timer_reg_top.sv:331, 374, 536, 579, 737, 767,
+  //     946, 1069 & prim_reg_cdc_arb.sv:71-95, 199-212]
   //    AND [aon_timer.sv:185-218 vs programmers_guide.md:88-90]:
   //    (a) When `INTR_STATE.wkup_timer_expired` first becomes `1`
   //    (`u_intr_sync`
   //        in 24 MHz `clk_i`), `WKUP_CAUSE` (`0x34`) and `WKUP_COUNT_LO`
   //        (`0x14`) still read `0` for ~5 us (`1 clk_aon_i` cycle) because
-  //        `.dst_update_i` on `u_wkup_cause_cdc` and `u_wkup_count_lo_cdc` is
-  //        wired to `prim_subreg.qe` (`== we == 0`) instead of `hw2reg.*.de`,
-  //        making `dst_ds_i` early capture unreachable (`VC_COV_UNR`).
+  //        `.dst_update_i` on `u_wkup_cause_cdc` (`line 579`) and
+  //        `u_wkup_count_lo_cdc` (`line 374`) is wired to `prim_subreg.qe`
+  //        (`== we == 0`) instead of `hw2reg.*.de`, making `dst_ds_i` early
+  //        capture unreachable (`VC_COV_UNR`).
   //    (b) After `WKUP_CAUSE` becomes `1`, clearing `WKUP_CAUSE` (`write 0`)
   //        and `INTR_STATE` (`write 1` W1C) while `PRESCALER == 0` and
   //        `WKUP_COUNT >= WKUP_THOLD` re-asserts `WKUP_CAUSE = 1` on the next
@@ -171,7 +172,8 @@ bool test_main(void) {
   //        (and likewise for `wdog_timer_bark`).
   // =========================================================================
   LOG_INFO(
-      "Verifying [aon_timer_reg_top.sv:374,579 & aon_timer.sv:185-218]: "
+      "Verifying [aon_timer_reg_top.sv:331,374,536,579 & "
+      "aon_timer.sv:185-218]: "
       "WKUP_CAUSE/WKUP_COUNT 1-cycle (5 us) CDC lag behind INTR_STATE & "
       "PRESCALER==0 / wdog_timer_bark edge-detector non-retrigger...");
   aon_reset_all();
@@ -387,13 +389,13 @@ bool test_main(void) {
   CHECK(abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET) == 0u);
 
   // =========================================================================
-  // 4. [aon_timer_reg_pkg.sv:191-206 & aon_timer_reg_top.sv:1171-1187]:
+  // 4. [aon_timer_reg_pkg.sv:200-215 & aon_timer_reg_top.sv:1171-1187]:
   //    Sub-word write `wr_err` (`d_error = 1`, `mcause = 7`) on `WKUP_CTRL`
   //    (`4'b0011`, `sb` faults while `sh` succeeds), `WDOG_CTRL` (`4'b0001`,
   //    `sb` succeeds), and `WKUP_THOLD_LO` (`4'b1111`, `sb`/`sh` fault).
   // =========================================================================
   LOG_INFO(
-      "Verifying [aon_timer_reg_pkg.sv:191-206]: AON_TIMER_PERMIT sub-word "
+      "Verifying [aon_timer_reg_pkg.sv:200-215]: AON_TIMER_PERMIT sub-word "
       "write access faults (WKUP_CTRL 4'b0011 vs WDOG_CTRL 4'b0001 vs "
       "WKUP_THOLD_LO 4'b1111)...");
   aon_reset_all();
