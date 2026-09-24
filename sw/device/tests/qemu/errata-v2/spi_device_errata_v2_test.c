@@ -230,18 +230,19 @@ static void test_csr_subword_permit_masks(mmio_region_t base) {
   LOG_INFO("Test 5: Sub-word CSR write faults via SPI_DEVICE_PERMIT");
   uint32_t prev_faults = g_fault_count;
 
-  // Per spi_device_reg_top.sv:19606-19679, wr_err = |(SPI_DEVICE_PERMIT[i] &
-  // ~reg_be). FLASH_STATUS (0x4c, index 10) has SPI_DEVICE_PERMIT[10] =
-  // 4'b0111: any 8-bit (reg_be=4'b0001) or 16-bit (reg_be=4'b0011) write leaves
-  // byte 2 uncovered and raises a synchronous Store Access Fault (mcause=7),
-  // whereas a 32-bit write (reg_be=4'b1111) succeeds.
+  // Per spi_device_reg_top.sv:19606-19679 and spi_device_reg_pkg.sv:845-919,
+  // wr_err = |(SPI_DEVICE_PERMIT[i] & ~reg_be). FLASH_STATUS (0x28, index 10)
+  // has SPI_DEVICE_PERMIT[10] = 4'b0111: any 8-bit (reg_be=4'b0001) or 16-bit
+  // (reg_be=4'b0011) write leaves byte 2 uncovered and raises a synchronous
+  // Store Access Fault (mcause=7), whereas a 32-bit write (reg_be=4'b1111)
+  // succeeds.
   expect_write8_fault(base, SPI_DEVICE_FLASH_STATUS_REG_OFFSET, 0x00u);
   expect_write16_fault(base, SPI_DEVICE_FLASH_STATUS_REG_OFFSET, 0x0000u);
 
-  // TPM_ACCESS_1 (0x168, index 63) has SPI_DEVICE_PERMIT[63] = 4'b0001 (1 byte
-  // for locality 4), so an 8-bit write to byte 0 (0x168, reg_be=4'b0001)
-  // succeeds, whereas an 8-bit write to byte 1 (0x169, reg_be=4'b0010) or an
-  // 8-bit write to byte 0 of TPM_ACCESS_0 (0x164, index 62,
+  // TPM_ACCESS_1 (0x810, index 63) has SPI_DEVICE_PERMIT[63] = 4'b0001 (1 byte
+  // for locality 4), so an 8-bit write to byte 0 (0x810, reg_be=4'b0001)
+  // succeeds, whereas an 8-bit write to byte 1 (0x811, reg_be=4'b0010) or an
+  // 8-bit write to byte 0 of TPM_ACCESS_0 (0x80c, index 62,
   // SPI_DEVICE_PERMIT[62] = 4'b1111) faults with mcause=7.
   prev_faults = g_fault_count;
   mmio_region_write8(base, SPI_DEVICE_TPM_ACCESS_1_REG_OFFSET, 0x00u);
