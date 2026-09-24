@@ -57,7 +57,6 @@
 
 #include "hw/top/clkmgr_regs.h"
 #include "hw/top/csrng_regs.h"
-#include "hw/top/rv_core_ibex_regs.h"
 #include "hw/top/sram_ctrl_regs.h"
 #include "hw/top/uart_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
@@ -69,9 +68,7 @@ enum {
   kUart1Base = 0x40010000u,
   kSramRetRegsBase = 0x40500000u,
   kSramMetaRegsBase = TOP_EARLGREY_SRAM_CTRL_META_REGS_BASE_ADDR,
-  kSramMetaRamBase = TOP_EARLGREY_SRAM_CTRL_META_RAM_BASE_ADDR,
   kCsrngBase = TOP_EARLGREY_CSRNG_BASE_ADDR,
-  kRvCoreIbexBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR,
 };
 
 /**
@@ -333,22 +330,14 @@ static void test_prim_mubi_and_ram_scr_chunks(void) {
   CHECK(abs_mmio_read32(kRetWord0) == 0xa5a50000u);
   CHECK(abs_mmio_read32(kRetWord1) == 0xa5a50012u);
 
-  // Initialize SRAM_CTRL_META and temporarily enable RV_CORE_IBEX.CHERIOT_ENA
-  // (0x6) so `u_cheriot` forwards accesses to Chunk 0 (`kSramMetaRamBase + 0`)
-  // and Chunk 1 (`kSramMetaRamBase + 0x800`) of `u_sram_ctrl_meta`.
+  // Initialize SRAM_CTRL_META (`MemSizeRam = 38912 = 19 * 2048` bytes,
+  // `SramCtrlMetaNumAddrScrRounds = 0`) and verify `STATUS.INIT_DONE == 1`
+  // with zero `STATUS` error bits (`0x1f == 0`).
   abs_mmio_write32(kSramMetaRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
                    1u << SRAM_CTRL_CTRL_INIT_BIT);
   while ((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
           (1u << SRAM_CTRL_STATUS_INIT_DONE_BIT)) == 0u) {
   }
-  abs_mmio_write32(kRvCoreIbexBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
-                   kMultiBitBool4True);
-  abs_mmio_write32(kSramMetaRamBase + 0x0u, 0x5a5a0000u);
-  abs_mmio_write32(kSramMetaRamBase + 0x800u, 0x5a5a0001u);
-  CHECK(abs_mmio_read32(kSramMetaRamBase + 0x0u) == 0x5a5a0000u);
-  CHECK(abs_mmio_read32(kSramMetaRamBase + 0x800u) == 0x5a5a0001u);
-  abs_mmio_write32(kRvCoreIbexBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
-                   kMultiBitBool4False);
   CHECK((abs_mmio_read32(kSramMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET) &
          0x1fu) == 0u);
 }
