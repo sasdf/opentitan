@@ -199,7 +199,7 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
 }
 
 /**
- * Test 2: & (NEW_IN_V2)
+ * Test 2: UDS Reload & REGWEN Lock (NEW_IN_V2)
  * - `ROM` (`rom.c:665-735`) and
  *   `sc_keymgr_dpe_advance_creator()` leave `LOAD_KEY_LOCK == 0` (`0xd4`),
  *   allowing post-ROM firmware to execute `OpDpeLoadRootKey` (`OPERATION = 5`)
@@ -213,13 +213,13 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
 static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
     const dif_keymgr_dpe_t *keymgr_dpe) {
   LOG_INFO(
-      "Testing & LOAD_KEY_LOCK "
+      "Testing UDS reload LOAD_KEY_LOCK "
       "and UDS REGWEN lock");
 
   uint32_t load_lock =
       abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_LOAD_KEY_LOCK_REG_OFFSET);
   CHECK(load_lock == 0,
-        "Expected LOAD_KEY_LOCK == 0 after ROM boot (), "
+        "Expected LOAD_KEY_LOCK == 0 after ROM boot, "
         "got 0x%x",
         load_lock);
 
@@ -270,8 +270,7 @@ static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
       .slot_policy = 1,
   };
   CHECK(dif_keymgr_dpe_advance_state(keymgr_dpe, &adv_params) == kDifLocked,
-        "Expected dif_keymgr_dpe_advance_state() to fail with kDifLocked "
-        "()");
+        "Expected dif_keymgr_dpe_advance_state() to fail with kDifLocked ");
 }
 
 /**
@@ -397,8 +396,7 @@ static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
 
   CHECK(cfg_wen == 0u, "Expected CFG_REGWEN == 0 while WIP");
   CHECK(swb_wen == 0u,
-        "Expected SW_BINDING_REGWEN == 0 while CFG_REGWEN == 0 "
-        "()");
+        "Expected SW_BINDING_REGWEN == 0 while CFG_REGWEN == 0 ");
   CHECK(pol_wen == 0u,
         "Expected SLOT_POLICY_REGWEN == 0 while CFG_REGWEN == 0");
   CHECK(ver_wen == 0u,
@@ -793,7 +791,7 @@ bool test_main(void) {
     return false;
   }
 
-  LOG_INFO("=== Boot 2 (SW Reset): Running Test 9B () ===");
+  LOG_INFO("=== Boot 2 (SW Reset): Running Test 9B ===");
   test_errata_keymgr_003_fixed_in_v2_disabled_state();
   LOG_INFO("=== All keymgr_dpe v2 errata tests PASSED on CW340 FPGA! ===");
   return true;
