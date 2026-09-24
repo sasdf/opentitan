@@ -12,7 +12,8 @@ use serialport::Parity;
 
 use crate::monitor::Monitor;
 use opentitanlib::io::console::ConsoleDevice;
-use opentitanlib::io::uart::Uart;
+use opentitanlib::io::uart::flow::SoftwareFlowControl;
+use opentitanlib::io::uart::{FlowControl, Uart};
 use opentitanlib::io::uart::serial::SerialPortUart;
 
 pub struct QemuUart {
@@ -23,7 +24,7 @@ pub struct QemuUart {
     id: String,
 
     // Underlying SerialPort used for the UART.
-    serial_port: SerialPortUart,
+    serial_port: SoftwareFlowControl<SerialPortUart>,
 
     // Whether the UART is currently transmitting a break condition or not.
     in_break: RefCell<bool>,
@@ -34,7 +35,7 @@ impl QemuUart {
         Self {
             monitor,
             id: id.into(),
-            serial_port,
+            serial_port: SoftwareFlowControl::new(serial_port),
             in_break: RefCell::new(false),
         }
     }
@@ -57,6 +58,10 @@ impl Uart for QemuUart {
 
     fn set_baudrate(&self, baudrate: u32) -> Result<()> {
         self.serial_port.set_baudrate(baudrate)
+    }
+
+    fn get_flow_control(&self) -> Result<FlowControl> {
+        self.serial_port.get_flow_control()
     }
 
     fn set_flow_control(&self, flow_control: bool) -> Result<()> {

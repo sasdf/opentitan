@@ -7271,6 +7271,10 @@ opentitan_test(
         ]),
         test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
     ),
+    qemu = qemu_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_tx_rx",
+    ),
     silicon = silicon_params(
         test_cmd = " ".join([
             "--bootstrap=\"{firmware}\"",
@@ -7428,6 +7432,10 @@ opentitan_test(
         ]),
         test_harness = "//sw/host/tests/chip/uart:uart_baud_rate",
     ),
+    qemu = qemu_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
+        test_harness = "//sw/host/tests/chip/uart:uart_baud_rate",
+    ),
     silicon = silicon_params(
         test_cmd = " ".join([
             "--bootstrap=\"{firmware}\"",
@@ -7470,6 +7478,10 @@ opentitan_test(
             "--bootstrap=\"{firmware}\"",
             "--firmware-elf=\"{firmware:elf}\"",
         ]),
+        test_harness = "//sw/host/tests/chip/uart:uart_loopback",
+    ),
+    qemu = qemu_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_loopback",
     ),
     silicon = silicon_params(
@@ -7554,6 +7566,10 @@ opentitan_test(
             "--bootstrap=\"{firmware}\"",
             "--firmware-elf=\"{firmware:elf}\"",
         ]),
+        test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
+    ),
+    qemu = qemu_params(
+        test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/uart:uart_parity_break",
     ),
     silicon = silicon_params(
