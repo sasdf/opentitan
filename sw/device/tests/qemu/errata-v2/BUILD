@@ -219,6 +219,24 @@ opentitan_test(
 # Priority P15 Module: alert_handler
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p15_alert_handler ===
+opentitan_test(
+    name = "alert_handler_errata_v2_test",
+    srcs = ["alert_handler_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top:alert_handler_c_regs",
+        "//hw/top:uart_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p15_alert_handler ===
 
 # ----------------------------------------------------------------------------
