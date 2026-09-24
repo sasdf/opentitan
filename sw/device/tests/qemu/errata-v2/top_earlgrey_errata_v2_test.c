@@ -219,7 +219,7 @@ static void test_sram_ifetch_and_v2_sec_sram(void) {
  *   (`0x24`), shifting the first unmapped `addrmiss` offset inside the 64-byte
  *   `ADDR_MASK = 0x3f` window from `0x24` to `0x28`.
  * - Two-stage crossbar `ADDR_MASK` vs. `addrmiss` faults (`SPI_HOST0` at
- *   `0x40300038` within `ADDR_MASK = 0x3f`, `SYSRST_CTRL` at `0x40430078`
+ *   `0x40300038` within `ADDR_MASK = 0x3f`, `SYSRST_CTRL` at `0x404300AC`
  *   within `ADDR_MASK = 0xff`), plus removed v1 peripherals (`PATTGEN` at
  *   `0x400e0000`, `PWM` at `0x40450000`, `OTP_CTRL__PRIM` at `0x40132000`)
  *   routing through `ADDR_MASK_PERI` to `xbar_peri`'s `tlul_err_resp`
