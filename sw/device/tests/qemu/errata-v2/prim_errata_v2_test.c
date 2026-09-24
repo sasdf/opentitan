@@ -187,8 +187,9 @@ static void test_prim_fifo_sync_semantics(void) {
   CHECK(fifo_status == 0u);
 
   // 2. Push 4 bytes into TX FIFO while UART1.CTRL.TX == 0, then fill to
-  //    Depth = 128 and push a 129th byte (`0xFF`) to verify `fifo_incr_wptr =
-  //    wvalid_i & wready_o` gates off pointer wrap/overflow when `full_o == 1`.
+  //    Depth = 32 (`TxFifoDepth = 32`) and push a 33rd byte (`0xFF`) to verify
+  //    `fifo_incr_wptr = wvalid_i & wready_o` gates off pointer wrap/overflow
+  //    when `full_o == 1`.
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x11u);
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x22u);
   abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x33u);
