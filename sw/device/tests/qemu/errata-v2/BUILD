@@ -18,6 +18,33 @@ package(default_visibility = ["//visibility:public"])
 # Priority P01 Module: keymgr
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p01_keymgr ===
+opentitan_test(
+    name = "keymgr_errata_v2_test",
+    srcs = ["keymgr_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top:keymgr_dpe_c_regs",
+        "//hw/top:kmac_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:keymgr_dpe",
+        "//sw/device/lib/dif:kmac",
+        "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:entropy_testutils",
+        "//sw/device/lib/testing:kmac_testutils",
+        "//sw/device/lib/testing:rstmgr_testutils",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p01_keymgr ===
 
 # ----------------------------------------------------------------------------
