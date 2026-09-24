@@ -553,6 +553,39 @@ opentitan_test(
 # Priority P26 Module: clkmgr
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p26_clkmgr ===
+opentitan_test(
+    name = "clkmgr_errata_v2_test",
+    srcs = ["clkmgr_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+    },
+    fpga = fpga_params(
+        timeout = "short",
+    ),
+    deps = [
+        "//hw/top:clkmgr_c_regs",
+        "//hw/top/dt",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:aon_timer",
+        "//sw/device/lib/dif:clkmgr",
+        "//sw/device/lib/dif:pwrmgr",
+        "//sw/device/lib/dif:rstmgr",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing:aon_timer_testutils",
+        "//sw/device/lib/testing:pwrmgr_testutils",
+        "//sw/device/lib/testing:rstmgr_testutils",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p26_clkmgr ===
 
 # ----------------------------------------------------------------------------
