@@ -8,9 +8,10 @@
  * test for the physical CW340 FPGA.
  *
  * Verifies:
- * 1. `otp_ctrl.prim` TL-UL bus (`u_tlul_lc_gate` in `otp_ctrl.sv:330-352`)
- *    synchronous Load/Store Access Faults (`mcause=5`/`7`) when `lc_dft_en !=
- * On`.
+ * 1. Legacy `otp_ctrl.prim` (`0x40132000`) removal in `trunk-v2` raising
+ *    unmapped `xbar_peri` Load/Store Access Faults (`mcause=5`/`7`), contrasted
+ *    with `rram_macro.prim` (`0x41018000`) where `rram_macro.sv:63` ties
+ *    `lc_nvm_debug_en_i` to `unused_lc_nvm_debug_en` without `u_tlul_lc_gate`.
  * 2. `otp_ctrl.core` sub-word (8-bit/16-bit) CSR write rejection (`wr_err` in
  *    `otp_ctrl_core_reg_top.sv` via `OTP_CTRL_CORE_PERMIT == 4'b1111`) raising
  *    synchronous Store Access Fault (`mcause=7`) without `BUS_INTEG_ERROR`.
