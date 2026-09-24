@@ -134,23 +134,36 @@ bool test_main(void) {
         "SCR_KEY_ROTATED from 0x6 to 0x0, got 0x%x",
         rot);
 
-  // Rotate again (0x6) and write 0x6 (kMultiBitBool4True) -> clears cleanly to
-  // 0x9!
+  // Rotate again (0x6) after sram_init_mem so STATUS == 0x38 (INIT_DONE=1,
+  // SCR_KEY_SEED_VALID=1, SCR_KEY_VALID=1, ESCALATED=0), and write 0x6
+  // (kMultiBitBool4True) -> clears SCR_KEY_ROTATED cleanly to 0x9 while STATUS
+  // remains 0x38:
+  sram_init_mem(kSramRetRegsBase);
   sram_renew_key(kSramRetRegsBase);
+  uint32_t status_before_w1c =
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK(status_before_w1c == 0x38u,
+        "Expected STATUS == 0x38 (INIT_DONE=1, SCR_KEY_SEED_VALID=1, "
+        "SCR_KEY_VALID=1, ESCALATED=0) before clearing SCR_KEY_ROTATED, got "
+        "0x%x",
+        status_before_w1c);
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET,
                    kMultiBitBool4True);
   rot =
       abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_SCR_KEY_ROTATED_REG_OFFSET);
-  CHECK(rot == kMultiBitBool4False,
+  uint32_t status_after_w1c =
+      abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK(rot == kMultiBitBool4False && status_after_w1c == 0x38u,
         "[sram_ctrl_regs_reg_top.sv:566-590] Expected writing 0x6 to clear "
-        "SCR_KEY_ROTATED to 0x9, got 0x%x",
-        rot);
+        "SCR_KEY_ROTATED to 0x9 while preserving STATUS == 0x38, got rot=0x%x "
+        "status=0x%x",
+        rot, status_after_w1c);
   LOG_INFO("Test 1 (SCR_KEY_ROTATED mubi4_and_hi W1C semantics) PASSED");
 
   // ---------------------------------------------------------------------------
   // 2. [sram_ctrl_reg_pkg.sv:159-169, sram_ctrl_regs_reg_top.sv:721-732]:
-  //    SRAM_CTRL_REGS_PERMIT = 4'b0001 accepts sb to +0, faults sb to +1
-  //    (mcause=7), and faults unmapped read at 0x24 (mcause=5).
+  //    SRAM_CTRL_REGS_PERMIT = 4'b0001 accepts sb/sh to +0, faults sb to +1..+3
+  //    (mcause=7), and faults unmapped read/write at 0x24 (mcause=5/7).
   // ---------------------------------------------------------------------------
   CHECK(abs_mmio_read32(kSramRetRegsBase + SRAM_CTRL_CTRL_REG_OFFSET) == 0u,
         "Expected WO register CTRL (0x14) to read back 0");
@@ -162,11 +175,25 @@ bool test_main(void) {
         "(PERMIT=4'b0001) to succeed");
 
   g_load_store_fault = false;
-  g_last_mcause = 0;
-  abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET + 1u, 1u);
-  CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[sram_ctrl_reg_pkg.sv:159-169] Expected sb to EXEC_REGWEN+1 "
-        "(reg_be=4'b0010) to fault with mcause=7");
+  asm volatile("sh %0, 0(%1)"
+               :
+               : "r"((uint16_t)1u),
+                 "r"(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET)
+               : "memory");
+  CHECK(!g_load_store_fault,
+        "[sram_ctrl_reg_pkg.sv:159-169] Expected sh to EXEC_REGWEN+0 "
+        "(reg_be=4'b0011, PERMIT=4'b0001) to succeed");
+
+  for (uint32_t off = 1u; off <= 3u; ++off) {
+    g_load_store_fault = false;
+    g_last_mcause = 0;
+    abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET + off,
+                    1u);
+    CHECK(g_load_store_fault && g_last_mcause == 7u,
+          "[sram_ctrl_reg_pkg.sv:159-169] Expected sb to EXEC_REGWEN+%u "
+          "(reg_be[0]==0) to fault with mcause=7",
+          off);
+  }
 
   g_load_store_fault = false;
   g_last_mcause = 0;
@@ -174,6 +201,13 @@ bool test_main(void) {
   CHECK(g_load_store_fault && g_last_mcause == 5u,
         "[sram_ctrl_reg_pkg.sv:159-169] Expected unmapped CSR read at 0x24 to "
         "fault with mcause=5");
+
+  g_load_store_fault = false;
+  g_last_mcause = 0;
+  abs_mmio_write32(kSramRetRegsBase + 0x24u, 0u);
+  CHECK(g_load_store_fault && g_last_mcause == 7u,
+        "[sram_ctrl_reg_pkg.sv:159-169] Expected unmapped CSR write at 0x24 to "
+        "fault with mcause=7");
   LOG_INFO("Test 2 (SRAM_CTRL_REGS_PERMIT = 4'b0001 sub-word CSR) PASSED");
 
   // ---------------------------------------------------------------------------
@@ -194,10 +228,14 @@ bool test_main(void) {
     abs_mmio_write32(ret_buf + i * 4u, 0xa5a50000u + i);
   }
   abs_mmio_write8(ret_buf + 1u, 0x5au);
-  abs_mmio_write8(ret_buf + 2u, 0x34u);
-  abs_mmio_write8(ret_buf + 3u, 0x12u);
-  CHECK(abs_mmio_read32(ret_buf) == 0x12345a00u,
-        "Expected sub-word RMW on SRAM data window to produce 0x12345a00");
+  g_load_store_fault = false;
+  asm volatile("sh %0, 0(%1)"
+               :
+               : "r"((uint16_t)0x1234u), "r"(ret_buf + 2u)
+               : "memory");
+  CHECK(!g_load_store_fault && abs_mmio_read32(ret_buf) == 0x12345a00u,
+        "Expected sub-word sb/sh RMW on SRAM data window to produce "
+        "0x12345a00");
 
   g_nmi_load_integ_count = 0;
   sram_renew_key(kSramRetRegsBase);
