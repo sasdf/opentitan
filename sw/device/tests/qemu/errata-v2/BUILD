@@ -754,6 +754,27 @@ opentitan_test(
 # Priority P31 Module: pattgen
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p31_pattgen ===
+opentitan_test(
+    name = "pattgen_errata_v2_test",
+    srcs = ["pattgen_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top:hmac_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:hmac",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p31_pattgen ===
 
 # ----------------------------------------------------------------------------
