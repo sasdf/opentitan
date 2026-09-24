@@ -6,7 +6,7 @@
  * Physical CW340 FPGA Errata Confirmation & Discovery Test for `padring` (v2).
  *
  * Verifies:
- * 1. [ERRATA-PADRING-001] (`CONFIRMED_PRESENT_ON_V2`):
+ * 1. [prim_pad_wrapper.sv:50,76-98] (`CONFIRMED_PRESENT_ON_V2`):
  *    - In `hw/ip/prim_xilinx_ultrascale/rtl/prim_pad_wrapper.sv` (lines 50,
  *      76-98), `out = out_i ^ attr_i.invert`, `ie = ie_i &
  * ~attr_i.input_disable`, `in_raw_o = ie ? in : 1'b0`, and `in_o =
@@ -29,7 +29,7 @@
  *      `DioSpiDeviceCsb` = 13), while `PadType == BidirOd` drives push-pull
  *      when `virtual_od_en == 0`.
  *
- * 2. [ERRATA-PADRING-V2-001] (`NEW_IN_V2`):
+ * 2. [chip_earlgrey_cw340.sv:647-692] (`NEW_IN_V2`):
  *    - In `hw/top_earlgrey/rtl/autogen/chip_earlgrey_cw340.sv` (lines 147-148,
  *      647-692), `DioUsbdevUsbDp` (`DIO[0]`) and `DioUsbdevUsbDn` (`DIO[1]`)
  *      are parameterized as `BidirStd` in `PinmuxTargetCfg`, so
@@ -134,8 +134,8 @@ static bool gpio_sample_bit(uint32_t bit) {
 }
 
 /**
- * Part 1: Verify [ERRATA-PADRING-001] (`CONFIRMED_PRESENT_ON_V2`) on physical
- * CW340 FPGA:
+ * Part 1: Verify [prim_pad_wrapper.sv:50,76-98] (`CONFIRMED_PRESENT_ON_V2`) on
+ * physical CW340 FPGA:
  * - Double-inversion cancellation across `IOBUF` loopback when `invert = 1`
  *   and `input_disable = 0`.
  * - Pre-inversion clamping `in_raw_o = 0` when `input_disable = 1`, causing
@@ -146,7 +146,7 @@ static bool gpio_sample_bit(uint32_t bit) {
  *   pads (`0x83` for `BidirStd`/`BidirOd`, `0x81` for `InputStd`).
  */
 static void test_errata_padring_001_confirmed_on_v2(void) {
-  LOG_INFO("Testing [ERRATA-PADRING-001] on v2 CW340 FPGA...");
+  LOG_INFO("Testing [prim_pad_wrapper.sv:50,76-98] on v2 CW340 FPGA...");
 
   uint32_t orig_std_insel =
       abs_mmio_read32(mio_insel_addr(kTestGpioStdInselIdx));
@@ -188,8 +188,8 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   gpio_drive_bit(kTestGpioStdMask, false);
   bool inv_loop_low = gpio_sample_bit(kTestGpioStdBit);
   LOG_INFO(
-      "ERRATA-PADRING-001 (invert=1 loopback): out_i=1 -> in_o=%d, out_i=0 -> "
-      "in_o=%d",
+      "[prim_pad_wrapper.sv:50,98] (invert=1 loopback): out_i=1 -> in_o=%d, "
+      "out_i=0 -> in_o=%d",
       inv_loop_high, inv_loop_low);
   CHECK(inv_loop_high == true && inv_loop_low == false,
         "Expected double-inversion cancellation (in_o == out_i) across IOBUF");
@@ -216,8 +216,8 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   gpio_drive_bit(kTestGpioStdMask, true);
   bool dis_inv_drive1 = gpio_sample_bit(kTestGpioStdBit);
   LOG_INFO(
-      "ERRATA-PADRING-001 (input_disable=1): attr=0x80 -> (%d,%d), attr=0x81 "
-      "-> (%d,%d)",
+      "[prim_pad_wrapper.sv:76,97-98] (input_disable=1): attr=0x80 -> (%d,%d), "
+      "attr=0x81 -> (%d,%d)",
       dis_noinv_drive0, dis_noinv_drive1, dis_inv_drive0, dis_inv_drive1);
   CHECK(dis_inv_drive0 == true && dis_inv_drive1 == true,
         "Expected input_disable=1, invert=1 (0x81) to force in_o=1");
@@ -282,12 +282,13 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   }
   CHECK(dio_input_std_count == 2u && dio_bidir_count == 14u);
   LOG_INFO(
-      "[ERRATA-PADRING-001] confirmed: 47 MIO (0x83), 14 Bidir DIO (0x83), 2 "
-      "InputStd DIO (0x81).");
+      "[prim_pad_attr.sv:30-45] confirmed: 47 MIO (0x83), 14 Bidir DIO (0x83), "
+      "2 InputStd DIO (0x81).");
 }
 
 /**
- * Part 2: Verify [ERRATA-PADRING-V2-001] (`NEW_IN_V2`) on physical CW340 FPGA:
+ * Part 2: Verify [chip_earlgrey_cw340.sv:647-692] (`NEW_IN_V2`) on physical
+ * CW340 FPGA:
  * - `PINMUX.DIO_PAD_ATTR[0]` (`DioUsbdevUsbDp`) and `PINMUX.DIO_PAD_ATTR[1]`
  *   (`DioUsbdevUsbDn`) accept and read back `0x83` (`input_disable |
  *   virtual_od_en | invert`) because `TargetCfg.dio_pad_type[0..1]` is
@@ -301,7 +302,7 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
  *   and `rx_dn_s` remain identical under `0x00`, `0x80`, and `0x81`).
  */
 static void test_errata_padring_v2_001_unconnected_usb_dio_attr(void) {
-  LOG_INFO("Testing [ERRATA-PADRING-V2-001] on v2 CW340 FPGA...");
+  LOG_INFO("Testing [chip_earlgrey_cw340.sv:647-692] on v2 CW340 FPGA...");
 
   uint32_t dp_idx = kTopEarlgreyDirectPadsUsbdevUsbDp;
   uint32_t dn_idx = kTopEarlgreyDirectPadsUsbdevUsbDn;
@@ -346,7 +347,7 @@ static void test_errata_padring_v2_001_unconnected_usb_dio_attr(void) {
   abs_mmio_write32(dio_pad_attr_addr(dn_idx), orig_dn_attr);
 
   LOG_INFO(
-      "ERRATA-PADRING-V2-001: DIO_PAD_ATTR[0..1] readback=0x80/0x81, "
+      "[chip_earlgrey_cw340.sv:647-692] DIO_PAD_ATTR[0..1] readback=0x80/0x81, "
       "USBDEV.PHY_PINS_SENSE[1:0]: attr_00=0x%x, attr_80=0x%x, attr_81=0x%x",
       sense_attr_00, sense_attr_80, sense_attr_81);
 
