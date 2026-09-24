@@ -34,13 +34,13 @@
  *     `info_page_cfg = CfgRw` and bypassing all `MP_REGION_CFG`,
  *     `DEFAULT_REGION`, `SwInitDataCfg` (OTP region), and `INFO_PAGE_CFG` +
  *     life-cycle seed locks.
- *  6. [rram_ctrl.sv:447-476, 509-585, 879-915] & [tlul_adapter_sram.sv]:
- *     Empty/idle `RD_FIFO` read (`0x120`) outputs `39'h0` (`data_intg = 0`)
- *     triggering `LoadAccessFault` (`mcause = 5`) + Ibex Load Integrity NMI;
- *     CPU store to direct RRAM host window (`0x30000000`) outputs
- *     `d_data = 0xffffffff` with `data_intg = 0x39` triggering
- *     `StoreAccessFault` (`mcause = 7`) + Ibex Store Integrity NMI; and
- *     `WR_FIFO`/`RD_FIFO`/`PERMIT` access faults (`mcause = 5` / `7`).
+ *  6. [rram_ctrl.sv:447-476, 509-585, 879-915] &
+ * [tlul_adapter_sram.sv:349-366]: CPU store to direct RRAM host window
+ * (`0x30080000`) and out-of-bounds host read (`0x301ff600`) return `d_error =
+ * 1` (`mcause = 7 / 5`) with valid `error_blanking_integ = 0x55`
+ * (`g_intg_nmi_count == 0`, whereas empty `RD_FIFO` reads at `0x120` deadlock
+ * `u_to_rd_fifo` on `trunk-v2`); plus `WR_FIFO`/`RD_FIFO`/`PERMIT` access
+ * faults (`mcause = 5` / `7`).
  *  7. [rram_macro_prim_reg_top.sv] (`0x41018000`):
  *     `CSR2` (`0x08`) `rw` bits (`0x88`) omit `CSR0_REGWEN` (`0x00`) gating
  *     and remain writable after `CSR0_REGWEN` is locked to `0`.
@@ -479,19 +479,18 @@ bool test_main(void) {
   clear_rram_status();
 
   // ---------------------------------------------------------------------------
-  // 6. [rram_ctrl.sv:447-476, 509-585, 879-915] & [tlul_adapter_sram.sv]:
-  //    - Empty/idle read of `RD_FIFO` (`0x120`) outputs `39'h0` (`data_intg =
-  //    0`)
-  //      -> `LoadAccessFault` (`mcause = 5`) + Ibex Load Integrity NMI.
-  //    - CPU store to RRAM host window (`0x30080000`) returns `d_data =
-  //      0xffffffff` with `data_intg = 0x39` -> `StoreAccessFault` (`mcause =
-  //      7`) + Ibex Store Integrity NMI.
+  // 6. [rram_ctrl.sv:447-476, 509-585, 879-915] &
+  // [tlul_adapter_sram.sv:349-366]:
+  //    - CPU store to RRAM host window (`0x30080000`) and out-of-bounds read
+  //      (`0x301ff600`) return `d_error = 1` (`mcause = 7 / 5`) with valid
+  //      `error_blanking_integ = 0x55` (`g_intg_nmi_count == 0`), whereas an
+  //      empty `RD_FIFO` read (`0x120`) deadlocks `u_to_rd_fifo` on `trunk-v2`.
   //    - `RD_FIFO` write (`mcause = 7`), `WR_FIFO` read (`mcause = 5`), and
   //      sub-word writes (`sb`) to `WR_FIFO` and `CONTROL` (`mcause = 7`).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [rram_ctrl.sv:447-585, 879-915]: Host window store NMI and "
-      "WR_FIFO/RD_FIFO/CSR PERMIT access faults");
+      "Verifying [rram_ctrl.sv:447-585, 879-915]: Host window access faults "
+      "(error_blanking_integ=0x55) and WR_FIFO/RD_FIFO/CSR PERMIT faults");
   CHECK_STATUS_OK(
       ottf_alerts_ignore_alert(kTopEarlgreyAlertIdRvCoreIbexFatalHwErr));
 
