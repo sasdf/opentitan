@@ -15,12 +15,12 @@ package(default_visibility = ["//visibility:public"])
 # to prevent 3-way merge conflicts across concurrent worker agents.
 
 # ----------------------------------------------------------------------------
-# Priority P01 Module: keymgr
+# Priority P01 Module: keymgr_dpe
 # ----------------------------------------------------------------------------
-# === BEGIN ERRATA-V2 TEST: p01_keymgr ===
+# === BEGIN ERRATA-V2 TEST: p01_keymgr_dpe ===
 opentitan_test(
-    name = "keymgr_errata_v2_test",
-    srcs = ["keymgr_errata_v2_test.c"],
+    name = "keymgr_dpe_errata_v2_test",
+    srcs = ["keymgr_dpe_errata_v2_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
     },
@@ -45,15 +45,15 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
-# === END ERRATA-V2 TEST: p01_keymgr ===
+# === END ERRATA-V2 TEST: p01_keymgr_dpe ===
 
 # ----------------------------------------------------------------------------
-# Priority P02 Module: flash_ctrl
+# Priority P02 Module: rram_ctrl
 # ----------------------------------------------------------------------------
-# === BEGIN ERRATA-V2 TEST: p02_flash_ctrl ===
+# === BEGIN ERRATA-V2 TEST: p02_rram_ctrl ===
 opentitan_test(
-    name = "flash_ctrl_errata_v2_test",
-    srcs = ["flash_ctrl_errata_v2_test.c"],
+    name = "rram_ctrl_errata_v2_test",
+    srcs = ["rram_ctrl_errata_v2_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
     },
@@ -73,7 +73,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
-# === END ERRATA-V2 TEST: p02_flash_ctrl ===
+# === END ERRATA-V2 TEST: p02_rram_ctrl ===
 
 # ----------------------------------------------------------------------------
 # Priority P03 Module: otp_ctrl
@@ -578,6 +578,29 @@ opentitan_test(
 # Priority P20 Module: hmac
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p20_hmac ===
+opentitan_test(
+    name = "hmac_errata_v2_test",
+    srcs = ["hmac_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+    },
+    deps = [
+        "//hw/top:hmac_c_regs",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/dif:hmac",
+        "//sw/device/lib/runtime:hart",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:irq",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p20_hmac ===
 
 # ----------------------------------------------------------------------------
@@ -858,12 +881,12 @@ opentitan_test(
 # === END ERRATA-V2 TEST: p29_gpio ===
 
 # ----------------------------------------------------------------------------
-# Priority P30 Module: pwm
+# Priority P30 Module: cheriot
 # ----------------------------------------------------------------------------
-# === BEGIN ERRATA-V2 TEST: p30_pwm ===
+# === BEGIN ERRATA-V2 TEST: p30_cheriot ===
 opentitan_test(
-    name = "pwm_errata_v2_test",
-    srcs = ["pwm_errata_v2_test.c"],
+    name = "cheriot_errata_v2_test",
+    srcs = ["cheriot_errata_v2_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
     },
@@ -889,36 +912,7 @@ opentitan_test(
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
 )
-# === END ERRATA-V2 TEST: p30_pwm ===
-
-# ----------------------------------------------------------------------------
-# Priority P31 Module: pattgen
-# ----------------------------------------------------------------------------
-# === BEGIN ERRATA-V2 TEST: p31_pattgen ===
-opentitan_test(
-    name = "pattgen_errata_v2_test",
-    srcs = ["pattgen_errata_v2_test.c"],
-    exec_env = {
-        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-    },
-    deps = [
-        "//hw/top:hmac_c_regs",
-        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
-        "//sw/device/lib/base:abs_mmio",
-        "//sw/device/lib/base:bitfield",
-        "//sw/device/lib/base:mmio",
-        "//sw/device/lib/dif:hmac",
-        "//sw/device/lib/runtime:hart",
-        "//sw/device/lib/runtime:ibex",
-        "//sw/device/lib/runtime:irq",
-        "//sw/device/lib/runtime:log",
-        "//sw/device/lib/testing/test_framework:check",
-        "//sw/device/lib/testing/test_framework:ottf_isrs",
-        "//sw/device/lib/testing/test_framework:ottf_main",
-    ],
-)
-# === END ERRATA-V2 TEST: p31_pattgen ===
+# === END ERRATA-V2 TEST: p30_cheriot ===
 
 # ----------------------------------------------------------------------------
 # Priority P32 Module: sysrst_ctrl

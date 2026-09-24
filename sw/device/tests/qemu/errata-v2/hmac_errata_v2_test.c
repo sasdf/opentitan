@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * @file pattgen_errata_v2_test.c
+ * @file hmac_errata_v2_test.c
  * @brief Earlgrey v2 (`trunk-v2`) CW340 FPGA Hardware, Spec & DIF Errata
  * Verification Suite for `hmac` (`0x41110000`).
  *
@@ -484,12 +484,12 @@ bool test_main(void) {
   dif_hmac_t hmac;
   CHECK_DIF_OK(dif_hmac_init(mmio_region_from_addr(kHmacBase), &hmac));
 
-  LOG_INFO("=== Running P32 hmac v2 errata suite on CW340 FPGA ===");
+  LOG_INFO("=== Running hmac_errata_v2_test on CW340 FPGA ===");
   test_hmac_unwired_keymgr_sideload();
   test_hmac_key_swap_write_time_latch_hazard(&hmac);
   test_hmac_digest_write_gate_and_sha512_readback();
   test_hmac_msg_fifo_read_and_permit_faults();
   test_hmac_hash_stop_non_block_multiple_deadlock();
-  LOG_INFO("=== All P32 hmac v2 errata tests PASSED! ===");
+  LOG_INFO("=== All hmac_errata_v2_test checks PASSED on CW340 FPGA! ===");
   return true;
 }

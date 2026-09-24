@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * OpenTitan Earlgrey v2 (`trunk-v2`) Hardware & Specification Errata
- * Verification Test for `flash_ctrl` / `rram_ctrl` (CW340 FPGA).
+ * @file rram_ctrl_errata_v2_test.c
+ * @brief OpenTitan Earlgrey v2 (`trunk-v2`) Hardware & Specification Errata
+ * Verification Test for `rram_ctrl` (CW340 FPGA).
  *
  * In `trunk-v2`, `top_earlgrey` replaced `flash_ctrl` on the main bus with
  * `rram_ctrl` (`hw/ip/rram_ctrl/`, `0x41010000`) and `rram_macro_prim`
@@ -203,7 +204,7 @@ static void ensure_rram_init(void) {
 }
 
 bool test_main(void) {
-  LOG_INFO("=== Starting RRAM_CTRL / FLASH_CTRL Earlgrey v2 Errata Test ===");
+  LOG_INFO("=== Running rram_ctrl_errata_v2_test on CW340 FPGA ===");
 
   ensure_rram_init();
   clear_rram_status();
@@ -630,6 +631,6 @@ bool test_main(void) {
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
 
-  LOG_INFO("=== ALL RRAM_CTRL / FLASH_CTRL V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== All rram_ctrl_errata_v2_test checks PASSED on CW340 FPGA! ===");
   return true;
 }

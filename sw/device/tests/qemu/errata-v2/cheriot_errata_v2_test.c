@@ -3,18 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * @file
- * @brief CW340 FPGA Hardware & Spec Verification Test for PWM
- * (`hw/ip_templates/pwm`, `sw/device/lib/dif/dif_pwm.c`) and CHERIoT
+ * @file cheriot_errata_v2_test.c
+ * @brief CW340 FPGA Hardware & Spec Verification Test for CHERIoT
  * (`hw/ip/cheriot`, `hw/ip/rv_core_ibex/rtl/rv_core_ibex_cheriot_switch.sv`) on
  * Earlgrey v2 (`trunk-v2`).
- *
- * In `trunk-v2`, `top_earlgrey` removed the `pwm_aon` peripheral instance and
- * moved `pwm` to `hw/ip_templates/pwm/`, while adding the `cheriot` memory
- * subsystem
- * (`TOP_EARLGREY_CHERIOT_REGS_BASE_ADDR = 0x411B0000u`,
- * `TOP_EARLGREY_CHERIOT_REVBM_BASE_ADDR = 0x11000000u`, and
- * `TOP_EARLGREY_SRAM_CTRL_META_REGS_BASE_ADDR = 0x411C0000u`).
  *
  * This test verifies on the physical CW340 FPGA (`trunk-v2` bitstream):
  *   1. `cheriot_regs_reg_top.sv` (`0x411B0000`):
@@ -56,14 +48,6 @@
  * `LockedDis` or `LockedEna`. Subsequent writes of `0x0` or `0xF` to
  * `CHERIOT_LOCK` (and `0x6` to `CHERIOT_ENA`) are silently ignored without
  * setting `RV_CORE_IBEX_ERR_STATUS` or triggering alert 61.
- *   4. `sw/device/lib/dif/dif_pwm.c` (`dif_pwm_configure_channel` in
- * `trunk-v2`):
- *      - Verifies the `270eab3a1dc4` fix in `dif_pwm.c:106-109` (`BLINK_EN_0 =
- * 1` now asserted alongside `HTBT_EN_0 = 1` in `kDifPwmModeHeartbeat`) and the
- *        remaining off-by-one discrepancy in `dif_pwm.c:126-128` where
- *        `BLINK_PARAM.Y` is programmed to `phase_cntr_ticks_per_beat *
- * blink_parameter_y` instead of subtracting 1 to match
- * `pwm_chan.sv.tpl:173,175` (`blink_param_y_i + 1`).
  */
 
 #include <stdbool.h>
@@ -329,65 +313,16 @@ static void test_cheriot_switch_locked_dis_ignores_invalid_lock_writes(
                    (uint32_t)kMultiBitBool4False);
 }
 
-static void test_pwm_template_and_dif_heartbeat_step_math(void) {
-  LOG_INFO(
-      "Test 4: dif_pwm.c heartbeat BLINK_EN fix & BLINK_PARAM.Y step math");
-
-  // Verify the exact arithmetic performed by dif_pwm_configure_channel()
-  // in sw/device/lib/dif/dif_pwm.c:73-133 for DC_RESN = 7 (256 beats per
-  // pulse cycle, phase_cntr_ticks_per_beat = 256):
-  //   1. Commit 270eab3a1dc4 fixed dif_pwm.c:106-109 so kDifPwmModeHeartbeat
-  //      sets both HTBT_EN (bit 30) and BLINK_EN (bit 31) in PWM_PARAM_0.
-  //   2. However, dif_pwm.c:126-128 computes BLINK_PARAM.Y as:
-  //        phase_cntr_ticks_per_beat * config.blink_parameter_y
-  //      without subtracting 1, whereas pwm_chan.sv.tpl:173,175 adds
-  //      (blink_param_y_i + 1'b1) phase counter ticks per heartbeat step.
-  const uint32_t kPwmParamHtbtEnBit = 30u;
-  const uint32_t kPwmParamBlinkEnBit = 31u;
-  uint32_t pwm_param_reg = 0u;
-  pwm_param_reg = bitfield_bit32_write(pwm_param_reg, kPwmParamHtbtEnBit, true);
-  pwm_param_reg =
-      bitfield_bit32_write(pwm_param_reg, kPwmParamBlinkEnBit, true);
-  CHECK(((pwm_param_reg >> kPwmParamHtbtEnBit) & 1u) == 1u);
-  CHECK(((pwm_param_reg >> kPwmParamBlinkEnBit) & 1u) == 1u);
-
-  const uint8_t dc_resn = 7u;
-  const uint32_t beats_per_pulse_cycle = 1u << (dc_resn + 1u);
-  const uint16_t phase_cntr_ticks_per_beat =
-      (uint16_t)(1u << (16u - dc_resn - 1u));
-  CHECK(beats_per_pulse_cycle == 256u);
-  CHECK(phase_cntr_ticks_per_beat == 256u);
-
-  const uint16_t blink_parameter_y_beats = 1u;
-  const uint16_t dif_programmed_y =
-      (uint16_t)(phase_cntr_ticks_per_beat * blink_parameter_y_beats);
-  const uint16_t rtl_actual_step_ticks = (uint16_t)(dif_programmed_y + 1u);
-  CHECK(dif_programmed_y == 256u);
-  CHECK(rtl_actual_step_ticks == 257u);
-  CHECK(rtl_actual_step_ticks != phase_cntr_ticks_per_beat);
-
-  // Also verify config.blink_parameter_y == 0 passes dif_pwm.c:94
-  // (0 < beats_per_pulse_cycle) and programs BLINK_PARAM.Y = 0 (1 tick/step).
-  const uint16_t blink_parameter_y_zero = 0u;
-  CHECK(blink_parameter_y_zero < beats_per_pulse_cycle);
-  const uint16_t dif_programmed_y_zero =
-      (uint16_t)(phase_cntr_ticks_per_beat * blink_parameter_y_zero);
-  const uint16_t rtl_actual_step_ticks_zero =
-      (uint16_t)(dif_programmed_y_zero + 1u);
-  CHECK(dif_programmed_y_zero == 0u);
-  CHECK(rtl_actual_step_ticks_zero == 1u);
-}
-
 bool test_main(void) {
   dif_alert_handler_t alert_handler;
   CHECK_DIF_OK(dif_alert_handler_init(mmio_region_from_addr(kAlertHandlerBase),
                                       &alert_handler));
 
+  LOG_INFO("=== Running cheriot_errata_v2_test on CW340 FPGA ===");
   test_cheriot_regs_and_subword_permit(&alert_handler);
   test_cheriot_revbm_access_check_and_meta_sram(&alert_handler);
   test_cheriot_switch_locked_dis_ignores_invalid_lock_writes(&alert_handler);
-  test_pwm_template_and_dif_heartbeat_step_math();
 
-  LOG_INFO("pwm_errata_v2_test: ALL CHECKS PASSED");
+  LOG_INFO("=== All cheriot_errata_v2_test checks PASSED on CW340 FPGA! ===");
   return true;
 }

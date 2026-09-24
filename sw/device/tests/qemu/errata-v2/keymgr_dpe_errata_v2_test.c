@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * @file keymgr_errata_v2_test.c
+ * @file keymgr_dpe_errata_v2_test.c
  * @brief CW340 FPGA verification test for Earlgrey v2 (`trunk-v2`) `keymgr_dpe`
  * hardware, specification, and DIF errata:
  *
@@ -831,7 +831,8 @@ bool test_main(void) {
   dif_rstmgr_reset_info_bitfield_t reset_info = rstmgr_testutils_reason_get();
   if ((reset_info & kDifRstmgrResetInfoSw) == 0) {
     LOG_INFO(
-        "=== Boot 1 (POR): Running keymgr_dpe v2 errata suite (1..9A) ===");
+        "=== Boot 1 (POR): Running keymgr_dpe_errata_v2_test suite (1..9A) "
+        "===");
     test_errata_keymgr_007_permit_and_addrmiss();
     test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(&keymgr_dpe);
     test_errata_keymgr_001_fixed_in_v2_and_regwen_unlock();
@@ -850,8 +851,10 @@ bool test_main(void) {
     return false;
   }
 
-  LOG_INFO("=== Boot 2 (SW Reset): Running Test 9B ===");
+  LOG_INFO(
+      "=== Boot 2 (SW Reset): Running keymgr_dpe_errata_v2_test Test 9B ===");
   test_errata_keymgr_003_fixed_in_v2_disabled_state();
-  LOG_INFO("=== All keymgr_dpe v2 errata tests PASSED on CW340 FPGA! ===");
+  LOG_INFO(
+      "=== All keymgr_dpe_errata_v2_test checks PASSED on CW340 FPGA! ===");
   return true;
 }
