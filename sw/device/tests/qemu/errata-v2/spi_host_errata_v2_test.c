@@ -14,7 +14,7 @@
 //    (CSIDINVAL / CMDINVAL / CMD_BUSY, where ~command_busy masks CMDINVAL on
 //    the 5th command) while CONTROL.SPIEN == 0, paired with level-sensitive
 //    CONTROL.SW_RST datapath clearing (spi_host.sv:212-286, 425-461).
-// 3. SPI_HOST_PERMIT sub-word CSR write faults (spi_host_reg_pkg.sv:353-366)
+// 3. SPI_HOST_PERMIT sub-word CSR write faults (spi_host_reg_pkg.sv:360-373)
 //    and RXDATA (0x24) write / TXDATA (0x28) read window faults
 //    (spi_host_window.sv:28-92) vs. legal sub-word sb/sh byte-enable writes to
 //    TXDATA.
@@ -187,7 +187,17 @@ static void test_permit_and_window_faults(void) {
   g_last_mcause = 0;
   abs_mmio_write8(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET, 0u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "Expected sb to COMMAND (PERMIT=4'b0011) to fault with mcause=7");
+        "Expected sb to COMMAND (PERMIT=4'b1111) to fault with mcause=7");
+
+  g_load_store_fault = false;
+  g_last_mcause = 0;
+  asm volatile("sh %0, 0(%1)"
+               :
+               : "r"((uint16_t)0u),
+                 "r"(kSpiHostBase + SPI_HOST_COMMAND_REG_OFFSET)
+               : "memory");
+  CHECK(g_load_store_fault && g_last_mcause == 7u,
+        "Expected sh to COMMAND (PERMIT=4'b1111) to fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
