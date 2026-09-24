@@ -301,6 +301,6 @@ bool test_main(void) {
   test_unmapped_skipto_hole_bus_error();
   test_cfg0_3byte_permit_subword_fault();
   test_v2_mtime_rewind_sticky_intr_and_dif_counter_write();
-  LOG_INFO("=== ALL RV_TIMER ERRATA-V2 CHECKS PASSED ===");
+  LOG_INFO("=== ALL RV_TIMER V2 ERRATA CHECKS PASSED ===");
   return true;
 }

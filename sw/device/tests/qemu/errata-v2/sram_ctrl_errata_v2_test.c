@@ -340,6 +340,6 @@ bool test_main(void) {
       "Test 5 (sram_ctrl_meta 0x411A0000 INIT_DONE=1 vs unmapped/blocked "
       "0x11000000 RAM window) PASSED");
 
-  LOG_INFO("=== ALL SRAM_CTRL ERRATA-V2 CHECKS PASSED ===");
+  LOG_INFO("=== ALL SRAM_CTRL V2 ERRATA CHECKS PASSED ===");
   return true;
 }
