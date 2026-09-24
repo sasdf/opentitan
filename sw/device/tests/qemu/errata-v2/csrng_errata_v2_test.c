@@ -5,8 +5,7 @@
 /**
  * @file csrng_errata_v2_test.c
  * @brief Physical CW340 FPGA verification of Earlgrey v2 (`trunk-v2`) CSRNG
- *        confirmed v1 errata (`ERRATA-CSRNG-001..004`) and newly discovered
- *        v2 hardware errata (`ERRATA-CSRNG-V2-001`, `ERRATA-CSRNG-V2-002`).
+ *        confirmed v1 errata and newly discovered v2 hardware errata.
  */
 
 #include <stdbool.h>
@@ -80,12 +79,14 @@ static void csrng_send_sw_cmd(uint32_t acmd, uint32_t clen, uint32_t flag0,
 }
 
 /**
- * [ERRATA-CSRNG-001] (CONFIRMED_PRESENT_ON_V2):
- * RECOV_ALERT_STS.FIPS_FORCE_ENABLE_FIELD_ALERT (bit 3) is omitted from
- * recov_alert_event in csrng_core.sv:391-398, so recov_alert_o never fires.
+ * Verify that RECOV_ALERT_STS.FIPS_FORCE_ENABLE_FIELD_ALERT (bit 3) is omitted
+ * from recov_alert_event in csrng_core.sv:391-398, so recov_alert_o never
+ * fires.
  */
 static void test_v1_001_fips_force_enable_pfa_missing_from_recov_alert(void) {
-  LOG_INFO("Testing [ERRATA-CSRNG-001] on trunk-v2...");
+  LOG_INFO(
+      "Testing FIPS_FORCE_ENABLE_FIELD_ALERT omission from recov_alert_event "
+      "on trunk-v2...");
   csrng_disable_and_clear();
 
   // Enable alert_handler capture for CSRNG recoverable alert (ID 26).
@@ -133,12 +134,14 @@ static void test_v1_001_fips_force_enable_pfa_missing_from_recov_alert(void) {
 }
 
 /**
- * [ERRATA-CSRNG-002] (CONFIRMED_PRESENT_ON_V2):
- * HW_EXC_STS (rw0c) overwrites itself with 0x0000 after 1 clock cycle because
- * hw2reg.hw_exc_sts.de = cs_enable_fo[50] (1'b1) in csrng_core.sv:1002.
+ * Verify that HW_EXC_STS (rw0c) overwrites itself with 0x0000 after 1 clock
+ * cycle because hw2reg.hw_exc_sts.de = cs_enable_fo[50] (1'b1) in
+ * csrng_core.sv:1002.
  */
 static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
-  LOG_INFO("Testing [ERRATA-CSRNG-002] on trunk-v2...");
+  LOG_INFO(
+      "Testing HW_EXC_STS single-cycle overwrite (hw2reg.hw_exc_sts.de=1) on "
+      "trunk-v2...");
   csrng_disable_and_clear();
 
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
@@ -199,14 +202,15 @@ static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
 }
 
 /**
- * [ERRATA-CSRNG-003] (CONFIRMED_PRESENT_ON_V2 + expanded dead bits in v2):
+ * Verify ERR_CODE_TEST dead bits and disabled gating in trunk-v2:
  * 1. In trunk-v2, ERR_CODE_TEST values 2..19, 23..24, 27 are dead no-ops
  *    (assigned to unused_err_code_test_bit in csrng_core.sv:1014-1015).
  * 2. When CTRL.ENABLE == kMultiBitBool4False, writing ERR_CODE_TEST = 20..22,
  *    25..26 still asserts INTR_STATE.cs_fatal_err = 1 while ERR_CODE remains 0!
  */
 static void test_v1_003_err_code_test_disabled_gating_and_v2_dead_bits(void) {
-  LOG_INFO("Testing [ERRATA-CSRNG-003] on trunk-v2...");
+  LOG_INFO(
+      "Testing ERR_CODE_TEST dead bits and disabled gating on trunk-v2...");
   csrng_disable_and_clear();
 
   // 1. Even when CSRNG is ENABLED, ERR_CODE_TEST = 23 and 24 (which were
@@ -244,12 +248,14 @@ static void test_v1_003_err_code_test_disabled_gating_and_v2_dead_bits(void) {
 }
 
 /**
- * [ERRATA-CSRNG-004] (CONFIRMED_PRESENT_ON_V2):
- * Reading GENBITS when !CTRL.SW_APP_ENABLE returns 0 yet destructively pops
- * u_prim_packer_fifo_sw_genbits, and GENBITS_VLD remains ungated.
+ * Verify that reading GENBITS when !CTRL.SW_APP_ENABLE returns 0 yet
+ * destructively pops u_prim_packer_fifo_sw_genbits, and GENBITS_VLD remains
+ * ungated.
  */
 static void test_v1_004_genbits_destructive_pop_when_sw_app_disabled(void) {
-  LOG_INFO("Testing [ERRATA-CSRNG-004] on trunk-v2...");
+  LOG_INFO(
+      "Testing GENBITS destructive pop when SW_APP_ENABLE == False on "
+      "trunk-v2...");
   csrng_disable_and_clear();
 
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
@@ -297,15 +303,15 @@ static void test_v1_004_genbits_destructive_pop_when_sw_app_disabled(void) {
 }
 
 /**
- * [ERRATA-CSRNG-V2-001] & [ERRATA-CSRNG-V2-002] (NEW_IN_V2):
- * 1. [ERRATA-CSRNG-V2-001]: In trunk-v2 (commit add768a0), INT_STATE_NUM (0x54)
+ * Verify INT_STATE_NUM desynchronization and reg_rd_ptr_q == 15 word shift:
+ * 1. In trunk-v2 (commit add768a0), INT_STATE_NUM (0x54)
  *    was converted from hwext:true to an unconditional reggen flip-flop
  *    (hwaccess:hro), whereas csrng_state_db.reg_rd_id_q is cleared to 0
  * whenever !enable_i. Writing INT_STATE_NUM = 2 while CTRL.ENABLE == False
  * makes INT_STATE_NUM read back 2 (passing the HJSON readback check), while
  *    csrng_state_db.reg_rd_id_q remains 0!
- * 2. [ERRATA-CSRNG-V2-002]: In trunk-v2 (commit add768a0,
- * csrng_state_db.sv:95-96), when !reg_rd_otp_en_i (!CTRL.READ_INT_STATE),
+ * 2. In trunk-v2 (commit add768a0, csrng_state_db.sv:95-96), when
+ * !reg_rd_otp_en_i (!CTRL.READ_INT_STATE),
  * reg_rd_ptr_d is forced to '1 (4'hF = 15) instead of '0 (0). Consequently, if
  * software writes INT_STATE_NUM = 2 while CTRL.ENABLE == True and
  * CTRL.READ_INT_STATE == False and then sets CTRL.READ_INT_STATE = True,
@@ -316,10 +322,10 @@ static void test_v1_004_genbits_destructive_pop_when_sw_app_disabled(void) {
  */
 static void test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift(void) {
   LOG_INFO(
-      "Testing [ERRATA-CSRNG-V2-001] & [ERRATA-CSRNG-V2-002] on trunk-v2...");
+      "Testing INT_STATE_NUM desync and reg_rd_ptr_q=15 shift on trunk-v2...");
   csrng_disable_and_clear();
 
-  // --- Subtest A: [ERRATA-CSRNG-V2-001] ---
+  // --- Subtest A: INT_STATE_NUM desynchronization ---
   // Write INT_STATE_NUM = 2 while CTRL.ENABLE == False.
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 2u);
   CHECK(abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET) == 2u,
@@ -342,14 +348,14 @@ static void test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift(void) {
     any_nonzero |= abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET);
   }
   LOG_INFO(
-      "  [ERRATA-CSRNG-V2-001] INT_STATE_NUM=2 readback, OR of 14 "
+      "  INT_STATE_NUM=2 readback, OR of 14 "
       "INT_STATE_VAL words=0x%x",
       any_nonzero);
   CHECK(any_nonzero == 0u,
         "Expected all 14 INT_STATE_VAL reads to be 0 because reg_rd_id_q was "
         "held at 0 while CTRL.ENABLE was False");
 
-  // --- Subtest B: [ERRATA-CSRNG-V2-002] ---
+  // --- Subtest B: reg_rd_ptr_q == 15 word shift ---
   // Now keep CTRL.ENABLE=True, SW_APP_ENABLE=True, set READ_INT_STATE=False.
   abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
                    make_ctrl(kMultiBitBool4True, kMultiBitBool4True,
@@ -383,7 +389,7 @@ static void test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift(void) {
   }
 
   LOG_INFO(
-      "  [ERRATA-CSRNG-V2-002] w_shifted[0]=0x%x, w_shifted[1]=0x%x vs "
+      "  w_shifted[0]=0x%x, w_shifted[1]=0x%x vs "
       "w_true[0]=0x%x (rs_ctr), w_true[13]=0x%x (flags)",
       w_shifted[0], w_shifted[1], w_true[0], w_true[13]);
 
