@@ -22,20 +22,20 @@
  *      has `RV_DM_REGS_PERMIT[1] = 4'b0001` and accepts a byte-0 `sb` write.
  *
  * 2. Asymmetric `RV_DM.MEM` (`0x00010000`) Lifecycle & `LATE_DEBUG_ENABLE`
- *    Bus Gating via `u_tlul_lc_gate_rom` (`hw/ip/rv_dm/rtl/rv_dm.sv:260-265,
+ *    Bus Gating via `u_tlul_lc_gate_rom` and `OTP_CTRL.HW_CFG1`
+ *    `DIS_RV_DM_LATE_DEBUG` Override (`hw/ip/rv_dm/rtl/rv_dm.sv:260-265,
  *    646-659`):
  *    - `RV_DM.REGS` (`0x41200000`) is directly connected to the peripheral bus
  *      without a `tlul_lc_gate`, whereas `RV_DM.MEM` (`0x00010000`) is gated by
  *      `u_tlul_lc_gate_rom` (`lc_hw_debug_en_gated_ndm[LcEnRom]`).
- *    - In `DEV` lifecycle when `LATE_DEBUG_ENABLE != kMultiBitBool32True`
- *      (`0x96969696`), any read or write to `RV_DM.MEM`
- * (`0x00010000..0x00010ffc`) raises synchronous Load/Store Access Faults
- * (`mcause = 5/7`).
- *    - Writing `LATE_DEBUG_ENABLE = kMultiBitBool32True` (`0x96969696`)
- *      dynamically ungates `u_tlul_lc_gate_rom` so `RV_DM.MEM` accesses
- * succeed; toggling `LATE_DEBUG_ENABLE` back to `kMultiBitBool32False`
- * (`0x69696969`) immediately re-gates `RV_DM.MEM` (`mcause = 5/7`) while
- * preserving data already stored in `DATA0`/`DATA1` (`data_q` in `dm_mem.sv`).
+ *    - In `rv_dm.sv:260-265`, `lc_hw_debug_en_gated_raw[k]` ORs
+ *      `mubi8_test_true_strict(otp_dis_rv_dm_late_debug[k])` with
+ *      `mubi32_test_true_strict(late_debug_enable[k])`. When
+ *      `HW_CFG1.DIS_RV_DM_LATE_DEBUG` is fused to `kMultiBitBool8True` (`0x96`,
+ *      as in `trunk-v2` `hw/top_earlgrey/data/otp/BUILD:232`), writing
+ *      `LATE_DEBUG_ENABLE = kMultiBitBool32False` (`0x69696969`) is silently
+ *      overridden by `otp_dis_rv_dm_late_debug` (`RV_DM.MEM` remains open with
+ *      `mcause = 0`).
  *
  * 3. `RV_DM.MEM` (`0x00010000`) 8-Byte Control Register Stride (`0x100, 0x108,
  *    0x110, 0x118`) and Implemented `ABSTRACTCMD` / `PROGRAM_BUFFER` / `DATA`
@@ -65,18 +65,21 @@
  *    - By contrast, `ROM` (`0x800..0xffc`) assigns `err_d = we_i`, faulting
  *      even on 32-bit full-word `sw` (`mcause = 7`).
  *
- * 5. `DATA0`/`DATA1` (`0x380..0x387`) Ungated Sub-Word Write Side-Effect Under
- *    `err_d = gen_wr_err(we_i, be_i, FullRegMask)`
- * (`hw/vendor/pulp_riscv_dbg/src/dm_mem.sv:277-295, 396` vs. unused
- * `rv_dm_mem_reg_top.sv` in `hw/ip/rv_dm/rtl/rv_dm.sv:149-152`):
- *    - In `dm_mem.sv:277-295`, the `always_comb` block for `data_bits` updates
- *      `data_bits[dc][i*8+:8] = wdata_i[i*8+:8]` for each enabled byte
- * `be_i[i]` without checking `!err_d`, while `dm_mem.sv:396` asserts `err_d =
- * gen_wr_err(we_i, be_i, FullRegMask)` (`4'b1111`).
- *    - Consequently, an 8-bit `sb` or 16-bit `sh` store to `DATA0`
- * (`0x00010380`) simultaneously raises a synchronous Store Access Fault
- * (`mcause = 7`) AND commits the sub-word byte/halfword modification into
- * `DATA0`!
+ * 5. `DATAADDR_0`/`DATAADDR_1` (`0x380..0x387`) Synchronous Zero-Clamp Under
+ *    `!dmcontrol_q.dmactive` (`hw/vendor/pulp_riscv_dbg/src/dm_csrs.sv:612,
+ *    627, 647`) and `ABSTRACTCMD_1..9` (`0x33c..0x35c`) Non-Zero Reset
+ *    Instructions (`hw/vendor/pulp_riscv_dbg/src/dm_mem.sv:425-437` vs.
+ *    `hw/ip/rv_dm/data/rv_dm.hjson` `resval: "0"`):
+ *    - Although `DATAADDR_0` and `DATAADDR_1` are declared `swaccess: "rw"` in
+ *      `rv_dm.hjson:249-280` and 32-bit `sw` stores return `err_d = 0`
+ *      (`mcause = 0`), `dm_csrs.sv:647` clamps `data_q <= '0` on every clock
+ *      cycle whenever `!dmcontrol_q.dmactive` (which resets to `0` and cannot
+ *      be set by the CPU on `top_earlgrey` when `UseDmiInterface = 1`),
+ *      discarding all 32-bit CPU writes while sub-word `sb`/`sh` stores fault
+ *      with `mcause = 7`.
+ *    - `ABSTRACTCMD_1..9` (`0x33c..0x35c`) specify `resval: "0"` in
+ *      `rv_dm.hjson`, but `dm_mem.sv:425-437` combinationally drives non-zero
+ *      RISC-V instructions (`0x00000517`, `0x00000013`, `0x00100073`).
  */
 
 #include <stdbool.h>
