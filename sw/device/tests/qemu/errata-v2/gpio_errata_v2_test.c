@@ -280,6 +280,24 @@ static void test_gpio_level_intr_relatch_and_alert_pulse(void) {
   abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffffffffu);
   CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0u);
 
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio0,
+                                       kTopEarlgreyPinmuxInselConstantOne));
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_LVLHIGH_REG_OFFSET, 1u);
+  busy_spin_micros(10);
+
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & 1u) == 1u,
+        "Expected INTR_STATE[0]==1 when LVLHIGH=1 and input=1");
+
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & 1u) == 1u,
+        "Expected INTR_STATE[0] to remain 1 after RW1C while LVLHIGH active");
+
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_LVLHIGH_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0u);
+
   for (int i = 0; i < 2; ++i) {
     CHECK_STATUS_OK(
         ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdGpioFatalFault));
