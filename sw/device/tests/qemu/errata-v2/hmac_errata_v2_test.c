@@ -8,16 +8,27 @@
  * Verification Suite for `hmac` (`0x41110000`).
  *
  * Verifies:
- *   1. `hw/ip/prim/rtl/prim_sha2_pad.sv:235-240` &
- *      `hw/ip/prim/rtl/prim_sha2.sv:474-476`: Issuing `CMD.HASH_STOP = 1`
+ *   1. `hw/ip/prim/rtl/prim_sha2_pad.sv:235-240`,
+ *      `hw/ip/prim/rtl/prim_sha2.sv:474-476`, and
+ *      `hw/ip/hmac/rtl/hmac.sv:184-209, 574-578`: Issuing `CMD.HASH_STOP = 1`
  *      after writing a non-block-multiple message (`9` words = `288` bits for
  *      `SHA2_256`, `message_length_i[8:0] != 0`) causes `prim_sha2_pad` to
  *      transition to `StIdle` (`fifo_rready_o = 0`, `shaf_rvalid_o = 0`) on
  *      `txcnt_eq_msg_len && hash_stop_flag_q` while `prim_sha2` remains in
- *      `FifoLoadFromFifo` (`w_index_q == 9 < 15`), permanently deadlocking
- *      `STATUS.HMAC_IDLE == 0` (`INTR_STATE.HMAC_DONE == 0`) and stranding any
- *      subsequent `MSG_FIFO` writes (`STATUS.FIFO_DEPTH == 7`) until
- *      `CFG.SHA_EN = 0` is cleared.
+ *      `FifoLoadFromFifo` (`w_index_q == 9 < 15`), deadlocking
+ *      `STATUS.HMAC_IDLE == 0` (`INTR_STATE.HMAC_DONE == 0`).
+ *      - Case A (no extra words pushed): Toggling `CFG.SHA_EN` `1 -> 0` resets
+ *        `prim_sha2` (`STATUS.HMAC_IDLE = 1`), but `done_state_q` lacks a
+ *        `!sha_en` reset and stays trapped in `DoneAwaitMessageComplete`. A
+ *        subsequent SHA-256 hash completes with `STATUS.HMAC_IDLE == 1` but
+ *        `INTR_STATE.HMAC_DONE` remains `0` permanently!
+ *      - Case B (extra words pushed): Pushing 7 additional words into
+ * `MSG_FIFO` strands those words in `u_msg_fifo` (`.NeverClears(1'b1)`,
+ * `.clr_i(1'b0)`). Toggling `CFG.SHA_EN` `1 -> 0 -> 1` and starting a new hash
+ * permanently deadlocks both `STATUS.HMAC_IDLE == 0` and `INTR_STATE.HMAC_DONE
+ * == 0` because `CMD.HASH_START` resets `message_length = 0` while
+ * `prim_sha2_pad` drains the stranded words, advancing `tx_count` past
+ * `message_length`.
  *   2. `hw/ip/hmac/rtl/hmac.sv:26-44` &
  *      `hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119` (`TODO(#31026)`): `hmac`
  *      and `keymgr_dpe` declare the `keymgr_key` sideload interface in
@@ -111,31 +122,59 @@ static void hmac_wait_done(void) {
 }
 
 /**
- * Test 1: `prim_sha2_pad.sv:235-240` & `prim_sha2.sv:474-476`
+ * Test 1: `prim_sha2_pad.sv:235-240`, `prim_sha2.sv:474-476`, and
+ * `hmac.sv:184-209, 574-578`:
  * Issuing `CMD.HASH_STOP = 1` at a non-multiple of the 512-bit (16-word)
  * SHA-256 block size causes `prim_sha2_pad` to enter `StIdle` on
  * `txcnt_eq_msg_len && hash_stop_flag_q` while `prim_sha2` remains in
- * `FifoLoadFromFifo`, permanently deadlocking `STATUS.HMAC_IDLE == 0`
- * (`INTR_STATE.HMAC_DONE == 0`) and stranding subsequent `MSG_FIFO` writes
- * until `CFG.SHA_EN = 0` is cleared.
+ * `FifoLoadFromFifo` and `done_state_q` enters `DoneAwaitMessageComplete`:
+ *
+ * Case A (No extra words pushed after HASH_STOP -> toggle SHA_EN 1 -> 0 -> 1):
+ *   - After HASH_STOP with 9 words, clearing CFG.SHA_EN = 0 resets prim_sha2
+ *     fifo_st_q = FifoIdle so STATUS.HMAC_IDLE returns to 1 (because MSG_FIFO
+ *     is empty).
+ *   - However, done_state_q lacks a !sha_en or hash_start reset and remains
+ *     trapped in DoneAwaitMessageComplete.
+ *   - Re-enabling CFG.SHA_EN = 1 and computing a normal SHA-256 of "abc"
+ *     processes the block and returns STATUS.HMAC_IDLE to 1, but
+ *     INTR_STATE.HMAC_DONE remains 0 permanently because done_state_q is still
+ *     trapped in DoneAwaitMessageComplete!
+ *
+ * Case B (Extra words pushed after HASH_STOP -> toggle SHA_EN 1 -> 0 -> 1):
+ *   - Pushing 7 additional words into MSG_FIFO while prim_sha2_pad is in StIdle
+ *     strands those words in MSG_FIFO (STATUS.FIFO_DEPTH >= 6).
+ *   - Clearing CFG.SHA_EN = 0 leaves STATUS.HMAC_IDLE == 0 because u_msg_fifo
+ *     has .NeverClears(1'b1) and .clr_i(1'b0), keeping fifo_empty == 0.
+ *   - Furthermore, re-enabling CFG.SHA_EN = 1, pulsing CMD.HASH_START = 1, and
+ *     writing/processing "abc" permanently deadlocks both STATUS.HMAC_IDLE == 0
+ *     and INTR_STATE.HMAC_DONE == 0 because CMD.HASH_START resets
+ * message_length to 0 while prim_sha2_pad immediately drains the stranded
+ * words, advancing tx_count past message_length so txcnt_eq_msg_len never
+ * matches!
  */
 static void test_hmac_hash_stop_non_block_multiple_deadlock(void) {
   LOG_INFO(
-      "Testing prim_sha2_pad.sv:235-240 & prim_sha2.sv:474-476: "
-      "CMD.HASH_STOP non-block-multiple deadlock and SHA_EN=0 recovery");
-
-  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
-  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+      "Testing prim_sha2_pad.sv:235-240, prim_sha2.sv:474-476 & "
+      "hmac.sv:184-209: Case A & Case B HASH_STOP deadlock & SHA_EN toggle");
 
   const uint32_t kSha256Cfg =
       (1u << HMAC_CFG_SHA_EN_BIT) |
       (HMAC_CFG_DIGEST_SIZE_VALUE_SHA2_256 << HMAC_CFG_DIGEST_SIZE_OFFSET);
+
+  // ---------------------------------------------------------------------------
+  // Case A: No extra words pushed after HASH_STOP -> toggle SHA_EN 1 -> 0 -> 1
+  // ---------------------------------------------------------------------------
+  LOG_INFO(
+      "Case A: HASH_STOP after 9 words without extra words -> SHA_EN toggle");
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, kSha256Cfg);
   abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
                    (1u << HMAC_CMD_HASH_START_BIT));
 
   // Write 9 words (288 bits, not a multiple of the 16-word 512-bit SHA-256
-  // block size) to HMAC_MSG_FIFO, then pulse CMD.HASH_STOP = 1.
+  // block size).
   for (uint32_t i = 0; i < 9u; ++i) {
     abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x10000000u + i);
   }
@@ -143,9 +182,62 @@ static void test_hmac_hash_stop_non_block_multiple_deadlock(void) {
                    (1u << HMAC_CMD_HASH_STOP_BIT));
   busy_spin_micros(10);
 
-  // Push 7 additional words to attempt to complete the 16-word block after
-  // HASH_STOP; because prim_sha2_pad already transitioned to StIdle
-  // (fifo_rready_o = 0), these words remain stranded in MSG_FIFO!
+  uint32_t status_case_a = abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  CHECK((status_case_a & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) == 0u,
+        "Expected STATUS.HMAC_IDLE == 0 after non-block-multiple HASH_STOP in "
+        "Case A");
+
+  // Toggle CFG.SHA_EN 1 -> 0: because MSG_FIFO is empty, fifo_st_q resets to
+  // FifoIdle and STATUS.HMAC_IDLE returns to 1.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  busy_spin_micros(10);
+  uint32_t status_case_a_cfg0 =
+      abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  CHECK((status_case_a_cfg0 & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) != 0u,
+        "Expected STATUS.HMAC_IDLE == 1 upon CFG.SHA_EN = 0 when MSG_FIFO has "
+        "no stranded words");
+
+  // Toggle CFG.SHA_EN 0 -> 1 and attempt a normal SHA-256 hash of "abc".
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, kSha256Cfg);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_START_BIT));
+  abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x00636261u);  // "abc"
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_PROCESS_BIT));
+  busy_spin_micros(50);
+
+  // Even though STATUS.HMAC_IDLE returns to 1 after "abc" is compressed,
+  // INTR_STATE.HMAC_DONE remains 0 because done_state_q remains trapped in
+  // DoneAwaitMessageComplete across SHA_EN 1->0->1 toggle!
+  uint32_t status_case_a_post =
+      abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  uint32_t intr_case_a_post =
+      abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  CHECK((status_case_a_post & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) != 0u,
+        "Expected STATUS.HMAC_IDLE == 1 after hashing 'abc' in Case A");
+  CHECK((intr_case_a_post & (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)) == 0u,
+        "Expected INTR_STATE.HMAC_DONE == 0 because done_state_q remains "
+        "trapped in "
+        "DoneAwaitMessageComplete across SHA_EN 1->0->1 toggle!");
+
+  // ---------------------------------------------------------------------------
+  // Case B: Extra words pushed after HASH_STOP -> toggle SHA_EN 1 -> 0 -> 1
+  // ---------------------------------------------------------------------------
+  LOG_INFO(
+      "Case B: HASH_STOP after 9 words with 7 extra words -> permanent "
+      "deadlock");
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_START_BIT));
+
+  // Write 9 words, then pulse HASH_STOP.
+  for (uint32_t i = 0; i < 9u; ++i) {
+    abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x10000000u + i);
+  }
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_STOP_BIT));
+  busy_spin_micros(10);
+
+  // Push 7 additional words while prim_sha2_pad is in StIdle.
   for (uint32_t i = 0; i < 7u; ++i) {
     abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x20000000u + i);
   }
@@ -167,9 +259,8 @@ static void test_hmac_hash_stop_non_block_multiple_deadlock(void) {
         "while prim_sha2_pad is in StIdle, got %u",
         fifo_depth);
 
-  // Verify that even clearing CFG.SHA_EN = 0 cannot clear u_msg_fifo
-  // (.NeverClears(1'b1), .clr_i(1'b0) at hmac.sv:574-578) or reset done_state_q
-  // (hmac.sv:184-190), leaving STATUS.HMAC_IDLE permanently 0 until reset.
+  // Clearing CFG.SHA_EN = 0 cannot clear u_msg_fifo (.NeverClears(1'b1),
+  // .clr_i(1'b0) at hmac.sv:574-578), leaving STATUS.HMAC_IDLE permanently 0.
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
   busy_spin_micros(20);
   uint32_t status_after_cfg_zero =
@@ -177,6 +268,28 @@ static void test_hmac_hash_stop_non_block_multiple_deadlock(void) {
   CHECK((status_after_cfg_zero & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) == 0u,
         "Expected STATUS.HMAC_IDLE == 0 to remain permanently stuck even after "
         "clearing CFG.SHA_EN = 0");
+
+  // Re-enabling CFG.SHA_EN = 1 and attempting to hash "abc" permanently
+  // deadlocks both STATUS.HMAC_IDLE == 0 and INTR_STATE.HMAC_DONE == 0 because
+  // tx_count advanced past message_length.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, kSha256Cfg);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_START_BIT));
+  abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x00636261u);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_PROCESS_BIT));
+  busy_spin_micros(50);
+
+  uint32_t status_case_b_post =
+      abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  uint32_t intr_case_b_post =
+      abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  CHECK((status_case_b_post & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) == 0u,
+        "Expected STATUS.HMAC_IDLE == 0 to remain permanently deadlocked in "
+        "Case B "
+        "because tx_count advanced past message_length!");
+  CHECK((intr_case_b_post & (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)) == 0u,
+        "Expected INTR_STATE.HMAC_DONE == 0 in Case B permanent deadlock");
 }
 
 /**
