@@ -178,9 +178,9 @@ bool test_main(void) {
       "PRESCALER==0 / wdog_timer_bark edge-detector non-retrigger...");
   aon_reset_all();
 
-  // Set WKUP_THOLD = 1, WKUP_COUNT = 0, and start with PRESCALER = 0, ENABLE
+  // Set WKUP_THOLD = 2, WKUP_COUNT = 0, and start with PRESCALER = 0, ENABLE
   // = 1.
-  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 1u);
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 2u);
   busy_spin_micros(30);
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET, 1u);
 
@@ -208,17 +208,18 @@ bool test_main(void) {
 
   // Because .dst_update_i is wired to qe (we=0) instead of de, WKUP_CAUSE and
   // WKUP_COUNT_LO lag behind INTR_STATE by 1 clk_aon_i cycle (5 us): at the
-  // instant INTR_STATE asserts 1, WKUP_CAUSE is still 0 and WKUP_COUNT_LO < 2!
+  // instant INTR_STATE asserts 1, WKUP_CAUSE is still 0 and WKUP_COUNT_LO == 1
+  // (< 2)!
   CHECK(cause_at_irq == 0u,
         "Expected WKUP_CAUSE==0 immediately at INTR_STATE assertion due to "
         "unreachable dst_update_i (qe vs de), got %u",
         cause_at_irq);
-  CHECK(
-      count_at_irq < 2u,
-      "Expected WKUP_COUNT_LO < 2 immediately at INTR_STATE assertion, got %u",
-      count_at_irq);
+  CHECK(count_at_irq == 1u,
+        "Expected WKUP_COUNT_LO == 1 (< 2) immediately at INTR_STATE "
+        "assertion, got %u",
+        count_at_irq);
   CHECK(cause_after_cdc == 1u);
-  CHECK(count_after_cdc >= 2u);
+  CHECK(count_after_cdc >= 5u);
 
   // Clear WKUP_CAUSE (rw0c) and INTR_STATE (rw1c) while WKUP_CTRL.PRESCALER==0
   // and WKUP_COUNT >= WKUP_THOLD.
@@ -379,14 +380,23 @@ bool test_main(void) {
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_COUNT_LO_REG_OFFSET, 10u);
   busy_spin_micros(30);
 
-  // Enable with PRESCALER = 200 (1 ms per tick). Even after 50 us (~10 AON
-  // cycles, well after WKUP_CTRL has crossed the CDC), WKUP_CAUSE and
+  // Enable with PRESCALER = 0xfff (20.48 ms per tick). Even after 50 us (~10
+  // AON cycles, well after WKUP_CTRL has crossed the CDC), WKUP_CAUSE and
   // INTR_STATE remain 0 because wkup_incr has not yet pulsed!
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
-                   (200u << AON_TIMER_WKUP_CTRL_PRESCALER_OFFSET) | 1u);
+                   (0xfffu << AON_TIMER_WKUP_CTRL_PRESCALER_OFFSET) | 1u);
   busy_spin_micros(50);
   CHECK(abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET) == 0u);
+
+  // Lowering PRESCALER to 0 immediately satisfies prescale_count_q == prescaler
+  // and asserts both INTR_STATE.wkup_timer_expired == 1 and WKUP_CAUSE == 1!
+  abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_CTRL_REG_OFFSET,
+                   (0u << AON_TIMER_WKUP_CTRL_PRESCALER_OFFSET) | 1u);
+  busy_spin_micros(30);
+  CHECK(abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_CAUSE_REG_OFFSET) == 1u);
+  CHECK((abs_mmio_read32(kAonTimerBase + AON_TIMER_INTR_STATE_REG_OFFSET) &
+         (1u << AON_TIMER_INTR_STATE_WKUP_TIMER_EXPIRED_BIT)) != 0u);
 
   // =========================================================================
   // 4. [aon_timer_reg_pkg.sv:200-215 & aon_timer_reg_top.sv:1171-1187]:
@@ -423,7 +433,7 @@ bool test_main(void) {
   // 8-bit (sb) and 16-bit (sh) writes to WKUP_THOLD_LO (4'b1111) fault with
   // mcause = 7 and do not modify WKUP_THOLD_LO.
   abs_mmio_write32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET,
-                   0x11223344u);
+                   0x12345678u);
   abs_mmio_write8(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET, 0x99u);
   CHECK(g_access_fault_count == 2u);
   CHECK(g_last_mcause == kRiscvStoreAccessFault);
@@ -431,7 +441,7 @@ bool test_main(void) {
   CHECK(g_access_fault_count == 3u);
   CHECK(g_last_mcause == kRiscvStoreAccessFault);
   CHECK(abs_mmio_read32(kAonTimerBase + AON_TIMER_WKUP_THOLD_LO_REG_OFFSET) ==
-        0x11223344u);
+        0x12345678u);
 
   aon_reset_all();
   LOG_INFO("All Earlgrey v2 aon_timer errata checks confirmed on CW340 FPGA!");
