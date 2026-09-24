@@ -230,6 +230,25 @@ static void verify_edn_err_code_test_and_auto_underflow(void) {
       "set INTR_STATE=0x%x",
       type_err_code, type_intr, src_intr);
 
+  // 2b. Verify [edn_core.sv:620-632] & [edn_ack_sm.sv:82-98]:
+  // Enable EDN0 and EDN1 in Boot Mode (CTRL = 0x9966u), verify multi-word
+  // Ibex RND endpoint delivery across the prim_edn_req 4-phase CDC handshake
+  // (RV_CORE_IBEX_RND_STATUS = 0x08, RV_CORE_IBEX_RND_DATA = 0x04), and verify
+  // HW_CMD_STS.BOOT_MODE == 1 on EDN0!
+  reset_entropy_complex_enable_csrng();
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9966u);
+  abs_mmio_write32(kEdn1Base + EDN_CTRL_REG_OFFSET, 0x9966u);
+  const uint32_t kIbexCfgBase = TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR;
+  for (uint32_t w = 0; w < 2u; ++w) {
+    IBEX_SPIN_FOR((abs_mmio_read32(kIbexCfgBase + 0x08u) & 1u) != 0u, 100000);
+    uint32_t rnd_word = abs_mmio_read32(kIbexCfgBase + 0x04u);
+    (void)rnd_word;
+  }
+  uint32_t hw_sts_boot = abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET);
+  CHECK((hw_sts_boot & (1u << EDN_HW_CMD_STS_BOOT_MODE_BIT)) != 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write32(kEdn1Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+
   // 3. Verify [edn_core.sv:620-632] on EDN0:
   // Queue a valid 1-word RESEED command (0x00000602) in RESEED_CMD with
   // MAX_NUM_REQS_BETWEEN_RESEEDS = 0, enable Auto Mode (0x9696), and send
@@ -258,6 +277,20 @@ static void verify_edn_err_code_test_and_auto_underflow(void) {
   CHECK(sm_reject == 0x018u);
   CHECK((hw_sts_reject & (1u << EDN_HW_CMD_STS_AUTO_MODE_BIT)) != 0u);
   CHECK((recov_reject & (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT)) != 0u);
+
+  // Now return EDN0 to Idle (CTRL = 0x9999u), re-enable Boot Mode (0x9966u) so
+  // HW_CMD_STS.BOOT_MODE == 1, and escalate EDN0 to Error (0x17e) via
+  // ERR_CODE_TEST = 21 to verify HW_CMD_STS.BOOT_MODE also stays sticky at 1!
+  reset_entropy_complex_enable_csrng();
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9966u);
+  IBEX_SPIN_FOR((abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET) &
+                 (1u << EDN_HW_CMD_STS_BOOT_MODE_BIT)) != 0u,
+                100000);
+  abs_mmio_write32(kEdn0Base + EDN_ERR_CODE_TEST_REG_OFFSET,
+                   EDN_ERR_CODE_EDN_MAIN_SM_ERR_BIT);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x17eu);
+  CHECK((abs_mmio_read32(kEdn0Base + EDN_HW_CMD_STS_REG_OFFSET) &
+         (1u << EDN_HW_CMD_STS_BOOT_MODE_BIT)) != 0u);
 
   // 4. Verify [edn_core.sv:307-318], [edn_core.sv:668-687], and
   // [dif_edn.c:154-181] on EDN1:
