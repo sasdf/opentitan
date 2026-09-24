@@ -9,6 +9,7 @@ load(
     "EARLGREY_SILICON_OWNER_ROM_EXT_ENVS",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
 )
 
@@ -18,9 +19,12 @@ load(
 # - cw310
 # - cw340
 # - silicon
+# - qemu
 CRYPTOTEST_EXEC_ENVS = {
     "//hw/top_earlgrey:fpga_cw340_test_rom": "fpga_cw340",
     "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": "fpga_cw340",
+    "//hw/top_earlgrey:sim_qemu_test_rom": "qemu",
+    "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu",
 } | EARLGREY_SILICON_OWNER_ROM_EXT_ENVS
 
 FIRMWARE_DEPS = [
@@ -56,7 +60,7 @@ FIRMWARE_OTBN_DEPS = [
     for dep in FIRMWARE_DEPS
 ]
 
-def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False, use_otbn_hash = False):
+def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False, use_otbn_hash = False, exec_env = CRYPTOTEST_EXEC_ENVS):
     """A macro for defining a CryptoTest test case.
 
     Args:
@@ -66,6 +70,7 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False, u
         test_harness: the test harness to use.
         slow_test: indicate if the test should be run in the nightly CI.
         use_otbn_hash: whether to link hash_otbn instead of hash.
+        exec_env: execution environments for the test.
     """
     tags = ["slow_test"] if slow_test else []
     deps = FIRMWARE_OTBN_DEPS if use_otbn_hash else FIRMWARE_DEPS
@@ -90,7 +95,14 @@ def cryptotest(name, test_vectors, test_args, test_harness, slow_test = False, u
             """ + test_args,
             test_harness = test_harness,
         ),
-        exec_env = CRYPTOTEST_EXEC_ENVS,
+        exec_env = exec_env,
+        qemu = qemu_params(
+            timeout = "long",
+            tags = tags,
+            data = test_vectors,
+            test_cmd = test_args,
+            test_harness = test_harness,
+        ),
         silicon = silicon_params(
             timeout = "eternal",
             tags = tags,
