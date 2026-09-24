@@ -212,6 +212,7 @@ opentitan_test(
     srcs = ["dice_cwt_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     deps = [
         ":dice_cwt",
