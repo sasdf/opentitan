@@ -26,6 +26,7 @@ opentitan_binary(
     },
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     deps = [
         "//sw/device/lib/base:status",
@@ -46,6 +47,7 @@ opentitan_binary(
     },
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     target_compatible_with = opentitan_require_top("earlgrey"),
@@ -794,6 +796,7 @@ opentitan_binary(
     },
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     target_compatible_with = opentitan_require_top("earlgrey"),
     deps = [

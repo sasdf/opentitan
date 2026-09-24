@@ -72,6 +72,7 @@ opentitan_test(
     srcs = ["isfb_page_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Check that the ISFB info page is configured for RD/WR, but not
@@ -96,6 +97,7 @@ opentitan_test(
     srcs = ["isfb_page_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Even though the isfb_erase extension is present and set to true,
@@ -217,6 +219,7 @@ _ISFB_CONTRAINT_TESTS = {
         srcs = ["//sw/device/silicon_creator/rom_ext/e2e/verified_boot:boot_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             binaries = {

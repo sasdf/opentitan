@@ -39,6 +39,7 @@ opentitan_test(
     srcs = ["boot_svc_empty_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
@@ -64,6 +65,7 @@ opentitan_test(
     srcs = ["boot_svc_enter_rescue_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@0 {firmware}@0x10000 {firmware}@0x90000",
@@ -96,6 +98,7 @@ opentitan_test(
     defines = ["BOOT_SVC_AFTER_WAKEUP_ENABLED=0"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -125,6 +128,7 @@ opentitan_test(
     defines = ["BOOT_SVC_AFTER_WAKEUP_ENABLED=1"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         # Not supported in QEMU whilst low power is not modelled
     },
     fpga = fpga_params(
@@ -161,6 +165,7 @@ NEXT_TEST_SEQUENCES = [
         defines = ["TEST_SEQUENCE_{}=1".format(test_sequence)],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
@@ -189,6 +194,7 @@ opentitan_test(
     srcs = ["boot_svc_primary_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
@@ -215,6 +221,7 @@ opentitan_test(
     srcs = ["boot_svc_bad_next_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
@@ -241,6 +248,7 @@ opentitan_test(
     srcs = ["boot_svc_bad_primary_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
@@ -309,6 +317,7 @@ MIN_SEC_VER_SLOTS = [
         srcs = ["boot_svc_min_sec_ver_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{v0_slot} {min_sec_ver_5:signed_bin}@{v5_slot}",

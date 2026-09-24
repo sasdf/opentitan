@@ -110,6 +110,7 @@ _CONFIGS = {
         name = "rescue_firmware_{}_{}".format(name, protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -171,6 +172,7 @@ genrule(
         name = "rescue_rom_ext_{}_update_{}".format(rxslot, name),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_offset}",
@@ -206,6 +208,7 @@ genrule(
         name = "next_slot_{}".format(protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
@@ -240,6 +243,7 @@ genrule(
         name = "primary_slot_{}".format(protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@{rom_ext_slot_a} {slot_a:signed_bin}@{owner_slot_a} {slot_b:signed_bin}@{owner_slot_b}",
@@ -278,6 +282,7 @@ genrule(
         name = "rescue_rate_{}_test".format(rate),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -310,6 +315,7 @@ genrule(
         name = "rescue_unsupported_rate_{}_test".format(rate),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -346,6 +352,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_xmodem_timeout",
@@ -382,6 +389,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # We configure OTP to preserve the reset reason and set the watchdog timeout
@@ -415,6 +423,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_failure = "ok: ",
@@ -447,6 +456,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         params = "-p spi-dfu -t gpio -v +Ioa2",
@@ -472,6 +482,7 @@ opentitan_test(
         name = "rescue_enter_on_fail_{}".format(name),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -503,6 +514,7 @@ opentitan_test(
         name = "rescue_get_boot_log_{}".format(protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -523,6 +535,7 @@ opentitan_test(
         name = "rescue_get_device_id_{}".format(protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "",
@@ -545,6 +558,7 @@ opentitan_test(
         name = "rescue_get_owner_page_{}".format(protocol),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{romext}@{romext_offset} {firmware}@{owner_offset}",
@@ -568,6 +582,7 @@ opentitan_test(
     name = "rescue_disability_xmodem",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{romext_offset} {firmware}@{owner_offset}",
@@ -588,6 +603,7 @@ opentitan_test(
     name = "rescue_disability_spidfu",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{romext_offset} {firmware}@{owner_offset}",
@@ -609,6 +625,7 @@ opentitan_test(
     name = "rescue_user_error",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "",
@@ -631,6 +648,7 @@ opentitan_test(
     name = "rescue_config_module_mismatch",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -654,6 +672,7 @@ opentitan_test(
     name = "spidfu_rescue_boot_svc_req_disability",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -673,6 +692,7 @@ opentitan_test(
     name = "xmodem_rescue_error_handling_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         timeout = "long",
@@ -689,6 +709,7 @@ opentitan_test(
     name = "spidfu_dfu_state_transitions",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -708,6 +729,7 @@ opentitan_test(
     name = "spidfu_invalid_dfu_requests",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -727,6 +749,7 @@ opentitan_test(
     name = "spidfu_invalid_flash_transaction",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -746,6 +769,7 @@ opentitan_test(
     name = "usbdfu_out_chunk_too_big",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{romext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
@@ -770,6 +794,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_failure = "(FAIL|BFV:|mode: RESQ).*",
@@ -793,6 +818,7 @@ opentitan_test(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_success = "mode: RESQ",

@@ -61,6 +61,7 @@ BOOT_POLICY_VALID_CASES = [
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             assemble = "{{slot_a}}@{} {{slot_b}}@{}".format(

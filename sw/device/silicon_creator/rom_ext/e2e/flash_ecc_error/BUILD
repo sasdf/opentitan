@@ -168,6 +168,7 @@ opentitan_binary(
         name = t["name"].format(c["cause"]),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             assemble = "{rom_ext}@0 {fw_a}@{slot_a} {rom_ext}@0x80000 {fw_b}@{slot_b}",
@@ -212,6 +213,7 @@ opentitan_test(
     name = "flash_exc_handler_disabled_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@0 {fw_a}@{slot_a} {rom_ext}@0x80000 {fw_b}@{slot_b}",

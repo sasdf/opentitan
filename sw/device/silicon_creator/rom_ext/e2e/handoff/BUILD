@@ -69,6 +69,7 @@ _FAULT_TEST_CASES = {
         defines = test_data["defines"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             exit_success = test_data["exit_success"],
@@ -102,6 +103,7 @@ opentitan_test(
     srcs = ["epmp_print.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         # Note: the application stage may have a dependency on the ePMP
@@ -162,6 +164,7 @@ SRAM_EXEC_TESTCASES = [
         srcs = ["sram_exec_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         fpga = fpga_params(
             exit_success = test["exit_success"],
@@ -184,6 +187,7 @@ opentitan_test(
     srcs = ["//sw/device/silicon_creator/rom_ext/e2e/verified_boot:boot_test"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         device_status = "0x1",

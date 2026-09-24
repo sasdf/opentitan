@@ -57,6 +57,7 @@ _READBACK_TESTS = {
         srcs = ["sram_readback_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = param["otp"],
@@ -115,6 +116,7 @@ _RENEW_TESTS = {
         srcs = ["sram_renew_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = param["otp"],
