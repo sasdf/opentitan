@@ -170,14 +170,18 @@ static void test_v1_002_permit_subword_and_addrmiss(void) {
           kPermit0011Offsets[i]);
   }
 
-  // 2. 16-bit sh write to RECOV_ALERT (PERMIT = 4'b0011) and 8-bit sb write to
+  // 2. 16-bit sh writes to all four PERMIT = 4'b0011 registers (ALERT_TRIG,
+  // FATAL_ALERT_EN, RECOV_ALERT, FATAL_ALERT) and 8-bit sb write to
   // ALERT_EN_0 (PERMIT = 4'b0001) must succeed without fault!
   g_fault_count = 0;
-  mmio_write16(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET, 0u);
+  for (size_t i = 0; i < 4u; ++i) {
+    mmio_write16(kSensorCtrlBase + kPermit0011Offsets[i], 0u);
+  }
   mmio_write8(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET,
               kMultiBitBool4True);
   CHECK(g_fault_count == 0u,
-        "Expected sh to RECOV_ALERT and sb to ALERT_EN_0 to succeed");
+        "Expected sh to all PERMIT=4'b0011 CSRs and sb to ALERT_EN_0 to "
+        "succeed");
 
   // 3. Unmapped offsets 0x74..0x7c within BlockAw = 7 (128B) aperture assert
   // addrmiss = 1 (mcause = 5 on lw, mcause = 7 on sw).
@@ -262,17 +266,43 @@ static void test_v2_002_alert_en_loose_mubi4_zero_stays_enabled(void) {
   abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_1_REG_OFFSET,
                    kMultiBitBool4True);
 
-  // Finally verify CFG_REGWEN locks both FATAL_ALERT_EN and ALERT_EN_0..10.
+  // Verify CFG_REGWEN locks both FATAL_ALERT_EN and ALERT_EN_0..10 in hardware
+  // (sensor_ctrl_reg_top.sv) while ALERT_TRIG remains writable.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET,
+                   kMultiBitBool4True);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET, 0u);
   dif_sensor_ctrl_t sensor_ctrl;
   CHECK_DIF_OK(dif_sensor_ctrl_init(mmio_region_from_addr(kSensorCtrlBase),
                                     &sensor_ctrl));
   CHECK_DIF_OK(dif_sensor_ctrl_lock_cfg(&sensor_ctrl));
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_CFG_REGWEN_REG_OFFSET) ==
+        0u);
   CHECK(dif_sensor_ctrl_set_alert_en(&sensor_ctrl, 0, kDifToggleDisabled) ==
             kDifLocked,
         "Expected dif_sensor_ctrl_set_alert_en to return kDifLocked");
   CHECK(dif_sensor_ctrl_set_alert_fatal(&sensor_ctrl, 0, kDifToggleEnabled) ==
             kDifLocked,
         "Expected dif_sensor_ctrl_set_alert_fatal to return kDifLocked");
+
+  // Direct MMIO writes to ALERT_EN_0 and FATAL_ALERT_EN must be rejected by
+  // hardware CFG_REGWEN gating, whereas ALERT_TRIG remains writable.
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET,
+                   kMultiBitBool4False);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_ALERT_EN_0_REG_OFFSET) ==
+            kMultiBitBool4True,
+        "Hardware CFG_REGWEN==0 must block direct MMIO write to ALERT_EN_0");
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET,
+                   0x7ffu);
+  CHECK(abs_mmio_read32(kSensorCtrlBase +
+                        SENSOR_CTRL_FATAL_ALERT_EN_REG_OFFSET) == 0u,
+        "Hardware CFG_REGWEN==0 must block direct MMIO write to "
+        "FATAL_ALERT_EN");
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET) ==
+            1u,
+        "ALERT_TRIG must remain writable even when CFG_REGWEN==0");
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_ALERT_TRIG_REG_OFFSET, 0u);
+  abs_mmio_write32(kSensorCtrlBase + SENSOR_CTRL_RECOV_ALERT_REG_OFFSET, 1u);
 }
 
 bool test_main(void) {
