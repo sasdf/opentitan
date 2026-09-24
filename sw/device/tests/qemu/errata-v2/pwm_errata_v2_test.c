@@ -136,23 +136,41 @@ static void test_cheriot_regs_and_subword_permit(
       dif_cheriot_alert_force(&cheriot_dt, kDifCheriotAlertFatalFault));
   CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(kCheriotAlert));
 
-  // CHERIOT_REGS_PERMIT[0] = 4'b0001: byte-0 store (`sb` at +0) is permitted
-  // (`reg_be = 4'b0001`) and fires alert 64 without bus fault.
+  // CHERIOT_REGS_PERMIT[0] = 4'b0001: byte-0 store (`sb` at +0) and halfword-0
+  // store (`sh` at +0, `reg_be = 4'b0011`) are permitted (`|(4'b0001 & ~reg_be)
+  // == 0`) and fire alert 64 without bus fault.
   g_fault_seen = false;
   CHECK_STATUS_OK(ottf_alerts_expect_alert_start(kCheriotAlert));
   abs_mmio_write8(kCheriotRegsBase + CHERIOT_ALERT_TEST_REG_OFFSET, 1u);
   CHECK(!g_fault_seen);
   CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(kCheriotAlert));
 
-  // Unaligned byte-1 store (`sb` at +1, `reg_be = 4'b0010`) violates
-  // CHERIOT_REGS_PERMIT[0] = 4'b0001 (`wr_err = 1`, `d_error = 1`, mcause = 7)
-  // and does NOT assert intg_err_o / alert 64.
+  g_fault_seen = false;
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_start(kCheriotAlert));
+  *(volatile uint16_t *)(kCheriotRegsBase + CHERIOT_ALERT_TEST_REG_OFFSET) = 1u;
+  CHECK(!g_fault_seen);
+  CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(kCheriotAlert));
+
+  // Unaligned byte-1 store (`sb` at +1, `reg_be = 4'b0010`) and halfword-1
+  // store (`sh` at +2, `reg_be = 4'b1100`) violate CHERIOT_REGS_PERMIT[0] =
+  // 4'b0001 (`wr_err = 1`, `d_error = 1`, mcause = 7) and do NOT assert
+  // intg_err_o / alert 64.
   g_fault_seen = false;
   g_last_mcause = 0;
   abs_mmio_write8(kCheriotRegsBase + CHERIOT_ALERT_TEST_REG_OFFSET + 1u, 1u);
   CHECK(g_fault_seen);
   CHECK(g_last_mcause == kIbexExcStoreAccessFault);
   bool is_cause = true;
+  CHECK_DIF_OK(dif_alert_handler_alert_is_cause(alert_handler, kCheriotAlert,
+                                                &is_cause));
+  CHECK(!is_cause);
+
+  g_fault_seen = false;
+  g_last_mcause = 0;
+  *(volatile uint16_t *)(kCheriotRegsBase + CHERIOT_ALERT_TEST_REG_OFFSET +
+                         2u) = 1u;
+  CHECK(g_fault_seen);
+  CHECK(g_last_mcause == kIbexExcStoreAccessFault);
   CHECK_DIF_OK(dif_alert_handler_alert_is_cause(alert_handler, kCheriotAlert,
                                                 &is_cause));
   CHECK(!is_cause);
@@ -163,11 +181,22 @@ static void test_cheriot_revbm_access_check_and_meta_sram(
   LOG_INFO(
       "Test 2: cheriot_access_check on revbm (0x11000000) & sram_ctrl_meta");
 
-  // Verify sram_ctrl_meta (0x411C0000) CSR interface is alive on CW340 FPGA.
-  uint32_t meta_status =
+  // Verify sram_ctrl_meta (0x411C0000) CSR interface is alive on CW340 FPGA:
+  // at cold boot STATUS == 0x0, and after writing CTRL.INIT = 1 it transitions
+  // to STATUS == 0x20 (1 << SRAM_CTRL_STATUS_INIT_DONE_BIT).
+  uint32_t meta_status_init =
       abs_mmio_read32(kSramCtrlMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK((meta_status_init & (1u << SRAM_CTRL_STATUS_BUS_INTEG_ERROR_BIT)) ==
+        0u);
+  abs_mmio_write32(kSramCtrlMetaRegsBase + SRAM_CTRL_CTRL_REG_OFFSET,
+                   1u << SRAM_CTRL_CTRL_INIT_BIT);
+  uint32_t meta_status = 0u;
+  do {
+    meta_status =
+        abs_mmio_read32(kSramCtrlMetaRegsBase + SRAM_CTRL_STATUS_REG_OFFSET);
+  } while ((meta_status & (1u << SRAM_CTRL_STATUS_INIT_DONE_BIT)) == 0u);
   LOG_INFO("sram_ctrl_meta STATUS = 0x%08x", meta_status);
-  CHECK((meta_status & (1u << SRAM_CTRL_STATUS_BUS_INTEG_ERROR_BIT)) == 0u);
+  CHECK(meta_status == 0x20u);
 
   // In ePMP mode (cheriot_ena_i == MuBi4False), u_cheriot_access_check_sys
   // steers all accesses in 0x11000000..0x11000BFF to u_tlul_err_resp
@@ -180,6 +209,18 @@ static void test_cheriot_revbm_access_check_and_meta_sram(
 
   g_fault_seen = false;
   g_last_mcause = 0;
+  (void)*(volatile uint16_t *)kCheriotRevbmBase;
+  CHECK(g_fault_seen);
+  CHECK(g_last_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  g_last_mcause = 0;
+  (void)abs_mmio_read8(kCheriotRevbmBase);
+  CHECK(g_fault_seen);
+  CHECK(g_last_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_seen = false;
+  g_last_mcause = 0;
   (void)abs_mmio_read32(kCheriotRevbmBase + kCheriotRevbmSize - 4u);
   CHECK(g_fault_seen);
   CHECK(g_last_mcause == kIbexExcLoadAccessFault);
@@ -187,6 +228,12 @@ static void test_cheriot_revbm_access_check_and_meta_sram(
   g_fault_seen = false;
   g_last_mcause = 0;
   abs_mmio_write32(kCheriotRevbmBase, 0xA5A5A5A5u);
+  CHECK(g_fault_seen);
+  CHECK(g_last_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_seen = false;
+  g_last_mcause = 0;
+  *(volatile uint16_t *)kCheriotRevbmBase = 0x5A5Au;
   CHECK(g_fault_seen);
   CHECK(g_last_mcause == kIbexExcStoreAccessFault);
 
@@ -269,6 +316,14 @@ static void test_cheriot_switch_locked_dis_ignores_invalid_lock_writes(
       &is_cause));
   CHECK(!is_cause);
 
+  // Verify u_cheriot_switch.ena_o remains MuBi4False (kCheriotRevbmBase still
+  // faults with LoadAccessFault mcause = 5).
+  g_fault_seen = false;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kCheriotRevbmBase);
+  CHECK(g_fault_seen);
+  CHECK(g_last_mcause == kIbexExcLoadAccessFault);
+
   // Restore CHERIOT_ENA CSR to kMultiBitBool4False.
   abs_mmio_write32(kRvCoreIbexCfgBase + RV_CORE_IBEX_CHERIOT_ENA_REG_OFFSET,
                    (uint32_t)kMultiBitBool4False);
@@ -287,6 +342,15 @@ static void test_pwm_template_and_dif_heartbeat_step_math(void) {
   //        phase_cntr_ticks_per_beat * config.blink_parameter_y
   //      without subtracting 1, whereas pwm_chan.sv.tpl:173,175 adds
   //      (blink_param_y_i + 1'b1) phase counter ticks per heartbeat step.
+  const uint32_t kPwmParamHtbtEnBit = 30u;
+  const uint32_t kPwmParamBlinkEnBit = 31u;
+  uint32_t pwm_param_reg = 0u;
+  pwm_param_reg = bitfield_bit32_write(pwm_param_reg, kPwmParamHtbtEnBit, true);
+  pwm_param_reg =
+      bitfield_bit32_write(pwm_param_reg, kPwmParamBlinkEnBit, true);
+  CHECK(((pwm_param_reg >> kPwmParamHtbtEnBit) & 1u) == 1u);
+  CHECK(((pwm_param_reg >> kPwmParamBlinkEnBit) & 1u) == 1u);
+
   const uint8_t dc_resn = 7u;
   const uint32_t beats_per_pulse_cycle = 1u << (dc_resn + 1u);
   const uint16_t phase_cntr_ticks_per_beat =
@@ -301,6 +365,17 @@ static void test_pwm_template_and_dif_heartbeat_step_math(void) {
   CHECK(dif_programmed_y == 256u);
   CHECK(rtl_actual_step_ticks == 257u);
   CHECK(rtl_actual_step_ticks != phase_cntr_ticks_per_beat);
+
+  // Also verify config.blink_parameter_y == 0 passes dif_pwm.c:94
+  // (0 < beats_per_pulse_cycle) and programs BLINK_PARAM.Y = 0 (1 tick/step).
+  const uint16_t blink_parameter_y_zero = 0u;
+  CHECK(blink_parameter_y_zero < beats_per_pulse_cycle);
+  const uint16_t dif_programmed_y_zero =
+      (uint16_t)(phase_cntr_ticks_per_beat * blink_parameter_y_zero);
+  const uint16_t rtl_actual_step_ticks_zero =
+      (uint16_t)(dif_programmed_y_zero + 1u);
+  CHECK(dif_programmed_y_zero == 0u);
+  CHECK(rtl_actual_step_ticks_zero == 1u);
 }
 
 bool test_main(void) {
