@@ -8,48 +8,48 @@
  * hardware, specification, and DIF errata:
  *
  * Confirmed v1 Errata Still Present on v2 (`keymgr_dpe`):
- *   - [ERRATA-KEYMGR-002]: Undocumented dynamic gating of `SW_BINDING_REGWEN`,
+ *   - Undocumented dynamic gating of `SW_BINDING_REGWEN`,
  *     `SLOT_POLICY_REGWEN`, and `MAX_KEY_VER_REGWEN` by `CFG_REGWEN` while
  *     `OP_STATUS == WIP` (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:476-478`).
- *   - [ERRATA-KEYMGR-004]: `SIDELOAD_CLEAR` continuous level priority over
+ *   - `SIDELOAD_CLEAR` continuous level priority over
  *     `GEN_HW_OUT` (`OP_STATUS = DONE_SUCCESS` while holding `valid_q = 0`,
  *     causing KMAC sideload to fail with `ErrKeyNotValid = 0x5`,
  *     `hw/ip/keymgr_dpe/rtl/keymgr_dpe_sideload_key.sv:32-48`).
- *   - [ERRATA-KEYMGR-005]: `data_valid_o` gating (`~invalid_op` at
+ *   - `data_valid_o` gating (`~invalid_op` at
  *     `hw/ip/keymgr_dpe/rtl/keymgr_dpe_ctrl.sv:284`) preserves existing
  *     `SW_SHARE0/1_OUTPUT` and sideload keys when `KEY_VERSION >
  *     slot.max_key_version` raises `ERR_CODE = INVALID_OP |
  *     INVALID_KMAC_INPUT (0x3)`.
- *   - [ERRATA-KEYMGR-006]: Failed `ADVANCE` (`op_err == 1`) preserves
+ *   - Failed `ADVANCE` (`op_err == 1`) preserves
  *     `WORKING_STATE = Available` and existing DPE key slots (`SlotUpdateIdle`)
  *     while holding `unlock_after_advance_o = 0` (`SW_BINDING_REGWEN` stays
  *     locked at `0`, `hw/ip/keymgr_dpe/rtl/keymgr_dpe_ctrl.sv:174, 212`).
- *   - [ERRATA-KEYMGR-007]: Synchronous TL-UL bus error (`d_error = 1`, Ibex
+ *   - Synchronous TL-UL bus error (`d_error = 1`, Ibex
  *     `mcause = 7 / 5`) on narrow sub-word writes violating
  *     `KEYMGR_DPE_PERMIT[54]` (`CONTROL_SHADOWED = 4'b0111`,
  *     `SW_BINDING_0 = 4'b1111`) and unmapped offset accesses (`>= 0xd8`).
  *
  * v1 Errata Fixed in v2 RTL (`keymgr_dpe`):
- *   - [ERRATA-KEYMGR-001]: `adv_dvalid` and `hw2reg.debug` are now aligned with
+ *   - `adv_dvalid` and `hw2reg.debug` are now aligned with
  *     `adv_matrix` (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:543-570, 649-656`);
  *     advancing from `BootStageCreator (0)` checks `devid_vld &
  *     health_state_vld & rom_digest_vld` without checking `creator_seed_vld`
  *     one stage early.
- *   - [ERRATA-KEYMGR-003]: `StCtrlDpeDisabled` (`WORKING_STATE = Disabled (2)`)
+ *   - `StCtrlDpeDisabled` (`WORKING_STATE = Disabled (2)`)
  *     sets `op_req = 0` and `invalid_op = op_start_i`
  *     (`hw/ip/keymgr_dpe/rtl/keymgr_dpe_ctrl.sv:580-587`), completing in 1
  *     cycle with `OP_STATUS = DONE_ERROR (3)` and `ERR_CODE.INVALID_OP = 1`
  *     without streaming dummy KMAC transactions.
  *
  * Newly Discovered Earlgrey v2 (`trunk-v2`) Errata (`NEW_IN_V2`):
- *   - [ERRATA-KEYMGR-V2-01]: Unenumerated `CONTROL_SHADOWED.OPERATION` (`6` or
+ *   - Unenumerated `CONTROL_SHADOWED.OPERATION` (`6` or
  *     `7`) in `StCtrlDpeAvailable` sets `op_req = 1` with `adv_req = gen_req =
  *     erase_req = dis_req = load_req = 0` and `invalid_op = 0`
  *     (`hw/ip/keymgr_dpe/rtl/keymgr_dpe_ctrl.sv:155-160, 408, 534-543`),
  *     leaving `u_op_state` in `StIdle` (`op_ack = 0`) and permanently
  *     deadlocking `keymgr_dpe` in `OP_STATUS = WIP (1)` with `START = 1` and
  *     `CFG_REGWEN = 0` until hardware reset.
- *   - [ERRATA-KEYMGR-V2-02]: `u_sw_binding_regwen`, `u_slot_policy_regwen`, and
+ *   - `u_sw_binding_regwen`, `u_slot_policy_regwen`, and
  *     `u_max_key_ver_regwen` set `.NonInitClr(1'b1)`
  *     (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:433-474`, contradicting
  *     `keymgr_dpe.hjson:736`), while `unlock_after_advance_o = adv_req &
@@ -57,13 +57,13 @@
  *     `init_o` and `load_req`, so UDS loading fails to unlock `*_REGWEN` and
  *     causes `dif_keymgr_dpe_advance_state()` to return `kDifLocked`
  *     (`TODO(#30666)` / `TODO(#30667)`).
- *   - [ERRATA-KEYMGR-V2-03]: 3-bit `CONTROL_SHADOWED.SLOT_SRC_SEL` (`[16:14]`)
+ *   - 3-bit `CONTROL_SHADOWED.SLOT_SRC_SEL` (`[16:14]`)
  *     and `SLOT_DST_SEL` (`[20:18]`) silently tie off bit `[2]` and truncate
  *     modulo 4 (`slot & 0x3`, `hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:319-336`,
  *     `TODO(#30682)`) instead of raising `ERR_CODE.INVALID_OP`, allowing
  *     out-of-bounds `SLOT_SRC_SEL = 6` / `SLOT_DST_SEL = 6` to alias and erase
  *     hardware slot `2`.
- *   - [ERRATA-KEYMGR-V2-04]: `ROM`
+ *   - `ROM`
  * (`sw/device/silicon_creator/rom/rom.c:665-735`) and
  * `sc_keymgr_dpe_advance_creator()`
  *     (`sw/device/silicon_creator/lib/drivers/keymgr_dpe.c:509-534`) never
@@ -158,14 +158,13 @@ static uint32_t keymgr_wait_done(uint32_t *err_code_out) {
 }
 
 /**
- * Test 1: [ERRATA-KEYMGR-007] (CONFIRMED_PRESENT_ON_V2)
+ * Test 1: (CONFIRMED_PRESENT_ON_V2)
  * Narrow sub-word writes violating `KEYMGR_DPE_PERMIT[54]` and unmapped offset
  * accesses (`>= 0xd8`) raise a synchronous TL-UL bus error (`d_error = 1`,
  * Ibex `mcause = 7 / 5`).
  */
 static void test_errata_keymgr_007_permit_and_addrmiss(void) {
-  LOG_INFO(
-      "Testing [ERRATA-KEYMGR-007]: KEYMGR_DPE_PERMIT and addrmiss faults");
+  LOG_INFO("Testing KEYMGR_DPE_PERMIT and addrmiss faults");
 
   uint32_t ctrl_before =
       abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET);
@@ -200,12 +199,12 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
 }
 
 /**
- * Test 2: [ERRATA-KEYMGR-V2-04] & [ERRATA-KEYMGR-V2-02] (NEW_IN_V2)
- * - [ERRATA-KEYMGR-V2-04]: `ROM` (`rom.c:665-735`) and
+ * Test 2: & (NEW_IN_V2)
+ * - `ROM` (`rom.c:665-735`) and
  *   `sc_keymgr_dpe_advance_creator()` leave `LOAD_KEY_LOCK == 0` (`0xd4`),
  *   allowing post-ROM firmware to execute `OpDpeLoadRootKey` (`OPERATION = 5`)
  *   and reload the raw OTP `UDS` (`BootStageCreator = 0`) into slot 2.
- * - [ERRATA-KEYMGR-V2-02]: Locking `SW_BINDING_REGWEN = 0`,
+ * - Locking `SW_BINDING_REGWEN = 0`,
  *   `SLOT_POLICY_REGWEN = 0`, and `MAX_KEY_VER_REGWEN = 0` before UDS load
  *   leaves all three `*_REGWEN` registers locked at `0` after UDS load succeeds
  *   (`unlock_after_advance_o = adv_req & op_ack & ... == 0`), causing
@@ -214,13 +213,13 @@ static void test_errata_keymgr_007_permit_and_addrmiss(void) {
 static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
     const dif_keymgr_dpe_t *keymgr_dpe) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-V2-04] & [ERRATA-KEYMGR-V2-02]: LOAD_KEY_LOCK "
+      "Testing & LOAD_KEY_LOCK "
       "and UDS REGWEN lock");
 
   uint32_t load_lock =
       abs_mmio_read32(kKeymgrBase + KEYMGR_DPE_LOAD_KEY_LOCK_REG_OFFSET);
   CHECK(load_lock == 0,
-        "Expected LOAD_KEY_LOCK == 0 after ROM boot ([ERRATA-KEYMGR-V2-04]), "
+        "Expected LOAD_KEY_LOCK == 0 after ROM boot (), "
         "got 0x%x",
         load_lock);
 
@@ -252,7 +251,7 @@ static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
         "Expected DONE_SUCCESS on OpDpeLoadRootKey into slot 2, got 0x%x", st);
   CHECK(err == 0, "Expected ERR_CODE == 0, got 0x%x", err);
 
-  // [ERRATA-KEYMGR-V2-02]: Because `unlock_after_advance_o = adv_req & op_ack
+  // Because `unlock_after_advance_o = adv_req & op_ack
   // & ~(op_err | op_fault_err)` is 0 during UDS load (both in StCtrlDpeRootKey
   // and OpDpeLoadRootKey), all three *_REGWEN registers remain locked at 0!
   CHECK(abs_mmio_read32(kKeymgrBase +
@@ -272,11 +271,11 @@ static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
   };
   CHECK(dif_keymgr_dpe_advance_state(keymgr_dpe, &adv_params) == kDifLocked,
         "Expected dif_keymgr_dpe_advance_state() to fail with kDifLocked "
-        "([ERRATA-KEYMGR-V2-02])");
+        "()");
 }
 
 /**
- * Test 3: [ERRATA-KEYMGR-001] (FIXED_IN_V2_RTL)
+ * Test 3: (FIXED_IN_V2_RTL)
  * Advancing slot 2 (`BootStageCreator (0) -> BootStageOwnerInt (1)`) with
  * `SW_BINDING_ONLY = 0` checks `devid_vld & health_state_vld & rom_digest_vld`
  * (`adv_dvalid[BootStageCreator]`) and does NOT check `creator_seed_vld` one
@@ -286,7 +285,7 @@ static void test_errata_v2_04_and_v2_02_uds_reload_and_regwen_lock(
  */
 static void test_errata_keymgr_001_fixed_in_v2_and_regwen_unlock(void) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-001] (FIXED_IN_V2_RTL): BootStageCreator "
+      "Testing (FIXED_IN_V2_RTL): BootStageCreator "
       "adv_dvalid alignment");
 
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_DEBUG_REG_OFFSET, 0u);
@@ -355,7 +354,7 @@ static void test_errata_keymgr_001_fixed_in_v2_and_regwen_unlock(void) {
 }
 
 /**
- * Test 4: [ERRATA-KEYMGR-002] (CONFIRMED_PRESENT_ON_V2)
+ * Test 4: (CONFIRMED_PRESENT_ON_V2)
  * While an operation is in progress (`OP_STATUS == WIP (1)`, `CFG_REGWEN ==
  * 0`), `SW_BINDING_REGWEN`, `SLOT_POLICY_REGWEN`, and `MAX_KEY_VER_REGWEN`
  * dynamically read `0` (`hw2reg.*_regwen.d = *_regwen & cfg_regwen` at
@@ -363,8 +362,7 @@ static void test_errata_keymgr_001_fixed_in_v2_and_regwen_unlock(void) {
  * `SLOT_POLICY`, then return to `1` when `OP_STATUS == DONE_SUCCESS`.
  */
 static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
-  LOG_INFO(
-      "Testing [ERRATA-KEYMGR-002]: Dynamic gating of *_REGWEN by CFG_REGWEN");
+  LOG_INFO("Testing Dynamic gating of *_REGWEN by CFG_REGWEN");
 
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_SW_BINDING_0_REG_OFFSET,
                    0x11223344u);
@@ -400,7 +398,7 @@ static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
   CHECK(cfg_wen == 0u, "Expected CFG_REGWEN == 0 while WIP");
   CHECK(swb_wen == 0u,
         "Expected SW_BINDING_REGWEN == 0 while CFG_REGWEN == 0 "
-        "([ERRATA-KEYMGR-002])");
+        "()");
   CHECK(pol_wen == 0u,
         "Expected SLOT_POLICY_REGWEN == 0 while CFG_REGWEN == 0");
   CHECK(ver_wen == 0u,
@@ -414,15 +412,14 @@ static void test_errata_keymgr_002_cfg_regwen_dynamic_gating(void) {
 }
 
 /**
- * Test 5: [ERRATA-KEYMGR-004] (CONFIRMED_PRESENT_ON_V2)
+ * Test 5: (CONFIRMED_PRESENT_ON_V2)
  * `SIDELOAD_CLEAR` continuous level priority over `GEN_HW_OUT` reports
  * `OP_STATUS = DONE_SUCCESS` while holding `valid_q = 0` (`u_kmac_key`),
  * causing KMAC sideload operations to fail with `ErrKeyNotValid (0x5)`.
  */
 static void test_errata_keymgr_004_sideload_clear_level_priority(
     dif_kmac_t *kmac) {
-  LOG_INFO(
-      "Testing [ERRATA-KEYMGR-004]: SIDELOAD_CLEAR continuous level priority");
+  LOG_INFO("Testing SIDELOAD_CLEAR continuous level priority");
 
   // Hold SIDELOAD_CLEAR = KMAC (2) while running GEN_HW_OUT (DEST_SEL = KMAC).
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_SIDELOAD_CLEAR_REG_OFFSET,
@@ -486,15 +483,14 @@ static void test_errata_keymgr_004_sideload_clear_level_priority(
 }
 
 /**
- * Test 6: [ERRATA-KEYMGR-005] (CONFIRMED_PRESENT_ON_V2)
+ * Test 6: (CONFIRMED_PRESENT_ON_V2)
  * `data_valid_o` gating (`~invalid_op` at `keymgr_dpe_ctrl.sv:284`) preserves
  * existing `SW_SHARE0/1_OUTPUT` and sideload keys when `KEY_VERSION >
  * slot.max_key_version` fails with `ERR_CODE = INVALID_OP |
  * INVALID_KMAC_INPUT (0x3)`.
  */
 static void test_errata_keymgr_005_data_valid_gating_on_invalid_version(void) {
-  LOG_INFO(
-      "Testing [ERRATA-KEYMGR-005]: data_valid_o gating on invalid version");
+  LOG_INFO("Testing data_valid_o gating on invalid version");
 
   // Generate a valid SW key on slot 2 (version 1 <= max_key_version 10).
   abs_mmio_write32(kKeymgrBase + KEYMGR_DPE_KEY_VERSION_REG_OFFSET, 1u);
@@ -544,14 +540,14 @@ static void test_errata_keymgr_005_data_valid_gating_on_invalid_version(void) {
 }
 
 /**
- * Test 7: [ERRATA-KEYMGR-006] (CONFIRMED_PRESENT_ON_V2)
+ * Test 7: (CONFIRMED_PRESENT_ON_V2)
  * Failed `ADVANCE` preserves `WORKING_STATE = Available` and existing DPE key
  * slots (`SlotUpdateIdle`), while holding `unlock_after_advance_o = 0` so
  * `SW_BINDING_REGWEN` stays locked at `0` until a subsequent valid `ADVANCE`.
  */
 static void test_errata_keymgr_006_failed_advance_locks_sw_binding(void) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-006]: Failed ADVANCE preserves slot but keeps "
+      "Testing Failed ADVANCE preserves slot but keeps "
       "SW_BINDING_REGWEN == 0");
 
   // Lock SW_BINDING_REGWEN = 0.
@@ -597,14 +593,14 @@ static void test_errata_keymgr_006_failed_advance_locks_sw_binding(void) {
 }
 
 /**
- * Test 8: [ERRATA-KEYMGR-V2-03] (NEW_IN_V2, `TODO(#30682)`)
+ * Test 8: (NEW_IN_V2, `TODO(#30682)`)
  * Out-of-bounds 3-bit `SLOT_SRC_SEL` / `SLOT_DST_SEL` (`4..7`) in
  * `keymgr_dpe.sv:319-336` silently truncates modulo 4 (`slot & 0x3`) instead
  * of raising `ERR_CODE.INVALID_OP`.
  */
 static void test_errata_v2_03_out_of_bounds_slot_truncation_aliasing(void) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-V2-03]: Out-of-bounds slot 6 silently aliases "
+      "Testing Out-of-bounds slot 6 silently aliases "
       "and erases slot 2");
 
   // Generate SW key from valid slot 2 (`SLOT_SRC_SEL = 2`).
@@ -678,7 +674,7 @@ static void test_errata_v2_03_out_of_bounds_slot_truncation_aliasing(void) {
 }
 
 /**
- * Test 9A (Boot 1): [ERRATA-KEYMGR-V2-01] (NEW_IN_V2)
+ * Test 9A (Boot 1): (NEW_IN_V2)
  * Programming unenumerated `CONTROL_SHADOWED.OPERATION = 6` (`3'b110`) in
  * `StCtrlDpeAvailable` (`WORKING_STATE == 1`) sets `op_req = 1` with all
  * `*_req = 0` and `invalid_op = 0`, permanently deadlocking `keymgr_dpe` in
@@ -686,7 +682,7 @@ static void test_errata_v2_03_out_of_bounds_slot_truncation_aliasing(void) {
  */
 static void test_errata_v2_01_unenumerated_op_deadlock_in_available(void) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-V2-01]: Unenumerated OPERATION=6 permanent WIP "
+      "Testing Unenumerated OPERATION=6 permanent WIP "
       "deadlock in Available state");
 
   keymgr_write_shadowed(
@@ -723,7 +719,7 @@ static void test_errata_v2_01_unenumerated_op_deadlock_in_available(void) {
 }
 
 /**
- * Test 9B (Boot 2 after SW reset): [ERRATA-KEYMGR-003] (FIXED_IN_V2_RTL)
+ * Test 9B (Boot 2 after SW reset): (FIXED_IN_V2_RTL)
  * In `StCtrlDpeDisabled` (`WORKING_STATE = Disabled (2)`), `keymgr_dpe` sets
  * `op_req = 0` and `invalid_op = op_start_i` (`keymgr_dpe_ctrl.sv:580-587`),
  * completing in 1 cycle with `OP_STATUS = DONE_ERROR (3)` and
@@ -731,7 +727,7 @@ static void test_errata_v2_01_unenumerated_op_deadlock_in_available(void) {
  */
 static void test_errata_keymgr_003_fixed_in_v2_disabled_state(void) {
   LOG_INFO(
-      "Testing [ERRATA-KEYMGR-003] (FIXED_IN_V2_RTL): Disabled state fast "
+      "Testing (FIXED_IN_V2_RTL): Disabled state fast "
       "rejection without KMAC");
 
   // Transition from Available (1) to Disabled (2).
@@ -789,7 +785,7 @@ bool test_main(void) {
     test_errata_v2_03_out_of_bounds_slot_truncation_aliasing();
     test_errata_v2_01_unenumerated_op_deadlock_in_available();
 
-    // Recover from the permanent [ERRATA-KEYMGR-V2-01] hardware deadlock via
+    // Recover from the permanent hardware deadlock via
     // software device reset to run Boot 2 (Test 9B).
     rstmgr_testutils_reason_clear();
     CHECK_DIF_OK(dif_rstmgr_software_device_reset(&rstmgr));
@@ -797,7 +793,7 @@ bool test_main(void) {
     return false;
   }
 
-  LOG_INFO("=== Boot 2 (SW Reset): Running Test 9B ([ERRATA-KEYMGR-003]) ===");
+  LOG_INFO("=== Boot 2 (SW Reset): Running Test 9B () ===");
   test_errata_keymgr_003_fixed_in_v2_disabled_state();
   LOG_INFO("=== All keymgr_dpe v2 errata tests PASSED on CW340 FPGA! ===");
   return true;
