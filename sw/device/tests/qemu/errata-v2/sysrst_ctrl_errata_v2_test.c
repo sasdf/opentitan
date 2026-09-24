@@ -19,8 +19,11 @@
  *      `sysrst_ctrl_detect.sv:65-76` (`trigger_active & ~trigger_active_q`) and
  *      assert `KEY_INTR_STATUS` (`0xa8`).
  *    - Programming `COM_SEL_CTL_0 != 0` with `COM_DET_CTL_0 = 0` when the
- *      selected input is already active immediately triggers
- *      `COMBO_INTR_STATUS` (`0xa4`) on the next AON cycle.
+ *      selected input is already active (`key0_int == 0`) keeps `trigger` at
+ *      `1 -> 1` (`COMBO_INTR_STATUS == 0`) because `trigger_active_q` is
+ *      already `1` when `COM_SEL_CTL_0 == 0`, and `COMBO_INTR_STATUS` (`0xa4`)
+ *      only asserts once `KEY_INVERT_CTL` synthesizes a `1 -> 0` `key0_int`
+ *      edge.
  * 2. `[sysrst_ctrl_ulp.sv:68-95, sysrst_ctrl_detect.sv:180-211]`
  *    (`SPEC_DOC_ERRATA`):
  *    - `ULP_STATUS` (`0x28`, `rw1c`) is driven by the single-cycle
