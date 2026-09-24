@@ -301,13 +301,21 @@ static void test_window_gap_and_subword_permits(void) {
 static void test_nmi_w1s_and_mstack_clobber(void) {
   LOG_INFO("Test 2: NMI_ENABLE W1S irreversibility and 1-deep mstack clobber");
 
-  // 2a. `_rom_start_boot` (`rom_start.S:166`) writes `NMI_ENABLE.WDOG_EN = 1`
-  // (`0x2`) at reset and leaves `NMI_ENABLE.ALERT_EN == 0` (`bit 0`). Verify
-  // `WDOG_EN == 1` persisted (`SwAccessW1S`) while `ALERT_EN == 0`.
+  // 2a. At entry, `NMI_ENABLE.ALERT_EN` (`bit 0`) is `0` (`NMI_ENABLE == 0x0`
+  // under `test_rom`, or `0x2` with `WDOG_EN = 1` under `rom_with_fake_keys`
+  // from `rom_start.S:166`). Enable `WDOG_EN` (`bit 1`, `W1S`) and verify
+  // writing `0` cannot clear `WDOG_EN` (`NMI_ENABLE == 0x2`, `ALERT_EN == 0`).
   uint32_t nmi_en_init =
       abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET);
+  CHECK((nmi_en_init & (1u << RV_CORE_IBEX_NMI_ENABLE_ALERT_EN_BIT)) == 0u,
+        "Expected NMI_ENABLE.ALERT_EN == 0 at entry, got 0x%x", nmi_en_init);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET,
+                   (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT));
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET, 0u);
+  nmi_en_init =
+      abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_NMI_ENABLE_REG_OFFSET);
   CHECK(nmi_en_init == (1u << RV_CORE_IBEX_NMI_ENABLE_WDOG_EN_BIT),
-        "Expected NMI_ENABLE == 0x2 (WDOG_EN=1 from ROM, ALERT_EN=0), got 0x%x",
+        "Expected NMI_ENABLE == 0x2 (WDOG_EN=1 W1S, ALERT_EN=0), got 0x%x",
         nmi_en_init);
 
   // Configure `alert_handler` Class A to pulse `esc_rx[0]` (`signal = 0`,
@@ -473,13 +481,18 @@ static void test_sw_recov_err_and_rnd_data(void) {
         "Expected RND_STATUS.RND_DATA_VALID=0 after RND_DATA read while EDN0 "
         "is paused (got 0x%x)",
         status_immediately_after);
-  abs_mmio_write32(kEdn0CtrlAddr, edn0_ctrl_orig);
+  abs_mmio_write32(kEdn0CtrlAddr,
+                   (edn0_ctrl_orig == 0x9999u) ? 0x9966u : edn0_ctrl_orig);
   uint32_t status_refilled = 0;
   for (int poll = 0; poll < 10000; ++poll) {
     status_refilled =
         abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_RND_STATUS_REG_OFFSET);
     if (status_refilled & (1u << RV_CORE_IBEX_RND_STATUS_RND_DATA_VALID_BIT)) {
       break;
+    }
+    if (poll == 1000 && edn0_ctrl_orig != 0x9966u) {
+      abs_mmio_write32(kEdn0CtrlAddr, 0x9999u);
+      abs_mmio_write32(kEdn0CtrlAddr, 0x9966u);
     }
   }
   CHECK((status_refilled &
