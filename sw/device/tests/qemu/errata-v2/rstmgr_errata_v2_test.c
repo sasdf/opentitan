@@ -5,8 +5,8 @@
 /**
  * @file rstmgr_errata_v2_test.c
  * @brief Physical CW340 FPGA verification of Earlgrey v2 (`trunk-v2`) RSTMGR
- *        confirmed v1 errata (`ERRATA-RSTMGR-001..005`) and newly discovered
- *        v2 hardware/DIF erratum (`ERRATA-RSTMGR-V2-001`).
+ *        hardware and DIF behaviors across `rstmgr.sv`, `rstmgr_crash_info.sv`,
+ *        `rstmgr_reg_pkg.sv`, `rstmgr_reg_top.sv`, and `dif_rstmgr.c`.
  */
 
 #include <stdbool.h>
@@ -46,13 +46,13 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 }
 
 /**
- * [ERRATA-RSTMGR-003] (CONFIRMED_PRESENT_ON_V2):
+ * [rstmgr.sv:1196]:
  * Writing RESET_REQ = kMultiBitBool4True (0x6) and immediately writing
  * kMultiBitBool4False (0x9) before the 200 kHz AON clock (5 us) samples
  * sw_rst_req_o cancels the pending software reset in-flight.
  */
 static void test_v1_003_reset_req_in_flight_cancel(void) {
-  LOG_INFO("Testing [ERRATA-RSTMGR-003] on trunk-v2...");
+  LOG_INFO("Testing [rstmgr.sv:1196] RESET_REQ in-flight cancel...");
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET,
                    kMultiBitBool4True);
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET,
@@ -64,7 +64,7 @@ static void test_v1_003_reset_req_in_flight_cancel(void) {
 }
 
 /**
- * [ERRATA-RSTMGR-005] (CONFIRMED_PRESENT_ON_V2):
+ * [rstmgr_reg_pkg.sv:256]:
  * 1. Read-only CSRs ALERT_INFO (0x24) and CPU_INFO (0x34) have RSTMGR_PERMIT =
  *    4'b1111, so 32-bit SW writes are silently ignored (no fault), whereas
  *    sub-word SB/SH writes fault with d_error = 1 (mcause = 7).
@@ -72,7 +72,7 @@ static void test_v1_003_reset_req_in_flight_cancel(void) {
  *    (d_error = 1, mcause = 5 on LW and mcause = 7 on SW).
  */
 static void test_v1_005_permit_subword_and_addrmiss_faults(void) {
-  LOG_INFO("Testing [ERRATA-RSTMGR-005] on trunk-v2...");
+  LOG_INFO("Testing [rstmgr_reg_pkg.sv:256] RSTMGR_PERMIT & addrmiss...");
 
   // 1. 32-bit write to RO ALERT_INFO (0x24) and CPU_INFO (0x34): NO fault.
   g_fault_count = 0;
@@ -136,24 +136,25 @@ static void test_v1_005_permit_subword_and_addrmiss_faults(void) {
 
 /**
  * Post-SW_RESET verification of:
- * - [ERRATA-RSTMGR-001]: ALERT_INFO_CTRL.INDEX (5) and CPU_INFO_CTRL.INDEX (3)
+ * - [rstmgr.sv:1224]: ALERT_INFO_CTRL.INDEX (5) and CPU_INFO_CTRL.INDEX (3)
  *   persist across SW_RESET (clocked on rst_por_ni with .de(1'b0)), while EN
  *   is cleared to 0.
- * - [ERRATA-RSTMGR-002a] & [ERRATA-RSTMGR-002b]: ALERT_INFO out-of-bounds
- *   INDEX = 9..15 returns 0x00000000 (SlotCntWidth=4), whereas CPU_INFO
- *   out-of-bounds INDEX = 8..15 aliases slots[0..7] (SlotCntWidth=3).
- * - [ERRATA-RSTMGR-V2-001] (NEW_IN_V2): Locking CPU_REGWEN = 0 (or
- *   ALERT_REGWEN = 0) gates CPU_INFO_CTRL.INDEX (and ALERT_INFO_CTRL.INDEX)
- *   writes in hardware, yet dif_rstmgr_cpu_info_dump_read() and
- *   dif_rstmgr_alert_info_dump_read() fail to check cpu_capture_is_locked() /
- *   alert_capture_is_locked(), returning kDifOk while filling all 8 (or 9)
- *   output segments with identical copies of the frozen slot[INDEX]!
+ * - [rstmgr_crash_info.sv:45]: ALERT_INFO out-of-bounds INDEX = 9..15 returns
+ *   0x00000000 (SlotCntWidth=4), whereas CPU_INFO out-of-bounds INDEX = 8..15
+ *   aliases slots[0..7] (SlotCntWidth=3).
+ * - [rstmgr_reg_top.sv:430,551]: Locking CPU_REGWEN = 0 (or ALERT_REGWEN = 0)
+ *   gates CPU_INFO_CTRL.INDEX (and ALERT_INFO_CTRL.INDEX) writes in hardware,
+ *   yet dif_rstmgr_cpu_info_dump_read() and dif_rstmgr_alert_info_dump_read()
+ *   fail to check cpu_capture_is_locked() / alert_capture_is_locked(),
+ *   returning kDifOk while filling all 8 (or 9) output segments with identical
+ *   copies of the frozen slot[INDEX]!
  */
 static void verify_post_sw_reset_errata(void) {
   LOG_INFO(
-      "Verifying post-SW_RESET [ERRATA-RSTMGR-001], [002a/b], and [V2-001]...");
+      "Verifying post-SW_RESET [rstmgr.sv:1224], [rstmgr_crash_info.sv:45], "
+      "and [rstmgr_reg_top.sv:430,551]...");
 
-  // 1. [ERRATA-RSTMGR-001]: Check that EN cleared to 0 while INDEX survived!
+  // 1. [rstmgr.sv:1224]: Check that EN cleared to 0 while INDEX survived!
   uint32_t alert_ctrl =
       abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET);
   uint32_t cpu_ctrl =
@@ -171,7 +172,7 @@ static void verify_post_sw_reset_errata(void) {
   CHECK(bitfield_field32_read(cpu_ctrl, RSTMGR_CPU_INFO_CTRL_INDEX_FIELD) == 3u,
         "Expected CPU_INFO_CTRL.INDEX == 3 to survive SW_RESET");
 
-  // 2. [ERRATA-RSTMGR-002a]: ALERT_INFO (CNT_AVAIL = 9) returns 0 for
+  // 2. [rstmgr_crash_info.sv:45]: ALERT_INFO (CNT_AVAIL = 9) returns 0 for
   // INDEX 9..15.
   uint32_t alert_cnt =
       abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_ATTR_REG_OFFSET);
@@ -182,8 +183,8 @@ static void verify_post_sw_reset_errata(void) {
     CHECK(val == 0u, "Expected ALERT_INFO[INDEX=%u] == 0", idx);
   }
 
-  // 3. [ERRATA-RSTMGR-002b]: CPU_INFO (CNT_AVAIL = 8) aliases slots[0..7] for
-  // INDEX 8..15.
+  // 3. [rstmgr_crash_info.sv:45]: CPU_INFO (CNT_AVAIL = 8) aliases slots[0..7]
+  // for INDEX 8..15.
   uint32_t cpu_cnt =
       abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_ATTR_REG_OFFSET);
   CHECK(cpu_cnt == 8u, "Expected CPU_INFO_ATTR.CNT_AVAIL == 8");
@@ -207,11 +208,11 @@ static void verify_post_sw_reset_errata(void) {
         idx, aliased, idx & 0x7u, cpu_slots[idx & 0x7u]);
   }
   LOG_INFO(
-      "  [ERRATA-RSTMGR-002b] CPU_INFO[0]=0x%x == CPU_INFO[8]=0x%x (modulo-8 "
-      "alias verified)",
+      "  [rstmgr_crash_info.sv:45] CPU_INFO[0]=0x%x == CPU_INFO[8]=0x%x "
+      "(modulo-8 alias verified)",
       cpu_slots[0], cpu_slots[0]);
 
-  // 4. [ERRATA-RSTMGR-V2-001] (NEW_IN_V2):
+  // 4. [rstmgr_reg_top.sv:430,551]:
   // Find a slot k_diff (1..7) where cpu_slots[k_diff] != cpu_slots[0].
   uint32_t k_diff = 0u;
   for (uint32_t k = 1u; k < 8u; ++k) {
@@ -270,7 +271,7 @@ static void verify_post_sw_reset_errata(void) {
             (5u << 4),
         "Expected ALERT_INFO_CTRL.INDEX frozen at 5 after dump_read");
   LOG_INFO(
-      "  [ERRATA-RSTMGR-V2-001] Locked CPU_REGWEN=0 at INDEX=%u -> "
+      "  [rstmgr_reg_top.sv:430,551] Locked CPU_REGWEN=0 at INDEX=%u -> "
       "dif_rstmgr_cpu_info_dump_read returned kDifOk with all 8 words == 0x%x "
       "(true slot[0]=0x%x)",
       k_diff, dump[0], cpu_slots[0]);

@@ -4,7 +4,7 @@
 
 // CW340 FPGA Verification Test for OpenTitan Earlgrey v2 (`trunk-v2`) `usbdev`:
 //
-// 1. `hw/ip/usbdev/rtl/usbdev.sv:264-269, 731-732`, `usbdev_usbif.sv:156`,
+// 1. `hw/ip/usbdev/rtl/usbdev.sv:264-269, 728-729`, `usbdev_usbif.sv:156`,
 //    `hw/ip/usbdev/data/usbdev.hjson:441-449, 607-614`:
 //    `USBSTAT.rx_empty` (`bit 31`) reads `0` (`!= resval: "1"`) and
 //    `USBCTRL.device_address` (`bits 22:16`) is forced to `0` whenever
@@ -92,7 +92,7 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 
 static void test_usbdev_rx_empty_and_devaddr_gated_by_enable(void) {
   LOG_INFO(
-      "Testing [usbdev.sv:264-269,731-732]: USBSTAT.rx_empty & "
+      "Testing [usbdev.sv:264-269,728-729]: USBSTAT.rx_empty & "
       "USBCTRL.device_address gated by USBCTRL.enable");
 
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0x0u);
