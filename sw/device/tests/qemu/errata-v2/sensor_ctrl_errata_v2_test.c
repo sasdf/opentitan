@@ -6,7 +6,7 @@
  * @file sensor_ctrl_errata_v2_test.c
  * @brief Physical CW340 FPGA verification test for Earlgrey v2 (`trunk-v2`)
  *        `sensor_ctrl` hardware and specification discrepancies:
- *   - `ast_alert.sv:44-75` & `sensor_ctrl.sv:216-231`
+ *   - `ast_alert.sv:36-68` & `sensor_ctrl.sv:216-231`
  * (`CONFIRMED_PRESENT_ON_V2`): `ALERT_TRIG` latches persistently inside
  * `ast_alert.sv` flip-flops across `1 -> 0` pulses when `ALERT_EN_i ==
  * kMultiBitBool4False` (firing later as soon as `ALERT_EN_i` is enabled), and
@@ -83,7 +83,7 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
 
 static void test_v1_001_ast_alert_latch_and_ack(void) {
   LOG_INFO(
-      "Testing ast_alert.sv:44-75 & sensor_ctrl.sv:216-231 on trunk-v2...");
+      "Testing ast_alert.sv:36-68 & sensor_ctrl.sv:216-231 on trunk-v2...");
 
   // Ensure channel 0 is recoverable (FATAL_ALERT_EN[0] = 0) and initially
   // disabled (ALERT_EN_0 = kMultiBitBool4False = 0x9).
