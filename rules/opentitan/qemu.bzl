@@ -433,14 +433,17 @@ def _test_dispatch(ctx, exec_env, firmware):
         flash_bin = image
         if flash_bin and flash_bin.extension == "elf":
             flash_bin = firmware.binary if (firmware and hasattr(firmware, "binary") and ctx.attr.kind != "ram") else None
-        flash_image = gen_flash(
-            ctx,
-            flashgen = exec_env.flashgen,
-            firmware_bin = flash_bin if testopt_bootstrap else None,
-            firmware_elf = None,
-            check_elfs = False,
-        )
-        data_files += [flash_image]
+        if "assemble" in param and testopt_bootstrap and flash_bin:
+            flash_image = flash_bin
+        else:
+            flash_image = gen_flash(
+                ctx,
+                flashgen = exec_env.flashgen,
+                firmware_bin = flash_bin if testopt_bootstrap else None,
+                firmware_elf = None,
+                check_elfs = False,
+            )
+            data_files += [flash_image]
         test_script_fmt |= {
             "flash": flash_image.short_path,
         }
