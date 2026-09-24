@@ -8,17 +8,17 @@
  * Suite for `entropy_src` (P09).
  *
  * Empirically verifies on physical CW340 FPGA silicon (`trunk-v2`):
- * 1. [entropy_src_core.sv:530-533, 626-762, 1952-2001]:
- *    - `RECOV_ALERT_STS.ES_THRESH_CFG_ALERT` (`entropy_src_core.sv:1952-1954`)
+ * 1. [entropy_src_core.sv:530-533, 626-762, 1945-2001]:
+ *    - `RECOV_ALERT_STS.ES_THRESH_CFG_ALERT` (`entropy_src_core.sv:1945-1947`)
  *      and `*_FIELD_ALERT` are continuous combinational level signals (`de=1,
  *      d=1`) that override `rw0c` clears while `ALERT_THRESHOLD` is
  *      non-complementary (`0x12345678`) or an invalid `mubi4` value remains in
  *      a configuration CSR.
  *    - `REGWEN` uses `mubi4_test_false_loose(MODULE_ENABLE)` (`!= 0x6`), so
  *      writing `0x5` to `MODULE_ENABLE` keeps `REGWEN == 1`.
- * 2. [entropy_src_core.sv:1796-1870] vs [entropy_src.hjson:802-898]
+ * 2. [entropy_src_core.sv:1815-1887] vs [entropy_src.hjson:802-898]
  *    (NEW_IN_V2 + Refactored v1 Watermark Reset):
- *    - `u_entropy_src_ht_watermark_reg` (`entropy_src_core.sv:1854-1869`) uses
+ *    - `u_entropy_src_ht_watermark_reg` (`entropy_src_core.sv:1873-1887`) uses
  *      a single shared 16-bit register (`event_cntr_q`) across all 9
  *      `HT_WATERMARK_NUM` selections and only clears on `health_test_clr`
  *      (`es_enable_pulse`). Writing `HT_WATERMARK_NUM = ADAPTP_LO` (`3`) while
@@ -47,7 +47,7 @@
  *      `THRESHOLD_ONEWAY` lacks `REGWEN` protection and remains writable when
  *      `SW_REGUPD == 0` (`REGWEN == 0`), requiring software to write
  *      `kMultiBitBool4True` (`0x6`) to clear `THRESHOLD_ONEWAY_FIELD_ALERT`.
- * 4. [entropy_src_core.sv:946-947, 2478-2479, 2851-2864] &
+ * 4. [entropy_src_core.sv:1033-1034, 2477-2478, 2851-2864] &
  *    [entropy_src_main_sm.sv:61-71, 220-237, 259-265]:
  *    - `FWInsertStart` (`0x0c3`) pulses `sha3_start_o = 1` on leaving `Idle`,
  *      absorbing `FW_OV_WR_DATA` words (`0x11111111, 0x22222222`) written prior
@@ -60,7 +60,7 @@
  *      `ES_BUS_CMP_ALERT` compares `[63:0]` of consecutive seeds and asserts on
  *      the 12th `ENTROPY_DATA` read (`sfifo_esfinal_pop`).
  * 5. [entropy_src_core.sv:2811, 2818-2821, 2882-2899] &
- *    [entropy_src_reg_pkg.sv:887-940]:
+ *    [entropy_src_reg_pkg.sv:791-842]:
  *    - Reading an empty `ENTROPY_DATA` returns `0` with `ERR_CODE == 0` on
  *      reads `1..11` (`swread_idx_q = 0..10`) and latches
  *      `SFIFO_ESFINAL_ERR | FIFO_READ_ERR` (`0x20000008`) only on the 12th
@@ -117,13 +117,13 @@ bool test_main(void) {
       dif_entropy_src_init(mmio_region_from_addr(kEsBase), &entropy_src));
 
   // ---------------------------------------------------------------------------
-  // 1. [entropy_src_core.sv:530-533, 626-762, 1952-2001]:
+  // 1. [entropy_src_core.sv:530-533, 626-762, 1945-2001]:
   //    - ES_THRESH_CFG_ALERT level signal overrides rw0c clear while
   //      ALERT_THRESHOLD is non-complementary (0x12345678).
   //    - REGWEN stays 1 when MODULE_ENABLE is written with 0x5 (loose false).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [entropy_src_core.sv:530-533, 1952-2001]: sticky "
+      "Verifying [entropy_src_core.sv:530-533, 1945-2001]: sticky "
       "ES_THRESH_CFG_ALERT & loose-false REGWEN");
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdEntropySrcRecovAlert));
@@ -135,7 +135,7 @@ bool test_main(void) {
   CHECK(
       bitfield_bit32_read(recov_sts,
                           ENTROPY_SRC_RECOV_ALERT_STS_ES_THRESH_CFG_ALERT_BIT),
-      "[entropy_src_core.sv:1952-1954] Expected ES_THRESH_CFG_ALERT to remain "
+      "[entropy_src_core.sv:1945-1947] Expected ES_THRESH_CFG_ALERT to remain "
       "1 after rw0c clear while ALERT_THRESHOLD=0x12345678 (got 0x%x)",
       recov_sts);
   abs_mmio_write32(kEsBase + ENTROPY_SRC_ALERT_THRESHOLD_REG_OFFSET,
@@ -158,11 +158,11 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   LOG_INFO(
-      "[entropy_src_core.sv:530-533, 1952-2001] CONFIRMED: ES_THRESH_CFG_ALERT "
+      "[entropy_src_core.sv:530-533, 1945-2001] CONFIRMED: ES_THRESH_CFG_ALERT "
       "sticky & REGWEN=1 on MODULE_ENABLE=0x5");
 
   // ---------------------------------------------------------------------------
-  // 2. [entropy_src_core.sv:1796-1870] vs [entropy_src.hjson:802-898]
+  // 2. [entropy_src_core.sv:1815-1887] vs [entropy_src.hjson:802-898]
   //    (NEW_IN_V2 + Refactored v1 Watermark Behavior):
   //    - Configure HT_WATERMARK_NUM = ADAPTP_LO (3) while MODULE_ENABLE=False:
   //      HT_WATERMARK remains 0x0000 until MODULE_ENABLE=True pulses
@@ -176,7 +176,7 @@ bool test_main(void) {
   //      and repcnt_event_cnt resets to 1.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [entropy_src_core.sv:1796-1870] (NEW_IN_V2): HT_WATERMARK "
+      "Verifying [entropy_src_core.sv:1815-1887] (NEW_IN_V2): HT_WATERMARK "
       "shared flop retention & REPCNT_HI continuous latch of 1");
   uint32_t conf_fw_ov_sha3 =
       (kMultiBitBool4True << ENTROPY_SRC_CONF_FIPS_ENABLE_OFFSET) |
@@ -216,7 +216,7 @@ bool test_main(void) {
   uint32_t wm_before_en =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_HT_WATERMARK_REG_OFFSET);
   CHECK(wm_before_en == 0x0000u,
-        "[entropy_src_core.sv:1854-1869] Expected HT_WATERMARK == 0x0000 "
+        "[entropy_src_core.sv:1873-1887] Expected HT_WATERMARK == 0x0000 "
         "before MODULE_ENABLE=True even with HT_WATERMARK_NUM=ADAPTP_LO, got "
         "0x%04x",
         wm_before_en);
@@ -226,7 +226,7 @@ bool test_main(void) {
   uint32_t wm_adaptp_lo =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_HT_WATERMARK_REG_OFFSET);
   CHECK(wm_adaptp_lo == 0xffffu,
-        "[entropy_src_core.sv:1854-1869] Expected HT_WATERMARK == 0xFFFF "
+        "[entropy_src_core.sv:1873-1887] Expected HT_WATERMARK == 0xFFFF "
         "after MODULE_ENABLE=True with HT_WATERMARK_NUM=ADAPTP_LO, got 0x%04x",
         wm_adaptp_lo);
 
@@ -238,7 +238,7 @@ bool test_main(void) {
   CHECK_DIF_OK(dif_entropy_src_get_health_test_stats(&entropy_src, &stats));
   CHECK(stats.watermark_num == kDifEntropySrcWatermarkNumAdaptpHi &&
             stats.watermark == 0xffffu,
-        "[entropy_src_core.sv:1854-1869] Expected shared HT_WATERMARK to "
+        "[entropy_src_core.sv:1873-1887] Expected shared HT_WATERMARK to "
         "retain stale 0xFFFF from ADAPTP_LO after switching HT_WATERMARK_NUM "
         "to ADAPTP_HI while disabled (got num=%u, wm=0x%04x)",
         stats.watermark_num, stats.watermark);
@@ -250,17 +250,17 @@ bool test_main(void) {
   uint32_t wm_repcnt_hi =
       abs_mmio_read32(kEsBase + ENTROPY_SRC_HT_WATERMARK_REG_OFFSET);
   CHECK(wm_repcnt_hi == 0x0001u,
-        "[entropy_src_core.sv:1797-1801] Expected HT_WATERMARK == 0x0001 for "
+        "[entropy_src_core.sv:1816-1820] Expected HT_WATERMARK == 0x0001 for "
         "REPCNT_HI immediately after MODULE_ENABLE=True with 0 RNG symbols "
         "tested, got 0x%04x",
         wm_repcnt_hi);
   LOG_INFO(
-      "[entropy_src_core.sv:1796-1870] CONFIRMED: wm_before_en=0x%04x, "
+      "[entropy_src_core.sv:1815-1887] CONFIRMED: wm_before_en=0x%04x, "
       "wm_adaptp_lo=0x%04x, stale_adaptp_hi=0x%04x, wm_repcnt_hi=0x%04x",
       wm_before_en, wm_adaptp_lo, stats.watermark, wm_repcnt_hi);
 
   // ---------------------------------------------------------------------------
-  // 3. [entropy_src_core.sv:946-947, 2478-2479, 2851-2864] &
+  // 3. [entropy_src_core.sv:1033-1034, 2477-2478, 2851-2864] &
   //    [entropy_src_main_sm.sv:61-71, 220-237, 259-265]:
   //    - Conditioned FW_OV_ENTROPY_INSERT enters FWInsertStart (0x0c3) with
   //      MAIN_SM_IDLE == 0, and pulses sha3_start_o immediately in Idle so
@@ -273,7 +273,7 @@ bool test_main(void) {
   //      ES_BUS_CMP_ALERT.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [entropy_src_core.sv:946-947, 2478-2479, 2851-2864 / "
+      "Verifying [entropy_src_core.sv:1033-1034, 2477-2478, 2851-2864 / "
       "entropy_src_main_sm.sv:61-71]: FWInsertStart (0x0c3), pre-SHA3_START "
       "absorption, & ES_BUS_CMP_ALERT");
   abs_mmio_write32(kEsBase + ENTROPY_SRC_INTR_STATE_REG_OFFSET, 0xfu);
@@ -292,7 +292,7 @@ bool test_main(void) {
   recov_sts = abs_mmio_read32(kEsBase + ENTROPY_SRC_RECOV_ALERT_STS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(
             recov_sts, ENTROPY_SRC_RECOV_ALERT_STS_ES_FW_OV_DISABLE_ALERT_BIT),
-        "[entropy_src_core.sv:2478-2479] Expected ES_FW_OV_DISABLE_ALERT == 0 "
+        "[entropy_src_core.sv:2477-2478] Expected ES_FW_OV_DISABLE_ALERT == 0 "
         "when FW_OV_WR_FIFO_FULL == 0 despite 1 unprocessed 32-bit word in "
         "pfifo_precon");
 
@@ -379,7 +379,8 @@ bool test_main(void) {
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdEntropySrcRecovAlert));
   LOG_INFO(
-      "[entropy_src_core.sv:946-947, 2851-2864 / entropy_src_main_sm.sv:61-71] "
+      "[entropy_src_core.sv:1033-1034, 2851-2864 / "
+      "entropy_src_main_sm.sv:61-71] "
       "CONFIRMED: seed1_w0=0x%08x, MAIN_SM_STATE=0x%03x, ES_BUS_CMP_ALERT=1",
       seed1_w0, sm_state);
 
@@ -521,28 +522,28 @@ bool test_main(void) {
       "REGWEN=0");
 
   // ---------------------------------------------------------------------------
-  // 6. [entropy_src_reg_pkg.sv:887-940] (SEC_CM: BUS.INTEGRITY):
+  // 6. [entropy_src_reg_pkg.sv:791-842] (SEC_CM: BUS.INTEGRITY):
   //    ENTROPY_SRC_PERMIT rejects 8-bit sb writes to CONF (4'b1111, mcause=7)
   //    while accepting 8-bit sb writes to byte 0 of MODULE_ENABLE (4'b0001).
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [entropy_src_reg_pkg.sv:887-940]: ENTROPY_SRC_PERMIT "
+      "Verifying [entropy_src_reg_pkg.sv:791-842]: ENTROPY_SRC_PERMIT "
       "sub-word write protection");
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kEsBase + ENTROPY_SRC_CONF_REG_OFFSET, 0x66u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[entropy_src_reg_pkg.sv:887-940] Expected sb to CONF (PERMIT=4'b1111) "
+        "[entropy_src_reg_pkg.sv:791-842] Expected sb to CONF (PERMIT=4'b1111) "
         "to fault with mcause=7");
 
   g_load_store_fault = false;
   abs_mmio_write8(kEsBase + ENTROPY_SRC_MODULE_ENABLE_REG_OFFSET,
                   kMultiBitBool4False);
   CHECK(!g_load_store_fault,
-        "[entropy_src_reg_pkg.sv:887-940] Expected sb to MODULE_ENABLE+0 "
+        "[entropy_src_reg_pkg.sv:791-842] Expected sb to MODULE_ENABLE+0 "
         "(PERMIT=4'b0001) to succeed");
   LOG_INFO(
-      "[entropy_src_reg_pkg.sv:887-940] CONFIRMED: ENTROPY_SRC_PERMIT "
+      "[entropy_src_reg_pkg.sv:791-842] CONFIRMED: ENTROPY_SRC_PERMIT "
       "enforced");
 
   LOG_INFO("=== ALL ENTROPY_SRC V2 ERRATA CHECKS PASSED ===");
