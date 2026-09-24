@@ -148,7 +148,7 @@ bool test_main(void) {
   LOG_INFO("Test 1 (SCR_KEY_ROTATED mubi4_and_hi W1C semantics) PASSED");
 
   // ---------------------------------------------------------------------------
-  // 2. [sram_ctrl_reg_pkg.sv:152-162, sram_ctrl_regs_reg_top.sv:711-722]:
+  // 2. [sram_ctrl_reg_pkg.sv:159-169, sram_ctrl_regs_reg_top.sv:721-732]:
   //    SRAM_CTRL_REGS_PERMIT = 4'b0001 accepts sb to +0, faults sb to +1
   //    (mcause=7), and faults unmapped read at 0x24 (mcause=5).
   // ---------------------------------------------------------------------------
@@ -158,21 +158,21 @@ bool test_main(void) {
   g_load_store_fault = false;
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET, 1u);
   CHECK(!g_load_store_fault,
-        "[sram_ctrl_reg_pkg.sv:152-162] Expected sb to EXEC_REGWEN+0 "
+        "[sram_ctrl_reg_pkg.sv:159-169] Expected sb to EXEC_REGWEN+0 "
         "(PERMIT=4'b0001) to succeed");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   abs_mmio_write8(kSramRetRegsBase + SRAM_CTRL_EXEC_REGWEN_REG_OFFSET + 1u, 1u);
   CHECK(g_load_store_fault && g_last_mcause == 7u,
-        "[sram_ctrl_reg_pkg.sv:152-162] Expected sb to EXEC_REGWEN+1 "
+        "[sram_ctrl_reg_pkg.sv:159-169] Expected sb to EXEC_REGWEN+1 "
         "(reg_be=4'b0010) to fault with mcause=7");
 
   g_load_store_fault = false;
   g_last_mcause = 0;
   (void)abs_mmio_read32(kSramRetRegsBase + 0x24u);
   CHECK(g_load_store_fault && g_last_mcause == 5u,
-        "[sram_ctrl_reg_pkg.sv:152-162] Expected unmapped CSR read at 0x24 to "
+        "[sram_ctrl_reg_pkg.sv:159-169] Expected unmapped CSR read at 0x24 to "
         "fault with mcause=5");
   LOG_INFO("Test 2 (SRAM_CTRL_REGS_PERMIT = 4'b0001 sub-word CSR) PASSED");
 
