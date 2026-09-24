@@ -1067,6 +1067,7 @@ opentitan_test(
     },
     deps = [
         "//hw/top:clkmgr_c_regs",
+        "//hw/top:csrng_c_regs",
         "//hw/top:sram_ctrl_c_regs",
         "//hw/top:uart_c_regs",
         "//hw/top_earlgrey/sw/autogen:top_earlgrey",
