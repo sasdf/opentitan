@@ -178,11 +178,11 @@ static void test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite(void) {
   LOG_INFO("  EDN0 invalid cmd seq -> RECOV_ALERT_STS=0x%x, HW_EXC_STS=0x%x",
            recov_sts, hw_exc_sts);
 
-  CHECK(recov_sts == 0x2000u &&
+  CHECK(recov_sts == 0x4000u &&
             bitfield_bit32_read(
                 recov_sts,
                 CSRNG_RECOV_ALERT_STS_CMD_STAGE_INVALID_CMD_SEQ_ALERT_BIT),
-        "Expected RECOV_ALERT_STS == 0x2000 (CMD_STAGE_INVALID_CMD_SEQ_ALERT)");
+        "Expected RECOV_ALERT_STS == 0x4000 (CMD_STAGE_INVALID_CMD_SEQ_ALERT)");
   CHECK(hw_exc_sts == 0u,
         "Expected HW_EXC_STS == 0 due to continuous hw2reg.hw_exc_sts.de=1 "
         "overwrite");
