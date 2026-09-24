@@ -21,8 +21,8 @@
  *    (`u_prim_filter`) and `filter_out_q` edge-flop update while
  *    `WKUP_DETECTOR_EN == 0`, MIO (`+2` offset `{mio_wkup_no_scan, 1'b1,
  * 1'b0}`) vs. DIO (`0` offset) `PADSEL` indexing, and `MIO_PAD_ATTR` /
- *    `DIO_PAD_ATTR` WARL masks (`0x83` for Bidir pads, `0x81` for InputStd
- *    DIO `10..13`).
+ *    `DIO_PAD_ATTR` WARL masks (`0x83` for BidirStd/BidirOd pads including
+ *    DIO `10..11`, `0x81` for InputStd DIO `12..13`).
  * 3. `pinmux_reg_pkg.sv:2127-2696` and `pinmux_reg_top.sv:33108-33770`:
  *    `PINMUX_PERMIT[568]` enforces `4'b0111` (3 bytes required) on all 47
  *    `MIO_PAD_ATTR` and 16 `DIO_PAD_ATTR` CSRs despite the 1-byte (`0x83` /
@@ -35,12 +35,13 @@
  *       `*reg_offset = (ptrdiff_t)index / 32 + reg_base` (missing
  *       `* sizeof(uint32_t)`). For MIO pads `32..46` (`index / 32 == 1`),
  *       `*reg_offset` evaluates to the unaligned byte offset `0x451` instead
- *       of `0x454` (`PINMUX_MIO_PAD_SLEEP_STATUS_1_REG_OFFSET`). Calling
- *       `dif_pinmux_pad_sleep_get_state` or `dif_pinmux_pad_sleep_clear_state`
- *       for any MIO pad `32..46` issues an unaligned 32-bit `lw` at
- *       `0x40460451`, which Ibex splits into a 3-byte TL-UL `Get` (`a_size=2`,
- *       `a_mask=4'b1110` at `0x40460450`) that fails `tlul_err` `mask_chk`
- *       and raises a synchronous Load Access Fault (`mcause = 5`).
+ *       of `0x454` (`PINMUX_MIO_PAD_SLEEP_STATUS_1_REG_OFFSET`), which
+ *       `mmio_region_read32`/`mmio_region_write32` integer division
+ *       (`0x451 / 4 = 0x114`) silently truncates back to `0x450`
+ *       (`PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET`), aliasing `MIO32..46`
+ *       onto `MIO0..14` while leaving `MIO_PAD_SLEEP_STATUS_1` (`0x454`)
+ *       unreachable via DIF (and faulting with `mcause = 7` on raw unaligned
+ *       `0x451` stores).
  *    b) `NMioPeriphOut` decreased from `75` (in v1) to `64` (in v2
  *       `pinmux_reg_pkg.sv:10`), causing `dif_pinmux_output_select`
  *       (`dif_pinmux.c:186`) to reject `outsel >= 67` (`3 + 64`) with
@@ -196,7 +197,7 @@ static void test_filter_tracking_and_pad_attr_warl(void) {
 
   // Verify WARL masks on CW340 FPGA (`prim_xilinx_pad_attr.sv:30-56`):
   // MIO46 (`BidirStd`) retains `0x83` (`input_disable[7]`, `virtual_od_en[1]`,
-  // `invert[0]`), while DIO10 (`InputStd`) retains `0x81` (`input_disable[7]`,
+  // `invert[0]`), while DIO12 (`InputStd`) retains `0x81` (`input_disable[7]`,
   // `invert[0]`).
   const uint32_t mio_attr_off =
       PINMUX_MIO_PAD_ATTR_0_REG_OFFSET + 4u * kTestMioPadIdx;
@@ -212,7 +213,7 @@ static void test_filter_tracking_and_pad_attr_warl(void) {
 
   abs_mmio_write32(kPinmuxBase + dio_attr_off, 0xFFFFFFFFu);
   CHECK(abs_mmio_read32(kPinmuxBase + dio_attr_off) == 0x00000081u,
-        "Expected InputStd DIO_PAD_ATTR_10 WARL mask 0x81");
+        "Expected InputStd DIO_PAD_ATTR_12 WARL mask 0x81");
   abs_mmio_write32(kPinmuxBase + dio_attr_off, orig_dio);
 }
 
