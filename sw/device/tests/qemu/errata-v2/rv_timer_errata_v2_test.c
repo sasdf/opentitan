@@ -174,10 +174,26 @@ static void test_unmapped_skipto_hole_bus_error(void) {
   (void)abs_mmio_read32(kTimerBase + 0x0fcu);
   CHECK(g_load_fault_count == 2u && g_last_mcause == kIbexExcLoadAccessFault);
 
+  (void)abs_mmio_read32(kTimerBase + 0x120u);
+  CHECK(g_load_fault_count == 3u && g_last_mcause == kIbexExcLoadAccessFault);
+
+  (void)abs_mmio_read32(kTimerBase + 0x1fcu);
+  CHECK(g_load_fault_count == 4u && g_last_mcause == kIbexExcLoadAccessFault);
+
   abs_mmio_write32(kTimerBase + 0x008u, 0x1u);
   CHECK(g_store_fault_count == 1u && g_last_mcause == kIbexExcStoreAccessFault);
 
-  LOG_INFO("Test 3 (Unmapped 0x008..0x0fc skipto hole addrmiss fault) PASSED");
+  abs_mmio_write32(kTimerBase + 0x0fcu, 0x1u);
+  CHECK(g_store_fault_count == 2u && g_last_mcause == kIbexExcStoreAccessFault);
+
+  abs_mmio_write32(kTimerBase + 0x120u, 0x1u);
+  CHECK(g_store_fault_count == 3u && g_last_mcause == kIbexExcStoreAccessFault);
+
+  abs_mmio_write32(kTimerBase + 0x1fcu, 0x1u);
+  CHECK(g_store_fault_count == 4u && g_last_mcause == kIbexExcStoreAccessFault);
+
+  LOG_INFO(
+      "Test 3 (Unmapped 0x008..0x0fc and 0x120..0x1fc addrmiss fault) PASSED");
 }
 
 // -----------------------------------------------------------------------------
@@ -262,6 +278,9 @@ static void test_v2_mtime_rewind_sticky_intr_and_dif_counter_write(void) {
   abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 0u);
   abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET, 0u);
   abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 20u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET) ==
+        20u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET) == 0u);
   CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u);
 
   abs_mmio_write32(kTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 400u);
