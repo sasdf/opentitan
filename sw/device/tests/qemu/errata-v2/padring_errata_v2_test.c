@@ -140,7 +140,7 @@ static bool gpio_sample_bit(uint32_t bit) {
  *   and `input_disable = 0`.
  * - Pre-inversion clamping `in_raw_o = 0` when `input_disable = 1`, causing
  *   `in_o == attr_i.invert` (`0` for `0x80`, `1` for `0x81`).
- * - `PadType == BidirOd` (`Iob9`) actively drives high (`DATA_IN == 1`) when
+ * - `PadType == BidirOd` (`Ioa6`) actively drives high (`DATA_IN == 1`) when
  *   `virtual_od_en == 0` because `od_en` is unimplemented (`WARL = 0x83`).
  * - `MIO_PAD_ATTR` and `DIO_PAD_ATTR` WARL masks across all 47 MIO and 16 DIO
  *   pads (`0x83` for `BidirStd`/`BidirOd`, `0x81` for `InputStd`).
@@ -157,8 +157,8 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   uint32_t orig_od_outsel = abs_mmio_read32(mio_outsel_addr(kTestMioOdPad));
   uint32_t orig_od_attr = abs_mmio_read32(mio_pad_attr_addr(kTestMioOdPad));
 
-  /* Route GPIO[16] <-> MIO[9] (`Iob0`, `BidirStd`) and GPIO[17] <-> MIO[18]
-   * (`Iob9`, `BidirOd`). */
+  /* Route GPIO[16] <-> MIO[9] (`Iob0`, `BidirStd`) and GPIO[17] <-> MIO[6]
+   * (`Ioa6`, `BidirOd`). */
   abs_mmio_write32(mio_insel_addr(kTestGpioStdInselIdx), kTestMioStdInsel);
   abs_mmio_write32(mio_outsel_addr(kTestMioStdPad), kTestGpioStdOutselVal);
   abs_mmio_write32(mio_pad_attr_addr(kTestMioStdPad), 0u);
@@ -222,19 +222,19 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   CHECK(dis_inv_drive0 == true && dis_inv_drive1 == true,
         "Expected input_disable=1, invert=1 (0x81) to force in_o=1");
 
-  /* 1D: `PadType == BidirOd` (`Iob9`) drives push-pull when `virtual_od_en ==
-   * 0` and ignores `od_en` (`0x40`). */
+  /* 1D: `PadType == BidirOd` (`Ioa6`, MIO[6]) drives push-pull when
+   * `virtual_od_en == 0` and ignores `od_en` (`0x40`). */
   abs_mmio_write32(mio_pad_attr_addr(kTestMioOdPad), 0xFFFFFFFFu);
-  uint32_t iob9_warl = abs_mmio_read32(mio_pad_attr_addr(kTestMioOdPad));
-  CHECK(iob9_warl == kPadAttrWarlBidir,
-        "Expected BidirOd pad Iob9 WARL mask 0x83, got 0x%x", iob9_warl);
+  uint32_t ioa6_warl = abs_mmio_read32(mio_pad_attr_addr(kTestMioOdPad));
+  CHECK(ioa6_warl == kPadAttrWarlBidir,
+        "Expected BidirOd pad Ioa6 WARL mask 0x83, got 0x%x", ioa6_warl);
   abs_mmio_write32(mio_pad_attr_addr(kTestMioOdPad), 0u);
   gpio_drive_bit(kTestGpioOdMask, false);
   CHECK(gpio_sample_bit(kTestGpioOdBit) == false);
   gpio_drive_bit(kTestGpioOdMask, true);
   CHECK(
       gpio_sample_bit(kTestGpioOdBit) == true,
-      "Expected BidirOd pad Iob9 to drive push-pull high when virtual_od_en=0");
+      "Expected BidirOd pad Ioa6 to drive push-pull high when virtual_od_en=0");
 
   /* Restore GPIO/MIO state. */
   gpio_oe_bit(kTestGpioStdMask, false);

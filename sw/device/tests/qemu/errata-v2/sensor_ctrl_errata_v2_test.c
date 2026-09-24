@@ -5,27 +5,27 @@
 /**
  * @file sensor_ctrl_errata_v2_test.c
  * @brief Physical CW340 FPGA verification test for Earlgrey v2 (`trunk-v2`)
- *        `sensor_ctrl` errata:
- *   - [ERRATA-SENSOR_CTRL-001] (CONFIRMED_PRESENT_ON_V2):
- *     `ALERT_TRIG` latches persistently inside `ast_alert.sv` flip-flops across
- *     `1 -> 0` pulses when `ALERT_EN_i == kMultiBitBool4False` (firing later
- *     as soon as `ALERT_EN_i` is enabled), and `RECOV_ALERT` (`rw1c`) cannot
- *     clear while `ALERT_TRIG_i == 1`. Also verifies `CFG_REGWEN` locks both
- *     `FATAL_ALERT_EN` and `ALERT_EN_0..10`.
- *   - [ERRATA-SENSOR_CTRL-002] (CONFIRMED_PRESENT_ON_V2):
+ *        `sensor_ctrl` hardware and specification discrepancies:
+ *   - `ast_alert.sv:44-75` & `sensor_ctrl.sv:216-231`
+ * (`CONFIRMED_PRESENT_ON_V2`): `ALERT_TRIG` latches persistently inside
+ * `ast_alert.sv` flip-flops across `1 -> 0` pulses when `ALERT_EN_i ==
+ * kMultiBitBool4False` (firing later as soon as `ALERT_EN_i` is enabled), and
+ * `RECOV_ALERT` (`rw1c`) cannot clear while `ALERT_TRIG_i == 1`. Also verifies
+ * `CFG_REGWEN` locks both `FATAL_ALERT_EN` and `ALERT_EN_0..10`.
+ *   - `sensor_ctrl_reg_pkg.sv:263-293` (`CONFIRMED_PRESENT_ON_V2`):
  *     `SENSOR_CTRL_PERMIT = 4'b0011` rejects 8-bit `sb` writes to `ALERT_TRIG`,
  *     `FATAL_ALERT_EN`, `RECOV_ALERT`, and read-only `FATAL_ALERT` with a
  *     synchronous Store Access Fault (`mcause = 7`), whereas 16-bit `sh` and
  *     32-bit `sw` writes succeed, and unmapped offsets `0x74..0x7c` raise
  *     `addrmiss` bus faults (`mcause = 5` / `7`).
- *   - [ERRATA-SENSOR_CTRL-V2-001] (NEW_IN_V2):
+ *   - `sensor_ctrl.sv:354-388` vs `sensor_ctrl.hjson:339-389` (`NEW_IN_V2`):
  *     `MANUAL_PAD_ATTR_0..3` (`0x64..0x70`) is documented in
- * `sensor_ctrl.hjson` as having WARL pad-attribute behavior only supported on
- * `chip_earlgrey_asic`, and is omitted from `dif_sensor_ctrl`, yet
- * `sensor_ctrl.sv:354-388` implements unconditional flip-flops for all 3
- * defined bits (`0x8c`: `pull_en`, `pull_select`, `input_disable`) without any
- * WARL pad-mask input on CW340 FPGA.
- *   - [ERRATA-SENSOR_CTRL-V2-002] (NEW_IN_V2):
+ *     `sensor_ctrl.hjson` as having WARL pad-attribute behavior only supported
+ *     on `chip_earlgrey_asic`, and is omitted from `dif_sensor_ctrl`, yet
+ *     `sensor_ctrl.sv:354-388` implements unconditional flip-flops for all 3
+ *     defined bits (`0x8c`: `pull_en`, `pull_select`, `input_disable`) without
+ *     any WARL pad-mask input on CW340 FPGA.
+ *   - `sensor_ctrl.sv:210-213` vs `sensor_ctrl.hjson:202-203` (`NEW_IN_V2`):
  *     `ALERT_EN_0..10` (`0x18..0x40`) uses `mubi4_test_true_loose` (`!= 0x9`)
  *     in `sensor_ctrl.sv:213`, so writing `0x0` (or any non-`0x9` value such as
  *     `0x5` or `0xF`) to `ALERT_EN_i` leaves the alert channel ENABLED in
@@ -82,7 +82,8 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
 }
 
 static void test_v1_001_ast_alert_latch_and_ack(void) {
-  LOG_INFO("Testing [ERRATA-SENSOR_CTRL-001] on trunk-v2...");
+  LOG_INFO(
+      "Testing ast_alert.sv:44-75 & sensor_ctrl.sv:216-231 on trunk-v2...");
 
   // Ensure channel 0 is recoverable (FATAL_ALERT_EN[0] = 0) and initially
   // disabled (ALERT_EN_0 = kMultiBitBool4False = 0x9).
@@ -148,7 +149,9 @@ static void test_v1_001_ast_alert_latch_and_ack(void) {
 }
 
 static void test_v1_002_permit_subword_and_addrmiss(void) {
-  LOG_INFO("Testing [ERRATA-SENSOR_CTRL-002] on trunk-v2...");
+  LOG_INFO(
+      "Testing sensor_ctrl_reg_pkg.sv:263-293 PERMIT & addrmiss on "
+      "trunk-v2...");
 
   // 1. 8-bit sb writes to PERMIT = 4'b0011 registers (ALERT_TRIG,
   // FATAL_ALERT_EN, RECOV_ALERT, FATAL_ALERT) must fault with mcause = 7!
@@ -192,7 +195,8 @@ static void test_v1_002_permit_subword_and_addrmiss(void) {
 }
 
 static void test_v2_001_manual_pad_attr_no_warl_on_fpga(void) {
-  LOG_INFO("Testing [ERRATA-SENSOR_CTRL-V2-001] (NEW_IN_V2) on trunk-v2...");
+  LOG_INFO(
+      "Testing sensor_ctrl.sv:354-388 MANUAL_PAD_ATTR_0..3 on trunk-v2...");
 
   // sensor_ctrl.hjson states MANUAL_PAD_ATTR_0..3 (0x64..0x70) has WARL
   // behavior and is only supported on chip_earlgrey_asic, yet sensor_ctrl.sv
@@ -223,7 +227,9 @@ static void test_v2_001_manual_pad_attr_no_warl_on_fpga(void) {
 }
 
 static void test_v2_002_alert_en_loose_mubi4_zero_stays_enabled(void) {
-  LOG_INFO("Testing [ERRATA-SENSOR_CTRL-V2-002] (NEW_IN_V2) on trunk-v2...");
+  LOG_INFO(
+      "Testing sensor_ctrl.sv:210-213 ALERT_EN mubi4_test_true_loose on "
+      "trunk-v2...");
 
   // Write 0x0 (non-MuBi4 encoding, often written by naive software intending
   // to disable) to ALERT_EN_1 (0x1c).
