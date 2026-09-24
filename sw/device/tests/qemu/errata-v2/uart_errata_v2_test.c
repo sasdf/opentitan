@@ -86,6 +86,11 @@ bool test_main(void) {
   uint32_t val_reset = abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET);
   CHECK(val_reset == 0x0000u, "Expected VAL reset value 0x0000, got 0x%04x",
         val_reset);
+  uint32_t status_reset = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
+  CHECK((status_reset & ~0x3fu) == 0u && status_reset == 0x3cu,
+        "Expected UART_STATUS (0x14) to only populate bits [5:0]=0x3c with "
+        "bits [31:6]==0 (no STATUS.BREAK bit), got 0x%08x",
+        status_reset);
 
   // -------------------------------------------------------------------------
   // Check 2: TIMEOUT_CTRL.EN=1 with VAL=0 continuously asserts rx_timeout on
