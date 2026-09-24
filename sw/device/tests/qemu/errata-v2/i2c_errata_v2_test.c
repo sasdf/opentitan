@@ -477,6 +477,26 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
     }
     busy_spin_micros(2);
   }
+  uint32_t acq_st =
+      abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET);
+  uint32_t acqlvl =
+      bitfield_field32_read(acq_st, I2C_TARGET_FIFO_STATUS_ACQLVL_FIELD);
+  CHECK_EQ(acqlvl, 3u,
+           "[i2c_target_fsm.sv:328-329] Expected 3 ACQDATA entries (AcqStart, "
+           "AcqNack, AcqNackStop)");
+  uint32_t acq0 = abs_mmio_read32(kI2c0Base + I2C_ACQDATA_REG_OFFSET);
+  uint32_t acq1 = abs_mmio_read32(kI2c0Base + I2C_ACQDATA_REG_OFFSET);
+  uint32_t acq2 = abs_mmio_read32(kI2c0Base + I2C_ACQDATA_REG_OFFSET);
+  CHECK_EQ(bitfield_field32_read(acq0, I2C_ACQDATA_SIGNAL_FIELD),
+           (uint32_t)I2C_ACQDATA_SIGNAL_VALUE_START,
+           "Expected ACQDATA[0] SIGNAL == AcqStart");
+  CHECK_EQ(bitfield_field32_read(acq1, I2C_ACQDATA_SIGNAL_FIELD),
+           (uint32_t)I2C_ACQDATA_SIGNAL_VALUE_NACK,
+           "Expected ACQDATA[1] SIGNAL == AcqNack");
+  CHECK_EQ(bitfield_field32_read(acq2, I2C_ACQDATA_SIGNAL_FIELD),
+           (uint32_t)I2C_ACQDATA_SIGNAL_VALUE_NACK_STOP,
+           "Expected ACQDATA[2] SIGNAL == AcqNackStop");
+
   uint32_t nack_cnt_first_read =
       abs_mmio_read32(kI2c0Base + I2C_TARGET_NACK_COUNT_REG_OFFSET);
   uint32_t nack_cnt_second_read =
@@ -499,6 +519,120 @@ static void test_i2c_readb_rcont_stop_and_nack_count(void) {
   abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
   abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+}
+
+static void test_i2c_acqfull_at_266_threshold(void) {
+  LOG_INFO(
+      "Verifying [i2c_target_fsm.sv:268-272]: STATUS.ACQFULL asserts at "
+      "ACQLVL == 266 (AcqFifoDepth - 2) instead of 268...");
+
+  dif_pinmux_t pinmux;
+  CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
+  CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIoa7,
+                                        kTopEarlgreyPinmuxOutselI2c0Sda));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Sda,
+                                       kTopEarlgreyPinmuxInselIoa7));
+  CHECK_DIF_OK(dif_pinmux_output_select(&pinmux, kTopEarlgreyPinmuxMioOutIoa8,
+                                        kTopEarlgreyPinmuxOutselI2c0Scl));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInI2c0Scl,
+                                       kTopEarlgreyPinmuxInselIoa8));
+  precharge_i2c0_pads_high(&pinmux);
+
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING0_REG_OFFSET,
+      (60u << I2C_TIMING0_THIGH_OFFSET) | (60u << I2C_TIMING0_TLOW_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING1_REG_OFFSET,
+      (20u << I2C_TIMING1_T_R_OFFSET) | (4u << I2C_TIMING1_T_F_OFFSET));
+  abs_mmio_write32(kI2c0Base + I2C_TIMING2_REG_OFFSET,
+                   (60u << I2C_TIMING2_TSU_STA_OFFSET) |
+                       (60u << I2C_TIMING2_THD_STA_OFFSET));
+  abs_mmio_write32(kI2c0Base + I2C_TIMING3_REG_OFFSET,
+                   (10u << I2C_TIMING3_TSU_DAT_OFFSET) |
+                       (10u << I2C_TIMING3_THD_DAT_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_TIMING4_REG_OFFSET,
+      (60u << I2C_TIMING4_TSU_STO_OFFSET) | (60u << I2C_TIMING4_T_BUF_OFFSET));
+
+  uint32_t fifo_rst =
+      (1u << I2C_FIFO_CTRL_RXRST_BIT) | (1u << I2C_FIFO_CTRL_FMTRST_BIT) |
+      (1u << I2C_FIFO_CTRL_ACQRST_BIT) | (1u << I2C_FIFO_CTRL_TXRST_BIT);
+  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_ID_REG_OFFSET,
+                   (0x7Fu << I2C_TARGET_ID_MASK0_OFFSET) |
+                       (0x33u << I2C_TARGET_ID_ADDRESS0_OFFSET));
+  abs_mmio_write32(
+      kI2c0Base + I2C_CTRL_REG_OFFSET,
+      (1u << I2C_CTRL_ENABLEHOST_BIT) | (1u << I2C_CTRL_ENABLETARGET_BIT));
+
+  // Push 1 AcqStart entry + 264 AcqByte entries = 265 ACQ_FIFO entries.
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET,
+                   (1u << I2C_FDATA_START_BIT) | (0x33u << 1));
+  for (uint32_t sent = 0u; sent < 264u;) {
+    uint32_t batch = (264u - sent > 16u) ? 16u : (264u - sent);
+    for (uint32_t i = 0u; i < batch; ++i) {
+      abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, 0x55u);
+    }
+    sent += batch;
+    for (int spin = 0; spin < 5000; ++spin) {
+      uint32_t st = abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET);
+      if (bitfield_bit32_read(st, I2C_STATUS_FMTEMPTY_BIT)) {
+        break;
+      }
+      busy_spin_micros(2);
+    }
+  }
+  busy_spin_micros(20);
+
+  uint32_t acqlvl_265 = bitfield_field32_read(
+      abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET),
+      I2C_TARGET_FIFO_STATUS_ACQLVL_FIELD);
+  uint32_t status_265 = abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET);
+  CHECK_EQ(acqlvl_265, 265u, "Expected ACQLVL == 265 after 1 Start + 264 Data");
+  CHECK(!bitfield_bit32_read(status_265, I2C_STATUS_ACQFULL_BIT),
+        "[i2c_target_fsm.sv:268-272] Expected STATUS.ACQFULL == 0 at ACQLVL == "
+        "265");
+
+  // Push 1 more data byte -> ACQLVL == 266 (AcqFifoDepth - 2): STATUS.ACQFULL
+  // must assert to 1!
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, 0x55u);
+  for (int spin = 0; spin < 5000; ++spin) {
+    uint32_t st = abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET);
+    if (bitfield_bit32_read(st, I2C_STATUS_FMTEMPTY_BIT)) {
+      break;
+    }
+    busy_spin_micros(2);
+  }
+  busy_spin_micros(20);
+
+  uint32_t acqlvl_266 = bitfield_field32_read(
+      abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET),
+      I2C_TARGET_FIFO_STATUS_ACQLVL_FIELD);
+  uint32_t status_266 = abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET);
+  CHECK_EQ(acqlvl_266, 266u, "Expected ACQLVL == 266 (AcqFifoDepth - 2)");
+  CHECK(bitfield_bit32_read(status_266, I2C_STATUS_ACQFULL_BIT),
+        "[i2c_target_fsm.sv:268-272] Expected STATUS.ACQFULL == 1 at ACQLVL == "
+        "266 (AcqFifoDepth - 2)");
+
+  // Pop 1 entry from ACQDATA: ACQLVL drops from 266 back to 265, and
+  // STATUS.ACQFULL immediately deasserts from 1 to 0.
+  (void)abs_mmio_read32(kI2c0Base + I2C_ACQDATA_REG_OFFSET);
+  CHECK_EQ(bitfield_field32_read(
+               abs_mmio_read32(kI2c0Base + I2C_TARGET_FIFO_STATUS_REG_OFFSET),
+               I2C_TARGET_FIFO_STATUS_ACQLVL_FIELD),
+           265u, "Expected ACQLVL == 265 after popping 1 entry from 266");
+  CHECK(!bitfield_bit32_read(abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET),
+                             I2C_STATUS_ACQFULL_BIT),
+        "Expected STATUS.ACQFULL == 0 after popping 1 entry to ACQLVL == 265");
+
+  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+  precharge_i2c0_pads_high(&pinmux);
 }
 
 static void test_i2c_permit_subword_writes_vs_reads(void) {
@@ -567,6 +701,14 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   CHECK_EQ(abs_mmio_read32(kI2c0Base + I2C_INTR_ENABLE_REG_OFFSET), 0x0015u,
            "Expected INTR_ENABLE == 0x15");
   abs_mmio_write32(kI2c0Base + I2C_INTR_ENABLE_REG_OFFSET, 0u);
+
+  g_fault_count = 0;
+  abs_mmio_write8(kI2c0Base + I2C_OVRD_REG_OFFSET, 0x05u);
+  CHECK_EQ(g_fault_count, 0u,
+           "Expected sb to OVRD+0 (4'b0001) to succeed without fault");
+  CHECK_EQ(abs_mmio_read32(kI2c0Base + I2C_OVRD_REG_OFFSET), 0x05u,
+           "Expected OVRD == 0x05 after sb");
+  abs_mmio_write32(kI2c0Base + I2C_OVRD_REG_OFFSET, 0u);
 }
 
 bool test_main(void) {
@@ -575,6 +717,7 @@ bool test_main(void) {
   test_i2c_v2_timing_width_and_dif_truncation();
   test_i2c_fifo_preload_hostidle_val_and_ovrd_interference();
   test_i2c_readb_rcont_stop_and_nack_count();
+  test_i2c_acqfull_at_266_threshold();
   test_i2c_ovrd_interference_when_enabled();
   test_i2c_permit_subword_writes_vs_reads();
 
