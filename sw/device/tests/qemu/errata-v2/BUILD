@@ -748,6 +748,34 @@ opentitan_test(
 # Priority P30 Module: pwm
 # ----------------------------------------------------------------------------
 # === BEGIN ERRATA-V2 TEST: p30_pwm ===
+opentitan_test(
+    name = "pwm_errata_v2_test",
+    srcs = ["pwm_errata_v2_test.c"],
+    exec_env = {
+        "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+    },
+    deps = [
+        "//hw/top:alert_handler_c_regs",
+        "//hw/top:cheriot_c_regs",
+        "//hw/top:rv_core_ibex_c_regs",
+        "//hw/top:sram_ctrl_c_regs",
+        "//hw/top/dt:cheriot",
+        "//hw/top_earlgrey/sw/autogen:top_earlgrey",
+        "//sw/device/lib/base:abs_mmio",
+        "//sw/device/lib/base:bitfield",
+        "//sw/device/lib/base:csr",
+        "//sw/device/lib/base:mmio",
+        "//sw/device/lib/base:multibits",
+        "//sw/device/lib/dif:alert_handler",
+        "//sw/device/lib/dif/autogen:cheriot",
+        "//sw/device/lib/runtime:ibex",
+        "//sw/device/lib/runtime:log",
+        "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
+        "//sw/device/lib/testing/test_framework:ottf_isrs",
+        "//sw/device/lib/testing/test_framework:ottf_main",
+    ],
+)
 # === END ERRATA-V2 TEST: p30_pwm ===
 
 # ----------------------------------------------------------------------------
