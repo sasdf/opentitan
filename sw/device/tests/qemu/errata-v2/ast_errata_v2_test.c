@@ -6,7 +6,7 @@
  * @file ast_errata_v2_test.c
  * @brief Physical CW340 FPGA verification test for Earlgrey v2 (`trunk-v2`)
  *        `ast` errata:
- *   - [ERRATA-AST-001] (CONFIRMED_PRESENT_ON_V2):
+ *   - (CONFIRMED_PRESENT_ON_V2):
  *     `REGA0` (`0x00`), `REGA1` (`0x04`), and `REGA28` (`0x70`) are described
  *     as `"for OTP/ROM Write Testing"` yet have `SwAccessRO` (`we = 0`) and
  *     always read back `0x00`, `0x01`, and `0x1c`, while `REGAL` (`0xd4` in v2,
@@ -14,13 +14,13 @@
  *     yet `u_regal.qs()` is left unconnected (`SwAccessWO`), so `REGAL`
  * (`0xd4`) always reads back `0x00000000` while asserting `ast_init_done_o =
  *     MuBi4True` (`SENSOR_CTRL.STATUS.AST_INIT_DONE = 1`).
- *   - [ERRATA-AST-002] (CONFIRMED_PRESENT_ON_V2):
+ *   - (CONFIRMED_PRESENT_ON_V2):
  *     `AST_PERMIT[59]` is `4'b1111` for all 59 AST registers (`REGA0..REGA52`,
  *     `REGAL` at `0xd4`, `REGB0..REGB4` at `0x200..0x210`), rejecting any
  *     sub-word write (`sb` or `sh`, even to `REGA0` or `REGAL`) with a
  *     synchronous Store Access Fault (`mcause = 7`), and unmapped holes
  *     `0xd8..0x1fc` and `0x214..0x3fc` raise `addrmiss` (`mcause = 5` / `7`).
- *   - [ERRATA-AST-V2-001] (NEW_IN_V2):
+ *   - (NEW_IN_V2):
  *     In `trunk-v2`, `REGA` expanded by 15 registers (`REGA38..REGA52` at
  *     `0x98..0xd0`, `rw`, `resval = 0x26..0x34`) and `REGAL` shifted from
  *     `0x98` (`resval = 0x26`) to `0xd4` (`resval = 0x35`). Offset `0x98`
@@ -78,7 +78,7 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
 }
 
 static void test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback(void) {
-  LOG_INFO("Testing [ERRATA-AST-001] and [ERRATA-AST-V2-001] on trunk-v2...");
+  LOG_INFO("Testing and on trunk-v2...");
 
   // 1. REGA0 (0x00), REGA1 (0x04), and REGA28 (0x70) are read-only (SwAccessRO)
   // and silently ignore 32-bit writes, returning 0x00, 0x01, and 0x1c.
@@ -127,7 +127,7 @@ static void test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback(void) {
 }
 
 static void test_v1_002_permit_subword_and_addrmiss_holes(void) {
-  LOG_INFO("Testing [ERRATA-AST-002] on trunk-v2...");
+  LOG_INFO("Testing on trunk-v2...");
 
   // 1. Sub-word writes (sb/sh) to any AST register (REGA0, REGA2, REGAL, REGB0)
   // fault with mcause = 7 (AST_PERMIT = 4'b1111 for all 59 registers).
