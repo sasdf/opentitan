@@ -25,7 +25,8 @@
  * (`reg2hw.rnd_data.re`) clearing `RND_STATUS` (`0x5C`) prior to EDN refill
  * (`rv_core_ibex.sv:1092-1120`).
  * 4. [NEW IN V2] `MCOUNTEREN_WRITABLE` (`0x70`) / `MCOUNTEREN_WRITABLE_REGWEN`
- *    (`0x6C`) and Ibex `mcounteren` (`0x306`) CSR 12-bit WARL mask (`0x1FFD`),
+ *    (`0x6C`) and Ibex `mcounteren` (`0x306`) CSR 4-bit WARL mask (`0x0000001D`
+ *    due to `RvCoreIbexMHPMCounterNum=2` vs `0x00001FFD` IP default),
  *    strict `MuBi4True` (`0x6`) write-enable gating
  * (`rv_core_ibex.sv:461-465`), silent CSR write suppression (`illegal_csr == 0`
  * in `ibex_cs_registers.sv:464,845`) without clearing existing `mcounteren_q`
@@ -326,12 +327,34 @@ static void test_sw_recov_err_and_rnd_data(void) {
   CHECK(
       (status_before & (1u << RV_CORE_IBEX_RND_STATUS_RND_DATA_VALID_BIT)) != 0,
       "Expected RND_STATUS.RND_DATA_VALID=1 before reading RND_DATA");
+  // Pause EDN0 (`CTRL = 0x14`) so `rv_core_ibex` cannot immediately refill
+  // `rnd_data_q` before we read `RND_STATUS`.
+  const uint32_t kEdn0CtrlAddr = TOP_EARLGREY_EDN0_BASE_ADDR + 0x14u;
+  uint32_t edn0_ctrl_orig = abs_mmio_read32(kEdn0CtrlAddr);
+  abs_mmio_write32(kEdn0CtrlAddr, 0x9999u);
   uint32_t rnd_word =
       abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_RND_DATA_REG_OFFSET);
   uint32_t status_immediately_after =
       abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_RND_STATUS_REG_OFFSET);
-  LOG_INFO("  RND_DATA=0x%08x, RND_STATUS before=0x%x after=0x%x", rnd_word,
-           status_before, status_immediately_after);
+  CHECK((status_immediately_after &
+         (1u << RV_CORE_IBEX_RND_STATUS_RND_DATA_VALID_BIT)) == 0,
+        "Expected RND_STATUS.RND_DATA_VALID=0 after RND_DATA read while EDN0 "
+        "is paused (got 0x%x)",
+        status_immediately_after);
+  abs_mmio_write32(kEdn0CtrlAddr, edn0_ctrl_orig);
+  uint32_t status_refilled = 0;
+  for (int poll = 0; poll < 10000; ++poll) {
+    status_refilled =
+        abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_RND_STATUS_REG_OFFSET);
+    if (status_refilled & (1u << RV_CORE_IBEX_RND_STATUS_RND_DATA_VALID_BIT)) {
+      break;
+    }
+  }
+  CHECK((status_refilled &
+         (1u << RV_CORE_IBEX_RND_STATUS_RND_DATA_VALID_BIT)) != 0,
+        "Expected RND_STATUS.RND_DATA_VALID=1 after restoring EDN0");
+  LOG_INFO("  RND_DATA=0x%08x, RND_STATUS before=0x%x after=0x%x refilled=0x%x",
+           rnd_word, status_before, status_immediately_after, status_refilled);
 }
 
 /**
