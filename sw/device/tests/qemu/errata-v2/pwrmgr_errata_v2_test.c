@@ -145,8 +145,16 @@ static void test_pwrmgr_wake_status_cdc_masking(void) {
         "got 0x%08x",
         wake_status);
 
-  // Enable AON timer bit in WAKEUP_EN and sync via CFG_CDC_SYNC.
+  // Enable AON timer bit in WAKEUP_EN: before CFG_CDC_SYNC, slow_wakeup_en is
+  // still 0 even after waiting 30 us of slow clock cycles, so WAKE_STATUS stays
+  // 0 until CFG_CDC_SYNC is pulsed.
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, kAonTimerWkupBit);
+  busy_spin_micros(30);
+  wake_status = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET);
+  CHECK(wake_status == 0u,
+        "[pwrmgr.sv:525,535-538] WAKE_STATUS must remain 0 after writing "
+        "WAKEUP_EN before CFG_CDC_SYNC, got 0x%08x",
+        wake_status);
   pwrmgr_cdc_sync();
   busy_spin_micros(30);
   wake_status = abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET);
@@ -420,6 +428,15 @@ static void test_pwrmgr_aborted_sleep_pinmux_latch_and_wake_info_relatch(void) {
         "got 0x%08x",
         retained_ctrl_bits, ctrl_after);
   CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET) ==
+            kAonTimerWkupBit,
+        "Expected WAKEUP_EN retained across LowPowerExit");
+  CHECK((abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET) &
+         kAonTimerWkupBit) != 0u,
+        "Expected WAKE_INFO to retain wakeup bit across LowPowerExit");
+  CHECK((abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET) &
+         kAonTimerWkupBit) != 0u,
+        "Expected WAKE_STATUS to retain wakeup status across LowPowerExit");
 
   // Clean up AON timer, PLIC, and pwrmgr interrupt state.
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 1u);
