@@ -900,6 +900,7 @@ opentitan_test(
     srcs = ["pattgen_errata_v2_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
     },
     deps = [
         "//hw/top:hmac_c_regs",
@@ -908,6 +909,7 @@ opentitan_test(
         "//sw/device/lib/base:bitfield",
         "//sw/device/lib/base:mmio",
         "//sw/device/lib/dif:hmac",
+        "//sw/device/lib/runtime:hart",
         "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:irq",
         "//sw/device/lib/runtime:log",

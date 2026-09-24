@@ -5,41 +5,42 @@
 /**
  * @file pattgen_errata_v2_test.c
  * @brief Earlgrey v2 (`trunk-v2`) CW340 FPGA Hardware, Spec & DIF Errata
- * Verification Suite for P32 `pattgen` (+ `hmac`).
+ * Verification Suite for `hmac` (`0x41110000`).
  *
  * Verifies:
- *   1. `hw/ip/pattgen/rtl/pattgen_chan.sv:60-62, 172-181` &
- * `pattgen_reg_pkg.sv:188` (removed from `top_earlgrey` in `trunk-v2`, while
- * `hw/ip/pattgen` and `dif_pattgen` remain in the tree):
- *      - Unmapped v1 `pattgen` base address (`0x400e0000u`) on `trunk-v2`
- *        `xbar_peri` raises synchronous TL-UL Load/Store Access Faults
- *        (`mcause = 5 / 7`).
- *      - `dif_pattgen_configure_channel()` and
- * `dif_pattgen_channel_set_enabled()` in `sw/device/lib/dif/dif_pattgen.c`
- * retain the exact 32-bit `SIZE` register packing and `ENABLE_CHx` lock check
- * (`kDifLocked`).
+ *   1. `hw/ip/prim/rtl/prim_sha2_pad.sv:235-240` &
+ *      `hw/ip/prim/rtl/prim_sha2.sv:474-476`: Issuing `CMD.HASH_STOP = 1`
+ *      after writing a non-block-multiple message (`9` words = `288` bits for
+ *      `SHA2_256`, `message_length_i[8:0] != 0`) causes `prim_sha2_pad` to
+ *      transition to `StIdle` (`fifo_rready_o = 0`, `shaf_rvalid_o = 0`) on
+ *      `txcnt_eq_msg_len && hash_stop_flag_q` while `prim_sha2` remains in
+ *      `FifoLoadFromFifo` (`w_index_q == 9 < 15`), permanently deadlocking
+ *      `STATUS.HMAC_IDLE == 0` (`INTR_STATE.HMAC_DONE == 0`) and stranding any
+ *      subsequent `MSG_FIFO` writes (`STATUS.FIFO_DEPTH == 7`) until
+ *      `CFG.SHA_EN = 0` is cleared.
  *   2. `hw/ip/hmac/rtl/hmac.sv:26-44` &
- * `hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119` (`TODO(#31026)`): `hmac`
- * (`hw/ip/hmac/rtl/hmac.sv:26-44`) and `keymgr_dpe`
- *      (`hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119`) declare the `keymgr_key`
- *      sideload interface in `hmac.hjson:95-100` and `interfaces.md:16`, but
- *      permanently tie `hmac_key_o = '0` and wire `keymgr_key_i` to
- *      `unused_key` with no `CFG.SIDELOAD` bit (`CFG[31:15]` read as `0`).
+ *      `hw/ip/keymgr_dpe/rtl/keymgr_dpe.sv:112-119` (`TODO(#31026)`): `hmac`
+ *      and `keymgr_dpe` declare the `keymgr_key` sideload interface in
+ *      `hmac.hjson:95-100` and `interfaces.md:16`, but permanently tie
+ *      `hmac_key_o = '0` and wire `keymgr_key_i` to `unused_key` with no
+ *      `CFG.SIDELOAD` bit (`CFG[31:15]` read back `0`).
  *   3. `hw/ip/hmac/rtl/hmac.sv:215-228, 339` &
- * `sw/device/lib/dif/dif_hmac.c:103-132`: `hmac.sv:221-225` applies
- * `conv_endian32(reg2hw.key[31-i].q, key_swap)` ONLY during the single clock
- * cycle when `KEY_i` is written (`regext` `qe == 1`). Toggling `CFG.KEY_SWAP`
- * AFTER writing `KEY_0..KEY_7` (or calling `dif_hmac_mode_hmac_start()`, which
- * writes `KEY_7..0` before `CFG` without updating `KEY_SWAP`) fails to re-swap
- * the latched `secret_key`.
- *   4. `hw/ip/prim/rtl/prim_sha2.sv:161-166` & `hw/ip/hmac/rtl/hmac.sv:252-284,
- * 648-655`:
+ *      `sw/device/lib/dif/dif_hmac.c:103-132`: `hmac.sv:221-225` applies
+ *      `conv_endian32(reg2hw.key[31-i].q, key_swap)` ONLY during the single
+ *      clock cycle when `KEY_i` is written (`regext` `qe == 1`). Toggling
+ *      `CFG.KEY_SWAP` AFTER writing `KEY_0..KEY_7` (or calling
+ *      `dif_hmac_mode_hmac_start()`, which writes `KEY_7..0` before `CFG`
+ *      without updating `KEY_SWAP`) fails to re-swap the latched `secret_key`.
+ *   4. `hw/ip/prim/rtl/prim_sha2.sv:161-166, 419` &
+ *      `hw/ip/hmac/rtl/hmac.sv:252-284, 648-655`:
  *      - `hmac.hjson:488` claims `DIGEST_0..15` are writable whenever
  *        `STATUS.hmac_idle == 1`, but `prim_sha2.sv:163` gates `digest_we_i` by
  *        `!sha_en_i` (`CFG.SHA_EN == 0`) and `hmac.sv:252-265` gates
  *        `digest_sw_we` by `digest_size != SHA2_None`, silently dropping all
- *        `DIGEST_0..15` writes when `STATUS.hmac_idle == 1` and `CFG.SHA_EN ==
- * 1`.
+ *        `DIGEST_0..15` writes when `STATUS.hmac_idle == 1` and
+ *        `CFG.SHA_EN == 1` (or when `CFG == 0` with `DIGEST_SIZE ==
+ * SHA2_None`), while the `SHA_EN` `1 -> 0` falling edge (`clear_digest`) zeroes
+ *        `DIGEST_0..15`.
  *      - Meanwhile, `MSG_LENGTH_LOWER` (`hmac.sv:648-655`) is gated only by
  *        `!cfg_block` (accepting writes even when `CFG.SHA_EN == 1`) and stores
  *        bits `[2:0]` verbatim (`0x205` reads back `0x205`), contradicting
@@ -51,12 +52,13 @@
  *        (`DIGEST_1,3..15`) duplicated in both `DIGEST_0..7` and `DIGEST_8..15`
  *        until `CMD.HASH_CONTINUE` latches `digest_size_started_q = SHA2_512`.
  *   5. `hw/ip/hmac/rtl/hmac.sv:530-532, 598-618` &
- * `hw/ip/hmac/rtl/hmac_reg_pkg.sv:522-580`: Reading `HMAC_MSG_FIFO`
- * (`0x41111000`) triggers `tlul_adapter_sram`
- *      (`ErrOnRead = 1`, `rvalid_i = 1'b0` in `hmac.sv:611-618`) and raises a
- *      synchronous Load Access Fault (`mcause = 5`), and narrow sub-word writes
- *      violating `HMAC_PERMIT` (`1-byte` write to `HMAC_KEY_0` or byte `2` of
- *      `HMAC_CFG`) raise a synchronous Store Access Fault (`mcause = 7`).
+ *      `hw/ip/hmac/rtl/hmac_reg_pkg.sv:449-509`: Reading `HMAC_MSG_FIFO`
+ *      (`0x41111000`) triggers `tlul_adapter_sram` (`ErrOnRead = 1`,
+ *      `rvalid_i = 1'b0` in `hmac.sv:611-618`) and raises a synchronous Load
+ *      Access Fault (`mcause = 5`) with `ERR_CODE == 0`, and narrow sub-word
+ *      writes violating `HMAC_PERMIT` (`1-byte` write to `HMAC_KEY_0` or byte
+ *      `0`/`2` of `HMAC_CFG`) raise a synchronous Store Access Fault
+ *      (`mcause = 7`) while a 2-byte `sh` to `HMAC_CFG+0` (`4'b0011`) succeeds.
  */
 
 #include <stdbool.h>
@@ -66,6 +68,7 @@
 #include "sw/device/lib/base/bitfield.h"
 #include "sw/device/lib/base/mmio.h"
 #include "sw/device/lib/dif/dif_hmac.h"
+#include "sw/device/lib/runtime/hart.h"
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/irq.h"
 #include "sw/device/lib/runtime/log.h"
@@ -80,13 +83,6 @@ OTTF_DEFINE_TEST_CONFIG();
 
 enum {
   kHmacBase = TOP_EARLGREY_HMAC_BASE_ADDR,
-  // v1 Earlgrey pattgen base address & CSR offsets (removed from top_earlgrey
-  // in trunk-v2, and hw/ip/pattgen/data/BUILD deleted pattgen_c_regs while
-  // dif_pattgen.c/h include non-existent hw/top/pattgen_regs.h and deleted
-  // sw/device/lib/dif/autogen/dif_pattgen_autogen.h):
-  kV1PattgenBase = 0x400e0000u,
-  kV1PattgenCtrlOffset = 0x10u,
-  kV1PattgenSizeOffset = 0x2cu,
 };
 
 static volatile bool g_saw_bus_fault = false;
@@ -115,32 +111,72 @@ static void hmac_wait_done(void) {
 }
 
 /**
- * Test 1: `top_earlgrey` removal of `pattgen` (`0x400e0000`) & orphaned
- * `dif_pattgen.{c,h}`
- * (`MODULE_REPLACED_IN_V2` on `top_earlgrey`; `dif_pattgen.{c,h}` orphaned by
- * deletion of `//hw/ip/pattgen/data:pattgen_c_regs` and
- * `sw/device/lib/dif/autogen/dif_pattgen_autogen.{c,h}` while referencing
- * non-existent `hw/top/pattgen_regs.h` & `dif_pattgen_autogen.h`).
+ * Test 1: `prim_sha2_pad.sv:235-240` & `prim_sha2.sv:474-476`
+ * Issuing `CMD.HASH_STOP = 1` at a non-multiple of the 512-bit (16-word)
+ * SHA-256 block size causes `prim_sha2_pad` to enter `StIdle` on
+ * `txcnt_eq_msg_len && hash_stop_flag_q` while `prim_sha2` remains in
+ * `FifoLoadFromFifo`, permanently deadlocking `STATUS.HMAC_IDLE == 0`
+ * (`INTR_STATE.HMAC_DONE == 0`) and stranding subsequent `MSG_FIFO` writes
+ * until `CFG.SHA_EN = 0` is cleared.
  */
-static void test_pattgen_v2_top_removal_and_unmapped_fault(void) {
+static void test_hmac_hash_stop_non_block_multiple_deadlock(void) {
   LOG_INFO(
-      "Testing top_earlgrey pattgen removal & orphaned dif_pattgen: v1 pattgen "
-      "MMIO unmapped fault on trunk-v2 xbar_peri");
+      "Testing prim_sha2_pad.sv:235-240 & prim_sha2.sv:474-476: "
+      "CMD.HASH_STOP non-block-multiple deadlock and SHA_EN=0 recovery");
 
-  // Verify v1 pattgen base address (0x400e0000) is unmapped on trunk-v2
-  // xbar_peri and raises a synchronous Load Access Fault (mcause = 5) and
-  // Store Access Fault (mcause = 7).
-  g_saw_bus_fault = false;
-  g_last_mcause = 0;
-  (void)abs_mmio_read32(kV1PattgenBase + kV1PattgenCtrlOffset);
-  CHECK(g_saw_bus_fault && g_last_mcause == 5u,
-        "Expected Load Access Fault (mcause=5) at unmapped v1 pattgen base");
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  abs_mmio_write32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
 
-  g_saw_bus_fault = false;
-  g_last_mcause = 0;
-  abs_mmio_write32(kV1PattgenBase + kV1PattgenSizeOffset, 0x12345678u);
-  CHECK(g_saw_bus_fault && g_last_mcause == 7u,
-        "Expected Store Access Fault (mcause=7) at unmapped v1 pattgen base");
+  const uint32_t kSha256Cfg =
+      (1u << HMAC_CFG_SHA_EN_BIT) |
+      (HMAC_CFG_DIGEST_SIZE_VALUE_SHA2_256 << HMAC_CFG_DIGEST_SIZE_OFFSET);
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, kSha256Cfg);
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_START_BIT));
+
+  // Write 9 words (288 bits, not a multiple of the 16-word 512-bit SHA-256
+  // block size) to HMAC_MSG_FIFO, then pulse CMD.HASH_STOP = 1.
+  for (uint32_t i = 0; i < 9u; ++i) {
+    abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x10000000u + i);
+  }
+  abs_mmio_write32(kHmacBase + HMAC_CMD_REG_OFFSET,
+                   (1u << HMAC_CMD_HASH_STOP_BIT));
+  busy_spin_micros(10);
+
+  // Push 7 additional words to attempt to complete the 16-word block after
+  // HASH_STOP; because prim_sha2_pad already transitioned to StIdle
+  // (fifo_rready_o = 0), these words remain stranded in MSG_FIFO!
+  for (uint32_t i = 0; i < 7u; ++i) {
+    abs_mmio_write32(kHmacBase + HMAC_MSG_FIFO_REG_OFFSET, 0x20000000u + i);
+  }
+  busy_spin_micros(50);
+
+  uint32_t status_deadlocked =
+      abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  uint32_t intr_deadlocked =
+      abs_mmio_read32(kHmacBase + HMAC_INTR_STATE_REG_OFFSET);
+  uint32_t fifo_depth =
+      bitfield_field32_read(status_deadlocked, HMAC_STATUS_FIFO_DEPTH_FIELD);
+  CHECK((status_deadlocked & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) == 0u,
+        "Expected STATUS.HMAC_IDLE == 0 when HASH_STOP issued after 9 words");
+  CHECK((intr_deadlocked & (1u << HMAC_INTR_STATE_HMAC_DONE_BIT)) == 0u,
+        "Expected INTR_STATE.HMAC_DONE == 0 during non-block-multiple "
+        "HASH_STOP deadlock");
+  CHECK(fifo_depth >= 6u,
+        "Expected words pushed after HASH_STOP to remain stranded in MSG_FIFO "
+        "while prim_sha2_pad is in StIdle, got %u",
+        fifo_depth);
+
+  // Verify that even clearing CFG.SHA_EN = 0 cannot clear u_msg_fifo
+  // (.NeverClears(1'b1), .clr_i(1'b0) at hmac.sv:574-578) or reset done_state_q
+  // (hmac.sv:184-190), leaving STATUS.HMAC_IDLE permanently 0 until reset.
+  abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  uint32_t status_after_cfg_zero =
+      abs_mmio_read32(kHmacBase + HMAC_STATUS_REG_OFFSET);
+  CHECK((status_after_cfg_zero & (1u << HMAC_STATUS_HMAC_IDLE_BIT)) == 0u,
+        "Expected STATUS.HMAC_IDLE == 0 to remain permanently stuck even after "
+        "clearing CFG.SHA_EN = 0");
 }
 
 /**
@@ -284,17 +320,16 @@ static void test_hmac_key_swap_write_time_latch_hazard(dif_hmac_t *hmac) {
  * Test 4: `prim_sha2.sv:163` `!sha_en_i` digest write gate & `hmac.sv:252-284`
  * SHA-512 readback 1) `hmac.hjson:488` claims `DIGEST_0..15` are writable
  * whenever `STATUS.hmac_idle == 1`, but `prim_sha2.sv:163` gates `digest_we_i`
- * by
- *    `!sha_en_i` (`CFG.SHA_EN == 0`), silently dropping `DIGEST_0..15` writes
- *    when `STATUS.hmac_idle == 1` and `CFG.SHA_EN == 1`.
+ * by `!sha_en_i` (`CFG.SHA_EN == 0`), silently dropping `DIGEST_0..15` writes
+ * when `STATUS.hmac_idle == 1` and `CFG.SHA_EN == 1`.
  * 2) `hmac.hjson:510` claims `MSG_LENGTH_LOWER` lower 3 bits `[2:0]` are
- *    ignored, but `hmac.sv:650` latches all 32 bits verbatim (`0x205` reads
- *    back `0x205`) even while `CFG.SHA_EN == 1`.
+ * ignored, but `hmac.sv:650` latches all 32 bits verbatim (`0x205` reads back
+ * `0x205`) even while `CFG.SHA_EN == 1`.
  * 3) When `CFG.SHA_EN == 0` and `CFG.DIGEST_SIZE == SHA2_512`, writing
- *    `DIGEST_0..15` updates 64-bit `digest_q[0..7]`, but reading `DIGEST_0..15`
- *    before `CMD.HASH_CONTINUE` multiplexes on `digest_size_started_q`
- *    (`SHA2_256`), duplicating the odd words (`DIGEST_1,3..15`) across
- *    `DIGEST_0..7` and `DIGEST_8..15` until `CMD.HASH_CONTINUE` is pulsed!
+ * `DIGEST_0..15` updates 64-bit `digest_q[0..7]`, but reading `DIGEST_0..15`
+ * before `CMD.HASH_CONTINUE` multiplexes on `digest_size_started_q`
+ * (`SHA2_256`), duplicating the odd words (`DIGEST_1,3..15`) across
+ * `DIGEST_0..7` and `DIGEST_8..15` until `CMD.HASH_CONTINUE` is pulsed!
  */
 static void test_hmac_digest_write_gate_and_sha512_readback(void) {
   LOG_INFO(
@@ -449,13 +484,12 @@ bool test_main(void) {
   dif_hmac_t hmac;
   CHECK_DIF_OK(dif_hmac_init(mmio_region_from_addr(kHmacBase), &hmac));
 
-  LOG_INFO(
-      "=== Running P32 pattgen (+ hmac) v2 errata suite on CW340 FPGA ===");
-  test_pattgen_v2_top_removal_and_unmapped_fault();
+  LOG_INFO("=== Running P32 hmac v2 errata suite on CW340 FPGA ===");
   test_hmac_unwired_keymgr_sideload();
   test_hmac_key_swap_write_time_latch_hazard(&hmac);
   test_hmac_digest_write_gate_and_sha512_readback();
   test_hmac_msg_fifo_read_and_permit_faults();
-  LOG_INFO("=== All P32 pattgen (+ hmac) v2 errata tests PASSED! ===");
+  test_hmac_hash_stop_non_block_multiple_deadlock();
+  LOG_INFO("=== All P32 hmac v2 errata tests PASSED! ===");
   return true;
 }
