@@ -26,12 +26,14 @@
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top/rstmgr_regs.h"
+#include "hw/top/usbdev_regs.h"
 #include "hw/top_earlgrey/sw/autogen/top_earlgrey.h"
 
 OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 
 enum {
   kRstmgrBase = TOP_EARLGREY_RSTMGR_BASE_ADDR,
+  kUsbdevBase = TOP_EARLGREY_USBDEV_BASE_ADDR,
 };
 
 static volatile uint32_t g_fault_count = 0;
@@ -53,6 +55,14 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
  */
 static void test_v1_003_reset_req_in_flight_cancel(void) {
   LOG_INFO("Testing [rstmgr.sv:1196] RESET_REQ in-flight cancel...");
+  // Synchronize to a 200 kHz AON clock (clk_slow_i, 5 us period) rising edge
+  // via PWSTMGR_CFG_CDC_SYNC (0x40400018) so that the back-to-back RESET_REQ
+  // writes (0x6 -> 0x9) always execute at the start of a 5 us AON clock period
+  // regardless of binary code alignment.
+  const uint32_t kPwrmgrCfgCdcSync = 0x40400018u;
+  abs_mmio_write32(kPwrmgrCfgCdcSync, 1u);
+  while (abs_mmio_read32(kPwrmgrCfgCdcSync) != 0u) {
+  }
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET,
                    kMultiBitBool4True);
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET,
@@ -110,10 +120,76 @@ static void test_v1_005_permit_subword_and_addrmiss_faults(void) {
   CHECK(g_fault_count == 0u,
         "Expected SB to ALERT_INFO_CTRL (PERMIT=4'b0001) to succeed");
 
-  // Pulse SW_RST_CTRL_N[3] (USB, 0x54) and SW_RST_CTRL_N[4] (USB_AON, 0x58)
+  // [prim_reg_cdc_arb.sv:94-95]: Verify SW_RST_CTRL_N[3] (USB, 0x54) vs
+  // SW_RST_CTRL_N[4] (USB_AON, 0x58) on USBDEV.WAKE_EVENTS (0x94).
+  // 1. Pulse both SW_RST_CTRL_N[3] and SW_RST_CTRL_N[4] to start clean, then
+  //    write USBDEV.WAKE_CONTROL.suspend_req = 1 and wait 50 us so the AON
+  //    domain sets dst_qs_o = 1 and transfers WAKE_EVENTS.module_active = 1.
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 0u);
-  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 1u);
+  busy_spin_micros(20);
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_WAKE_CONTROL_REG_OFFSET,
+                   1u << USBDEV_WAKE_CONTROL_SUSPEND_REQ_BIT);
+  busy_spin_micros(50);
+  uint32_t wake_ev_init =
+      abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
+  CHECK((wake_ev_init & (1u << USBDEV_WAKE_EVENTS_MODULE_ACTIVE_BIT)) != 0u,
+        "Expected USBDEV.WAKE_EVENTS.module_active == 1 after SUSPEND_REQ, "
+        "got 0x%x",
+        wake_ev_init);
+
+  // 2. Pulse ONLY SW_RST_CTRL_N[3] (USB, 0x54) without pulsing SW_RST_CTRL_N[4]
+  //    (USB_AON, 0x58): src_q (WAKE_EVENTS) resets to 0, while dst_qs_o in AON
+  //    remains 1 (== dst_ds_i), so re-issuing SUSPEND_REQ fails to re-latch
+  //    WAKE_EVENTS!
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
+  busy_spin_micros(20);
+  uint32_t wake_ev_usb_only =
+      abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
+  CHECK(wake_ev_usb_only == 0u,
+        "Expected USBDEV.WAKE_EVENTS == 0 after pulsing SW_RST_CTRL_N[3] "
+        "alone, got 0x%x",
+        wake_ev_usb_only);
+  abs_mmio_write32(kUsbdevBase + USBDEV_WAKE_CONTROL_REG_OFFSET,
+                   1u << USBDEV_WAKE_CONTROL_SUSPEND_REQ_BIT);
+  busy_spin_micros(50);
+  wake_ev_usb_only =
+      abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
+  CHECK(wake_ev_usb_only == 0u,
+        "Expected USBDEV.WAKE_EVENTS to remain stuck at 0 when SW_RST_CTRL_N[4]"
+        " (USB_AON) was not pulsed (dst_qs_o == dst_ds_i), got 0x%x",
+        wake_ev_usb_only);
+
+  // 3. Now pulse BOTH SW_RST_CTRL_N[3] and SW_RST_CTRL_N[4] (USB_AON, 0x58):
+  //    dst_qs_o resets to 0, so SUSPEND_REQ causes (dst_qs_o != dst_ds_i) and
+  //    re-latches WAKE_EVENTS.module_active == 1!
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 0u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 1u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kUsbdevBase + USBDEV_WAKE_CONTROL_REG_OFFSET,
+                   1u << USBDEV_WAKE_CONTROL_SUSPEND_REQ_BIT);
+  busy_spin_micros(50);
+  uint32_t wake_ev_both =
+      abs_mmio_read32(kUsbdevBase + USBDEV_WAKE_EVENTS_REG_OFFSET);
+  CHECK((wake_ev_both & (1u << USBDEV_WAKE_EVENTS_MODULE_ACTIVE_BIT)) != 0u,
+        "Expected USBDEV.WAKE_EVENTS.module_active == 1 after pulsing both "
+        "SW_RST_CTRL_N[3..4], got 0x%x",
+        wake_ev_both);
+
+  // Clean up USBDEV state by pulsing both SW_RST_CTRL_N[3..4].
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 0u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 0u);
+  busy_spin_micros(20);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
   abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 1u);
   CHECK(
       abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET) == 1u &&
@@ -162,6 +238,14 @@ static void verify_post_sw_reset_errata(void) {
   LOG_INFO("  Post-SW_RESET ALERT_INFO_CTRL=0x%x, CPU_INFO_CTRL=0x%x",
            alert_ctrl, cpu_ctrl);
 
+  CHECK(alert_ctrl == 0x50u,
+        "Expected ALERT_INFO_CTRL == 0x50 (EN=0, INDEX=5) after SW_RESET, got "
+        "0x%x",
+        alert_ctrl);
+  CHECK(cpu_ctrl == 0x30u,
+        "Expected CPU_INFO_CTRL == 0x30 (EN=0, INDEX=3) after SW_RESET, got "
+        "0x%x",
+        cpu_ctrl);
   CHECK(bitfield_bit32_read(alert_ctrl, RSTMGR_ALERT_INFO_CTRL_EN_BIT) == 0u,
         "Expected ALERT_INFO_CTRL.EN == 0 after SW_RESET");
   CHECK(bitfield_field32_read(alert_ctrl, RSTMGR_ALERT_INFO_CTRL_INDEX_FIELD) ==
@@ -254,8 +338,11 @@ static void verify_post_sw_reset_errata(void) {
         dump[0], cpu_slots[0]);
 
   // Also verify ALERT_REGWEN=0 (0x18) locks ALERT_INFO_CTRL.INDEX at 5 while
-  // dif_rstmgr_alert_info_dump_read() returns kDifOk (segments_read == 9):
+  // dif_rstmgr_alert_info_dump_read() returns kDifOk (segments_read == 9) and
+  // repeats alert_slot_5 across all 9 entries:
   abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET, 5u << 4);
+  uint32_t alert_slot_5 =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET);
   abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_REGWEN_REG_OFFSET, 0u);
   CHECK(dif_rstmgr_alert_info_set_enabled(&rstmgr, kDifToggleEnabled) ==
             kDifLocked,
@@ -267,6 +354,12 @@ static void verify_post_sw_reset_errata(void) {
                                                DIF_RSTMGR_ALERT_INFO_MAX_SIZE,
                                                &alert_segments_read));
   CHECK(alert_segments_read == 9u, "Expected alert_segments_read == 9");
+  for (size_t i = 0; i < 9u; ++i) {
+    CHECK(alert_dump[i] == alert_slot_5,
+          "Expected alert_dump[%u] (0x%08x) to repeat frozen alert_slot_5 "
+          "(0x%08x)",
+          (uint32_t)i, alert_dump[i], alert_slot_5);
+  }
   CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET) ==
             (5u << 4),
         "Expected ALERT_INFO_CTRL.INDEX frozen at 5 after dump_read");
