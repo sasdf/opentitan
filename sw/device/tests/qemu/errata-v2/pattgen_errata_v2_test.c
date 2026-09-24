@@ -321,12 +321,17 @@ static void test_hmac_digest_write_gate_and_sha512_readback(void) {
   CHECK(abs_mmio_read32(kHmacBase + HMAC_MSG_LENGTH_LOWER_REG_OFFSET) == 0x205u,
         "Expected MSG_LENGTH_LOWER to retain lower 3 bits [2:0] == 5");
 
-  // 2. Also verify `hmac.sv:252-265`: when `CFG == 0` (`CFG.SHA_EN == 0` AND
-  // `CFG.DIGEST_SIZE == SHA2_None`), writing `DIGEST_0` is ALSO silently
-  // dropped because `digest_sw_we` is gated by `digest_size != SHA2_None`!
+  // 2. Also verify `prim_sha2.sv:419` (`clear_digest = ~sha_en_i & sha_en_q`)
+  // and `hmac.sv:252-265`: writing `CFG = 0` (`SHA_EN` falling edge `1 -> 0`)
+  // clears `DIGEST_0` to `0`, and writing `DIGEST_0 = 0x55667788` while
+  // `CFG == 0` (`CFG.SHA_EN == 0` AND `CFG.DIGEST_SIZE == SHA2_None`) is
+  // silently dropped (`DIGEST_0` remains `0`)!
   abs_mmio_write32(kHmacBase + HMAC_CFG_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == 0u,
+        "Expected SHA_EN 1->0 falling edge (clear_digest) to clear DIGEST_0 to "
+        "0");
   abs_mmio_write32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET, 0x55667788u);
-  CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == prev_d0,
+  CHECK(abs_mmio_read32(kHmacBase + HMAC_DIGEST_0_REG_OFFSET) == 0u,
         "Expected DIGEST_0 write while CFG.SHA_EN==0 & DIGEST_SIZE==SHA2_None "
         "to be silently dropped");
 
