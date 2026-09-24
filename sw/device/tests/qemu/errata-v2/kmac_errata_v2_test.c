@@ -112,10 +112,6 @@ bool test_main(void) {
   }
   abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
 
-  for (uint32_t i = 0; i < 6u; ++i) {
-    abs_mmio_write32(kKmacBase + KMAC_ENTROPY_SEED_REG_OFFSET,
-                     0x11111111u * (i + 1u));
-  }
   uint32_t cfg_3a = 0;
   cfg_3a = bitfield_bit32_write(cfg_3a, KMAC_CFG_SHADOWED_KMAC_EN_BIT, true);
   cfg_3a = bitfield_field32_write(cfg_3a, KMAC_CFG_SHADOWED_KSTRENGTH_FIELD,
@@ -127,6 +123,10 @@ bool test_main(void) {
   cfg_3a =
       bitfield_bit32_write(cfg_3a, KMAC_CFG_SHADOWED_ENTROPY_READY_BIT, true);
   write_cfg_shadowed(cfg_3a);
+  for (uint32_t i = 0; i < 6u; ++i) {
+    abs_mmio_write32(kKmacBase + KMAC_ENTROPY_SEED_REG_OFFSET,
+                     0x11111111u * (i + 1u));
+  }
 
   abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
                    KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
