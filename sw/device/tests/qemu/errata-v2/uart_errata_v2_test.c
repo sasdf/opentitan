@@ -86,6 +86,16 @@ bool test_main(void) {
   uint32_t val_reset = abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET);
   CHECK(val_reset == 0x0000u, "Expected VAL reset value 0x0000, got 0x%04x",
         val_reset);
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
+                   0xffffu << UART_CTRL_NCO_OFFSET);
+  busy_spin_micros(50);
+  uint32_t val_frozen = abs_mmio_read32(kUart1Base + UART_VAL_REG_OFFSET);
+  CHECK(val_frozen == 0x0000u,
+        "Expected VAL to remain frozen at 0x0000 when CTRL.NCO=0xffff and "
+        "TX=RX=0, got 0x%04x",
+        val_frozen);
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
+
   uint32_t status_reset = abs_mmio_read32(kUart1Base + UART_STATUS_REG_OFFSET);
   CHECK((status_reset & ~0x3fu) == 0u && status_reset == 0x3cu,
         "Expected UART_STATUS (0x14) to only populate bits [5:0]=0x3c with "
@@ -157,45 +167,65 @@ bool test_main(void) {
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
 
   // -------------------------------------------------------------------------
-  // Check 4: Status-type INTR_STATE (tx_watermark & tx_empty) and TXILVL=7
-  // saturation at 16 bytes (lsio_trigger_o / event_tx_watermark behavior)
+  // Check 4: Status-type INTR_STATE (tx_watermark & tx_empty), TXILVL=4..7
+  // saturation at 16 bytes, and RXILVL=7 suppression
   // -------------------------------------------------------------------------
-  // Program unenumerated TXILVL=7 (bits 7:5 = 0x7) and reset TX FIFO while
-  // CTRL.TX=0: tx_watermark_thresh saturates at 16 instead of 0, so
-  // INTR_STATE.tx_watermark (bit 0) and tx_empty (bit 8) stay 1 (0x101) and
-  // ignore W1C!
+  for (uint32_t txilvl = 4u; txilvl <= 7u; ++txilvl) {
+    abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+                     (7u << UART_FIFO_CTRL_RXILVL_OFFSET) |
+                         (txilvl << UART_FIFO_CTRL_TXILVL_OFFSET) |
+                         (1u << UART_FIFO_CTRL_TXRST_BIT) |
+                         (1u << UART_FIFO_CTRL_RXRST_BIT));
+    abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+    intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+    CHECK(intr_state == 0x101u,
+          "Expected INTR_STATE == 0x101 (tx_watermark | tx_empty) when "
+          "TXLVL==0 even with CTRL.TX==0 and TXILVL==%u, got 0x%03x",
+          txilvl, intr_state);
+
+    // Push 15 bytes into WDATA while CTRL.TX==0: TXLVL==15 < 16, so
+    // tx_empty clears to 0 while tx_watermark remains 1 (0x001).
+    for (uint32_t i = 0; i < 15u; ++i) {
+      abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x55u);
+    }
+    intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+    CHECK(intr_state == 0x001u,
+          "Expected INTR_STATE == 0x001 at TXLVL==15 with TXILVL==%u "
+          "(threshold saturated at 16), got 0x%03x",
+          txilvl, intr_state);
+
+    // Push 16th byte into WDATA: TXLVL==16 >= 16, so event_tx_watermark (and
+    // lsio_trigger_o) finally deasserts to 0!
+    abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x55u);
+    intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+    CHECK(intr_state == 0x000u,
+          "Expected INTR_STATE == 0x000 at TXLVL==16 with TXILVL==%u, got "
+          "0x%03x",
+          txilvl, intr_state);
+  }
+
+  // Verify RXILVL=7 (rx_watermark_thresh=127) suppresses rx_watermark even
+  // when RX FIFO receives bytes via SLPBK.
+  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
+                   (7u << UART_FIFO_CTRL_RXILVL_OFFSET) |
+                       (1u << UART_FIFO_CTRL_TXRST_BIT) |
+                       (1u << UART_FIFO_CTRL_RXRST_BIT));
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET,
+                   (0xffffu << UART_CTRL_NCO_OFFSET) |
+                       (1u << UART_CTRL_SLPBK_BIT) | (1u << UART_CTRL_TX_BIT) |
+                       (1u << UART_CTRL_RX_BIT));
+  abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0xa5u);
+  busy_spin_micros(50);
+  fifo_status = abs_mmio_read32(kUart1Base + UART_FIFO_STATUS_REG_OFFSET);
+  CHECK(((fifo_status >> UART_FIFO_STATUS_RXLVL_OFFSET) & 0xffu) == 1u,
+        "Expected RXLVL == 1 after SLPBK byte");
+  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
+  CHECK(((intr_state >> UART_INTR_COMMON_RX_WATERMARK_BIT) & 1u) == 0u,
+        "Expected rx_watermark == 0 when RXILVL == 7 and RXLVL == 1");
+  abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(
       kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-      (7u << UART_FIFO_CTRL_TXILVL_OFFSET) | (1u << UART_FIFO_CTRL_TXRST_BIT));
-  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
-  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
-  CHECK(intr_state == 0x101u,
-        "Expected INTR_STATE == 0x101 (tx_watermark | tx_empty) when TXLVL==0 "
-        "even with CTRL.TX==0 and TXILVL==7, got 0x%03x",
-        intr_state);
-
-  // Push 15 bytes into WDATA while CTRL.TX==0: TXLVL==15 < 16, so
-  // tx_empty clears to 0 while tx_watermark remains 1 (0x001).
-  for (uint32_t i = 0; i < 15u; ++i) {
-    abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x55u);
-  }
-  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
-  CHECK(intr_state == 0x001u,
-        "Expected INTR_STATE == 0x001 at TXLVL==15 with TXILVL==7 (threshold "
-        "saturated at 16), got 0x%03x",
-        intr_state);
-
-  // Push 16th byte into WDATA: TXLVL==16 >= 16, so event_tx_watermark (and
-  // lsio_trigger_o) finally deasserts to 0!
-  abs_mmio_write32(kUart1Base + UART_WDATA_REG_OFFSET, 0x55u);
-  intr_state = abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET);
-  CHECK(intr_state == 0x000u,
-        "Expected INTR_STATE == 0x000 at TXLVL==16 with TXILVL==7, got 0x%03x",
-        intr_state);
-
-  // Reset TX FIFO back to empty.
-  abs_mmio_write32(kUart1Base + UART_FIFO_CTRL_REG_OFFSET,
-                   1u << UART_FIFO_CTRL_TXRST_BIT);
+      (1u << UART_FIFO_CTRL_TXRST_BIT) | (1u << UART_FIFO_CTRL_RXRST_BIT));
 
   // -------------------------------------------------------------------------
   // Check 5: UART_PERMIT sub-word write faults and addrmiss (>= 0x34)
@@ -213,6 +243,20 @@ bool test_main(void) {
         "Expected CTRL unchanged after rejected sub-word writes");
   abs_mmio_write32(kUart1Base + UART_CTRL_REG_OFFSET, 0u);
 
+  abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0x00123456u);
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET) = 0x78u;
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected sb to TIMEOUT_CTRL (PERMIT=4'b1111) to fault with mcause=7");
+  *(volatile uint16_t *)(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET) = 0x5678u;
+  CHECK(g_fault_count == 2u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected sh to TIMEOUT_CTRL (PERMIT=4'b1111) to fault with mcause=7");
+  CHECK(
+      abs_mmio_read32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET) == 0x00123456u,
+      "Expected TIMEOUT_CTRL unchanged after rejected sub-word writes");
+  abs_mmio_write32(kUart1Base + UART_TIMEOUT_CTRL_REG_OFFSET, 0u);
+
   abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
   g_fault_count = 0;
   *(volatile uint8_t *)(kUart1Base + UART_INTR_ENABLE_REG_OFFSET) = 0x05u;
@@ -227,9 +271,35 @@ bool test_main(void) {
   abs_mmio_write32(kUart1Base + UART_INTR_ENABLE_REG_OFFSET, 0u);
 
   g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_INTR_STATE_REG_OFFSET) = 0xffu;
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected sb to INTR_STATE (PERMIT=4'b0011) to fault with mcause=7");
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kUart1Base + UART_INTR_STATE_REG_OFFSET) = 0x01ffu;
+  CHECK(g_fault_count == 0u,
+        "Expected sh to INTR_STATE+0 (PERMIT=4'b0011) to succeed");
+
+  g_fault_count = 0;
+  *(volatile uint8_t *)(kUart1Base + UART_INTR_TEST_REG_OFFSET) = 0x02u;
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected sb to INTR_TEST (PERMIT=4'b0011) to fault with mcause=7");
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kUart1Base + UART_INTR_TEST_REG_OFFSET) = 0x0002u;
+  CHECK(g_fault_count == 0u,
+        "Expected sh to INTR_TEST+0 (PERMIT=4'b0011) to succeed");
+  CHECK(((abs_mmio_read32(kUart1Base + UART_INTR_STATE_REG_OFFSET) >>
+          UART_INTR_COMMON_RX_WATERMARK_BIT) &
+         1u) == 1u,
+        "Expected sh to INTR_TEST+0 to set INTR_STATE.rx_watermark");
+  abs_mmio_write32(kUart1Base + UART_INTR_STATE_REG_OFFSET, 0x1ffu);
+
+  g_fault_count = 0;
   (void)abs_mmio_read32(kUart1Base + kUnmappedOffset);
   CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
         "Expected read at unmapped offset 0x34 to fault with mcause=5");
+  abs_mmio_write32(kUart1Base + kUnmappedOffset, 0xdeadbeefu);
+  CHECK(g_fault_count == 2u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected write at unmapped offset 0x34 to fault with mcause=7");
 
   LOG_INFO("UART1 errata v2 test passed all checks on CW340 FPGA");
   return true;
