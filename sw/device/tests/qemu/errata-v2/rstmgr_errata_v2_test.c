@@ -93,6 +93,34 @@ static void test_v1_005_permit_subword_and_addrmiss_faults(void) {
   CHECK(g_fault_count == 1u && g_last_mcause == 7u,
         "Expected SB to CPU_INFO to fault with mcause=7");
 
+  // 2b. 16-bit write (SH) to RO ALERT_INFO (0x24) and CPU_INFO (0x34): faults!
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET) = 0x1234u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected SH to ALERT_INFO to fault with mcause=7");
+
+  g_fault_count = 0;
+  *(volatile uint16_t *)(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET) = 0x5678u;
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected SH to CPU_INFO to fault with mcause=7");
+
+  // 2c. 8-bit write (SB) to ALERT_INFO_CTRL (0x1c, PERMIT=4'b0001): succeeds!
+  g_fault_count = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET, 0x20u);
+  CHECK(g_fault_count == 0u,
+        "Expected SB to ALERT_INFO_CTRL (PERMIT=4'b0001) to succeed");
+
+  // Pulse SW_RST_CTRL_N[3] (USB, 0x54) and SW_RST_CTRL_N[4] (USB_AON, 0x58)
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 0u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET, 1u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 0u);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET, 1u);
+  CHECK(
+      abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_3_REG_OFFSET) == 1u &&
+          abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_4_REG_OFFSET) ==
+              1u,
+      "Expected SW_RST_CTRL_N[3..4] == 1 after pulse");
+
   // 3. Unmapped offset 0x70 within BlockAw=7 (0x80) window: addrmiss ->
   // d_error.
   g_fault_count = 0;
@@ -223,6 +251,24 @@ static void verify_post_sw_reset_errata(void) {
         "Expected dump[0] (0x%x) != true cpu_slots[0] (0x%x) due to frozen "
         "CPU_INFO_CTRL.INDEX",
         dump[0], cpu_slots[0]);
+
+  // Also verify ALERT_REGWEN=0 (0x18) locks ALERT_INFO_CTRL.INDEX at 5 while
+  // dif_rstmgr_alert_info_dump_read() returns kDifOk (segments_read == 9):
+  abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET, 5u << 4);
+  abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_REGWEN_REG_OFFSET, 0u);
+  CHECK(dif_rstmgr_alert_info_set_enabled(&rstmgr, kDifToggleEnabled) ==
+            kDifLocked,
+        "Expected dif_rstmgr_alert_info_set_enabled to return kDifLocked");
+  dif_rstmgr_alert_info_dump_segment_t
+      alert_dump[DIF_RSTMGR_ALERT_INFO_MAX_SIZE] = {0};
+  size_t alert_segments_read = 0;
+  CHECK_DIF_OK(dif_rstmgr_alert_info_dump_read(&rstmgr, alert_dump,
+                                               DIF_RSTMGR_ALERT_INFO_MAX_SIZE,
+                                               &alert_segments_read));
+  CHECK(alert_segments_read == 9u, "Expected alert_segments_read == 9");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET) ==
+            (5u << 4),
+        "Expected ALERT_INFO_CTRL.INDEX frozen at 5 after dump_read");
   LOG_INFO(
       "  [ERRATA-RSTMGR-V2-001] Locked CPU_REGWEN=0 at INDEX=%u -> "
       "dif_rstmgr_cpu_info_dump_read returned kDifOk with all 8 words == 0x%x "
