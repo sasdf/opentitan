@@ -107,6 +107,10 @@ static void test_alert_handler_class_en_gated_by_esc_enables(void) {
       0u,
       "[alert_handler_reg_wrap.sv:193-213] Expected CLASSB_ACCUM_CNT == 0 when "
       "EN=1 but EN_E0..3 == 0");
+  CHECK_EQ(
+      abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSB_STATE_REG_OFFSET), 0u,
+      "[alert_handler_reg_wrap.sv:193-213] Expected CLASSB_STATE == 0 when "
+      "EN=1 but EN_E0..3 == 0");
 
   // Also verify: disabling LOC_ALERT_EN_SHADOWED[5] does NOT mask
   // LOC_ALERT_CAUSE[5] on readback.
@@ -166,6 +170,11 @@ static void test_alert_handler_timeout_irq_and_clr_shadowed(void) {
   // CLASSA_STATE remains Idle (0) because INTR_ENABLE.CLASSA == 0 (`irq[0] ==
   // 0`).
   CHECK_EQ(abs_mmio_read32(alert_cause_addr), 1u, "Expected ALERT_CAUSE == 1");
+  CHECK_EQ((abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET) >>
+            ALERT_HANDLER_INTR_STATE_CLASSA_BIT) &
+               1u,
+           1u,
+           "[alert_handler.sv:256] Expected INTR_STATE.CLASSA == 1 at Step 1");
   CHECK_EQ(
       abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_CNT_REG_OFFSET),
       1u, "Expected CLASSA_ACCUM_CNT == 1");
@@ -209,6 +218,12 @@ static void test_alert_handler_timeout_irq_and_clr_shadowed(void) {
   abs_mmio_write32(
       kAlertBase + ALERT_HANDLER_INTR_ENABLE_REG_OFFSET,
       intr_en_orig & ~(1u << ALERT_HANDLER_INTR_ENABLE_CLASSA_BIT));
+  CHECK_EQ((abs_mmio_read32(kAlertBase + ALERT_HANDLER_INTR_STATE_REG_OFFSET) >>
+            ALERT_HANDLER_INTR_STATE_CLASSA_BIT) &
+               1u,
+           1u,
+           "[alert_handler.sv:256] Expected INTR_STATE.CLASSA to remain 1 when "
+           "INTR_ENABLE.CLASSA cleared");
   CHECK_EQ(abs_mmio_read32(kAlertBase + ALERT_HANDLER_CLASSA_STATE_REG_OFFSET),
            0u,
            "[alert_handler.sv:256] Expected CLASSA_STATE to return to Idle "
@@ -223,7 +238,7 @@ static void test_alert_handler_timeout_irq_and_clr_shadowed(void) {
 
 static void test_alert_handler_permit_subword_and_addrmiss(void) {
   LOG_INFO(
-      "Verifying [alert_handler_reg_top.sv:16096-16454]: ALERT_HANDLER_PERMIT "
+      "Verifying [alert_handler_reg_top.sv:16081-16439]: ALERT_HANDLER_PERMIT "
       "sub-word wr_err & >= 0x588 addrmiss (NAlerts=66, NumRegs=354)");
 
   // 1. 1-byte write to CLASSA_TIMEOUT_CYC_SHADOWED (PERMIT = 4'b1111) traps
@@ -233,7 +248,7 @@ static void test_alert_handler_permit_subword_and_addrmiss(void) {
   abs_mmio_write8(
       kAlertBase + ALERT_HANDLER_CLASSA_TIMEOUT_CYC_SHADOWED_REG_OFFSET, 0xAAu);
   CHECK_EQ(g_fault_count, 1u,
-           "[alert_handler_reg_top.sv:16096-16454] Expected sb to "
+           "[alert_handler_reg_top.sv:16081-16439] Expected sb to "
            "CLASSA_TIMEOUT_CYC_SHADOWED to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -247,7 +262,7 @@ static void test_alert_handler_permit_subword_and_addrmiss(void) {
       kAlertBase + ALERT_HANDLER_CLASSA_ACCUM_THRESH_SHADOWED_REG_OFFSET,
       0x55u);
   CHECK_EQ(g_fault_count, 1u,
-           "[alert_handler_reg_top.sv:16096-16454] Expected sb to "
+           "[alert_handler_reg_top.sv:16081-16439] Expected sb to "
            "CLASSA_ACCUM_THRESH_SHADOWED to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
@@ -281,7 +296,7 @@ static void test_alert_handler_permit_subword_and_addrmiss(void) {
   g_last_mcause = 0;
   (void)abs_mmio_read32(kAlertBase + kUnmappedOffsetV2);
   CHECK_EQ(g_fault_count, 1u,
-           "[alert_handler_reg_top.sv:16096-16454] Expected read at unmapped "
+           "[alert_handler_reg_top.sv:16081-16439] Expected read at unmapped "
            "offset 0x588 to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvLoadAccessFault, "Expected mcause=5");
 
@@ -289,7 +304,7 @@ static void test_alert_handler_permit_subword_and_addrmiss(void) {
   g_last_mcause = 0;
   abs_mmio_write32(kAlertBase + kUnmappedOffsetV2, 0xDEADBEEFu);
   CHECK_EQ(g_fault_count, 1u,
-           "[alert_handler_reg_top.sv:16096-16454] Expected write at unmapped "
+           "[alert_handler_reg_top.sv:16081-16439] Expected write at unmapped "
            "offset 0x588 to trap");
   CHECK_EQ(g_last_mcause, (uint32_t)kRiscvStoreAccessFault,
            "Expected mcause=7");
