@@ -150,6 +150,7 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         otp = "//hw/top_earlgrey/data/otp:img_test_unlocked1",

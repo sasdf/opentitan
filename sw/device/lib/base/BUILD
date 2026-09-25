@@ -21,6 +21,7 @@ BASE_EXEC_ENVS = dicts.add(
     EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     {
         "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
     },
 )
 
@@ -88,6 +89,7 @@ opentitan_test(
         BASE_EXEC_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+            "//hw/top_earlgrey:sim_qemu_test_rom": None,
         },
     ),
     fpga = fpga_params(

@@ -94,6 +94,7 @@ opentitan_test(
         ),
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
     ),
     verilator = verilator_params(
@@ -635,6 +636,7 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             # See #21706, expects keymgr state 0 so not working after ROM_EXT.
             "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": "broken",
         },

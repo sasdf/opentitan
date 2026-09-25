@@ -205,6 +205,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -248,6 +249,7 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",

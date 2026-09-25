@@ -32,6 +32,7 @@ opentitan_binary(
     srcs = ["//sw/device/tests/penetrationtests/firmware:firmware_cryptolib_fi_sym.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     deps = [
         "//sw/device/tests/penetrationtests/firmware/sca:trigger_sca",

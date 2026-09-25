@@ -82,6 +82,7 @@ _MANUF_TEST_LOCKED_KEY = None
         exec_env = {
             "//hw/top_earlgrey:sim_dv": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             lc_state = lc_state,  # will be expanded in test_cmd
@@ -118,6 +119,7 @@ opentitan_test(
     srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         needs_jtag = True,
@@ -185,6 +187,7 @@ opentitan_test(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             lc_state = lc_state,  # will be expanded in test_cmd
@@ -265,6 +268,7 @@ cc_library(
         srcs = ["sram_empty_functest.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
             "//hw/top_earlgrey:silicon_creator": None,
         },
         fpga = fpga_params(
@@ -318,6 +322,7 @@ opentitan_binary(
     srcs = ["sram_device_info_nvm_wr_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     kind = "ram",
     linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
@@ -359,6 +364,7 @@ opentitan_binary(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             binaries = {
@@ -447,6 +453,7 @@ opentitan_binary(
         srcs = ["idle_functest.c"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             binaries = {
@@ -504,6 +511,7 @@ opentitan_test(
     srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         needs_jtag = True,
@@ -606,6 +614,7 @@ opentitan_test(
     srcs = ["ujson_msg_size_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         tags = ["manuf"],
@@ -628,6 +637,7 @@ opentitan_test(
     srcs = ["ujson_msg_padding_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         tags = ["manuf"],

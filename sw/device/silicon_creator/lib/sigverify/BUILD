@@ -153,6 +153,7 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+            "//hw/top_earlgrey:sim_qemu_test_rom": None,
         },
     ),
     deps = [
@@ -184,6 +185,7 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         {
             "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+            "//hw/top_earlgrey:sim_qemu_test_rom": None,
         },
     ),
     verilator = verilator_params(

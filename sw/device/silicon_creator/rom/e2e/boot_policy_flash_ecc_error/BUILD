@@ -185,6 +185,7 @@ otp_image(
         name = t["name"].format(c["cause"]),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
@@ -227,6 +228,7 @@ opentitan_test(
     name = "flash_exc_handler_disabled_test",
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
