@@ -436,6 +436,47 @@ static void test_lc_ctrl_permit_and_addrmiss_faults(void) {
   CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET) ==
         (uint32_t)kMultiBitBool8False);
 
+  /* 2-byte store (`sh`) to `STATUS` (`permit = 4'b0011`) -> OK (RO ignored)!
+   * 1-byte store (`sb`) to `STATUS` (`permit = 4'b0011`) -> Store Access Fault!
+   */
+  uint32_t status_before =
+      abs_mmio_read32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET);
+  asm volatile("sh %1, 0(%0)"
+               :
+               : "r"(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET),
+                 "r"((uint16_t)0xffffu)
+               : "memory");
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET) ==
+        status_before);
+  expect_store8_fault(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET, 0xffu);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_STATUS_REG_OFFSET) ==
+        status_before);
+
+  /* Verify WO / R0W1C / RO readback and RO write-ignore across remaining CSRs
+   * (`ALERT_TEST`, `TRANSITION_CMD`, `OTP_VENDOR_TEST_STATUS`,
+   * `DEVICE_ID_0..7`, `MANUF_STATE_0..7`). */
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kLcCtrlBase + LC_CTRL_TRANSITION_CMD_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kLcCtrlBase +
+                        LC_CTRL_OTP_VENDOR_TEST_STATUS_REG_OFFSET) == 0u);
+  abs_mmio_write32(kLcCtrlBase + LC_CTRL_OTP_VENDOR_TEST_STATUS_REG_OFFSET,
+                   0xffffffffu);
+  CHECK(abs_mmio_read32(kLcCtrlBase +
+                        LC_CTRL_OTP_VENDOR_TEST_STATUS_REG_OFFSET) == 0u);
+
+  for (uint32_t i = 0; i < 8u; ++i) {
+    uint32_t dev_off = LC_CTRL_DEVICE_ID_0_REG_OFFSET + (i * 4u);
+    uint32_t manuf_off = LC_CTRL_MANUF_STATE_0_REG_OFFSET + (i * 4u);
+    uint32_t dev_val = abs_mmio_read32(kLcCtrlBase + dev_off);
+    uint32_t manuf_val = abs_mmio_read32(kLcCtrlBase + manuf_off);
+    abs_mmio_write32(kLcCtrlBase + dev_off, ~dev_val);
+    abs_mmio_write32(kLcCtrlBase + manuf_off, ~manuf_val);
+    CHECK(abs_mmio_read32(kLcCtrlBase + dev_off) == dev_val,
+          "DEVICE_ID_%u (RO) modified on write", i);
+    CHECK(abs_mmio_read32(kLcCtrlBase + manuf_off) == manuf_val,
+          "MANUF_STATE_%u (RO) modified on write", i);
+  }
+
   /* Unmapped offset `0x8c` (`addrmiss`) -> Load/Store Access Fault! */
   expect_load_fault(kLcCtrlBase + kLcCtrlUnmappedOffset);
   expect_store32_fault(kLcCtrlBase + kLcCtrlUnmappedOffset, 0xdeadbeefu);
@@ -444,28 +485,49 @@ static void test_lc_ctrl_permit_and_addrmiss_faults(void) {
 /**
  * [lc_ctrl.sv:632-666]:
  * Verify that `ALERT_TEST` (`lc_ctrl.sv:632-666`) generates a 1-cycle transient
- * pulse (`q & qe`) so repeated writes to `ALERT_TEST` fire the alert each time
- * without sticking high, and verify `CLAIM_TRANSITION_IF_REGWEN` (`rw0c`)
- * locks `CLAIM_TRANSITION_IF` permanently.
+ * pulse (`q & qe`) across all 3 alert channels (`FATAL_PROG_ERROR`,
+ * `FATAL_STATE_ERROR`, `FATAL_BUS_INTEG_ERROR`) so repeated writes fire the
+ * alert each time without sticking high, and verify
+ * `CLAIM_TRANSITION_IF_REGWEN` (`rw0c`) locks `CLAIM_TRANSITION_IF`
+ * permanently.
  */
 static void test_lc_ctrl_alert_test_pulse_and_regwen_lock(void) {
   LOG_INFO(
       "Verifying [lc_ctrl.sv:632-666]: ALERT_TEST 1-cycle transient pulse and "
       "CLAIM_TRANSITION_IF_REGWEN lock on trunk-v2");
 
-  for (int i = 0; i < 2; ++i) {
-    CHECK_STATUS_OK(ottf_alerts_expect_alert_start(
-        kTopEarlgreyAlertIdLcCtrlFatalProgError));
-    abs_mmio_write32(kLcCtrlBase + LC_CTRL_ALERT_TEST_REG_OFFSET,
-                     (1u << LC_CTRL_ALERT_TEST_FATAL_PROG_ERROR_BIT));
-    CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(
-        kTopEarlgreyAlertIdLcCtrlFatalProgError));
+  const struct {
+    uint32_t bit;
+    top_earlgrey_alert_id_t alert_id;
+  } kAlerts[] = {
+      {LC_CTRL_ALERT_TEST_FATAL_PROG_ERROR_BIT,
+       kTopEarlgreyAlertIdLcCtrlFatalProgError},
+      {LC_CTRL_ALERT_TEST_FATAL_STATE_ERROR_BIT,
+       kTopEarlgreyAlertIdLcCtrlFatalStateError},
+      {LC_CTRL_ALERT_TEST_FATAL_BUS_INTEG_ERROR_BIT,
+       kTopEarlgreyAlertIdLcCtrlFatalBusIntegError},
+  };
+  for (size_t a = 0; a < ARRAYSIZE(kAlerts); ++a) {
+    for (int i = 0; i < 2; ++i) {
+      CHECK_STATUS_OK(ottf_alerts_expect_alert_start(kAlerts[a].alert_id));
+      abs_mmio_write32(kLcCtrlBase + LC_CTRL_ALERT_TEST_REG_OFFSET,
+                       (1u << kAlerts[a].bit));
+      CHECK_STATUS_OK(ottf_alerts_expect_alert_finish(kAlerts[a].alert_id));
+    }
   }
 
-  /* Lock `CLAIM_TRANSITION_IF_REGWEN` (`rw0c` write 0) and confirm
-   * `CLAIM_TRANSITION_IF` (`0x69`) can no longer be changed to `0x96`. */
+  /* Writing 1 to `CLAIM_TRANSITION_IF_REGWEN` (`rw0c`) keeps it at 1; writing 0
+   * locks it permanently to 0 (`rw0c`). */
+  abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET,
+                   1u);
+  CHECK(abs_mmio_read32(kLcCtrlBase +
+                        LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET) == 1u);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET,
                    0u);
+  CHECK(abs_mmio_read32(kLcCtrlBase +
+                        LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET) == 0u);
+  abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET,
+                   1u);
   CHECK(abs_mmio_read32(kLcCtrlBase +
                         LC_CTRL_CLAIM_TRANSITION_IF_REGWEN_REG_OFFSET) == 0u);
   abs_mmio_write32(kLcCtrlBase + LC_CTRL_CLAIM_TRANSITION_IF_REG_OFFSET,
@@ -478,13 +540,13 @@ static void test_lc_ctrl_alert_test_pulse_and_regwen_lock(void) {
 }
 
 bool test_main(void) {
-  LOG_INFO("Starting lc_ctrl_errata_v2_test (P04) on CW340 FPGA (trunk-v2)...");
+  LOG_INFO("Starting lc_ctrl_consistency_test (P04)...");
   test_lc_ctrl_claim_mutex_and_masking();
   test_lc_ctrl_state_decode_and_volatile_unlock_tied_zero();
   test_lc_ctrl_v2_dif_hw_rev_and_configure_ext_clock_errata();
   test_lc_ctrl_unfiltered_transition_target();
   test_lc_ctrl_permit_and_addrmiss_faults();
   test_lc_ctrl_alert_test_pulse_and_regwen_lock();
-  LOG_INFO("All lc_ctrl_errata_v2_test checks PASSED!");
+  LOG_INFO("All lc_ctrl_consistency_test checks PASSED!");
   return true;
 }
