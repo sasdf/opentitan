@@ -62,6 +62,7 @@ static void wait_kmac_squeeze(void) {
 }
 
 static void write_cfg_shadowed(uint32_t val) {
+  (void)abs_mmio_read32(kKmacBase + KMAC_CFG_SHADOWED_REG_OFFSET);
   abs_mmio_write32_shadowed(kKmacBase + KMAC_CFG_SHADOWED_REG_OFFSET, val);
 }
 
@@ -75,6 +76,28 @@ static uint32_t read_unmasked_state_word(uint32_t word_idx) {
 
 bool test_main(void) {
   wait_kmac_idle();
+
+  // =========================================================================
+  // 0. [kmac_reg_top.sv & kmac.sv:589-676] Initial CSR Reset Values &
+  //    Idle Status Verification:
+  // =========================================================================
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET), 0x00004001u,
+           "Expected initial STATUS == 0x00004001 (fifo_empty=1, sha3_idle=1)");
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_CFG_REGWEN_REG_OFFSET), 1u,
+           "Expected initial CFG_REGWEN == 1 in StIdle");
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_ENABLE_REG_OFFSET), 0u,
+           "Expected initial INTR_ENABLE == 0");
+  write_cfg_shadowed(0u);
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_CFG_SHADOWED_REG_OFFSET), 0u,
+           "Expected CFG_SHADOWED == 0 after shadowed write of 0");
+  CHECK_EQ(abs_mmio_read32(kKmacBase +
+                           KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET),
+           0u, "Expected initial ENTROPY_REFRESH_THRESHOLD_SHADOWED == 0");
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   1u << KMAC_CMD_ENTROPY_REQ_BIT);
+  CHECK_EQ(
+      abs_mmio_read32(kKmacBase + KMAC_ENTROPY_REFRESH_HASH_CNT_REG_OFFSET), 0u,
+      "Expected ENTROPY_REFRESH_HASH_CNT == 0 after CMD.entropy_req=1");
 
   // =========================================================================
   // 1. [kmac_errchk.sv:268] (CONFIRMED_PRESENT_ON_V2):
@@ -458,6 +481,87 @@ bool test_main(void) {
   CHECK(load_store_fault_seen && last_mcause == 7u,
         "Expected Store Access Fault (mcause=7) on sub-word CSR write");
 
-  LOG_INFO("All KMAC Earlgrey v2 errata checks passed on CW340 FPGA!");
+  // =========================================================================
+  // 7. [kmac.sv:589-676] Status-Type INTR_STATE.fifo_empty (bit 1) vs
+  //    Event-Type kmac_done (bit 0) / kmac_err (bit 2) & INTR_TEST:
+  // =========================================================================
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET), 0u,
+           "Expected INTR_STATE == 0 in StIdle (msgfifo_empty_gate == 0)");
+  abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET,
+                   (1u << KMAC_INTR_TEST_KMAC_DONE_BIT) |
+                       (1u << KMAC_INTR_TEST_FIFO_EMPTY_BIT) |
+                       (1u << KMAC_INTR_TEST_KMAC_ERR_BIT));
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET), 0x7u,
+           "Expected INTR_TEST=0x7 to set kmac_done(0), fifo_empty(1), "
+           "kmac_err(2)");
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, 0x7u);
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET),
+           (1u << KMAC_INTR_STATE_FIFO_EMPTY_BIT),
+           "Expected RW1C on INTR_STATE to clear event bits (0, 2) while "
+           "status-type fifo_empty (bit 1) remains 1");
+  abs_mmio_write32(kKmacBase + KMAC_INTR_TEST_REG_OFFSET, 0u);
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET), 0u,
+           "Expected INTR_TEST=0 to deassert status-type fifo_empty (bit 1)");
+
+  // =========================================================================
+  // 8. [kmac_reg_top.sv & kmac_core.sv] CFG_REGWEN Dynamic Engine-Stable Lock
+  //    (0 during StAbsorb/StSqueeze, 1 in StIdle):
+  // =========================================================================
+  write_cfg_shadowed(cfg_plain_sha3);
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0x12345678u);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_START << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_absorb();
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_CFG_REGWEN_REG_OFFSET), 0u,
+           "Expected CFG_REGWEN == 0 while engine is in StAbsorb");
+  abs_mmio_write32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET, 0xdeadbeefu);
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_PREFIX_0_REG_OFFSET), 0x12345678u,
+           "Expected PREFIX_0 write to be ignored while CFG_REGWEN == 0");
+  abs_mmio_write32(kKmacBase + KMAC_MSG_FIFO_REG_OFFSET, 0x44332211u);
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_PROCESS << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_squeeze();
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_CFG_REGWEN_REG_OFFSET), 0u,
+           "Expected CFG_REGWEN == 0 while engine is in StSqueeze");
+  abs_mmio_write32(kKmacBase + KMAC_CMD_REG_OFFSET,
+                   KMAC_CMD_CMD_VALUE_DONE << KMAC_CMD_CMD_OFFSET);
+  wait_kmac_idle();
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_CFG_REGWEN_REG_OFFSET), 1u,
+           "Expected CFG_REGWEN == 1 after returning to StIdle");
+  abs_mmio_write32(kKmacBase + KMAC_INTR_STATE_REG_OFFSET, UINT32_MAX);
+
+  // =========================================================================
+  // 9. [kmac_reg_top.sv & prim_subreg_shadow.sv] Shadow Register Stage-A Read
+  //    Phase Reset & Mismatched Stage-B Update Error:
+  // =========================================================================
+  abs_mmio_write32(
+      kKmacBase + KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET, 0x10u);
+  CHECK_EQ(abs_mmio_read32(kKmacBase +
+                           KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET),
+           0u,
+           "Reading shadow reg after Stage-A write returns old value and "
+           "clears phase_q");
+  abs_mmio_write32(
+      kKmacBase + KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET, 0x20u);
+  abs_mmio_write32(
+      kKmacBase + KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET, 0x20u);
+  CHECK_EQ(abs_mmio_read32(kKmacBase +
+                           KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET),
+           0x20u,
+           "Two matching writes after read-reset commit 0x20 without error");
+  CHECK_EQ(abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET) &
+               (1u << KMAC_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT),
+           0u, "Expected ALERT_RECOV_CTRL_UPDATE_ERR == 0");
+
+  abs_mmio_write32(
+      kKmacBase + KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET, 0x30u);
+  abs_mmio_write32(
+      kKmacBase + KMAC_ENTROPY_REFRESH_THRESHOLD_SHADOWED_REG_OFFSET, 0x31u);
+  CHECK((abs_mmio_read32(kKmacBase + KMAC_STATUS_REG_OFFSET) &
+         (1u << KMAC_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT)) != 0u,
+        "Expected STATUS.alert_recov_ctrl_update_err == 1 on mismatched "
+        "Stage-B shadow write");
+
+  LOG_INFO("All KMAC Earlgrey v2 consistency checks passed!");
   return true;
 }
