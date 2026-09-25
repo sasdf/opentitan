@@ -195,12 +195,23 @@ static void verify_edn_err_code_test_and_auto_underflow(void) {
   CHECK((abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET) &
          (1u << EDN_INTR_STATE_EDN_FATAL_ERR_BIT)) == 0u);
 
-  // 2. With EDN0 enabled (CTRL = 0x9996), writing FIFO type bits 28, 29, 30 to
-  // ERR_CODE_TEST latches ERR_CODE[30:28] = 0x70000000 WITHOUT asserting
-  // INTR_STATE.EDN_FATAL_ERR (because edn_core.sv:314-317 omits
-  // fifo_{write,read,state}_err_sum from event_edn_fatal_err)!
+  // 2. With EDN0 enabled in SWPortMode (CTRL = 0x9996, MAIN_SM_STATE = 0x095):
+  // First verify 13-word replay FIFO capacity (OT_CSRNG_CMD_WORD_MAX = 13):
+  // 13 writes to RESEED_CMD fill the FIFO without error (ERR_CODE == 0,
+  // INTR_STATE == 0).
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9996u);
   abs_mmio_write32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x095u);
+  for (uint32_t i = 0; i < 13u; ++i) {
+    abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0x1000u + i);
+  }
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_ERR_CODE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET) == 0u);
+
+  // Next, writing FIFO type bits 28, 29, 30 to ERR_CODE_TEST latches
+  // ERR_CODE[30:28] = 0x70000000 WITHOUT asserting INTR_STATE.EDN_FATAL_ERR
+  // (because edn_core.sv:314-317 omits fifo_{write,read,state}_err_sum from
+  // event_edn_fatal_err)!
   abs_mmio_write32(kEdn0Base + EDN_ERR_CODE_TEST_REG_OFFSET,
                    EDN_ERR_CODE_FIFO_WRITE_ERR_BIT);
   abs_mmio_write32(kEdn0Base + EDN_ERR_CODE_TEST_REG_OFFSET,
@@ -216,19 +227,22 @@ static void verify_edn_err_code_test_and_auto_underflow(void) {
   CHECK(type_err_code == exp_type_bits);
   CHECK((type_intr & (1u << EDN_INTR_STATE_EDN_FATAL_ERR_BIT)) == 0u);
 
-  // By contrast, writing bit 0 (SFIFO_RESCMD_ERR) while enabled immediately
-  // asserts INTR_STATE.EDN_FATAL_ERR!
-  abs_mmio_write32(kEdn0Base + EDN_ERR_CODE_TEST_REG_OFFSET,
-                   EDN_ERR_CODE_SFIFO_RESCMD_ERR_BIT);
+  // Pushing a 14th word to RESEED_CMD overflows u_prim_fifo_sync_rescmd
+  // (Depth = 13), setting SFIFO_RESCMD_ERR (bit 0) and asserting
+  // INTR_STATE.EDN_FATAL_ERR while MAIN_SM_STATE remains 0x095 (SWPortMode)!
+  abs_mmio_write32(kEdn0Base + EDN_RESEED_CMD_REG_OFFSET, 0xdeadbeefu);
+  uint32_t ovf_err_code = abs_mmio_read32(kEdn0Base + EDN_ERR_CODE_REG_OFFSET);
   uint32_t src_intr = abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET);
+  CHECK((ovf_err_code & (1u << EDN_ERR_CODE_SFIFO_RESCMD_ERR_BIT)) != 0u);
   CHECK((src_intr & (1u << EDN_INTR_STATE_EDN_FATAL_ERR_BIT)) != 0u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x095u);
   abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
 
   LOG_INFO(
       "[edn_core.sv:314-317] confirmed: ERR_CODE_TEST=28..30 latched "
-      "ERR_CODE=0x%x with INTR_STATE=0x%x (no EDN_FATAL_ERR), whereas bit 0 "
-      "set INTR_STATE=0x%x",
-      type_err_code, type_intr, src_intr);
+      "ERR_CODE=0x%x with INTR_STATE=0x%x (no EDN_FATAL_ERR), whereas 14th "
+      "RESEED_CMD word set ERR_CODE=0x%x, INTR_STATE=0x%x",
+      type_err_code, type_intr, ovf_err_code, src_intr);
 
   // 2b. Verify [edn_core.sv:620-632] & [edn_ack_sm.sv:82-98]:
   // Enable EDN0 and EDN1 in Boot Mode (CTRL = 0x9966u), verify multi-word
@@ -370,17 +384,86 @@ static void verify_edn_err_code_test_and_auto_underflow(void) {
       dif_csrng_err ? 1u : 0u, err_escalated, sm_escalated);
 }
 
+static void verify_edn_reset_defaults_and_sw_port_mode(void) {
+  LOG_INFO(
+      "Verifying EDN0 reset defaults, SWPortMode (0x095), and 16-bit/8-bit "
+      "valid EDN_PERMIT writes...");
+  reset_entropy_complex_enable_csrng();
+
+  // 1. Verify reset / idle defaults (REGWEN=1, CTRL=0x9999, BOOT_INS_CMD=0x901,
+  // BOOT_GEN_CMD=0xfff003, MAIN_SM_STATE=0x0c1 Idle).
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_CTRL_REG_OFFSET) == 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_INS_CMD_REG_OFFSET) == 0x901u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_BOOT_GEN_CMD_REG_OFFSET) == 0xfff003u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x0c1u);
+
+  // 2. Verify valid subword writes allowed by EDN_PERMIT:
+  // - 16-bit write (sh) to CTRL (PERMIT = 4'b0011) succeeds without fault;
+  // - 8-bit write (sb) to INTR_ENABLE (PERMIT = 4'b0001) succeeds without
+  // fault.
+  uint32_t faults_before = g_access_fault_count;
+  mmio_write16(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  abs_mmio_write8(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET, 0x3u);
+  CHECK(g_access_fault_count == faults_before);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET) == 0x3u);
+  abs_mmio_write32(kEdn0Base + EDN_INTR_ENABLE_REG_OFFSET, 0x0u);
+
+  // 3. Enable EDN0 in SWPortMode (0x9996 -> MAIN_SM_STATE == 0x095), verify
+  // SW_CMD_STS (CMD_REG_RDY=1, CMD_RDY=1, CMD_ACK=0), send INSTANTIATE (0x601)
+  // -> CMD_ACK=1, CMD_STS=0, then duplicate INSTANTIATE (0x601) ->
+  // MAIN_SM_STATE == 0x018 (RejectCsrngEntropy), SW_CMD_STS.CMD_STS == 3,
+  // RECOV_ALERT_STS.CSRNG_ACK_ERR (bit 13) == 1 (and preserved across
+  // 0xffffffff rw0c write).
+  abs_mmio_write32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET, 0x3u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9996u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x095u);
+  uint32_t sw_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
+  CHECK((sw_sts & (1u << EDN_SW_CMD_STS_CMD_REG_RDY_BIT)) != 0u);
+  CHECK((sw_sts & (1u << EDN_SW_CMD_STS_CMD_RDY_BIT)) != 0u);
+  CHECK((sw_sts & (1u << EDN_SW_CMD_STS_CMD_ACK_BIT)) == 0u);
+
+  abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
+  IBEX_SPIN_FOR((abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET) &
+                 (1u << EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT)) != 0u,
+                10000);
+  sw_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
+  CHECK((sw_sts & (1u << EDN_SW_CMD_STS_CMD_ACK_BIT)) != 0u);
+  CHECK(((sw_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) &
+         EDN_SW_CMD_STS_CMD_STS_MASK) == 0u);
+  abs_mmio_write32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET, 0x3u);
+
+  abs_mmio_write32(kEdn0Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
+  IBEX_SPIN_FOR((abs_mmio_read32(kEdn0Base + EDN_INTR_STATE_REG_OFFSET) &
+                 (1u << EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT)) != 0u,
+                10000);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x018u);
+  sw_sts = abs_mmio_read32(kEdn0Base + EDN_SW_CMD_STS_REG_OFFSET);
+  CHECK(((sw_sts >> EDN_SW_CMD_STS_CMD_STS_OFFSET) &
+         EDN_SW_CMD_STS_CMD_STS_MASK) == 3u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
+        (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT));
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET) ==
+        (1u << EDN_RECOV_ALERT_STS_CSRNG_ACK_ERR_BIT));
+  abs_mmio_write32(kEdn0Base + EDN_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET, 0u);
+  abs_mmio_write32(kEdn0Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+  CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x0c1u);
+}
+
 bool test_main(void) {
   irq_external_ctrl(false);
   irq_global_ctrl(false);
 
   reset_entropy_complex_enable_csrng();
 
+  verify_edn_reset_defaults_and_sw_port_mode();
   verify_edn_permit_and_addrmiss_faults();
   verify_edn_recov_alert_sts_rw0c_mubi_preserve();
   verify_edn_cmd_fifo_rst_continuous_clear();
   verify_edn_err_code_test_and_auto_underflow();
 
-  LOG_INFO("All edn v2 errata checks confirmed on CW340 FPGA!");
+  LOG_INFO("All edn v2 consistency & errata checks confirmed!");
   return true;
 }
