@@ -155,25 +155,16 @@ fn test_openocd(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     // Test reset
     //
     jtag.reset(/* run */ false)?;
-    let reset_addr = (ot_hal::top::earlgrey::ROM_CTRL_ROM_BASE_ADDR as u32) + 0x80;
-    let first_jump_addr = (ot_hal::top::earlgrey::ROM_CTRL_ROM_BASE_ADDR as u32) + 0x180;
-    assert_eq!(
-        jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?,
-        reset_addr
-    );
+    // the reset address is 0x8080
+    assert_eq!(jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?, 0x40080);
     jtag.step()?;
-    assert_eq!(
-        jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?,
-        first_jump_addr
-    );
+    // the first instruction is a jump to 0x8180
+    assert_eq!(jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?, 0x40180);
     jtag.reset(/* run */ true)?;
     jtag.halt()?;
     // at this point the target must have execute at least one instruction so it should
     // not be at the reset vector anymore
-    assert_ne!(
-        jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?,
-        reset_addr
-    );
+    assert_ne!(jtag.read_riscv_reg(&RiscvReg::Csr(RiscvCsr::DPC))?, 0x40080);
     jtag.resume()?;
 
     jtag.disconnect()?;
