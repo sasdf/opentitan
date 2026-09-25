@@ -161,10 +161,50 @@ void ottf_internal_isr(uint32_t *exc_info) {
 static void test_window_gap_and_subword_permits(void) {
   LOG_INFO("Test 1: DV_SIM_WINDOW, v2 unmapped gap (0x74..0x7F), and permits");
 
-  // Confirm shifted `FPGA_INFO` at `0x68`, `MCOUNTEREN_WRITABLE_REGWEN` at
-  // `0x6C`, and `MCOUNTEREN_WRITABLE` at `0x70` are readable without bus fault.
+  // Confirm all 29 configuration registers (`0x00..0x70`) are readable without
+  // bus fault and verify their hardware reset / post-ROM states.
   g_expect_bus_fault = false;
   uint32_t prev_faults = g_bus_fault_count;
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_ALERT_TEST_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_SW_RECOV_ERR_REG_OFFSET) ==
+        kMultiBitBool4False);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_SW_FATAL_ERR_REG_OFFSET) ==
+        kMultiBitBool4False);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_IBUS_REGWEN_0_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_EN_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_EN_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_MATCHING_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_REMAP_ADDR_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_REMAP_ADDR_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_DBUS_REGWEN_0_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_DBUS_REGWEN_1_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_EN_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_EN_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_MATCHING_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_REMAP_ADDR_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_REMAP_ADDR_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) ==
+        0u);
   uint32_t fpga_info =
       abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_FPGA_INFO_REG_OFFSET);
   uint32_t regwen_init = abs_mmio_read32(
@@ -175,6 +215,52 @@ static void test_window_gap_and_subword_permits(void) {
   CHECK(regwen_init == 1u);
   CHECK(writable_init == kMultiBitBool4True);
   LOG_INFO("  FPGA_INFO (0x68) = 0x%08x", fpga_info);
+
+  // Verify `ERR_STATUS` (`0x54`) 2-byte permit (`4'b0011`): `sh` to `+0`
+  // succeeds (`be = 4'b0011`), while `sh` to `+2` (`be = 4'b1100`) faults with
+  // `mcause = 7`.
+  *(volatile uint16_t *)(uintptr_t)(kIbexCfgBase +
+                                    RV_CORE_IBEX_ERR_STATUS_REG_OFFSET) = 0u;
+  CHECK(g_bus_fault_count == prev_faults);
+  {
+    uint32_t prev_err = g_bus_fault_count;
+    g_expect_bus_fault = true;
+    *(volatile uint16_t *)(uintptr_t)(kIbexCfgBase +
+                                      RV_CORE_IBEX_ERR_STATUS_REG_OFFSET + 2) =
+        0u;
+    g_expect_bus_fault = false;
+    CHECK(g_bus_fault_count == prev_err + 1 && g_last_mcause == 7,
+          "Expected sh to +2 of 2-byte permit CSR ERR_STATUS to fault");
+  }
+
+  // Verify `IBUS_REGWEN_1` (`0x10`) and `DBUS_REGWEN_1` (`0x30`) `W0C` locking
+  // gates `IBUS_ADDR_MATCHING_1` (`0x20`) and `DBUS_ADDR_MATCHING_1` (`0x40`).
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET,
+                   0x12345000u);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET,
+                   0x6789A000u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+        0x12345000u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+        0x6789A000u);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET, 0u);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_DBUS_REGWEN_1_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_IBUS_REGWEN_1_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase + RV_CORE_IBEX_DBUS_REGWEN_1_REG_OFFSET) ==
+        0u);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET,
+                   0u);
+  abs_mmio_write32(kIbexCfgBase + RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET,
+                   0u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_IBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+        0x12345000u);
+  CHECK(abs_mmio_read32(kIbexCfgBase +
+                        RV_CORE_IBEX_DBUS_ADDR_MATCHING_1_REG_OFFSET) ==
+        0x6789A000u);
 
   // 1a. Unmapped decode gap in v2 is `0x74..0x7F` (3 words: `0x74`, `0x78`,
   // `0x7C`) between `MCOUNTEREN_WRITABLE` (`0x70`) and `DV_SIM_WINDOW`
