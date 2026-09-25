@@ -11,6 +11,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules:manifest.bzl", "manifest")
 
@@ -47,6 +48,11 @@ opentitan_test(
         exit_success = "FinalBootLog: 4:AAAA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+        exit_failure = "BFV|PASS|FAIL",
+        exit_success = "FinalBootLog: 4:AAAA\r\n",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -79,6 +85,17 @@ opentitan_test(
         """,
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+        exit_failure = "BFV|PASS|FAIL",
+        exit_success = "mode: RESQ\r\n",
+        test_cmd = """
+            --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+            # Try the `REBO` mode and make sure it works.
+            --exec="rescue no-op --reset-target=reboot"
+            no-op
+        """,
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -106,6 +123,9 @@ opentitan_test(
         #exit_success = "FinalBootLog: 2:AA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -129,13 +149,16 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
-        # Not supported in QEMU whilst low power is not modelled
     },
     fpga = fpga_params(
         assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
         rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_boot_svc_after_wakeup",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a}",
+        rom_ext = "//sw/device/silicon_creator/rom_ext:rom_ext_boot_svc_after_wakeup",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -173,6 +196,11 @@ NEXT_TEST_SEQUENCES = [
             exit_success = "FinalBootLog: 3:{}\r\n".format(test_sequence),
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+            exit_failure = "BFV:.*|PASS|FAIL",
+            exit_success = "FinalBootLog: 3:{}\r\n".format(test_sequence),
+        ),
         deps = [
             ":boot_svc_test_lib",
             "//sw/device/lib/base:status",
@@ -202,6 +230,11 @@ opentitan_test(
         exit_success = "FinalBootLog: 5:ABBBA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+        exit_failure = "BFV:.*|PASS|FAIL",
+        exit_success = "FinalBootLog: 5:ABBBA\r\n",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -229,6 +262,11 @@ opentitan_test(
         exit_success = "FinalBootLog: 3:AAA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+        exit_failure = "BFV:.*|PASS|FAIL",
+        exit_success = "FinalBootLog: 3:AAA\r\n",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -256,6 +294,11 @@ opentitan_test(
         exit_success = "FinalBootLog: 3:ABA\r\n",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
+    qemu = qemu_params(
+        assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{owner_slot_a} {firmware}@{owner_slot_b}",
+        exit_failure = "BFV:.*|PASS|FAIL",
+        exit_success = "FinalBootLog: 3:ABA\r\n",
+    ),
     deps = [
         ":boot_svc_test_lib",
         "//sw/device/lib/base:status",
@@ -289,6 +332,7 @@ opentitan_binary(
     srcs = ["boot_svc_min_sec_ver_test.c"],
     exec_env = [
         "//hw/top_earlgrey:fpga_cw340_rom_ext",
+        "//hw/top_earlgrey:sim_qemu_rom_ext",
     ],
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
     manifest = ":manifest_version_5",
@@ -329,6 +373,14 @@ MIN_SEC_VER_SLOTS = [
         ),
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_owner_slot_virtual",
         manifest = ":manifest_version_4",
+        qemu = qemu_params(
+            assemble = "{rom_ext}@{rom_ext_slot_a} {firmware}@{v0_slot} {min_sec_ver_5:signed_bin}@{v5_slot}",
+            binaries = {
+                ":min_sec_ver_5": "min_sec_ver_5",
+            },
+            v0_slot = "{{owner_slot_{}}}".format(slots[0]),
+            v5_slot = "{{owner_slot_{}}}".format(slots[1]),
+        ),
         deps = [
             ":boot_svc_test_lib",
             "//sw/device/lib/base:status",

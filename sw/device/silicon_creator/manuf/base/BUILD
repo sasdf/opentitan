@@ -14,6 +14,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/manuf/base:provisioning_inputs.bzl",
@@ -129,6 +130,24 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        timeout = "long",
+        binaries = {
+            ":sram_cp_provision": "sram_cp_provision",
+            ":sram_cp_provision_functest": "sram_cp_provision_functest",
+        },
+        needs_jtag = True,
+        otp = "//hw/top_earlgrey/data/otp:img_raw",
+        tags = [
+            "manuf",
+            "skip_in_ci",
+        ],
+        test_cmd = """
+            --provisioning-sram-elf={sram_cp_provision}
+            --test-sram-elf={sram_cp_provision_functest}
+        """,
+        test_harness = "//sw/host/tests/manuf/cp_provision_functest",
+    ),
+    qemu = qemu_params(
         timeout = "long",
         binaries = {
             ":sram_cp_provision": "sram_cp_provision",

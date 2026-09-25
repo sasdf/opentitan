@@ -18,6 +18,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "silicon_params",
     "spx_key_for_lc_state",
 )
@@ -148,6 +149,13 @@ opentitan_test(
         test_harness = "//sw/host/tests/manuf/manuf_cp_volatile_unlock_raw",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/top_earlgrey/data/otp:img_raw",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_cp_volatile_unlock_raw",
+        testopt_bootstrap = "False",
+    ),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -179,6 +187,15 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_sival": None,
         },
         fpga = fpga_params(
+            lc_state = lc_state,  # will be expanded in test_cmd
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
+            tags = ["manuf"],
+            test_cmd = "--initial-lc-state={lc_state}",
+            test_harness = "//sw/host/tests/manuf/manuf_cp_yield_test",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             lc_state = lc_state,  # will be expanded in test_cmd
             needs_jtag = True,
             otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
@@ -447,6 +464,22 @@ opentitan_binary(
             test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
             testopt_bootstrap = "False",
         ),
+        qemu = qemu_params(
+            binaries = {
+                ":sram_exec_test": "sram_program",
+            },
+            needs_jtag = True,
+            otp = ":otp_img_rom_exec_disabled_{}".format(lc_state.lower()),
+            tags = [
+                "manuf",
+                "skip_in_ci",
+            ],
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/manuf/manuf_cp_ast_test_execution",
+            testopt_bootstrap = "False",
+        ),
         deps = [
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing:otp_ctrl_testutils",
@@ -479,6 +512,13 @@ opentitan_test(
         test_harness = "//sw/host/tests/manuf/manuf_cp_test_lock",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = ":otp_img_otp_ctrl_functest",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_cp_test_lock",
+        testopt_bootstrap = "False",
+    ),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -502,6 +542,13 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        needs_jtag = True,
+        otp = ":otp_img_otp_ctrl_functest",
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/otp_ctrl:otp_ctrl",
+        testopt_bootstrap = "False",
+    ),
+    qemu = qemu_params(
         needs_jtag = True,
         otp = ":otp_img_otp_ctrl_functest",
         tags = ["manuf"],
@@ -564,6 +611,10 @@ opentitan_test(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_size",
     ),
+    qemu = qemu_params(
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_size",
+    ),
     deps = [
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/json:provisioning_data",
@@ -579,6 +630,10 @@ opentitan_test(
         "//hw/top_earlgrey:fpga_cw340_sival": None,
     },
     fpga = fpga_params(
+        tags = ["manuf"],
+        test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_padding",
+    ),
+    qemu = qemu_params(
         tags = ["manuf"],
         test_harness = "//sw/host/tests/manuf/manuf_ujson_msg_padding",
     ),

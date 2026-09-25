@@ -29,6 +29,7 @@ load(
     "DEFAULT_TEST_SUCCESS_MSG",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -168,6 +169,17 @@ _POSITIONS = {
             romext_offset = position["romext_offset"],
         ),
         linker_script = position["linker_script"],
+        qemu = qemu_params(
+            assemble = "{romext}@{romext_offset} {firmware}@{owner_offset}",
+            binaries = {
+                position["romext"]: "romext",
+            },
+            exit_failure = position.get("failure", DEFAULT_TEST_FAILURE_MSG),
+            exit_success = position["success"],
+            otp = position["otp_img"],
+            owner_offset = position["owner_offset"],
+            romext_offset = position["romext_offset"],
+        ),
         deps = [
             "//sw/device/lib/base:status",
             "//sw/device/lib/testing/test_framework:ottf_main",
@@ -206,6 +218,10 @@ opentitan_test(
         exit_success = "BFV:054d410d",
     ),
     manifest = ":bad_manifest",
+    qemu = qemu_params(
+        exit_failure = "PASS|FAIL|FAULT|BFV:.{8}",
+        exit_success = "BFV:054d410d",
+    ),
     deps = [
         "//sw/device/lib/base:status",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -253,6 +269,10 @@ opentitan_test(
         exit_success = "BFV:044d410d",
     ),
     manifest = ":bad_spx_manifest",
+    qemu = qemu_params(
+        exit_failure = "PASS|FAIL|FAULT|BFV:.{8}",
+        exit_success = "BFV:044d410d",
+    ),
     spx_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:spx_keyset": "app_prod_0"},
     deps = [
         "//sw/device/lib/base:status",
@@ -314,6 +334,10 @@ _KEYS = {
             exit_failure = keyinfo["exit_failure"],
             exit_success = keyinfo["exit_success"],
         ),
+        qemu = qemu_params(
+            exit_failure = keyinfo["exit_failure"],
+            exit_success = keyinfo["exit_success"],
+        ),
         spx_key = keyinfo["spx"],
         deps = [
             "//sw/device/lib/base:status",
@@ -358,6 +382,7 @@ opentitan_test(
     },
     fpga = fpga_params(),
     manifest = ":isfb_manifest",
+    qemu = qemu_params(),
     spx_key = {"//sw/device/silicon_creator/lib/ownership/keys/fake:spx_keyset": "app_prod_0"},
     deps = [
         "//sw/device/lib/base:status",

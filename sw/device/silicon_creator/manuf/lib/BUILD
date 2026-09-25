@@ -9,6 +9,7 @@ load(
     "OPENTITAN_CPU",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//sw/device/silicon_creator/manuf/base:provisioning_inputs.bzl",
@@ -154,6 +155,10 @@ opentitan_test(
         otp = "//hw/top_earlgrey/data/otp:img_test_unlocked1",
         tags = ["manuf"],
     ),
+    qemu = qemu_params(
+        otp = "//hw/top_earlgrey/data/otp:img_test_unlocked1",
+        tags = ["manuf"],
+    ),
     deps = [
         ":individualize",
         ":nvm_info_field",
@@ -224,6 +229,14 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/manuf/individualize_sw_cfg_functest",
     ),
+    qemu = qemu_params(
+        otp = "//hw/top_earlgrey/data/otp:img_test_unlocked1",
+        tags = ["manuf"],
+        test_cmd = """
+            --bootstrap={firmware}
+        """,
+        test_harness = "//sw/host/tests/manuf/individualize_sw_cfg_functest",
+    ),
     deps = [
         ":nvm_info_field",
         # Testing sival SKU only should be sufficient.
@@ -275,6 +288,18 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        needs_jtag = True,
+        otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_dev_manuf_individualized",
+        tags = [
+            "lc_dev",
+            "manuf",
+        ],
+        test_cmd = """
+            --bootstrap={firmware}
+        """,
+        test_harness = "//sw/host/tests/manuf/personalize_functest",
+    ),
+    qemu = qemu_params(
         needs_jtag = True,
         otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_dev_manuf_individualized",
         tags = [
@@ -338,6 +363,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        tags = ["manuf"],
+    ),
+    qemu = qemu_params(
         tags = ["manuf"],
     ),
     deps = [
