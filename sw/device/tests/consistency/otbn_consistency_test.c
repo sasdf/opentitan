@@ -182,12 +182,105 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
   *(volatile uint16_t *)addr = val;
 }
 
+#define OTBN_BN_ADDVM(wrd, wrs1, wrs2)                 \
+  ((1u << 30) | (((uint32_t)(wrs2) & 0x1fu) << 20) |   \
+   (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x0u << 12) | \
+   (((uint32_t)(wrd) & 0x1fu) << 7) | 0x5bu)
+
+static void verify_otbn_csrs_and_permits(void) {
+  // 0a. Clear post-ROM boot state (ROM sets CTRL=1 and runs signature check)
+  // and verify all OTBN CSRs and SCRATCH_0..3 read back 0.
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kOtbnBase + OTBN_INSN_CNT_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_ENABLE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_CMD_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_CTRL_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusIdle);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_FATAL_ALERT_CAUSE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INSN_CNT_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_SCRATCH_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_SCRATCH_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_SCRATCH_2_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_SCRATCH_3_REG_OFFSET) == 0u);
+
+  // 0b. Verify OTBN_PERMIT = 4'b0001 (0x1) CSRs (indices 0..6 and 8 in
+  // otbn_reg_pkg.sv:376-385) accept byte write at +0 and reject byte write at
+  // +1 with MCAUSE=7 (kIbexExcStoreAccessFault).
+  const uint32_t kPermit1Offsets[] = {
+      OTBN_INTR_STATE_REG_OFFSET, OTBN_INTR_ENABLE_REG_OFFSET,
+      OTBN_INTR_TEST_REG_OFFSET,  OTBN_ALERT_TEST_REG_OFFSET,
+      OTBN_CMD_REG_OFFSET,        OTBN_CTRL_REG_OFFSET,
+      OTBN_STATUS_REG_OFFSET,     OTBN_FATAL_ALERT_CAUSE_REG_OFFSET,
+  };
+  for (size_t i = 0; i < ARRAYSIZE(kPermit1Offsets); ++i) {
+    g_fault_seen = false;
+    abs_mmio_write8(kOtbnBase + kPermit1Offsets[i], 0x00u);
+    CHECK(!g_fault_seen,
+          "sb at +0 to offset 0x%x (OTBN_PERMIT=4'b0001) must succeed",
+          kPermit1Offsets[i]);
+
+    g_fault_seen = false;
+    abs_mmio_write8(kOtbnBase + kPermit1Offsets[i] + 1u, 0x00u);
+    CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+          "sb at +1 to offset 0x%x (OTBN_PERMIT=4'b0001) must raise MCAUSE=7",
+          kPermit1Offsets[i]);
+  }
+
+  // 0c. Verify OTBN_PERMIT = 4'b0111 (0x7) for ERR_BITS (0x1c, index[7] in
+  // otbn_reg_pkg.sv:384): sb (4'b0001) and sh (4'b0011) raise MCAUSE=7, while
+  // 32-bit sw (4'b1111) succeeds without fault.
+  g_fault_seen = false;
+  abs_mmio_write8(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0x00u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+        "sb to ERR_BITS (OTBN_PERMIT=4'b0111) must raise MCAUSE=7");
+  g_fault_seen = false;
+  mmio_write16(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0x0000u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+        "sh to ERR_BITS (OTBN_PERMIT=4'b0111) must raise MCAUSE=7");
+  g_fault_seen = false;
+  abs_mmio_write32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0xffffffffu);
+  CHECK(!g_fault_seen, "sw to ERR_BITS (OTBN_PERMIT=4'b0111) must succeed");
+
+  // 0d. Verify INTR_ENABLE, INTR_TEST (WO), and INTR_STATE (RW1C).
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_ENABLE_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_ENABLE_REG_OFFSET) == 0x1u);
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_TEST_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 1u);
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u);
+
+  // 0e. Verify v2 CTRL 3-bit mask (0x7: SW_ERRS_FATAL | WFI_ENABLED |
+  // URND_CTRL_ENABLED) and CMD.SEC_WIPE_DMEM (0xc3).
+  abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_CTRL_REG_OFFSET) == 0x7u);
+  abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
+
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0xdeadbeefu);
+  abs_mmio_write32(kOtbnBase + OTBN_CMD_REG_OFFSET, 0xc3u);
+  otbn_wait_for_settled_status();
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusIdle);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 1u);
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
+}
+
 bool test_main(void) {
   CHECK_STATUS_OK(entropy_testutils_auto_mode_init());
   otbn_wait_for_settled_status();
 
   dif_otbn_t otbn;
   CHECK_DIF_OK(dif_otbn_init(mmio_region_from_addr(kOtbnBase), &otbn));
+  verify_otbn_csrs_and_permits();
   abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
 
   // -------------------------------------------------------------------------
