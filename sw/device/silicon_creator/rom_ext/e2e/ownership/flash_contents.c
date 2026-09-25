@@ -14,7 +14,7 @@ OTTF_DEFINE_TEST_CONFIG();
 status_t flash_contents_print(boot_log_t *boot_log) {
   TRY(boot_log_check(boot_log));
   uint32_t *data = (uint32_t *)(NVM_DATA_BASE_ADDR + boot_log->rom_ext_size);
-  uint32_t *end = (uint32_t *)(NVM_DATA_BASE_ADDR + NVM_BYTES_PER_BANK);
+  uint32_t *end = (uint32_t *)(NVM_DATA_BASE_ADDR + NVM_BYTES_PER_SLOT);
   uint32_t incr = NVM_BYTES_PER_PAGE / sizeof(uint32_t);
 
   for (; data < end; data += incr) {
