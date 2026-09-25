@@ -18,6 +18,17 @@
 OTTF_DEFINE_TEST_CONFIG();
 
 static volatile uint32_t g_fault_count = 0;
+static uint32_t wait_op_done_local(void) {
+  uint32_t status;
+  do {
+    status = abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                             FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  } while (status == 0);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
+  return status;
+}
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   (void)exc_info;
@@ -256,7 +267,9 @@ bool test_main(void) {
   // 8. Invalid CONTROL.OP (0x3) sets OP_STATUS.ERR, OP_STATUS.DONE,
   // ERR_CODE.OP_ERR, clears CONTROL.START, does NOT set INTR_STATE.CORR_ERR,
   // and pulses recov_err alert.
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_INTR_STATE_REG_OFFSET,
                    (1u << FLASH_CTRL_INTR_STATE_OP_DONE_BIT) |
@@ -284,8 +297,8 @@ bool test_main(void) {
              "OP_ERR must NOT set INTR_STATE.CORR_ERR (got 0x%08x)",
              intr_state);
 
-  uint32_t op_status =
-      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  uint32_t op_status = abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                                       FLASH_CTRL_OP_STATUS_REG_OFFSET);
   uint32_t err_code =
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET);
   EXPECT_RTL(op_status == ((1u << FLASH_CTRL_OP_STATUS_DONE_BIT) |
@@ -302,10 +315,12 @@ bool test_main(void) {
   EXPECT_RTL(
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET) == 0u,
       "ERR_CODE must clear to 0 on W1C write");
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
-  EXPECT_RTL(
-      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET) == 0u,
-      "OP_STATUS must clear to 0 on RW write");
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
+  EXPECT_RTL(abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                             FLASH_CTRL_OP_STATUS_REG_OFFSET) == 0u,
+             "OP_STATUS must clear to 0 on RW write");
 
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
@@ -370,7 +385,9 @@ bool test_main(void) {
              "0x81000 (got 0x%08x)",
              abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
@@ -393,7 +410,9 @@ bool test_main(void) {
              "0x80000 (got 0x%08x)",
              abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
@@ -417,7 +436,9 @@ bool test_main(void) {
              "Read MP_ERR at 0x81234 must latch ERR_ADDR 0x81234 (got 0x%08x)",
              abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
@@ -436,7 +457,9 @@ bool test_main(void) {
       "OP_ERR must not overwrite ERR_ADDR (expected 0x81234, got 0x%08x)",
       abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
@@ -466,8 +489,8 @@ bool test_main(void) {
       "PROG_WIN_ERR and PROG_TYPE_ERR (got 0x%08x)",
       pre_drain_err_code);
 
-  uint32_t pre_drain_op_status =
-      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  uint32_t pre_drain_op_status = abs_mmio_read32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET);
   EXPECT_RTL(pre_drain_op_status == (1u << FLASH_CTRL_OP_STATUS_ERR_BIT),
              "Before PROG_FIFO drains NUM+1 words in StErr, OP_STATUS must be "
              "ERR=1, DONE=0 (got 0x%08x)",
@@ -482,8 +505,8 @@ bool test_main(void) {
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_PROG_FIFO_REG_OFFSET,
                    0xffffffffu);
 
-  uint32_t post_drain_op_status =
-      abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET);
+  uint32_t post_drain_op_status = abs_mmio_read32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET);
   EXPECT_RTL(post_drain_op_status == ((1u << FLASH_CTRL_OP_STATUS_DONE_BIT) |
                                       (1u << FLASH_CTRL_OP_STATUS_ERR_BIT)),
              "After draining PROG_FIFO in StErr, OP_STATUS must be DONE|ERR "
@@ -495,7 +518,9 @@ bool test_main(void) {
              "0x81234, got 0x%08x)",
              abs_mmio_read32(kFlashCoreBase + FLASH_CTRL_ERR_ADDR_REG_OFFSET));
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_ERR_CODE_REG_OFFSET, 0xffu);
-  abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_OP_STATUS_REG_OFFSET, 0u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_OP_STATUS_REG_OFFSET,
+      0u);
   CHECK_STATUS_OK(
       ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdFlashCtrlRecovErr));
 
@@ -661,6 +686,55 @@ bool test_main(void) {
   EXPECT_RTL(abs_mmio_read32(eflash_test_addr) == eflash_orig_word,
              "Rejected 8-bit direct write to eFlash window must not modify "
              "eFlash data");
+
+  // 22. Wave 1 Fix: Launch an asynchronous Page Erase and concurrently write to
+  // INIT.
+  //     Verify such write is silently ignored (d_error=0) without disturbing
+  //     the active operation. Enable erase in DEFAULT_REGION temporarily.
+  uint32_t saved_def_reg =
+      abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                      FLASH_CTRL_DEFAULT_REGION_REG_OFFSET);
+  uint32_t new_def_reg = saved_def_reg;
+  new_def_reg = bitfield_field32_write(new_def_reg,
+                                       FLASH_CTRL_DEFAULT_REGION_ERASE_EN_FIELD,
+                                       kMultiBitBool4True);
+  new_def_reg = bitfield_field32_write(
+      new_def_reg, FLASH_CTRL_DEFAULT_REGION_RD_EN_FIELD, kMultiBitBool4True);
+  abs_mmio_write32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                       FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
+                   new_def_reg);
+
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_ADDR_REG_OFFSET,
+      0x00000u);
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_CONTROL_REG_OFFSET,
+      bitfield_bit32_write(0u, FLASH_CTRL_CONTROL_START_BIT, true) |
+          bitfield_field32_write(0u, FLASH_CTRL_CONTROL_OP_FIELD,
+                                 FLASH_CTRL_CONTROL_OP_VALUE_ERASE));
+
+  g_fault_count = 0;
+  abs_mmio_write32(
+      TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR + FLASH_CTRL_INIT_REG_OFFSET, 1u);
+  EXPECT_RTL(
+      g_fault_count == 0u,
+      "Write to INIT during active OP must NOT raise bus fault (faults=%u)",
+      g_fault_count);
+
+  EXPECT_RTL(wait_op_done_local() == (1u << FLASH_CTRL_OP_STATUS_DONE_BIT),
+             "Erase operation must complete successfully despite concurrent "
+             "INIT write");
+  EXPECT_RTL(abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                             FLASH_CTRL_ERR_CODE_REG_OFFSET) == 0u,
+             "ERR_CODE must not be set by concurrent INIT write");
+  EXPECT_RTL((abs_mmio_read32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                              FLASH_CTRL_STATUS_REG_OFFSET) &
+              (1u << FLASH_CTRL_STATUS_INITIALIZED_BIT)) != 0u,
+             "INIT flag must remain intact");
+
+  abs_mmio_write32(TOP_EARLGREY_FLASH_CTRL_CORE_BASE_ADDR +
+                       FLASH_CTRL_DEFAULT_REGION_REG_OFFSET,
+                   saved_def_reg);
 
   return all_ok;
 }
