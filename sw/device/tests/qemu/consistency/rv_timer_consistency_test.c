@@ -288,6 +288,30 @@ static void test_v2_mtime_rewind_sticky_intr_and_dif_counter_write(void) {
         "Expected dummy write of existing mtimecmp (400) to COMPARE_LOWER0_0 "
         "to pulse mtimecmp_update and clear INTR_STATE0 to 0");
 
+  // Also verify direct writes to TIMER_V_LOWER0 and TIMER_V_UPPER0 while
+  // CTRL.active0 == 1 and mtime >= mtimecmp (ot_timer.c:441, 455):
+  // Set TIMER_V_LOWER0 = 500 (>= mtimecmp = 400) while CTRL == 1, then
+  // immediately rewind TIMER_V_LOWER0 to 10 (< 400) while CTRL == 1 ->
+  // INTR_STATE0 must remain latched at 1!
+  abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 500u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 10u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u,
+        "Expected INTR_STATE0 == 1 after direct TIMER_V_LOWER0 rewind from 500 "
+        "to 10 while CTRL.active0 == 1");
+  abs_mmio_write32(kTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 400u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
+
+  // Set TIMER_V_UPPER0 = 1 (mtime = 0x1_0000_000a >= mtimecmp = 400) while
+  // CTRL == 1, then immediately rewind TIMER_V_UPPER0 to 0 while CTRL == 1 ->
+  // INTR_STATE0 must remain latched at 1!
+  abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET, 1u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u,
+        "Expected INTR_STATE0 == 1 after direct TIMER_V_UPPER0 rewind from 1 "
+        "to 0 while CTRL.active0 == 1");
+  abs_mmio_write32(kTimerBase + RV_TIMER_COMPARE_UPPER0_0_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
+
   rv_timer_reset_clean();
   LOG_INFO(
       "Test 5 (dif_rv_timer_counter_write & programmers_guide mtime update vs "
