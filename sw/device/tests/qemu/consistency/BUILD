@@ -119,8 +119,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -155,8 +153,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -188,8 +184,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -305,8 +299,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -475,8 +467,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -508,8 +498,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -541,8 +529,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -577,8 +563,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -613,8 +597,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     deps = [
         "//hw/top:hmac_c_regs",
@@ -796,8 +778,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
@@ -867,8 +847,6 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        "//hw/top_earlgrey:fpga_cw340_test_rom": None,
-        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "short",
