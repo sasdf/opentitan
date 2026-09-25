@@ -7,6 +7,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load(
@@ -74,6 +75,9 @@ otp_json(
             tags = maybe_skip_in_ci(lc_state_val),
         ),
         manifest = ":manifest_rom_ext_upgrade_interrupt",
+        qemu = qemu_params(
+            otp = ":otp_img_rom_ext_upgrade_interrupt_{}".format(lc_state),
+        ),
         deps = [
             "//sw/device/lib/testing:nv_counter_testutils",
             "//sw/device/lib/testing:nvm_testutils",

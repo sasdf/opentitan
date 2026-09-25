@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -60,6 +61,9 @@ _READBACK_TESTS = {
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            otp = param["otp"],
+        ),
+        qemu = qemu_params(
             otp = param["otp"],
         ),
         deps = [
@@ -119,6 +123,9 @@ _RENEW_TESTS = {
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            otp = param["otp"],
+        ),
+        qemu = qemu_params(
             otp = param["otp"],
         ),
         deps = [

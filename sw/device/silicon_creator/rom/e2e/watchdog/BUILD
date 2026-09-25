@@ -8,6 +8,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
@@ -85,6 +86,7 @@ WATCHDOG_TEST_CASES = {
         ),
         exec_env = [
             "//hw/top_earlgrey:fpga_cw340",
+            "//hw/top_earlgrey:sim_qemu_base",
             "//hw/top_earlgrey:sim_verilator",
         ],
         local_defines = [
@@ -120,6 +122,7 @@ WATCHDOG_OTP = {
         ),
         exec_env = {
             "@//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "@//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "@//hw/top_earlgrey:sim_verilator": None,
         },
         fpga = fpga_params(
@@ -131,6 +134,15 @@ WATCHDOG_OTP = {
             },
             otp = WATCHDOG_OTP[watchdog_config].format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            binaries = {
+                ":test_watchdog_{}_{}".format(
+                    WATCHDOG_TEST_CASES[watchdog_config][lc_state],
+                    lc_state,
+                ): "firmware",
+            },
+            otp = WATCHDOG_OTP[watchdog_config].format(lc_state),
         ),
         verilator = verilator_params(
             timeout = "eternal",
