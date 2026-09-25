@@ -3748,13 +3748,13 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
         """,
-        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
-    ),
-    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
