@@ -113,6 +113,85 @@ static void aon_timer_clear_wakeup(void) {
 }
 
 /**
+ * Verify pwrmgr_reg_top.sv & pwrmgr.sv:344-354:
+ * Reset values, bit masks, RO/WO semantics for all 17 CSRs (0x00..0x40),
+ * and verify CTRL_CFG_REGWEN (0x10) remains 1 in Active mode both while
+ * CFG_CDC_SYNC (0x18) is in flight and when CONTROL.LOW_POWER_HINT == 1.
+ */
+static void test_pwrmgr_csr_reset_and_ro_semantics(void) {
+  LOG_INFO(
+      "Verifying [pwrmgr_reg_top.sv & pwrmgr.sv:344-354]: All 17 CSR reset "
+      "values, bit masks, RO/WO semantics, and CTRL_CFG_REGWEN in Active mode");
+
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_ENABLE_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_INTR_TEST_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_ALERT_TEST_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) ==
+        0x1u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET) == 0x180u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REGWEN_REG_OFFSET) ==
+        0x1u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_EN_REGWEN_REG_OFFSET) ==
+        0x1u);
+  // mask_rom watchdog_init() enables AON timer watchdog reset (bit 1 = 0x2u).
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET) == 0x2u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_ESCALATE_RESET_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_FAULT_STATUS_REG_OFFSET) == 0x0u);
+
+  // Verify RO registers ignore software writes of all-ones.
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_RESET_STATUS_REG_OFFSET, 0xffffffffu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_ESCALATE_RESET_STATUS_REG_OFFSET,
+                   0xffffffffu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_FAULT_STATUS_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_ESCALATE_RESET_STATUS_REG_OFFSET) == 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_FAULT_STATUS_REG_OFFSET) == 0x0u);
+
+  // Verify CONTROL (0x1f1), WAKEUP_EN (0x3f), RESET_EN (0x3), and
+  // WAKE_INFO_CAPTURE_DIS (0x1) bit masks and CTRL_CFG_REGWEN == 1 during
+  // CFG_CDC_SYNC and when LOW_POWER_HINT == 1 in Active mode (pwrmgr.sv:344).
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET) == 0x1f1u);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) ==
+        0x1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_CTRL_CFG_REGWEN_REG_OFFSET) ==
+        0x1u);
+  while (abs_mmio_read32(kPwrmgrBase + PWRMGR_CFG_CDC_SYNC_REG_OFFSET) != 0u) {
+  }
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET, 0x180u);
+  pwrmgr_cdc_sync();
+
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET) == 0x3fu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKEUP_EN_REG_OFFSET, 0x0u);
+
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET) == 0x3u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_RESET_EN_REG_OFFSET, 0x0u);
+
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET,
+                   0xffffffffu);
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET) == 0x1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0x0u);
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET) == 0x0u);
+}
+
+/**
  * Verify pwrmgr.sv:525,535-538:
  * WAKE_STATUS (0x24) reflects peri_reqs_masked.wakeups
  * (slow_peri_reqs.wakeups & slow_wakeup_en) and remains 0 even when
@@ -438,6 +517,47 @@ static void test_pwrmgr_aborted_sleep_pinmux_latch_and_wake_info_relatch(void) {
          kAonTimerWkupBit) != 0u,
         "Expected WAKE_STATUS to retain wakeup status across LowPowerExit");
 
+  CHECK(abs_mmio_read32(kPwrmgrBase +
+                        PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET) == 0u,
+        "Expected WAKE_INFO_CAPTURE_DIS to remain 0 across LowPowerExit");
+
+  // 5. Verify [pwrmgr_fsm.sv:387-399]: when peripheral wakeup (WAKE_STATUS ==
+  // kAonTimerWkupBit) is ALREADY asserted before WFI with LOW_POWER_HINT == 1,
+  // pwrmgr_fsm does NOT take FastPwrStateFallThrough (FALL_THROUGH bit 6 == 0);
+  // instead it enters low power (latching MIO_PAD_SLEEP_STATUS_0 bit 0 == 1)
+  // and immediately wakes with WAKE_INFO == kAonTimerWkupBit.
+  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_EN_0_REG_OFFSET, 1u);
+  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET, ~1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 1u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 0u);
+  abs_mmio_write32(kPwrmgrBase + PWRMGR_INTR_STATE_REG_OFFSET, 0x1u);
+  plic_claim = abs_mmio_read32(kPlicBase + 0x200004u);
+  if (plic_claim != 0u) {
+    abs_mmio_write32(kPlicBase + 0x200004u, plic_claim);
+  }
+  CHECK(abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_STATUS_REG_OFFSET) ==
+        kAonTimerWkupBit);
+  abs_mmio_write32(
+      kPwrmgrBase + PWRMGR_CONTROL_REG_OFFSET,
+      retained_ctrl_bits | (1u << PWRMGR_CONTROL_LOW_POWER_HINT_BIT));
+  pwrmgr_cdc_sync();
+  wait_for_interrupt();
+
+  uint32_t wake_info_pre =
+      abs_mmio_read32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET);
+  CHECK(wake_info_pre == kAonTimerWkupBit,
+        "[pwrmgr_fsm.sv:387-399] Expected WAKE_INFO == 0x%08x (FALL_THROUGH==0)"
+        " when peripheral wakeup is pre-asserted before WFI, got 0x%08x",
+        kAonTimerWkupBit, wake_info_pre);
+  CHECK(
+      (abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET) &
+       1u) == 1u,
+      "Expected MIO_PAD_SLEEP_STATUS_0 bit 0 == 1 when peripheral wakeup is "
+      "pre-asserted before WFI");
+  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_EN_0_REG_OFFSET, 0u);
+  abs_mmio_write32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET, ~1u);
+
   // Clean up AON timer, PLIC, and pwrmgr interrupt state.
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_CAPTURE_DIS_REG_OFFSET, 1u);
   abs_mmio_write32(kPwrmgrBase + PWRMGR_WAKE_INFO_REG_OFFSET, 0xffu);
@@ -557,12 +677,13 @@ static void test_pwrmgr_intr_alert_and_regwen_locks(void) {
 }
 
 bool test_main(void) {
-  LOG_INFO("Starting pwrmgr_errata_v2_test on CW340 FPGA (trunk-v2)...");
+  LOG_INFO("Starting pwrmgr_consistency_test...");
+  test_pwrmgr_csr_reset_and_ro_semantics();
   test_pwrmgr_wake_status_cdc_masking();
   test_pwrmgr_dif_dt_init_regression_and_return_code();
   test_pwrmgr_aborted_sleep_pinmux_latch_and_wake_info_relatch();
   test_pwrmgr_permit_and_addrmiss_faults();
   test_pwrmgr_intr_alert_and_regwen_locks();
-  LOG_INFO("All pwrmgr_errata_v2_test checks PASSED!");
+  LOG_INFO("All pwrmgr_consistency_test checks PASSED!");
   return true;
 }
