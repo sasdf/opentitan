@@ -53,6 +53,7 @@
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
 #include "hw/top/gpio_regs.h"
@@ -92,6 +93,29 @@ enum {
   kPadAttrWarlBidir = kPadAttrInputDisable | kPadAttrVirtOdEn | kPadAttrInvert,
   kPadAttrWarlInputStd = kPadAttrInputDisable | kPadAttrInvert,
 };
+
+static volatile bool g_expect_bus_fault = false;
+static volatile uint32_t g_bus_fault_count = 0;
+static volatile uint32_t g_last_mcause = 0;
+
+void ottf_load_store_fault_handler(uint32_t *exc_info) {
+  OT_DISCARD(exc_info);
+  uint32_t mcause = ibex_mcause_read();
+  if (g_expect_bus_fault) {
+    g_bus_fault_count++;
+    g_last_mcause = mcause;
+    return;
+  }
+  CHECK(false, "Unexpected load/store fault mcause=0x%08x", mcause);
+}
+
+static inline uint32_t mio_pad_attr_regwen_addr(uint32_t pad) {
+  return kPinmuxBase + PINMUX_MIO_PAD_ATTR_REGWEN_0_REG_OFFSET + (pad * 4u);
+}
+
+static inline uint32_t dio_pad_attr_regwen_addr(uint32_t pad) {
+  return kPinmuxBase + PINMUX_DIO_PAD_ATTR_REGWEN_0_REG_OFFSET + (pad * 4u);
+}
 
 static inline uint32_t mio_insel_addr(uint32_t idx) {
   return kPinmuxBase + PINMUX_MIO_PERIPH_INSEL_0_REG_OFFSET + (idx * 4u);
@@ -251,6 +275,8 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
    * `BidirStd`/`BidirOd` DIOs). */
   uint32_t mio_bidir_count = 0;
   for (uint32_t k = 0; k < PINMUX_PARAM_N_MIO_PADS; ++k) {
+    CHECK(abs_mmio_read32(mio_pad_attr_regwen_addr(k)) == 1u);
+    CHECK(abs_mmio_read32(mio_pad_attr_addr(k)) == 0u);
     uint32_t saved = abs_mmio_read32(mio_pad_attr_addr(k));
     abs_mmio_write32(mio_pad_attr_addr(k), 0xFFFFFFFFu);
     uint32_t warl = abs_mmio_read32(mio_pad_attr_addr(k));
@@ -264,6 +290,8 @@ static void test_errata_padring_001_confirmed_on_v2(void) {
   uint32_t dio_bidir_count = 0;
   uint32_t dio_input_std_count = 0;
   for (uint32_t k = 0; k < PINMUX_PARAM_N_DIO_PADS; ++k) {
+    CHECK(abs_mmio_read32(dio_pad_attr_regwen_addr(k)) == 1u);
+    CHECK(abs_mmio_read32(dio_pad_attr_addr(k)) == 0u);
     uint32_t saved = abs_mmio_read32(dio_pad_attr_addr(k));
     abs_mmio_write32(dio_pad_attr_addr(k), 0xFFFFFFFFu);
     uint32_t warl = abs_mmio_read32(dio_pad_attr_addr(k));
@@ -360,9 +388,42 @@ static void test_errata_padring_v2_001_unconnected_usb_dio_attr(void) {
         sense_attr_00, sense_attr_80, sense_attr_81);
 }
 
+static void test_padring_permit_and_regwen_locking(void) {
+  LOG_INFO(
+      "Testing PINMUX_PERMIT=0x7 subword store faults and *_PAD_ATTR_REGWEN "
+      "W0C locking...");
+  uint32_t prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  abs_mmio_write8(mio_pad_attr_addr(46u), 0x01u);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1u && g_last_mcause == 7u);
+  CHECK(abs_mmio_read32(mio_pad_attr_addr(46u)) == 0u);
+
+  prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  abs_mmio_write8(dio_pad_attr_addr(15u), 0x01u);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1u && g_last_mcause == 7u);
+  CHECK(abs_mmio_read32(dio_pad_attr_addr(15u)) == 0u);
+
+  // Verify MIO_PAD_ATTR_REGWEN_46 and DIO_PAD_ATTR_REGWEN_15 W0C lock:
+  abs_mmio_write32(mio_pad_attr_addr(46u), 0x01u);
+  abs_mmio_write32(mio_pad_attr_regwen_addr(46u), 0u);
+  CHECK(abs_mmio_read32(mio_pad_attr_regwen_addr(46u)) == 0u);
+  abs_mmio_write32(mio_pad_attr_addr(46u), 0x83u);
+  CHECK(abs_mmio_read32(mio_pad_attr_addr(46u)) == 0x01u);
+
+  abs_mmio_write32(dio_pad_attr_addr(15u), 0x01u);
+  abs_mmio_write32(dio_pad_attr_regwen_addr(15u), 0u);
+  CHECK(abs_mmio_read32(dio_pad_attr_regwen_addr(15u)) == 0u);
+  abs_mmio_write32(dio_pad_attr_addr(15u), 0x83u);
+  CHECK(abs_mmio_read32(dio_pad_attr_addr(15u)) == 0x01u);
+}
+
 bool test_main(void) {
   test_errata_padring_001_confirmed_on_v2();
   test_errata_padring_v2_001_unconnected_usb_dio_attr();
+  test_padring_permit_and_regwen_locking();
   LOG_INFO("All padring v2 errata checks passed on physical CW340 FPGA.");
   return true;
 }
