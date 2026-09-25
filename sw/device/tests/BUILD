@@ -3783,6 +3783,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_wake",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_wake",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4153,6 +4159,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_flash_smoketest",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             "{firmware:elf}"
         """,
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_flash_smoketest",
@@ -5902,6 +5914,12 @@ opentitan_test(
         tags = ["slow_test"],
         test_cmd = """
             --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_passthru",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             "{firmware:elf}"
         """,
         test_harness = "//sw/host/tests/chip/spi_device:spi_passthru",
@@ -7716,6 +7734,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_mio_dio_val",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7755,6 +7776,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/gpio:sleep_pin_retention",
     ),
     silicon = silicon_params(
