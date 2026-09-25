@@ -232,9 +232,7 @@ opentitan_test(
     srcs = ["aes_gcm_functest.c"],
     exec_env = dicts.add(
         CRYPTOTEST_EXEC_ENVS,
-        {
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
-        },
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken"},
     ),
     qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
@@ -305,9 +303,7 @@ opentitan_test(
     srcs = ["ecc_p256_dice_functest.c"],
     exec_env = dicts.add(
         CRYPTOTEST_EXEC_ENVS,
-        {
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken",
-        },
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": "qemu_broken"},
     ),
     qemu_broken = qemu_params(tags = ["broken"]),
     verilator = verilator_params(
