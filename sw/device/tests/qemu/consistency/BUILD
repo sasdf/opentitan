@@ -1103,6 +1103,21 @@ opentitan_test(
     ],
 )
 
+alias(
+    name = "tlul_consistency_test",
+    actual = ":tlul_and_prim_consistency_test",
+)
+
+alias(
+    name = "tlul_consistency_test_sim_qemu_rom_with_fake_keys",
+    actual = ":tlul_and_prim_consistency_test_sim_qemu_rom_with_fake_keys",
+)
+
+alias(
+    name = "tlul_consistency_test_fpga_cw340_rom_with_fake_keys",
+    actual = ":tlul_and_prim_consistency_test_fpga_cw340_rom_with_fake_keys",
+)
+
 # === END CONSISTENCY TEST: p35_tlul ===
 # === BEGIN CONSISTENCY TEST: p36_prim ===
 opentitan_test(

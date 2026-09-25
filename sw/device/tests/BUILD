@@ -2786,6 +2786,21 @@ _KMAC_APP_ROM_LIST = [
         ["//hw/top_earlgrey"],
     ),
     (
+        "//sw/device/lib/testing/test_rom:test_rom_sim_qemu_base_hashfile",
+        "sim_qemu_test_rom",
+        ["//hw/top_earlgrey"],
+    ),
+    (
+        "//sw/device/silicon_creator/rom:mask_rom_sim_qemu_base_hashfile",
+        "sim_qemu_rom_with_fake_keys",
+        ["//hw/top_earlgrey"],
+    ),
+    (
+        "//sw/device/silicon_creator/rom:mask_rom_sim_qemu_base_hashfile",
+        "sim_qemu_sival",
+        ["//hw/top_earlgrey"],
+    ),
+    (
         "//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile",
         "sim_dv",
         [
@@ -4695,14 +4710,10 @@ opentitan_test(
 opentitan_test(
     name = "sram_ctrl_execution_test",
     srcs = ["sram_ctrl_execution_test.c"],
-    exec_env = dicts.omit(
-        dicts.add(
-            EARLGREY_TEST_ENVS,
-            DARJEELING_TEST_ENVS,
-            EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        ),
-        # TODO (#26100): QEMU's `flashgen.py` script does not like this test.
-        ["//hw/top_earlgrey:sim_qemu_rom_with_fake_keys"],
+    exec_env = dicts.add(
+        EARLGREY_TEST_ENVS,
+        DARJEELING_TEST_ENVS,
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     deps = [
         "//hw/top/dt",

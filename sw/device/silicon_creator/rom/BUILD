@@ -279,6 +279,7 @@ legacy_rom_targets(
     for dev in [
         "fpga_cw340",
         "silicon_creator",
+        "sim_qemu_base",
     ]
 ]
 

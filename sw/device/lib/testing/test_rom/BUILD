@@ -78,6 +78,7 @@ legacy_rom_targets(
     )
     for dev in [
         "sim_dv",
+        "sim_qemu_base",
         "sim_verilator",
         "fpga_cw305",
         "fpga_cw340",

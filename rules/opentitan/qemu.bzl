@@ -20,6 +20,10 @@ load(
     "exec_env_as_dict",
     "exec_env_common_attrs",
 )
+load(
+    "@lowrisc_opentitan//rules/opentitan:transform.bzl",
+    "convert_to_scrambled_rom_vmem",
+)
 load("//rules/opentitan:toolchain.bzl", "LOCALTOOLS_TOOLCHAIN")
 
 def qemu_params(
@@ -332,9 +336,19 @@ sim_qemu = rule(
 )
 
 def _transform(ctx, exec_env, name, elf, binary, signed_bin, disassembly, mapfile):
+    hashfile = None
     if ctx.attr.kind == "rom":
         default = elf
         rom = elf
+        (_, hashfile) = convert_to_scrambled_rom_vmem(
+            ctx,
+            name = name,
+            src = elf,
+            suffix = "39.scr.vmem",
+            rom_scramble_tool = ctx.executable.rom_scramble_tool,
+            top_gen_hjson = exec_env.top_hjson,
+            top_secret_cfg = exec_env.top_secrets,
+        )
     elif ctx.attr.kind == "ram":
         default = elf
         rom = None
@@ -353,7 +367,7 @@ def _transform(ctx, exec_env, name, elf, binary, signed_bin, disassembly, mapfil
         "signed_bin": signed_bin,
         "disassembly": disassembly,
         "mapfile": mapfile,
-        "hashfile": None,
+        "hashfile": hashfile,
     }
 
 def _test_dispatch(ctx, exec_env, firmware):
