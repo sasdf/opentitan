@@ -4679,7 +4679,6 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     qemu = qemu_params(
-        # Require the PHY_PINS_SENSE register.
         test_cmd = """
             --no-wait-for-usb-device
         """,
@@ -4934,6 +4933,7 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     qemu = qemu_params(
+        # Require the PHY_PINS_SENSE register.
         test_cmd = """
             --no-wait-for-usb-device
         """,
@@ -6138,7 +6138,6 @@ _RV_DM_TEST_CONFIGURATIONS = [
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
             tags = [
                 "lc_{}".format(test_cfg["lc_state"]),
-                # Delayed enable currently not working in QEMU.
             ],
             test_cmd = """
                 {rv_dm_delayed_en}
@@ -6151,6 +6150,7 @@ _RV_DM_TEST_CONFIGURATIONS = [
             rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
             tags = [
                 "lc_{}".format(test_cfg["lc_state"]),
+                # Delayed enable currently not working in QEMU.
             ],
             test_cmd = """
                 --bootstrap="{firmware}"
