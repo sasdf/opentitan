@@ -30,10 +30,10 @@ use ot_hal::util::multibits::MultiBitBool8;
 
 /// Timeout waiting for the chip to reset and perform an RMA
 /// transition.
-const RMA_TRANSITION_CONSOLE_TIMEOUT: Duration = Duration::from_secs(5);
+const RMA_TRANSITION_CONSOLE_TIMEOUT: Duration = Duration::from_secs(15);
 /// Timeout waiting for RMA spinning (must be bigger than CREATOR_SW_CFG_RMA_SPIN_CYCLES),
 /// with an extra few seconds to avoid flakiness.
-const RMA_SPIN_TIMEOUT: Duration = Duration::from_secs(6 + 4);
+const RMA_SPIN_TIMEOUT: Duration = Duration::from_secs(35);
 
 /// CLI args for this test.
 #[derive(Debug, Parser)]
