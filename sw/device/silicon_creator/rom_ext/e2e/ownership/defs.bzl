@@ -54,11 +54,7 @@ def ownership_transfer_test(
             "//sw/device/silicon_creator/lib/ownership:datatypes",
         ],
         **kwargs):
-    qemu_dict = {
-        "testopt_bootstrap": "True",
-        "icount": 5,
-    } | (fpga or {}) | (qemu or {})
-    qemu = qemu_params(**qemu_dict)
+    qemu = qemu_params(**({"testopt_bootstrap": "True", "icount": 5} | (fpga or {}) | (qemu or {})))
 
     # FPGA should always bootstrap first, so enable this on every FPGA test unless overridden
     fpga = {

@@ -1114,8 +1114,6 @@ static status_t phase_start_resume(usbdev_suspend_ctx_t *ctx) {
       // has gone wrong.
       if (physical_timings()) {
         timeout_set(ctx, TimeoutPhysConfig);
-      } else if (kDeviceType == kDeviceSimQemu) {
-        timeout_frames_set(ctx, 80000u);
       } else {
         // It should take only a few bus frames even with the older, slower DPI
         // behavior.
