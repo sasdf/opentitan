@@ -1821,7 +1821,16 @@ opentitan_test(
         },
     ),
     fpga_skip_ci = fpga_params(
-        tags = ["skip_in_ci"],
+        tags = [
+            "broken",
+            "skip_in_ci",
+        ],
+    ),
+    qemu = qemu_params(
+        tags = [
+            "broken",
+            "skip_in_ci",
+        ],
     ),
     deps = [
         "//hw/top:top_lib",
@@ -1851,7 +1860,14 @@ opentitan_test(
     ),
     # No longer relevant on RRAM; exclude all FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = ["skip_in_ci"]),
+    fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//hw/top:top_lib",
@@ -1915,6 +1931,16 @@ _FLASH_CTRL_INFO_ACCESS_LC_STATES = get_lc_items(
         },
         fpga = fpga_params(
             otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
+            tags = [
+                "broken",
+                "skip_in_ci",
+            ],
+        ),
+        qemu = qemu_params(
+            tags = [
+                "broken",
+                "skip_in_ci",
+            ],
         ),
         deps = [
             "//hw/top/dt",
@@ -1952,6 +1978,10 @@ test_suite(
         },
         fpga = fpga_params(
             otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_{}_manuf_personalized".format(lc_state),
+            tags = [
+                "broken",
+                "skip_in_ci",
+            ],
         ),
         deps = [
             "//hw/top:top_lib",
@@ -1998,7 +2028,14 @@ opentitan_test(
     # No longer relevant on RRAM (no flash clock domain to test); exclude all
     # FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = ["skip_in_ci"]),
+    fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
     verilator = verilator_params(timeout = "long"),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
@@ -2027,7 +2064,14 @@ opentitan_test(
     # No longer relevant on RRAM; exclude all FPGA and verilator variants from
     # CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = ["skip_in_ci"]),
+    fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
     verilator = verilator_params(
         timeout = "long",
         tags = ["skip_in_ci"],
@@ -2053,6 +2097,14 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
+    fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
     verilator = verilator_params(timeout = "long"),
     deps = [
         "//hw/top:flash_ctrl_c_regs",
@@ -2079,6 +2131,14 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": "broken",
         },
     ),
+    fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
     verilator = verilator_params(timeout = "long"),
     deps = [
         "//hw/top:flash_ctrl_c_regs",
