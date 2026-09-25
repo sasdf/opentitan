@@ -116,6 +116,8 @@ status_t process_cmd(ujson_t *uj) {
   return OK_STATUS(0);
 }
 
+#include "sw/device/lib/crypto/drivers/kmac.h"
+
 bool test_main(void) {
   // We pick a random security level for the entire test run
   otcrypto_key_security_level_t sec_level;
@@ -125,6 +127,7 @@ bool test_main(void) {
   sec_level = kOtcryptoKeySecurityLevelLow;
 #endif
   CHECK_STATUS_OK(otcrypto_init(sec_level));
+  CHECK_STATUS_OK(kmac_hwip_default_configure());
   ujson_t uj = ujson_ottf_console();
   return status_ok(process_cmd(&uj));
 }
