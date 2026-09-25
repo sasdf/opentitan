@@ -54,6 +54,7 @@
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
@@ -372,6 +373,224 @@ static void test_sram_1r1w_ingress_uninitialized_parity_faults(
   }
 }
 
+static const uint8_t kSpiDevicePermit[73] = {
+    // Main CSR window (0x000..0x0ec, indices 0..58):
+    0x1u,  // [ 0] 0x000 INTR_STATE
+    0x1u,  // [ 1] 0x004 INTR_ENABLE
+    0x1u,  // [ 2] 0x008 INTR_TEST
+    0x1u,  // [ 3] 0x00c ALERT_TEST
+    0x1u,  // [ 4] 0x010 CONTROL
+    0xfu,  // [ 5] 0x014 CFG
+    0x1u,  // [ 6] 0x018 STATUS
+    0x1u,  // [ 7] 0x01c INTERCEPT_EN
+    0xfu,  // [ 8] 0x020 ADDR_MODE
+    0xfu,  // [ 9] 0x024 LAST_READ_ADDR
+    0x7u,  // [10] 0x028 FLASH_STATUS
+    0x3u,  // [11] 0x02c JEDEC_CC
+    0x7u,  // [12] 0x030 JEDEC_ID
+    0x3u,  // [13] 0x034 READ_THRESHOLD
+    0xfu,  // [14] 0x038 MAILBOX_ADDR
+    0x3u,  // [15] 0x03c UPLOAD_STATUS
+    0x7u,  // [16] 0x040 UPLOAD_STATUS2
+    0x3u,  // [17] 0x044 UPLOAD_CMDFIFO
+    0xfu,  // [18] 0x048 UPLOAD_ADDRFIFO
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,  // [19..26] 0x04c..0x068 CMD_FILTER_0..7
+    0xfu,  // [27] 0x06c ADDR_SWAP_MASK
+    0xfu,  // [28] 0x070 ADDR_SWAP_DATA
+    0xfu,  // [29] 0x074 PAYLOAD_SWAP_MASK
+    0xfu,  // [30] 0x078 PAYLOAD_SWAP_DATA
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,  // [31..38] 0x07c..0x098 CMD_INFO_0..7
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,  // [39..46] 0x09c..0x0b8 CMD_INFO_8..15
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,
+    0xfu,  // [47..54] 0x0bc..0x0d8 CMD_INFO_16..23
+    0xfu,  // [55] 0x0dc CMD_INFO_EN4B
+    0xfu,  // [56] 0x0e0 CMD_INFO_EX4B
+    0xfu,  // [57] 0x0e4 CMD_INFO_WREN
+    0xfu,  // [58] 0x0e8 CMD_INFO_WRDI
+    // TPM CSR window (0x800..0x834, indices 59..72):
+    0x7u,  // [59] 0x800 TPM_CAP
+    0x1u,  // [60] 0x804 TPM_CFG
+    0x1u,  // [61] 0x808 TPM_STATUS
+    0xfu,  // [62] 0x80c TPM_ACCESS_0
+    0x1u,  // [63] 0x810 TPM_ACCESS_1
+    0xfu,  // [64] 0x814 TPM_STS
+    0xfu,  // [65] 0x818 TPM_INTF_CAPABILITY
+    0xfu,  // [66] 0x81c TPM_INT_ENABLE
+    0x1u,  // [67] 0x820 TPM_INT_VECTOR
+    0xfu,  // [68] 0x824 TPM_INT_STATUS
+    0xfu,  // [69] 0x828 TPM_DID_VID
+    0x1u,  // [70] 0x82c TPM_RID
+    0xfu,  // [71] 0x830 TPM_CMD_ADDR
+    0xfu,  // [72] 0x834 TPM_READ_FIFO
+};
+
+static void test_all_73_csrs_subword_permit_and_readback(mmio_region_t base) {
+  LOG_INFO("Test 8: All 73 CSRs SPI_DEVICE_PERMIT sub-word access & readbacks");
+
+  // Verify hardware reset / post-bootstrap readbacks of key Main and TPM CSRs:
+  uint32_t tpm_cap = mmio_region_read32(base, SPI_DEVICE_TPM_CAP_REG_OFFSET);
+  CHECK(tpm_cap == 0x00660100u,
+        "Expected TPM_CAP == 0x00660100 (max_rd=6, max_wr=6, loc=1, rev=0), "
+        "got 0x%08x",
+        tpm_cap);
+  uint32_t jedec_cc = mmio_region_read32(base, SPI_DEVICE_JEDEC_CC_REG_OFFSET);
+  CHECK(jedec_cc == 0x0000007fu,
+        "Expected JEDEC_CC == 0x0000007f (cc=0x7f, num_cc=0), got 0x%08x",
+        jedec_cc);
+  uint32_t ctrl = mmio_region_read32(base, SPI_DEVICE_CONTROL_REG_OFFSET);
+  CHECK(ctrl == 0x00000010u,
+        "Expected CONTROL == 0x00000010 (MODE[5:4] == FlashMode=1), got 0x%08x",
+        ctrl);
+
+  // Verify out-of-bounds CSR offsets immediately after Main (0x0f0) and TPM
+  // (0x838) windows fault with Load/Store Access Fault (mcause = 5 / 7):
+  expect_read32_fault(base, 0x0f0u);
+  expect_write32_fault(base, 0x0f0u, 0u);
+  expect_read32_fault(base, 0x838u);
+  expect_write32_fault(base, 0x838u, 0u);
+
+  // Exhaustively verify all 73 CSRs (indices 0..58 at 0x000..0x0ec, and
+  // indices 59..72 at 0x800..0x834) against SPI_DEVICE_PERMIT[73]:
+  for (uint32_t i = 0; i < 73u; ++i) {
+    uint32_t off = (i < 59u) ? (i * 4u) : (0x800u + (i - 59u) * 4u);
+    uint8_t permit = kSpiDevicePermit[i];
+
+    // Save current value for all non-FIFO readable CSRs (avoid popping
+    // UPLOAD_CMDFIFO=0x44, UPLOAD_ADDRFIFO=0x48, TPM_CMD_ADDR=0x830).
+    uint32_t orig = 0u;
+    bool restore = (off != SPI_DEVICE_UPLOAD_CMDFIFO_REG_OFFSET &&
+                    off != SPI_DEVICE_UPLOAD_ADDRFIFO_REG_OFFSET &&
+                    off != SPI_DEVICE_TPM_CMD_ADDR_REG_OFFSET &&
+                    off != SPI_DEVICE_TPM_READ_FIFO_REG_OFFSET &&
+                    off != SPI_DEVICE_INTR_TEST_REG_OFFSET &&
+                    off != SPI_DEVICE_ALERT_TEST_REG_OFFSET);
+    if (restore) {
+      orig = mmio_region_read32(base, (ptrdiff_t)off);
+    }
+
+    if (permit == 0x1u) {
+      // 4'b0001: 8-bit write at byte +0 succeeds; 8-bit write at byte +1
+      // faults.
+      uint8_t safe_b0 =
+          (off == SPI_DEVICE_CONTROL_REG_OFFSET) ? (uint8_t)orig : 0x00u;
+      uint32_t prev = g_fault_count;
+      mmio_region_write8(base, (ptrdiff_t)off, safe_b0);
+      CHECK(g_fault_count == prev,
+            "8-bit write at byte +0 of permit=0x1 CSR 0x%03x (idx %u) must "
+            "succeed",
+            off, i);
+      expect_write8_fault(base, off + 1u, 0x00u);
+    } else if (permit == 0x3u) {
+      // 4'b0011: 8-bit write at byte +0 faults; 16-bit write at +0 succeeds.
+      expect_write8_fault(base, off, 0x00u);
+      uint32_t prev = g_fault_count;
+      *(volatile uint16_t *)(kSpiDeviceBase + off) = (uint16_t)(orig & 0xffffu);
+      CHECK(g_fault_count == prev,
+            "16-bit write at permit=0x3 CSR 0x%03x (idx %u) must succeed", off,
+            i);
+    } else {
+      // 4'b0111 (0x7) or 4'b1111 (0xf): both 8-bit and 16-bit writes at +0
+      // fault!
+      expect_write8_fault(base, off, 0x00u);
+      expect_write16_fault(base, off, 0x0000u);
+    }
+
+    if (restore && off != SPI_DEVICE_ADDR_MODE_REG_OFFSET &&
+        off != SPI_DEVICE_FLASH_STATUS_REG_OFFSET) {
+      mmio_region_write32(base, (ptrdiff_t)off, orig);
+    }
+  }
+}
+
+static void test_spi_device_intr_and_alert_test(mmio_region_t base) {
+  LOG_INFO(
+      "Test 9: INTR_STATE/INTR_ENABLE/INTR_TEST (7 Event + 1 Status) & "
+      "ALERT_TEST");
+
+  // 1. Verify INTR_ENABLE (0x04) 8-bit writable mask (0xff) while keeping
+  //    PLIC interrupts masked before testing INTR_TEST.
+  mmio_region_write32(base, SPI_DEVICE_INTR_ENABLE_REG_OFFSET, 0u);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_ENABLE_REG_OFFSET) == 0u,
+        "Expected INTR_ENABLE == 0");
+  mmio_region_write32(base, SPI_DEVICE_INTR_ENABLE_REG_OFFSET, 0xffffffffu);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_ENABLE_REG_OFFSET) == 0xffu,
+        "Expected INTR_ENABLE 8-bit mask 0xff");
+  mmio_region_write32(base, SPI_DEVICE_INTR_ENABLE_REG_OFFSET, 0u);
+
+  // Clear any prior pending bits in INTR_TEST (0x08) and INTR_STATE (0x00).
+  mmio_region_write32(base, SPI_DEVICE_INTR_TEST_REG_OFFSET, 0u);
+  mmio_region_write32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET, 0xffu);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0u,
+        "Expected INTR_STATE == 0 after clearing");
+
+  // 2. Verify all 7 Event-type interrupts (0xdf: bits 0,1,2,3,4,6,7 in
+  //    spi_device.sv:465-571) latch via INTR_TEST (WO, readback 0) and clear
+  //    via RW1C in INTR_STATE:
+  mmio_region_write32(base, SPI_DEVICE_INTR_TEST_REG_OFFSET, 0xdfu);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_TEST_REG_OFFSET) == 0u,
+        "Expected INTR_TEST (WO) to read back 0");
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0xdfu,
+        "Expected INTR_TEST=0xdf to set all 7 Event bits in INTR_STATE");
+  mmio_region_write32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET, 0xdfu);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0u,
+        "Expected RW1C write 0xdf to clear all 7 Event bits in INTR_STATE");
+
+  // 3. Verify bit 5 (`tpm_header_not_empty`, 0x20), which is instantiated with
+  //    `prim_intr_hw #(.IntrT("Status"))` (`spi_device.sv:525-539`):
+  //    - Writing 0x20 to INTR_TEST latches test_q[5] = 1 -> INTR_STATE = 0x20.
+  //    - Writing 0x20 to INTR_STATE does NOT clear INTR_STATE while test_q[5]
+  //    == 1.
+  //    - Writing 0x00 to INTR_TEST clears test_q[5] = 0 -> INTR_STATE = 0x00.
+  mmio_region_write32(base, SPI_DEVICE_INTR_TEST_REG_OFFSET, 0x20u);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0x20u,
+        "Expected INTR_TEST=0x20 to set Status-type tpm_header_not_empty (bit "
+        "5)");
+  mmio_region_write32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET, 0x20u);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0x20u,
+        "Expected Status-type bit 5 in INTR_STATE to stay 1 while test_q == 1");
+  mmio_region_write32(base, SPI_DEVICE_INTR_TEST_REG_OFFSET, 0x00u);
+  CHECK(
+      mmio_region_read32(base, SPI_DEVICE_INTR_STATE_REG_OFFSET) == 0u,
+      "Expected writing INTR_TEST=0 to clear Status-type bit 5 in INTR_STATE");
+
+  // 4. Verify ALERT_TEST (0x0c, WO, readback 0) transient pulse on
+  //    kTopEarlgreyAlertIdSpiDeviceFatalFault:
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdSpiDeviceFatalFault));
+  mmio_region_write32(base, SPI_DEVICE_ALERT_TEST_REG_OFFSET, 1u);
+  CHECK(mmio_region_read32(base, SPI_DEVICE_ALERT_TEST_REG_OFFSET) == 0u,
+        "Expected ALERT_TEST (WO) to read back 0");
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdSpiDeviceFatalFault));
+}
+
 bool test_main(void) {
   mmio_region_t base = mmio_region_from_addr(kSpiDeviceBase);
 
@@ -381,6 +600,8 @@ bool test_main(void) {
   test_csr_subword_permit_masks(base);
   test_dif_get_flash_command_slot_swap_bug(base);
   test_sram_1r1w_ingress_uninitialized_parity_faults(base);
+  test_all_73_csrs_subword_permit_and_readback(base);
+  test_spi_device_intr_and_alert_test(base);
 
   LOG_INFO("All spi_device Earlgrey v2 errata checks passed (faults=%u)",
            g_fault_count);
