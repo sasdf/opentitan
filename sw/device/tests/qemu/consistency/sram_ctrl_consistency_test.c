@@ -291,10 +291,51 @@ bool test_main(void) {
         "Expected byte 0 of laundered word to equal 0xcc, got 0x%08x",
         laundered_word);
 
+  // 4b. After CTRL.RENEW_SCR_KEY = 1, writing one full 64-word (256-byte)
+  // aligned slot (slot 8 at +0x800..+0x8fc) re-encodes valid ECC for those 64
+  // words while leaving other slots (e.g. slot 9 at +0x900..+0x91c) with stale
+  // scrambling ECC that MUST still trigger Ibex Load Integrity NMI on read.
+  // Once all 1024 words (4 KiB) of retention SRAM are written by CPU stores,
+  // all 1024 words read back cleanly with 0 Load Integrity NMIs.
+  sram_init_mem(kSramRetRegsBase);
+  sram_renew_key(kSramRetRegsBase);
+
+  uintptr_t slot8_base = kSramRetRamBase + 0x800u;
+  uintptr_t slot9_base = kSramRetRamBase + 0x900u;
+  for (uint32_t i = 0; i < 64u; ++i) {
+    abs_mmio_write32(slot8_base + i * 4u, 0x33cc0000u + i);
+  }
+  uint32_t nmi_before_slot8 = g_nmi_load_integ_count;
+  for (uint32_t i = 0; i < 64u; ++i) {
+    CHECK(abs_mmio_read32(slot8_base + i * 4u) == (0x33cc0000u + i));
+  }
+  CHECK(g_nmi_load_integ_count == nmi_before_slot8,
+        "Expected 0 Load Integrity NMIs when reading freshly written 64-word "
+        "slot 8");
+
+  uint32_t nmi_before_slot9 = g_nmi_load_integ_count;
+  for (uint32_t i = 0; i < 8u; ++i) {
+    (void)abs_mmio_read32(slot9_base + i * 4u);
+  }
+  CHECK(g_nmi_load_integ_count > nmi_before_slot9,
+        "Expected reading unwritten slot 9 after writing 64-word slot 8 to "
+        "still trigger Ibex Load Integrity NMI");
+
+  for (uint32_t i = 0; i < 1024u; ++i) {
+    abs_mmio_write32(kSramRetRamBase + i * 4u, 0x55aa0000u + i);
+  }
+  uint32_t nmi_before_full_read = g_nmi_load_integ_count;
+  for (uint32_t i = 0; i < 1024u; ++i) {
+    CHECK(abs_mmio_read32(kSramRetRamBase + i * 4u) == (0x55aa0000u + i));
+  }
+  CHECK(g_nmi_load_integ_count == nmi_before_full_read,
+        "Expected 0 Load Integrity NMIs after overwriting all 1024 words of "
+        "retention SRAM");
+
   // Restore clean ECC across retention SRAM via CTRL.INIT = 1:
   sram_init_mem(kSramRetRegsBase);
   LOG_INFO(
-      "Test 4 (Sub-word sb RMW ECC laundering on EccCorrection=0: "
+      "Test 4 (Sub-word sb RMW ECC laundering & partial/full SRAM write init: "
       "laundered_word=0x%08x) PASSED",
       laundered_word);
 
