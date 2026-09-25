@@ -61,6 +61,7 @@
 #include "sw/device/lib/runtime/ibex.h"
 #include "sw/device/lib/runtime/log.h"
 #include "sw/device/lib/testing/test_framework/check.h"
+#include "sw/device/lib/testing/test_framework/ottf_alerts.h"
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
@@ -432,6 +433,219 @@ static void test_usbdev_v2_rxenable_out_preserve_inversion_and_permit(void) {
   CHECK_DIF_OK(dif_usbdev_data_toggle_in_write(&usbdev, 0x0FFFu, 0x0000u));
 }
 
+static void test_usbdev_csrs_fifos_and_alerts(void) {
+  LOG_INFO(
+      "Testing [usbdev.sv:258-315, 993-1181, 1333-1423]: "
+      "INTR_STATE/ENABLE/TEST "
+      "(Event rw1c vs Status test_q), ALERT_TEST, AVOUT/AVSETUP FIFOs, "
+      "FIFO_CTRL, endpoint CSRs, and diagnostic counters");
+
+  // 1. Disable USBCTRL.enable (0x10) and reset FIFOs so Status interrupts
+  // (`av_out_empty`, `av_setup_empty`, `pkt_received`, `rx_full`) have
+  // `event_intr_i == 0`.
+  abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET, 0x7u);
+  busy_spin_micros(10);
+
+  // Verify INTR_ENABLE (0x04) 18-bit mask (`0x0003FFFF`), clear INTR_TEST
+  // (`0x08`) `test_q` latches and INTR_STATE (`0x00`) `rw1c` latches.
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0xFFFFFFFFu);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET) ==
+        0x0003FFFFu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_ENABLE_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET, 0x0003FFFFu);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) == 0u);
+
+  // Write `0x0003FFFF` to `INTR_TEST` (`0x08`, `WO`):
+  // - `INTR_TEST` reads back `0`.
+  // - All 18 interrupt bits in `INTR_STATE` (`0x00`) read `1` (`0x0003FFFF`).
+  // - Writing `0x0003FFFF` (`W1C`) to `INTR_STATE` clears the 13 `Event`
+  //   (`rw1c`) bits (`0x0001FE7C`), while the 5 `Status` (`ro`) bits
+  //   (`0x00020183`: `pkt_received`[0], `pkt_sent`[1], `av_out_empty`[7],
+  //   `rx_full`[8], `av_setup_empty`[17]) remain `1` via `prim_intr_hw`
+  //   `test_q` (`prim_intr_hw.sv:74-86`).
+  // - Writing `0` to `INTR_TEST` clears `test_q <= 0`, dropping `INTR_STATE`
+  //   to `0x00000000`.
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0x0003FFFFu);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) ==
+        0x0003FFFFu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET, 0x0003FFFFu);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) ==
+        0x00020183u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_TEST_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) == 0u);
+
+  // 2. Verify `ALERT_TEST` (`0x0c`, `WO`, `USBDEV_PERMIT[3] = 4'b0001` accepts
+  // 1-byte `sb`) triggers a 1-cycle transient alert pulse on
+  // `kTopEarlgreyAlertIdUsbdevFatalFault` across consecutive writes.
+  g_fault_count = 0;
+  for (int i = 0; i < 2; ++i) {
+    CHECK_STATUS_OK(
+        ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdUsbdevFatalFault));
+    *(volatile uint8_t *)(uintptr_t)(kUsbdevBase +
+                                     USBDEV_ALERT_TEST_REG_OFFSET) = 1u;
+    CHECK(g_fault_count == 0u,
+          "1-byte write to ALERT_TEST (4'b0001) must succeed without fault");
+    CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_ALERT_TEST_REG_OFFSET) == 0u);
+    CHECK_STATUS_OK(
+        ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdUsbdevFatalFault));
+  }
+
+  // 3. Enable `USBCTRL.enable = 1` (`0x10`) and test `AVOUTBUFFER` (`0x20`,
+  // depth 8), `AVSETUPBUFFER` (`0x24`, depth 4), `FIFO_CTRL` (`0x98`, `WO`),
+  // live Status interrupts `av_out_empty` (`bit 7`) / `av_setup_empty` (`bit
+  // 17`), and `av_overflow` (`bit 9`, `rw1c`).
+  abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET,
+                   1u << USBDEV_USBCTRL_ENABLE_BIT);
+  abs_mmio_write32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET, 0x7u);
+  busy_spin_micros(10);
+  uint32_t intr_state =
+      abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
+  CHECK((intr_state & ((1u << USBDEV_INTR_STATE_AV_OUT_EMPTY_BIT) |
+                       (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT))) ==
+        ((1u << USBDEV_INTR_STATE_AV_OUT_EMPTY_BIT) |
+         (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT)));
+  CHECK((intr_state & (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) == 0u);
+
+  for (uint32_t i = 0; i < 8u; ++i) {
+    abs_mmio_write32(kUsbdevBase + USBDEV_AVOUTBUFFER_REG_OFFSET, i);
+    if (i == 0u) {
+      intr_state = abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
+      CHECK((intr_state & (1u << USBDEV_INTR_STATE_AV_OUT_EMPTY_BIT)) == 0u);
+      CHECK((intr_state & (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT)) != 0u);
+    }
+  }
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_AVOUTBUFFER_REG_OFFSET) == 0u);
+  uint32_t stat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_OUT_DEPTH_MASK) == 8u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_FULL_BIT) & 1u) == 1u);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+         (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) == 0u);
+
+  // 9th write to AVOUTBUFFER triggers `av_overflow` (`bit 9`) while keeping
+  // depth capped at 8.
+  abs_mmio_write32(kUsbdevBase + USBDEV_AVOUTBUFFER_REG_OFFSET, 8u);
+  stat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_OUT_DEPTH_MASK) == 8u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_FULL_BIT) & 1u) == 1u);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+         (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) != 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET,
+                   1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+         (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) == 0u);
+
+  // Push 4 buffers (`8..11`) to AVSETUPBUFFER (`0x24`, depth 4).
+  for (uint32_t i = 0; i < 4u; ++i) {
+    abs_mmio_write32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET, 8u + i);
+    if (i == 0u) {
+      intr_state = abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
+      CHECK((intr_state & (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT)) == 0u);
+    }
+  }
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET) == 0u);
+  stat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_SETUP_DEPTH_MASK) == 4u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_FULL_BIT) & 1u) == 1u);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+         (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) == 0u);
+
+  // 5th write to AVSETUPBUFFER triggers `av_overflow` (`bit 9`) while keeping
+  // depth capped at 4.
+  abs_mmio_write32(kUsbdevBase + USBDEV_AVSETUPBUFFER_REG_OFFSET, 12u);
+  stat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_SETUP_DEPTH_MASK) == 4u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_FULL_BIT) & 1u) == 1u);
+  CHECK((abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET) &
+         (1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT)) != 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET,
+                   1u << USBDEV_INTR_STATE_AV_OVERFLOW_BIT);
+
+  // Reset all FIFOs via `FIFO_CTRL` (`0x98`, `WO`) and verify depths return to
+  // 0 and Status interrupts `av_out_empty` and `av_setup_empty` re-assert.
+  abs_mmio_write32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET, 0x7u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_FIFO_CTRL_REG_OFFSET) == 0u);
+  stat = abs_mmio_read32(kUsbdevBase + USBDEV_USBSTAT_REG_OFFSET);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_OUT_DEPTH_MASK) == 0u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_OUT_FULL_BIT) & 1u) == 0u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_DEPTH_OFFSET) &
+         USBDEV_USBSTAT_AV_SETUP_DEPTH_MASK) == 0u);
+  CHECK(((stat >> USBDEV_USBSTAT_AV_SETUP_FULL_BIT) & 1u) == 0u);
+  intr_state = abs_mmio_read32(kUsbdevBase + USBDEV_INTR_STATE_REG_OFFSET);
+  CHECK((intr_state & ((1u << USBDEV_INTR_STATE_AV_OUT_EMPTY_BIT) |
+                       (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT))) ==
+        ((1u << USBDEV_INTR_STATE_AV_OUT_EMPTY_BIT) |
+         (1u << USBDEV_INTR_STATE_AV_SETUP_EMPTY_BIT)));
+
+  // 4. Verify 12-bit endpoint bitmask CSRs (`EP_OUT_ENABLE` `0x14`,
+  // `EP_IN_ENABLE` `0x18`, `OUT_STALL` `0x3c`, `IN_STALL` `0x40`, `OUT_ISO`
+  // `0x74`, `IN_ISO` `0x78`), `CONFIGIN_0..11` (`0x44..0x70`), and diagnostic
+  // counters (`COUNT_OUT` `0x9c`, `COUNT_IN` `0xa0`, `COUNT_NODATA_IN` `0xa4`,
+  // `COUNT_ERRORS` `0xa8`).
+  const uint32_t kEpMaskRegs[] = {
+      USBDEV_EP_OUT_ENABLE_REG_OFFSET, USBDEV_EP_IN_ENABLE_REG_OFFSET,
+      USBDEV_OUT_STALL_REG_OFFSET,     USBDEV_IN_STALL_REG_OFFSET,
+      USBDEV_OUT_ISO_REG_OFFSET,       USBDEV_IN_ISO_REG_OFFSET,
+  };
+  for (size_t i = 0; i < sizeof(kEpMaskRegs) / sizeof(kEpMaskRegs[0]); ++i) {
+    abs_mmio_write32(kUsbdevBase + kEpMaskRegs[i], 0xFFFFFFFFu);
+    CHECK(abs_mmio_read32(kUsbdevBase + kEpMaskRegs[i]) == 0x00000FFFu);
+    abs_mmio_write32(kUsbdevBase + kEpMaskRegs[i], 0u);
+    CHECK(abs_mmio_read32(kUsbdevBase + kEpMaskRegs[i]) == 0u);
+  }
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_CONFIGIN_0_REG_OFFSET, 0x0000401Fu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_CONFIGIN_11_REG_OFFSET, 0x00002A15u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_CONFIGIN_0_REG_OFFSET) ==
+        0x0000401Fu);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_CONFIGIN_11_REG_OFFSET) ==
+        0x00002A15u);
+  g_fault_count = 0;
+  *(volatile uint16_t *)(uintptr_t)(kUsbdevBase +
+                                    USBDEV_CONFIGIN_0_REG_OFFSET) = 0u;
+  CHECK(g_fault_count == 1u,
+        "16-bit sh to CONFIGIN_0 (4'b1111) must fault with mcause=7");
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_CONFIGIN_0_REG_OFFSET) ==
+        0x0000401Fu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_CONFIGIN_0_REG_OFFSET, 0u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_CONFIGIN_11_REG_OFFSET, 0u);
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_OUT_REG_OFFSET, 0xFFFFFFFFu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_IN_REG_OFFSET, 0xFFFFFFFFu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_NODATA_IN_REG_OFFSET,
+                   0xFFFFFFFFu);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_ERRORS_REG_OFFSET, 0xFFFFFFFFu);
+  busy_spin_micros(10);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_OUT_REG_OFFSET) ==
+        0x0FFFF000u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_IN_REG_OFFSET) ==
+        0x0FFFE000u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_NODATA_IN_REG_OFFSET) ==
+        0x0FFF0000u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_ERRORS_REG_OFFSET) ==
+        0x78000000u);
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_OUT_REG_OFFSET, 0x80000000u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_IN_REG_OFFSET, 0x80000000u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_NODATA_IN_REG_OFFSET,
+                   0x80000000u);
+  abs_mmio_write32(kUsbdevBase + USBDEV_COUNT_ERRORS_REG_OFFSET, 0x80000000u);
+  busy_spin_micros(10);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_OUT_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_IN_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_NODATA_IN_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kUsbdevBase + USBDEV_COUNT_ERRORS_REG_OFFSET) == 0u);
+
+  abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0u);
+}
+
 bool test_main(void) {
   LOG_INFO("Starting usbdev CW340 FPGA errata-v2 verification test (P31)");
 
@@ -446,6 +660,7 @@ bool test_main(void) {
   test_usbdev_resume_link_active_no_sof_and_tx_osc(&pinmux);
   test_usbdev_buffer_asymmetric_subword_and_csr_faults();
   test_usbdev_v2_rxenable_out_preserve_inversion_and_permit();
+  test_usbdev_csrs_fifos_and_alerts();
 
   LOG_INFO("All usbdev errata-v2 checks PASSED on CW340 FPGA");
   return true;

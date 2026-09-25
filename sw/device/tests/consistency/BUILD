@@ -288,6 +288,7 @@ opentitan_test(
         "//sw/device/lib/runtime:ibex",
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_isrs",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
