@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -53,6 +54,15 @@ package(default_visibility = ["//visibility:public"])
         # leftover flash image from a previous test to run.  So, bootstrap an
         # unsigned image to force a boot failure.
         manifest = None,
+        qemu = qemu_params(
+            timeout = "moderate",
+            binaries = {"//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware"},
+            otp = ":otp_img_e2e_bootstrap_entry_{}".format(lc_state),
+            test_cmd = """
+                --bootstrap="{firmware}"
+            """,
+            test_harness = "//sw/host/tests/rom/e2e_bootstrap_entry",
+        ),
     )
     for lc_state, lc_state_val in get_lc_items()
 ]

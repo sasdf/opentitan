@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -44,6 +45,19 @@ package(default_visibility = ["//visibility:public"])
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
+            binaries = {
+                "//sw/device/examples/sram_program:sram_program": "sram_program",
+            },
+            logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = """
+                --elf={sram_program}
+            """,
+            test_harness = "//sw/host/tests/chip/jtag:sram_load",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             binaries = {
                 "//sw/device/examples/sram_program:sram_program": "sram_program",
             },
@@ -99,6 +113,14 @@ test_suite(
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
             testopt_bootstrap = "False",
         ),
+        qemu = qemu_params(
+            logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:asm_interrupt_handler",
+            testopt_bootstrap = "False",
+        ),
         deps = [
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing/test_framework:ottf_main",
@@ -142,6 +164,14 @@ test_suite(
             test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:shutdown_execution_asm",
             testopt_bootstrap = "False",
         ),
+        qemu = qemu_params(
+            logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}",
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:shutdown_execution_asm",
+            testopt_bootstrap = "False",
+        ),
         deps = [
             "//sw/device/lib/runtime:log",
             "//sw/device/lib/testing/test_framework:ottf_main",
@@ -175,7 +205,6 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -219,7 +248,6 @@ test_suite(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             logging = "debug",
@@ -270,8 +298,18 @@ LC_STATES_DEBUG_DISALLOWED = [
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            timeout = "moderate",
+            logging = "debug",
+            needs_jtag = True,
+            otp = ":img_{}_exec_disabled".format(lc_state),
+            test_cmd = " --elf={rom:elf}" + (" --expect-fail" if lc_state_val in LC_STATES_DEBUG_DISALLOWED else " "),
+            test_harness = "//sw/host/tests/rom/e2e_openocd_debug_test:debug_test",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             timeout = "moderate",
             logging = "debug",
             needs_jtag = True,

@@ -7,6 +7,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:keyutils.bzl", "ECDSA_ONLY_KEY_STRUCTS")
 load("//rules:const.bzl", "CONST")
@@ -80,6 +81,12 @@ opentitan_test(
         otp = "otp_img_bootstrap_rma",
         test_harness = "//sw/host/tests/rom/e2e_bootstrap_rma",
     ),
+    qemu = qemu_params(
+        icount = 5,
+        needs_jtag = True,
+        otp = "otp_img_bootstrap_rma",
+        test_harness = "//sw/host/tests/rom/e2e_bootstrap_rma",
+    ),
     deps = [
         "//hw/top:top_lib",
         "//sw/device/lib/base:macros",
@@ -107,4 +114,12 @@ opentitan_test(
         testopt_bootstrap = "False",
     ),
     manifest = None,
+    qemu = qemu_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:new_empty_test_slot_a": "firmware",
+        },
+        otp = "//hw/top_earlgrey/data/otp:img_bootstrap_disabled",
+        test_harness = "//sw/host/tests/rom/e2e_bootstrap_disabled",
+        testopt_bootstrap = "False",
+    ),
 )
