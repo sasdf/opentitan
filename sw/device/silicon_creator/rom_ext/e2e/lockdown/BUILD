@@ -5,6 +5,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load("//hw/top:defs.bzl", "opentitan_require_top")
 
@@ -25,6 +26,10 @@ opentitan_test(
         # OTP_CTRL_SW_CFG_WINDOW_REG_OFFSET + OTP_CTRL_PARAM_CREATOR_SW_CFG_OFFSET.
         exit_success = "FAULT: Load Access Fault.*MTVAL=40131040\r\n",
         tags = ["broken"],
+    ),
+    qemu = qemu_params(
+        exit_failure = "PASS|FAIL|BFV:.*\r\n",
+        exit_success = "FAULT: Load Access Fault.*MTVAL=40130840\r\n",
     ),
     deps = [
         "//hw/top:top_lib",
@@ -49,6 +54,11 @@ opentitan_test(
         # the REGWEN register will fail and cause a fault.
         # The address below # corresponds to the OTP controller at
         # OTP_CTRL_CHECK_REGWEN_REG_OFFSET.
+        exit_success = "FAULT: Load Access Fault.*MTVAL=4013003c\r\n",
+        tags = ["broken"],
+    ),
+    qemu = qemu_params(
+        exit_failure = "PASS|FAIL|BFV:.*\r\n",
         exit_success = "FAULT: Load Access Fault.*MTVAL=4013003c\r\n",
         tags = ["broken"],
     ),
@@ -86,6 +96,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
+        tags = ["broken"],
+    ),
+    qemu = qemu_params(
         tags = ["broken"],
     ),
     deps = [
