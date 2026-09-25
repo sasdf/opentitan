@@ -203,13 +203,13 @@ fn usbdev_suspend(
     // The full suspend-sleep-resume testing is decomposed into a number of shorter sequences to
     // make chip-level simulation feasible. Most of the top-level tests that this harness supports
     // expects to run through a short sub-sequence of these test phases.
-    log::info!("Phase sequence - {init_phase} to {fin_phase} inclusive");
+    log::info!("Phase sequence - {} to {} inclusive", init_phase, fin_phase);
 
     for iter in 1..=opts.num_iters {
         log::info!("Iteration {} of {}", iter, opts.num_iters);
         let mut phase = init_phase.clone();
         loop {
-            log::info!("Test phase {phase}");
+            log::info!("Test phase {}", phase);
 
             // Synchronize with the device-side code; it shall always emit this message at the point
             // of being ready to receive the stimulus within a given test phase, because we have
@@ -289,7 +289,11 @@ fn usbdev_suspend(
                         connect(&opts.usb, transport)?;
                     } else {
                         log::info!("Skipping VBUS Disconnection because support unavailable");
-                        resume(&hub, port, !opts.usb.relaxed_hub_op)?;
+                        // When VBUS control is not available (e.g. on FPGA), the device will prepare
+                        // everything to go to sleep but it will not actually sleep and go on with
+                        // the next phase immediately. Since the next phase is to shutdown, the device
+                        // will then disconnect from the bus. This means that at this point, the device
+                        // may or may not be connected.
                     }
                     next_phase = SuspendPhase::Shutdown;
                 }
@@ -336,7 +340,7 @@ fn main() -> Result<()> {
 
     // Wait until test is running.
     let uart = transport.uart("console")?;
-    UartConsole::wait_for(&*uart, r"Running [^\r\n]*", opts.timeout)?;
+    UartConsole::wait_for(&*uart, r"Running ", opts.timeout)?;
 
     execute_test!(usbdev_suspend_and_drain, &opts, &transport, &*uart);
     Ok(())

@@ -25,7 +25,7 @@ struct Opts {
     init: InitializeTest,
 
     /// Console receive timeout.
-    #[arg(long, value_parser = humantime::parse_duration, default_value = "60s")]
+    #[arg(long, value_parser = humantime::parse_duration, default_value = "10s")]
     timeout: Duration,
     #[arg(long, help = "Unlock private key (ECDSA P256)")]
     unlock_key: Option<PathBuf>,
@@ -136,39 +136,32 @@ fn flash_limit_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     // protocol buffers 2K blocks to write to flash.  After writing the first
     // 384K, block 385 and 386 will be buffered in RAM and the rescue module
     // will reject the write request and terminate the upload.
-    let rescue_size_pages = 200;
-    // 512 is NVM_BYTES_PER_PAGE in RRAM
-    let firmware_bytes = rescue_size_pages * 512;
-    // Payload needs to be larger than limit to trigger Cancellation. Add 2048 (2 blocks).
-    let data = vec![0u8; 65536 + firmware_bytes + 2048];
+    let data = vec![0u8; (128 + 200) * 512 + 2048];
     rescue.enter(transport, EntryMode::Reset)?;
     let result = rescue.update_firmware(BootSlot::SlotA, &data);
     assert_eq!(result.unwrap_err().to_string(), "Cancelled");
     log::info!("Got expected 'Cancel' during upload of too-large payload.");
 
     log::info!("###### Boot After Transfer Complete ######");
-    // ROM_EXT size max is 64KB (128 pages).
-    let rom_ext_bytes = 65536;
-    let firmware_end = 0x30000000 + rom_ext_bytes + firmware_bytes as u32;
-    let firmware_last_page = firmware_end - 512;
-
-    log::info!(
-        "Expecting to see 0 before offset 0x{:08x} and 0xffffffff at/after offset 0x{:08x}.",
-        firmware_end,
-        firmware_end
-    );
-
+    log::info!("Expecting to see 0 before offset 0x70000 and 0xffffffff at/after offset 0x70000.");
+    // The firmware in the target will print the first word of each flash page
+    // in the range [0x10000..0x80000).  We'll capture the last word of the
+    // firmware segment and the first word of the filesystem segment and
+    // verify that the firmware segement is programmed (value 0) and the
+    // filesystem segment remains unprogramed (value ffffffff).
     transport.reset_with_delay(UartRx::Clear, Duration::from_millis(50))?;
-    let re1 = format!(r"flash 0x{:08x} = (\w+)\r", firmware_last_page);
-    let cap1 = UartConsole::wait_for_bytes(&*uart, &re1, opts.timeout)?;
-    assert_eq!(&cap1[1], "0");
+    let capture = UartConsole::wait_for_bytes(
+        &*uart,
+        r"(?msR)flash 0x30028e00 = (\w+)\r.*flash 0x30029000 = (\w+)\r|BFV:([0-9A-Fa-f]{8})\r",
+        opts.timeout,
+    )?;
 
-    let re2 = format!(r"flash 0x{:08x} = (\w+)\r", firmware_end);
-    let cap2 = UartConsole::wait_for_bytes(&*uart, &re2, opts.timeout)?;
-    assert_eq!(&cap2[1], "ffffffff");
-
+    if capture[0].starts_with("BFV") {
+        return RomError(u32::from_str_radix(&capture[3], 16)?).into();
+    }
+    assert_eq!(capture[1], "0");
+    assert_eq!(capture[2], "ffffffff");
     UartConsole::wait_for_bytes(&*uart, r"PASS!", opts.timeout)?;
-
     Ok(())
 }
 

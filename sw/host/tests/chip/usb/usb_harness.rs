@@ -266,7 +266,7 @@ fn main() -> Result<()> {
 
     // Wait until test is running.
     let uart = transport.uart("console")?;
-    UartConsole::wait_for(&*uart, r"Running [^\r\n]*", opts.timeout)?;
+    UartConsole::wait_for(&*uart, r"Running ", opts.timeout)?;
 
     opts.usb.apply_strappings(&transport, true)?;
     // Enable VBUS sense on the board if necessary.
