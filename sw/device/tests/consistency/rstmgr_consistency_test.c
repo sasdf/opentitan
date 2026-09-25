@@ -370,6 +370,27 @@ static void verify_post_sw_reset_errata(void) {
       k_diff, dump[0], cpu_slots[0]);
 }
 
+static void test_sw_rst_regwen_lock(void) {
+  LOG_INFO("Testing SW_RST_REGWEN locking...");
+  // Use index 0 (SPI_DEVICE) as an example.
+  // Verify default state
+  uint32_t ctrl_val =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET);
+  CHECK(ctrl_val == 1u, "Expected SW_RST_CTRL_N[0] to equal 1 at reset");
+
+  // Lock the register
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET, 0u);
+  uint32_t regwen =
+      abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET);
+  CHECK(regwen == 0u, "Expected SW_RST_REGWEN[0] to be 0 after lock");
+
+  // Attempt to write to locked register
+  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET, 0u);
+  ctrl_val = abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET);
+  CHECK(ctrl_val == 1u,
+        "Expected SW_RST_CTRL_N[0] to stay 1 after being locked");
+}
+
 bool test_main(void) {
   LOG_INFO("=== RSTMGR Earlgrey v2 (trunk-v2) Errata Verification Test ===");
   uint32_t reset_info =
@@ -378,8 +399,12 @@ bool test_main(void) {
   LOG_INFO("  Boot RESET_INFO = 0x%x", reset_info);
 
   if ((reset_info & (1u << RSTMGR_RESET_INFO_SW_RESET_BIT)) == 0u) {
+    // Assert POR reset state logic
+    CHECK(reset_info == 1u,
+          "Expected initial POR Reset_Info to literally be 1");
     test_v1_003_reset_req_in_flight_cancel();
     test_v1_005_permit_subword_and_addrmiss_faults();
+    test_sw_rst_regwen_lock();
 
     // Arm ALERT_INFO_CTRL (EN=1, INDEX=5) and CPU_INFO_CTRL (EN=1, INDEX=3)
     // and trigger SW_RESET.
