@@ -537,6 +537,22 @@ bool test_main(void) {
 
   g_fault_count = 0;
   g_intg_nmi_count = 0;
+  fault_write32(kRramHostBase + (4091u * kRramPageBytes), 0xdeadbeefu,
+                kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(g_intg_nmi_count == 0u);
+
+  g_fault_count = 0;
+  g_intg_nmi_count = 0;
+  fault_read32(kRramHostBase + (4095u * kRramPageBytes),
+               kIbexExcLoadAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcLoadAccessFault);
+  CHECK(g_intg_nmi_count == 0u);
+
+  g_fault_count = 0;
+  g_intg_nmi_count = 0;
   fault_write32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET, 0x12345678u,
                 kIbexExcStoreAccessFault);
   CHECK(g_fault_count == 1u);
@@ -579,23 +595,57 @@ bool test_main(void) {
 
   // ---------------------------------------------------------------------------
   // 7. [rram_macro_prim_reg_top.sv] (`0x41018000`):
-  //    `CSR2` (`0x08`) `rw` bits (`0x88`) omit `CSR0_REGWEN` (`0x00`) gating
-  //    and remain writable after `CSR0_REGWEN` is locked to `0`.
+  //    - `CSR0_REGWEN` (`0x00`) is `SwAccessW0C` (`rw0c`), `PERMIT = 4'b0001`.
+  //    - `CSR1` (`0x04`) is 13-bit `rw` gated by `CSR0_REGWEN`, `PERMIT =
+  //      4'b0011` (1-byte `sb` store faults with `mcause = 7`).
+  //    - `CSR2` (`0x08`) `rw` bits (`0x88`) omit `CSR0_REGWEN` (`0x00`) gating
+  //      and remain writable after `CSR0_REGWEN` is locked to `0`, while `w1c`
+  //      bits (`0x77`) and unimplemented bits `[31:8]` read back `0`.
+  //    - Out-of-bounds offset `0x0cu` (`addrmiss = 1`) faults on read/write.
   // ---------------------------------------------------------------------------
   LOG_INFO(
-      "Verifying [rram_macro_prim_reg_top.sv]: CSR2 (0x08) bypasses "
-      "CSR0_REGWEN (0x00)");
-  abs_mmio_write32(kRramPrimBase + 0x04u, 0x123u);  // CSR1
+      "Verifying [rram_macro_prim_reg_top.sv]: CSR0_REGWEN rw0c, CSR1 PERMIT, "
+      "CSR2 (0x08) rw/w1c & lock bypass, and addrmiss faults");
+  abs_mmio_write32(kRramPrimBase + 0x00u, 1u);  // rw0c: writing 1 keeps 1
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x00u) == 1u);
+  abs_mmio_write32(kRramPrimBase + 0x04u, 0x3f123u);  // CSR1 masks to [12:0]
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x04u) == 0x1123u);
+  g_fault_count = 0;
+  fault_write8(kRramPrimBase + 0x04u, 0x55u, kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x04u) == 0x1123u);
+  abs_mmio_write32(kRramPrimBase + 0x04u, 0x123u);
   CHECK(abs_mmio_read32(kRramPrimBase + 0x04u) == 0x123u);
+
   abs_mmio_write32(kRramPrimBase + 0x00u, 0u);  // Lock CSR0_REGWEN = 0
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x00u) == 0u);
+  abs_mmio_write32(kRramPrimBase + 0x00u, 1u);  // rw0c: writing 1 stays 0!
   CHECK(abs_mmio_read32(kRramPrimBase + 0x00u) == 0u);
   abs_mmio_write32(kRramPrimBase + 0x04u, 0x456u);  // CSR1 write ignored
   CHECK(abs_mmio_read32(kRramPrimBase + 0x04u) == 0x123u);
   abs_mmio_write32(kRramPrimBase + 0x08u,
-                   0x88u);  // CSR2 rw bits [7,3] bypass lock!
-  CHECK((abs_mmio_read32(kRramPrimBase + 0x08u) & 0x88u) == 0x88u);
+                   0xffffffffu);  // CSR2 rw bits [7,3] (0x88) bypass lock!
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x08u) == 0x88u);
+  abs_mmio_write8(kRramPrimBase + 0x08u, 0x08u);  // PERMIT[2] = 4'b0001
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x08u) == 0x08u);
   abs_mmio_write32(kRramPrimBase + 0x08u, 0x00u);
-  CHECK((abs_mmio_read32(kRramPrimBase + 0x08u) & 0x88u) == 0x00u);
+  CHECK(abs_mmio_read32(kRramPrimBase + 0x08u) == 0x00u);
+
+  g_fault_count = 0;
+  fault_write8(kRramPrimBase + 0x08u + 1u, 0x88u, kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
+
+  g_fault_count = 0;
+  fault_read32(kRramPrimBase + 0x0cu, kIbexExcLoadAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcLoadAccessFault);
+
+  g_fault_count = 0;
+  fault_write32(kRramPrimBase + 0x0cu, 0x1u, kIbexExcStoreAccessFault);
+  CHECK(g_fault_count == 1u);
+  CHECK(g_last_fault_mcause == kIbexExcStoreAccessFault);
 
   // ---------------------------------------------------------------------------
   // 8. [rram_ctrl.sv:485, 575]:
@@ -733,6 +783,96 @@ bool test_main(void) {
         0xa5a55a5au);
   CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
         0x5a5aa5a5u);
+  clear_rram_status();
+
+  // ---------------------------------------------------------------------------
+  // 10. [rram_ctrl.sv:31-32, 571, 579, 586, 1185-1188] &
+  //     [rram_ctrl_pkg.sv:57]:
+  //     - `FIFO_LVL` (`0x110`, 5-bit `WR` `[4:0]` and 5-bit `RD` `[12:8]`)
+  //       controls watermark status interrupts `INTR_STATE.WR_LVL`
+  //       (`wr_fifo_rvalid <= FIFO_LVL.WR`) and `INTR_STATE.RD_LVL`
+  //       (`rd_fifo_wdepth >= FIFO_LVL.RD`).
+  //     - `RdFifoDepth = 16`: reading 16 words (`CONTROL.NUM = 15`) fills
+  //       `RD_FIFO` to capacity (`CURR_FIFO_LVL.RD == 16`, `0x1000`),
+  //       asserting `STATUS.RD_FULL == 1` and `INTR_STATE.RD_FULL == 1`.
+  //       Popping 1 word drops `CURR_FIFO_LVL.RD` to `15` (`0x0f00`) and
+  //       deasserts `STATUS.RD_FULL == 0` and `INTR_STATE.RD_FULL == 0`.
+  // ---------------------------------------------------------------------------
+  LOG_INFO(
+      "Verifying [rram_ctrl.sv:571, 579, 586, 1185-1188]: FIFO_LVL watermark "
+      "thresholds and RdFifoDepth = 16 RD_FULL status/interrupt");
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_FIFO_LVL_REG_OFFSET, 0xffff0402u);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_FIFO_LVL_REG_OFFSET) ==
+        0x0402u);
+  intr_state = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_WR_LVL_BIT));
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_LVL_BIT));
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_FULL_BIT));
+
+  uint32_t rd4_ctrl =
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_START_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_OP_FIELD,
+                             RRAM_CTRL_CONTROL_OP_VALUE_READ) |
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_PARTITION_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_NUM_FIELD, 3u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, rd4_ctrl);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CURR_FIFO_LVL_REG_OFFSET) ==
+        0x0400u);
+  intr_state = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_LVL_BIT));
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_FULL_BIT));
+
+  // Raising `FIFO_LVL.RD` from 4 to 5 while `CURR_FIFO_LVL.RD == 4` immediately
+  // deasserts status-type `INTR_STATE.RD_LVL`:
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_FIFO_LVL_REG_OFFSET, 0x0502u);
+  intr_state = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_LVL_BIT));
+  for (int i = 0; i < 4; ++i) {
+    (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
+  }
+  clear_rram_status();
+
+  // Issue a 16-word `RramOpRead` (`CONTROL.NUM = 15`) to fill `RD_FIFO` to
+  // `RdFifoDepth = 16`:
+  uint32_t rd16_ctrl =
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_START_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_OP_FIELD,
+                             RRAM_CTRL_CONTROL_OP_VALUE_READ) |
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_PARTITION_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_NUM_FIELD, 15u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, rd16_ctrl);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CURR_FIFO_LVL_REG_OFFSET) ==
+        0x1000u);
+  uint32_t rram_status =
+      abs_mmio_read32(kRramCoreBase + RRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(rram_status, RRAM_CTRL_STATUS_RD_FULL_BIT));
+  CHECK(!bitfield_bit32_read(rram_status, RRAM_CTRL_STATUS_RD_EMPTY_BIT));
+  intr_state = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_FULL_BIT));
+  CHECK(bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_LVL_BIT));
+
+  // Pop 1 word -> `CURR_FIFO_LVL.RD` drops to 15 (`0x0f00`), deasserting
+  // `STATUS.RD_FULL` and `INTR_STATE.RD_FULL`:
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
+        0xa5a55a5au);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CURR_FIFO_LVL_REG_OFFSET) ==
+        0x0f00u);
+  rram_status = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_STATUS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(rram_status, RRAM_CTRL_STATUS_RD_FULL_BIT));
+  intr_state = abs_mmio_read32(kRramCoreBase + RRAM_CTRL_INTR_STATE_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(intr_state, RRAM_CTRL_INTR_STATE_RD_FULL_BIT));
+
+  // Drain remaining 15 words and restore default `FIFO_LVL = 0x0f0fu`:
+  for (int i = 0; i < 15; ++i) {
+    (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
+  }
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_CURR_FIFO_LVL_REG_OFFSET) ==
+        0u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_FIFO_LVL_REG_OFFSET, 0x0f0fu);
   clear_rram_status();
 
   LOG_INFO("=== All rram_ctrl_consistency_test checks PASSED! ===");
