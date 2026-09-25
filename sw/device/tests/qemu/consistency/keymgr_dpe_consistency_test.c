@@ -69,6 +69,70 @@ bool test_main(void) {
   err_code = abs_mmio_read32(kBase + KEYMGR_DPE_ERR_CODE_REG_OFFSET);
   CHECK(err_code == 0, "Expected successful shadow commit");
 
+  // 2b. Advance Slot 0 (CreatorRootKey -> OwnerIntKey, consuming RRAM
+  // owner_seed) and generate a SW key to verify RRAM seed wiring and KDF.
+  abs_mmio_write32_shadowed(kBase + KEYMGR_DPE_MAX_KEY_VER_SHADOWED_REG_OFFSET,
+                            1);
+  abs_mmio_write32(kBase + KEYMGR_DPE_MAX_KEY_VER_REGWEN_REG_OFFSET, 0);
+  for (uint32_t i = 0; i < 8; ++i) {
+    abs_mmio_write32(kBase + KEYMGR_DPE_SW_BINDING_0_REG_OFFSET + i * 4,
+                     0x10 + i);
+  }
+  abs_mmio_write32(kBase + KEYMGR_DPE_SW_BINDING_REGWEN_REG_OFFSET, 0);
+  abs_mmio_write32(kBase + KEYMGR_DPE_SLOT_POLICY_REG_OFFSET,
+                   1u << KEYMGR_DPE_SLOT_POLICY_ALLOW_CHILD_BIT);
+  abs_mmio_write32(kBase + KEYMGR_DPE_SLOT_POLICY_REGWEN_REG_OFFSET, 0);
+
+  uint32_t adv_ctrl = bitfield_field32_write(
+      0, KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_FIELD,
+      KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE);
+  abs_mmio_write32_shadowed(kBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET,
+                            adv_ctrl);
+  abs_mmio_write32(kBase + KEYMGR_DPE_START_REG_OFFSET, 1);
+
+  uint32_t op_status;
+  do {
+    op_status = abs_mmio_read32(kBase + KEYMGR_DPE_OP_STATUS_REG_OFFSET);
+  } while (op_status == KEYMGR_DPE_OP_STATUS_STATUS_VALUE_WIP);
+  abs_mmio_write32(kBase + KEYMGR_DPE_OP_STATUS_REG_OFFSET, op_status);
+  CHECK(op_status == KEYMGR_DPE_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
+        "Expected DONE_SUCCESS on OwnerIntKey advance, got 0x%x", op_status);
+  CHECK(abs_mmio_read32(kBase + KEYMGR_DPE_ERR_CODE_REG_OFFSET) == 0,
+        "Expected ERR_CODE == 0 after OwnerIntKey advance");
+  CHECK(
+      abs_mmio_read32(kBase + KEYMGR_DPE_DEBUG_REG_OFFSET) == 0,
+      "Expected DEBUG == 0 (valid RRAM owner_seed) after OwnerIntKey advance");
+
+  abs_mmio_write32(kBase + KEYMGR_DPE_KEY_VERSION_REG_OFFSET, 0);
+  for (uint32_t i = 0; i < 8; ++i) {
+    abs_mmio_write32(kBase + KEYMGR_DPE_SALT_0_REG_OFFSET + i * 4, i + 1);
+  }
+  uint32_t gen_ctrl = bitfield_field32_write(
+      0, KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_FIELD,
+      KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_VALUE_GENERATE_SW_OUTPUT);
+  abs_mmio_write32_shadowed(kBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET,
+                            gen_ctrl);
+  abs_mmio_write32(kBase + KEYMGR_DPE_START_REG_OFFSET, 1);
+
+  do {
+    op_status = abs_mmio_read32(kBase + KEYMGR_DPE_OP_STATUS_REG_OFFSET);
+  } while (op_status == KEYMGR_DPE_OP_STATUS_STATUS_VALUE_WIP);
+  abs_mmio_write32(kBase + KEYMGR_DPE_OP_STATUS_REG_OFFSET, op_status);
+  CHECK(op_status == KEYMGR_DPE_OP_STATUS_STATUS_VALUE_DONE_SUCCESS,
+        "Expected DONE_SUCCESS on SW key generate, got 0x%x", op_status);
+  CHECK(abs_mmio_read32(kBase + KEYMGR_DPE_ERR_CODE_REG_OFFSET) == 0,
+        "Expected ERR_CODE == 0 after SW key generate");
+
+  uint32_t key_nonzero = 0;
+  for (uint32_t i = 0; i < 8; ++i) {
+    uint32_t s0 = abs_mmio_read32(
+        kBase + KEYMGR_DPE_SW_SHARE0_OUTPUT_0_REG_OFFSET + i * 4);
+    uint32_t s1 = abs_mmio_read32(
+        kBase + KEYMGR_DPE_SW_SHARE1_OUTPUT_0_REG_OFFSET + i * 4);
+    key_nonzero |= (s0 ^ s1);
+  }
+  CHECK(key_nonzero != 0, "Expected non-zero generated SW key");
+
   // 4. SIDELOAD_CLEAR Priority
   // Write '7' to clear AES, KMAC, OTBN sideload sink states
   abs_mmio_write32(kBase + KEYMGR_DPE_SIDELOAD_CLEAR_REG_OFFSET, 7);
