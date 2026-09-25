@@ -434,16 +434,144 @@ static void test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift(void) {
   csrng_disable_and_clear();
 }
 
+#include "sw/device/lib/base/csr.h"
+#include "sw/device/lib/base/mmio.h"
+
+static volatile uint32_t fault_count = 0;
+static volatile uint32_t last_mcause = 0;
+
+void ottf_exception_handler(uint32_t *exc_info) {
+  (void)exc_info;
+  uint32_t mcause = 0;
+  CSR_READ(CSR_REG_MCAUSE, &mcause);
+  last_mcause = mcause;
+  fault_count++;
+}
+
+static bool expect_load_fault_32(mmio_region_t base, uint32_t offset) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  (void)mmio_region_read32(base, (ptrdiff_t)offset);
+  return (fault_count == before + 1u) && (last_mcause == 5u);
+}
+
+static bool expect_store_fault_32(mmio_region_t base, uint32_t offset,
+                                  uint32_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write32(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
+
+static bool expect_store_fault_8(mmio_region_t base, uint32_t offset,
+                                 uint8_t val) {
+  uint32_t before = fault_count;
+  last_mcause = 0;
+  mmio_region_write8(base, (ptrdiff_t)offset, val);
+  return (fault_count == before + 1u) && (last_mcause == 7u);
+}
+
+/**
+ * Verify MAIN_SM_STATE v2 6-bit sparse encoding (MainSmIdle = 0x37),
+ * SW_CMD_STS.CMD_STS retention when CTRL.ENABLE is disabled, UNINSTANTIATE
+ * zeroization of RESEED_COUNTER_2 and INT_STATE_VAL, CS_BUS_CMP_ALERT behavior,
+ * and CSRNG_PERMIT subword / unmapped address bus fault behavior.
+ */
+static void test_v2_sm_state_cmd_sts_retention_bus_cmp_and_permits(void) {
+  LOG_INFO(
+      "Testing MAIN_SM_STATE=0x37, SW_CMD_STS.CMD_STS retention, "
+      "CS_BUS_CMP_ALERT, and CSRNG_PERMIT...");
+  csrng_disable_and_clear();
+
+  // 1. Verify MAIN_SM_STATE reset / idle encoding is 0x37 (6-bit MainSmIdle in
+  // csrng_pkg.sv:147-156).
+  uint32_t sm_idle =
+      abs_mmio_read32(kCsrngBase + CSRNG_MAIN_SM_STATE_REG_OFFSET);
+  CHECK(sm_idle == 0x37u,
+        "Expected v2 MAIN_SM_STATE == 0x37 (MainSmIdle), got 0x%x", sm_idle);
+
+  // 2. Enable CSRNG, trigger INVALID_CMD_SEQ (CMD_STS == 3), then disable
+  // CTRL.ENABLE and verify CMD_RDY/CMD_ACK clear to 0 while CMD_STS (bits
+  // [5:3]) retains 3 (csrng_core.sv:567-578).
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   make_ctrl(kMultiBitBool4True, kMultiBitBool4True,
+                             kMultiBitBool4False, kMultiBitBool4False));
+  csrng_send_sw_cmd(2u, 0u, kMultiBitBool4True, 0u, NULL);
+  uint32_t sts_en = abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
+  CHECK(bitfield_field32_read(sts_en, CSRNG_SW_CMD_STS_CMD_STS_FIELD) == 3u);
+
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   make_ctrl(kMultiBitBool4False, kMultiBitBool4False,
+                             kMultiBitBool4False, kMultiBitBool4False));
+  uint32_t sts_dis = abs_mmio_read32(kCsrngBase + CSRNG_SW_CMD_STS_REG_OFFSET);
+  CHECK(!bitfield_bit32_read(sts_dis, CSRNG_SW_CMD_STS_CMD_RDY_BIT) &&
+            !bitfield_bit32_read(sts_dis, CSRNG_SW_CMD_STS_CMD_ACK_BIT),
+        "Expected CMD_RDY=0 and CMD_ACK=0 when CTRL.ENABLE == False");
+  CHECK(bitfield_field32_read(sts_dis, CSRNG_SW_CMD_STS_CMD_STS_FIELD) == 3u,
+        "Expected SW_CMD_STS.CMD_STS to retain 3 when CTRL.ENABLE == False, "
+        "got 0x%x",
+        sts_dis);
+
+  // 3. Re-enable CSRNG, instantiate with deterministic seed, generate 1 block,
+  // and verify UNINSTANTIATE zeroizes RESEED_COUNTER_2 (1 -> 0) but does NOT
+  // clear cs_rdata_capt_vld_q (so re-instantiating with the identical seed
+  // raises RECOV_ALERT_STS.CS_BUS_CMP_ALERT bit 12).
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET,
+                   make_ctrl(kMultiBitBool4True, kMultiBitBool4True,
+                             kMultiBitBool4False, kMultiBitBool4False));
+  const uint32_t kSeed[1] = {0x12345678u};
+  csrng_send_sw_cmd(1u, 1u, kMultiBitBool4True, 0u, kSeed);
+  csrng_send_sw_cmd(3u, 0u, kMultiBitBool4False, 1u, NULL);
+  for (int i = 0; i < 4; ++i) {
+    (void)abs_mmio_read32(kCsrngBase + CSRNG_GENBITS_REG_OFFSET);
+  }
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET) == 1u);
+
+  // UNINSTANTIATE (acmd = 5)
+  csrng_send_sw_cmd(5u, 0u, kMultiBitBool4False, 0u, NULL);
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_RESEED_COUNTER_2_REG_OFFSET) == 0u,
+        "Expected RESEED_COUNTER_2 == 0 after UNINSTANTIATE");
+
+  // Re-instantiate with identical seed -> CS_BUS_CMP_ALERT (bit 12) must fire!
+  csrng_send_sw_cmd(1u, 1u, kMultiBitBool4True, 0u, kSeed);
+  csrng_send_sw_cmd(3u, 0u, kMultiBitBool4False, 1u, NULL);
+  uint32_t recov =
+      abs_mmio_read32(kCsrngBase + CSRNG_RECOV_ALERT_STS_REG_OFFSET);
+  CHECK(bitfield_bit32_read(recov, CSRNG_RECOV_ALERT_STS_CS_BUS_CMP_ALERT_BIT),
+        "Expected CS_BUS_CMP_ALERT == 1 after UNINSTANTIATE + identical seed, "
+        "got 0x%x",
+        recov);
+
+  // 4. Verify CSRNG_PERMIT subword write faults and unmapped offset 0x60 fault
+  // (csrng_reg_pkg.sv:348-373).
+  mmio_region_t csrng_mmio = mmio_region_from_addr(kCsrngBase);
+  CHECK(expect_load_fault_32(csrng_mmio, 0x60u));
+  CHECK(expect_store_fault_32(csrng_mmio, 0x60u, 0xdeadbeefu));
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_CTRL_REG_OFFSET, 0x99u));
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_RESEED_INTERVAL_REG_OFFSET,
+                             0x12u));
+  CHECK(expect_store_fault_8(csrng_mmio, CSRNG_REGWEN_REG_OFFSET + 1u, 0x00u));
+
+  csrng_disable_and_clear();
+}
+
 bool test_main(void) {
-  LOG_INFO("=== CSRNG Earlgrey v2 (trunk-v2) Errata Verification Test ===");
+  LOG_INFO("=== CSRNG Earlgrey v2 (trunk-v2) Consistency & Errata Test ===");
   test_v1_001_fips_force_enable_pfa_missing_from_recov_alert();
   test_v1_002_hw_exc_sts_rw0c_single_cycle_overwrite();
   test_v1_004_genbits_destructive_pop_when_sw_app_disabled();
   test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift();
+  test_v2_sm_state_cmd_sts_retention_bus_cmp_and_permits();
   // Run test_v1_003 last because ERR_CODE_TEST=22 triggers fatal_loc_events,
   // which permanently locks u_csrng_main_sm into MainSmError (0x29) until
   // reset.
   test_v1_003_err_code_test_disabled_gating_and_v2_dead_bits();
-  LOG_INFO("=== ALL CSRNG Earlgrey v2 Errata Checks PASSED on CW340 FPGA! ===");
+  uint32_t sm_err =
+      abs_mmio_read32(kCsrngBase + CSRNG_MAIN_SM_STATE_REG_OFFSET);
+  CHECK(sm_err == 0x29u,
+        "Expected v2 MAIN_SM_STATE == 0x29 (MainSmError) after fatal error, "
+        "got 0x%x",
+        sm_err);
+  LOG_INFO("=== ALL CSRNG Earlgrey v2 Consistency Checks PASSED! ===");
   return true;
 }
