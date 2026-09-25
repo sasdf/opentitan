@@ -98,7 +98,11 @@ _MANUF_TEST_LOCKED_KEY = None
             needs_jtag = True,
             otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state.lower()),
             tags = ["manuf"],
-            test_cmd = "--initial-lc-state={lc_state}",
+            test_cmd = (
+                "" if (
+                    (lc_state, lc_val) in _TEST_LOCKED_LC_ITEMS
+                ) else "--bootstrap={firmware}"
+            ) + " --initial-lc-state={lc_state}",
             test_harness = "//sw/host/tests/manuf/manuf_scrap",
             testopt_bootstrap = str((lc_state, lc_val) not in _TEST_LOCKED_LC_ITEMS),
         ),
