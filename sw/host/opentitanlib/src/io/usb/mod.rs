@@ -20,9 +20,6 @@ pub enum UsbError {
 impl_serializable_error!(UsbError);
 
 /// A trait which represents a USB device.
-///
-/// Note: some of the methods use `rusb`'s datatypes to avoid redefining
-/// all USB structure but otherwise does not require rusb to be implemented.
 pub trait UsbDevice {
     /// Return the VID of the device.
     fn get_vendor_id(&self) -> u16;
