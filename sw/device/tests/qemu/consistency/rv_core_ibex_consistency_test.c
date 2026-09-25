@@ -74,6 +74,7 @@ static volatile bool g_in_test_main = false;
 static volatile bool g_expect_bus_fault = false;
 static volatile uint32_t g_bus_fault_count = 0;
 static volatile uint32_t g_last_mcause = 0;
+static volatile uint32_t g_last_exc_cpuctrlsts = 0;
 
 static volatile bool g_in_trap_test = false;
 static volatile uint32_t g_nmi_count = 0;
@@ -83,6 +84,9 @@ static volatile uint32_t g_nmi_state_on_entry = 0;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   uint32_t mcause = ibex_mcause_read();
+  uint32_t cpuctrlsts = 0;
+  CSR_READ(0x7c0, &cpuctrlsts);
+  g_last_exc_cpuctrlsts = cpuctrlsts;
   if (g_expect_bus_fault) {
     g_bus_fault_count++;
     g_last_mcause = mcause;
@@ -784,6 +788,73 @@ static void test_v2_cheriot_switch_and_desync_readback(void) {
       "Expected ERR_STATUS == 0 after LockedDis CHERIOT_LOCK writes");
 }
 
+static void test_bitmanip_and_cpuctrlsts(void) {
+  LOG_INFO("Test 6: Bitmanip (orc.b, brev8, zip, unzip) & CSR_CPUCTRLSTS");
+
+  uint32_t orcb_in = 0x00800100u, orcb_out = 0u;
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x287"
+               : "=r"(orcb_out)
+               : "r"(orcb_in));
+  CHECK(orcb_out == 0x00ffff00u);
+
+  uint32_t brev8_in = 0x12345678u, brev8_out = 0u;
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x687"
+               : "=r"(brev8_out)
+               : "r"(brev8_in));
+  CHECK(brev8_out == 0x482c6a1eu);
+
+  uint32_t zip_lo = 0x0000ffffu, zip_lo_out = 0u;
+  uint32_t zip_hi = 0xffff0000u, zip_hi_out = 0u;
+  uint32_t unzip_lo_out = 0u, unzip_hi_out = 0u;
+  asm volatile(".insn i 0x13, 1, %0, %1, 0x08f"
+               : "=r"(zip_lo_out)
+               : "r"(zip_lo));
+  asm volatile(".insn i 0x13, 1, %0, %1, 0x08f"
+               : "=r"(zip_hi_out)
+               : "r"(zip_hi));
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x08f"
+               : "=r"(unzip_lo_out)
+               : "r"(zip_lo_out));
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x08f"
+               : "=r"(unzip_hi_out)
+               : "r"(zip_hi_out));
+  CHECK(zip_lo_out == 0x55555555u);
+  CHECK(zip_hi_out == 0xaaaaaaaau);
+  CHECK(unzip_lo_out == 0x0000ffffu);
+  CHECK(unzip_hi_out == 0xffff0000u);
+
+  uint32_t cpuctrl_before = 0;
+  CSR_READ(0x7c0, &cpuctrl_before);
+  CHECK((cpuctrl_before & 0xc0u) == 0u);
+
+  uint32_t prev = g_bus_fault_count;
+  g_last_exc_cpuctrlsts = 0;
+  g_expect_bus_fault = true;
+  (void)abs_mmio_read32(kIbexCfgBase + 0x74u);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 5);
+  CHECK((g_last_exc_cpuctrlsts & 0xc0u) == 0x40u);
+
+  uint32_t cpuctrl_after_mret = 0;
+  CSR_READ(0x7c0, &cpuctrl_after_mret);
+  CHECK((cpuctrl_after_mret & 0xc0u) == 0u);
+
+  CSR_SET_BITS(0x7c0, 0xc0u);
+  uint32_t cpuctrl_set = 0;
+  CSR_READ(0x7c0, &cpuctrl_set);
+  CHECK((cpuctrl_set & 0xc0u) == 0xc0u);
+
+  CSR_CLEAR_BITS(0x7c0, 0x40u);
+  uint32_t cpuctrl_clr6 = 0;
+  CSR_READ(0x7c0, &cpuctrl_clr6);
+  CHECK((cpuctrl_clr6 & 0xc0u) == 0x80u);
+
+  CSR_CLEAR_BITS(0x7c0, 0x80u);
+  uint32_t cpuctrl_clr7 = 0;
+  CSR_READ(0x7c0, &cpuctrl_clr7);
+  CHECK((cpuctrl_clr7 & 0xc0u) == 0u);
+}
+
 bool test_main(void) {
   g_in_test_main = true;
   LOG_INFO("=== rv_core_ibex Earlgrey v2 Errata Verification Test ===");
@@ -792,6 +863,7 @@ bool test_main(void) {
   test_sw_recov_err_and_rnd_data();
   test_v2_mcounteren_writable_and_csr();
   test_v2_cheriot_switch_and_desync_readback();
+  test_bitmanip_and_cpuctrlsts();
   LOG_INFO("=== All rv_core_ibex v2 errata checks OK ===");
   g_in_test_main = false;
   return true;
