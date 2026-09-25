@@ -61,6 +61,7 @@ enum {
   kGpioUnmappedOffset = 0x48u,
 };
 
+static volatile bool g_in_test_main = false;
 static volatile bool g_expect_bus_fault = false;
 static volatile bool g_bus_fault_seen = false;
 static volatile uint32_t g_bus_fault_mcause = 0;
@@ -76,6 +77,12 @@ static void advance_mepc_over_faulting_insn(void) {
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   (void)exc_info;
   uint32_t mcause = ibex_mcause_read();
+  if (!g_in_test_main && !g_expect_bus_fault) {
+    return;
+  }
+  if (!g_expect_bus_fault) {
+    g_in_test_main = false;
+  }
   CHECK(g_expect_bus_fault, "Unexpected load/store fault: mcause=0x%x", mcause);
   g_bus_fault_seen = true;
   g_bus_fault_mcause = mcause;
@@ -485,6 +492,7 @@ static void test_gpio_v2_hw_straps_disabled_and_permit_asymmetry(void) {
 }
 
 bool test_main(void) {
+  g_in_test_main = true;
   LOG_INFO("Starting gpio_errata_v2_test (P26) on CW340 FPGA...");
   test_gpio_reset_values_masked_aliasing_and_edge_intr();
   test_gpio_pad_invert_and_input_disable();
@@ -492,5 +500,6 @@ bool test_main(void) {
   test_gpio_level_intr_relatch_and_alert_pulse();
   test_gpio_v2_hw_straps_disabled_and_permit_asymmetry();
   LOG_INFO("All gpio_errata_v2_test checks PASSED!");
+  g_in_test_main = false;
   return true;
 }

@@ -80,6 +80,7 @@ enum {
   kTestDioInputStdIdx = 12,
 };
 
+static volatile bool g_in_test_main = false;
 static volatile bool g_expect_bus_fault = false;
 static volatile uint32_t g_bus_fault_count = 0;
 static volatile uint32_t g_last_mcause = 0;
@@ -97,6 +98,10 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
     }
     return;
   }
+  if (!g_in_test_main) {
+    return;
+  }
+  g_in_test_main = false;
   CHECK(false, "Unexpected load/store fault mcause=0x%08x", mcause);
 }
 
@@ -597,6 +602,7 @@ static void test_v2_dif_sleep_status_unaligned_fault_and_mio_outsel(void) {
 }
 
 bool test_main(void) {
+  g_in_test_main = true;
   LOG_INFO("=== pinmux Earlgrey v2 Errata Verification Test ===");
   test_pinmux_reset_values_regwen_and_unmapped();
   test_wkup_timed_cnt_th_zero_hazard();
@@ -604,5 +610,6 @@ bool test_main(void) {
   test_pad_attr_subword_store_faults();
   test_v2_dif_sleep_status_unaligned_fault_and_mio_outsel();
   LOG_INFO("=== All pinmux v2 errata checks PASSED ===");
+  g_in_test_main = false;
   return true;
 }
