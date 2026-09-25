@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load(":cryptotest.bzl", "cryptotest")
+load(":cryptotest.bzl", "CRYPTOTEST_ROM_EXT_EXEC_ENVS", "cryptotest")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -43,6 +43,7 @@ cryptotest(
 
 cryptotest(
     name = "kmac_acvp",
+    exec_env = CRYPTOTEST_ROM_EXT_EXEC_ENVS,
     slow_test = True,
     test_args = " ".join([
         "--input=\"$(rootpath //sw/host/cryptotest/testvectors/acvp:kmac_vectors.hjson)\"",
@@ -964,6 +965,7 @@ KMAC_TESTVECTOR_ARGS = " ".join([
 
 cryptotest(
     name = "kmac_kat",
+    exec_env = CRYPTOTEST_ROM_EXT_EXEC_ENVS,
     slow_test = True,
     test_args = KMAC_TESTVECTOR_ARGS,
     test_harness = "//sw/host/tests/crypto/kmac_kat:harness",

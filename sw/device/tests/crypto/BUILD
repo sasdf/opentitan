@@ -1595,7 +1595,13 @@ py_binary(
 opentitan_test(
     name = "hkdf_functest",
     srcs = ["hkdf_functest.c"],
-    exec_env = CRYPTOTEST_EXEC_ENVS,
+    exec_env = dicts.add(
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        {
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+        },
+    ),
     verilator = verilator_params(
         timeout = "long",
     ),
@@ -1612,7 +1618,13 @@ opentitan_test(
 opentitan_test(
     name = "hkdf_otbn_masked_functest",
     srcs = ["hkdf_otbn_masked_functest.c"],
-    exec_env = CRYPTOTEST_EXEC_ENVS,
+    exec_env = dicts.add(
+        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        {
+            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_sival_rom_ext": None,
+        },
+    ),
     verilator = verilator_params(
         timeout = "long",
     ),

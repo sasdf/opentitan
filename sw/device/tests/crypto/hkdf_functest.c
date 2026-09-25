@@ -587,11 +587,9 @@ static status_t run_negative_tests(void) {
         OTCRYPTO_BAD_ARGS.value);
 
   // Exceed 255 iterations
-  static uint32_t
-      huge_blob[2 * ((8161 + sizeof(uint32_t) - 1) / sizeof(uint32_t))];
   otcrypto_key_config_t huge_okm_cfg = valid_okm_cfg;
   huge_okm_cfg.key_length = 8161;
-  CHECK(ARRAYSIZE(huge_blob) == keyblob_num_words(huge_okm_cfg));
+  uint32_t huge_blob[keyblob_num_words(huge_okm_cfg)];
   otcrypto_blinded_key_t huge_okm = {.config = huge_okm_cfg,
                                      .keyblob_length = sizeof(huge_blob),
                                      .keyblob = huge_blob};

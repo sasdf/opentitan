@@ -27,6 +27,11 @@ CRYPTOTEST_EXEC_ENVS = {
     "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu",
 } | EARLGREY_SILICON_OWNER_ROM_EXT_ENVS
 
+CRYPTOTEST_ROM_EXT_EXEC_ENVS = {
+    "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": "fpga_cw340",
+    "//hw/top_earlgrey:sim_qemu_sival_rom_ext": "qemu",
+} | EARLGREY_SILICON_OWNER_ROM_EXT_ENVS
+
 FIRMWARE_DEPS = [
     "//sw/device/tests/crypto/cryptotest/firmware:aes",
     "//sw/device/tests/crypto/cryptotest/firmware:aes_gcm",
@@ -46,7 +51,6 @@ FIRMWARE_DEPS = [
     "//sw/device/tests/crypto/cryptotest/firmware:x25519",
     "//sw/device/lib/base:csr",
     "//sw/device/lib/base:status",
-    "//sw/device/lib/crypto/drivers:kmac",
     "//sw/device/lib/testing/test_framework:check",
     "//sw/device/lib/testing/test_framework:ottf_main",
     "//sw/device/lib/testing/test_framework:ujson_ottf",
