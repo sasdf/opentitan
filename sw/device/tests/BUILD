@@ -3486,6 +3486,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
@@ -3526,6 +3529,9 @@ opentitan_test(
         test_cmd = "--bootstrap={firmware}",
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
+    ),
     silicon = silicon_params(
         test_cmd = "--bootstrap={firmware}",
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
@@ -3559,6 +3565,9 @@ opentitan_test(
     ),
     fpga = fpga_params(
         test_cmd = "--bootstrap={firmware}",
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_resets",
     ),
     silicon = silicon_params(
@@ -3596,6 +3605,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap={firmware}
         """,
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_por",
     ),
     silicon = silicon_params(
@@ -3812,6 +3824,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap={firmware}
         """,
+        test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/pwrmgr:sleep_all_wakeups",
     ),
     silicon = silicon_params(
