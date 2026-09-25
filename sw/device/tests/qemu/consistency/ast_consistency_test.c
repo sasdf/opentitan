@@ -198,6 +198,6 @@ bool test_main(void) {
   LOG_INFO("=== AST Earlgrey v2 (trunk-v2) Errata Verification Test ===");
   test_v1_001_and_v2_001_rega_ro_and_regal_dead_readback();
   test_v1_002_permit_subword_and_addrmiss_holes();
-  LOG_INFO("=== ALL AST Earlgrey v2 Errata Checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== ALL AST Earlgrey v2 Errata Checks OK on CW340 FPGA! ===");
   return true;
 }

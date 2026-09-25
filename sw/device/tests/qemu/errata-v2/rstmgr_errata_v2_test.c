@@ -401,7 +401,6 @@ bool test_main(void) {
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET, reset_info);
   abs_mmio_write32(TOP_EARLGREY_SRAM_CTRL_RET_RAM_BASE_ADDR + 4u, 0u);
   verify_post_sw_reset_errata();
-  LOG_INFO(
-      "=== ALL RSTMGR Earlgrey v2 Errata Checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== ALL RSTMGR Earlgrey v2 Errata Checks OK on CW340 FPGA! ===");
   return true;
 }

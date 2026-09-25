@@ -58,6 +58,7 @@ void ottf_internal_isr(uint32_t *exc_info) {
   CSR_READ(CSR_REG_MCAUSE, &mcause);
   if (mcause == kIbexLoadIntegrityNmiMcause) {
     g_nmi_load_integ_count++;
+    abs_mmio_write32(TOP_EARLGREY_RV_CORE_IBEX_CFG_BASE_ADDR + 0x50u, 1u << 8u);
   }
 }
 
@@ -158,7 +159,7 @@ bool test_main(void) {
         "SCR_KEY_ROTATED to 0x9 while preserving STATUS == 0x38, got rot=0x%x "
         "status=0x%x",
         rot, status_after_w1c);
-  LOG_INFO("Test 1 (SCR_KEY_ROTATED mubi4_and_hi W1C semantics) PASSED");
+  LOG_INFO("Test 1 (SCR_KEY_ROTATED mubi4_and_hi W1C semantics) OK");
 
   // ---------------------------------------------------------------------------
   // 2. [sram_ctrl_reg_pkg.sv:159-169, sram_ctrl_regs_reg_top.sv:721-732]:
@@ -208,7 +209,7 @@ bool test_main(void) {
   CHECK(g_load_store_fault && g_last_mcause == 7u,
         "[sram_ctrl_reg_pkg.sv:159-169] Expected unmapped CSR write at 0x24 to "
         "fault with mcause=7");
-  LOG_INFO("Test 2 (SRAM_CTRL_REGS_PERMIT = 4'b0001 sub-word CSR) PASSED");
+  LOG_INFO("Test 2 (SRAM_CTRL_REGS_PERMIT = 4'b0001 sub-word CSR) OK");
 
   // ---------------------------------------------------------------------------
   // 3. [sram_ctrl.sv:326-365, prim_ram_1p_scr.sv:198-265]:
@@ -250,6 +251,7 @@ bool test_main(void) {
   for (uint32_t i = 0; i < 8; ++i) {
     uint32_t before = g_nmi_load_integ_count;
     (void)abs_mmio_read32(ret_buf + i * 4u);
+    asm volatile("nop; nop; nop; nop;" ::: "memory");
     if (g_nmi_load_integ_count > before) {
       corrupt_word_addr = ret_buf + i * 4u;
       break;
@@ -259,7 +261,7 @@ bool test_main(void) {
         "[sram_ctrl.sv:326-365] Expected reading stale SRAM words after "
         "CTRL.RENEW_SCR_KEY=1 to trigger Ibex Load Integrity NMI "
         "(mcause=0xffffffe0)");
-  LOG_INFO("Test 3 (RENEW_SCR_KEY status independence & stale-key NMI) PASSED");
+  LOG_INFO("Test 3 (RENEW_SCR_KEY status independence & stale-key NMI) OK");
 
   // ---------------------------------------------------------------------------
   // 4. NEW_IN_V2 [sram_ctrl.sv:593-670, top_earlgrey.sv:51,98,105,158,
@@ -295,7 +297,7 @@ bool test_main(void) {
   sram_init_mem(kSramRetRegsBase);
   LOG_INFO(
       "Test 4 (Sub-word sb RMW ECC laundering on EccCorrection=0: "
-      "laundered_word=0x%08x) PASSED",
+      "laundered_word=0x%08x) OK",
       laundered_word);
 
   // ---------------------------------------------------------------------------
@@ -338,8 +340,8 @@ bool test_main(void) {
         "fault with mcause=5 even after sram_ctrl_meta INIT_DONE=1");
   LOG_INFO(
       "Test 5 (sram_ctrl_meta 0x411A0000 INIT_DONE=1 vs unmapped/blocked "
-      "0x11000000 RAM window) PASSED");
+      "0x11000000 RAM window) OK");
 
-  LOG_INFO("=== ALL SRAM_CTRL V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL SRAM_CTRL V2 ERRATA CHECKS OK ===");
   return true;
 }

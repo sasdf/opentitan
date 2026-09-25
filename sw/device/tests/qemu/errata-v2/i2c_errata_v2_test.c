@@ -721,6 +721,6 @@ bool test_main(void) {
   test_i2c_ovrd_interference_when_enabled();
   test_i2c_permit_subword_writes_vs_reads();
 
-  LOG_INFO("All I2C Earlgrey v2 errata checks PASSED on CW340 FPGA!");
+  LOG_INFO("All I2C Earlgrey v2 errata checks OK on CW340 FPGA!");
   return true;
 }

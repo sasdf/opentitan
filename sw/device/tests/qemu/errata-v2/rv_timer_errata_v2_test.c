@@ -114,7 +114,7 @@ static void test_cfg0_ungated_and_live_prescale_runaway(void) {
   CHECK(runaway_mtime > clean_mtime * 6u);
 
   rv_timer_reset_clean();
-  LOG_INFO("Test 1 (CFG0 ungated & live-prescaler 12-bit wrap runaway) PASSED");
+  LOG_INFO("Test 1 (CFG0 ungated & live-prescaler 12-bit wrap runaway) OK");
 }
 
 // -----------------------------------------------------------------------------
@@ -153,8 +153,7 @@ static void test_step_zero_combinational_intr(void) {
   CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
 
   rv_timer_reset_clean();
-  LOG_INFO(
-      "Test 2 (CFG0.step == 0 combinational mtime >= mtimecmp IRQ) PASSED");
+  LOG_INFO("Test 2 (CFG0.step == 0 combinational mtime >= mtimecmp IRQ) OK");
 }
 
 // -----------------------------------------------------------------------------
@@ -192,8 +191,7 @@ static void test_unmapped_skipto_hole_bus_error(void) {
   abs_mmio_write32(kTimerBase + 0x1fcu, 0x1u);
   CHECK(g_store_fault_count == 4u && g_last_mcause == kIbexExcStoreAccessFault);
 
-  LOG_INFO(
-      "Test 3 (Unmapped 0x008..0x0fc and 0x120..0x1fc addrmiss fault) PASSED");
+  LOG_INFO("Test 3 (Unmapped 0x008..0x0fc and 0x120..0x1fc addrmiss fault) OK");
 }
 
 // -----------------------------------------------------------------------------
@@ -227,7 +225,7 @@ static void test_cfg0_3byte_permit_subword_fault(void) {
         kExpectedCfg0);
 
   rv_timer_reset_clean();
-  LOG_INFO("Test 4 (RV_TIMER_PERMIT[5]=4'b0111 CFG0 sub-word fault) PASSED");
+  LOG_INFO("Test 4 (RV_TIMER_PERMIT[5]=4'b0111 CFG0 sub-word fault) OK");
 }
 
 // -----------------------------------------------------------------------------
@@ -291,7 +289,7 @@ static void test_v2_mtime_rewind_sticky_intr_and_dif_counter_write(void) {
   rv_timer_reset_clean();
   LOG_INFO(
       "Test 5 (dif_rv_timer_counter_write & programmers_guide mtime update vs "
-      "mtimecmp_update clear) PASSED");
+      "mtimecmp_update clear) OK");
 }
 
 bool test_main(void) {
@@ -301,6 +299,6 @@ bool test_main(void) {
   test_unmapped_skipto_hole_bus_error();
   test_cfg0_3byte_permit_subword_fault();
   test_v2_mtime_rewind_sticky_intr_and_dif_counter_write();
-  LOG_INFO("=== ALL RV_TIMER V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL RV_TIMER V2 ERRATA CHECKS OK ===");
   return true;
 }

@@ -444,6 +444,6 @@ bool test_main(void) {
   // which permanently locks u_csrng_main_sm into MainSmError (0x29) until
   // reset.
   test_v1_003_err_code_test_disabled_gating_and_v2_dead_bits();
-  LOG_INFO("=== ALL CSRNG Earlgrey v2 Errata Checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== ALL CSRNG Earlgrey v2 Errata Checks OK on CW340 FPGA! ===");
   return true;
 }

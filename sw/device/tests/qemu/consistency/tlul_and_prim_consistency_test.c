@@ -445,6 +445,6 @@ bool test_main(void) {
   abs_mmio_write32(kSramRetRegsBase + SRAM_CTRL_READBACK_REG_OFFSET,
                    kMultiBitBool4False);
 
-  LOG_INFO("=== ALL TLUL V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL TLUL V2 ERRATA CHECKS OK ===");
   return true;
 }

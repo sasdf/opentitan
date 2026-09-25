@@ -323,6 +323,6 @@ bool test_main(void) {
   test_cheriot_revbm_access_check_and_meta_sram(&alert_handler);
   test_cheriot_switch_locked_dis_ignores_invalid_lock_writes(&alert_handler);
 
-  LOG_INFO("=== All cheriot_errata_v2_test checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== All cheriot_errata_v2_test checks OK on CW340 FPGA! ===");
   return true;
 }

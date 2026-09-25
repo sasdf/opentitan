@@ -108,6 +108,6 @@ bool test_main(void) {
         "Expected kTopEarlgreyPinmuxOutselLast == 66 in Earlgrey v2, got %u",
         (uint32_t)kTopEarlgreyPinmuxOutselLast);
 
-  LOG_INFO("=== ALL PATTGEN V2 CONSISTENCY CHECKS PASSED ===");
+  LOG_INFO("=== ALL PATTGEN V2 CONSISTENCY CHECKS OK ===");
   return true;
 }

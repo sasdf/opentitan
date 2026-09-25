@@ -246,6 +246,6 @@ bool test_main(void) {
   abs_mmio_write32(prio_reg, 0u);
   LOG_INFO("Confirmed dif_rv_plic irq=0 and out-of-range complete_data.");
 
-  LOG_INFO("All rv_plic Earlgrey v2 FPGA checks PASSED!");
+  LOG_INFO("All rv_plic Earlgrey v2 FPGA checks OK!");
   return true;
 }

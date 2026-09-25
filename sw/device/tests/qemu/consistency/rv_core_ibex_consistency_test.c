@@ -792,7 +792,7 @@ bool test_main(void) {
   test_sw_recov_err_and_rnd_data();
   test_v2_mcounteren_writable_and_csr();
   test_v2_cheriot_switch_and_desync_readback();
-  LOG_INFO("=== All rv_core_ibex v2 errata checks PASSED ===");
+  LOG_INFO("=== All rv_core_ibex v2 errata checks OK ===");
   g_in_test_main = false;
   return true;
 }

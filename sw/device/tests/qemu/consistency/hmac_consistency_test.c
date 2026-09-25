@@ -603,6 +603,6 @@ bool test_main(void) {
   test_hmac_digest_write_gate_and_sha512_readback();
   test_hmac_msg_fifo_read_and_permit_faults();
   test_hmac_hash_stop_non_block_multiple_deadlock();
-  LOG_INFO("=== All hmac_errata_v2_test checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== All hmac_errata_v2_test checks OK on CW340 FPGA! ===");
   return true;
 }

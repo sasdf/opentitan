@@ -854,7 +854,6 @@ bool test_main(void) {
   LOG_INFO(
       "=== Boot 2 (SW Reset): Running keymgr_dpe_errata_v2_test Test 9B ===");
   test_errata_keymgr_003_fixed_in_v2_disabled_state();
-  LOG_INFO(
-      "=== All keymgr_dpe_errata_v2_test checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== All keymgr_dpe_errata_v2_test checks OK on CW340 FPGA! ===");
   return true;
 }

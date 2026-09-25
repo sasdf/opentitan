@@ -631,6 +631,6 @@ bool test_main(void) {
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
 
-  LOG_INFO("=== All rram_ctrl_errata_v2_test checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== All rram_ctrl_errata_v2_test checks OK on CW340 FPGA! ===");
   return true;
 }

@@ -583,6 +583,6 @@ bool test_main(void) {
   test_reggen_wo_ro_and_xbar_decode_windows();
   test_v2_sram_ctrl_meta_and_cheriot_xbar_integration();
   test_v2_rom_plic_alert_and_rram_integration();
-  LOG_INFO("=== All top_earlgrey v2 errata checks PASSED ===");
+  LOG_INFO("=== All top_earlgrey v2 errata checks OK ===");
   return true;
 }

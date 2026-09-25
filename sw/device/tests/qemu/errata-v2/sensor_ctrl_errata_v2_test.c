@@ -313,7 +313,7 @@ bool test_main(void) {
   test_v2_001_manual_pad_attr_no_warl_on_fpga();
   test_v2_002_alert_en_loose_mubi4_zero_stays_enabled();
   LOG_INFO(
-      "=== ALL SENSOR_CTRL Earlgrey v2 Errata Checks PASSED on CW340 FPGA! "
+      "=== ALL SENSOR_CTRL Earlgrey v2 Errata Checks OK on CW340 FPGA! "
       "===");
   return true;
 }

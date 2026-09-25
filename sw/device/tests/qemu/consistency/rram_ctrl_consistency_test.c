@@ -875,6 +875,6 @@ bool test_main(void) {
   abs_mmio_write32(kRramCoreBase + RRAM_CTRL_FIFO_LVL_REG_OFFSET, 0x0f0fu);
   clear_rram_status();
 
-  LOG_INFO("=== All rram_ctrl_consistency_test checks PASSED! ===");
+  LOG_INFO("=== All rram_ctrl_consistency_test checks OK! ===");
   return true;
 }

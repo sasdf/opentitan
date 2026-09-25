@@ -684,6 +684,6 @@ bool test_main(void) {
   test_pwrmgr_aborted_sleep_pinmux_latch_and_wake_info_relatch();
   test_pwrmgr_permit_and_addrmiss_faults();
   test_pwrmgr_intr_alert_and_regwen_locks();
-  LOG_INFO("All pwrmgr_consistency_test checks PASSED!");
+  LOG_INFO("All pwrmgr_consistency_test checks OK!");
   return true;
 }

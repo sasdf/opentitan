@@ -572,6 +572,6 @@ bool test_main(void) {
         "Expected v2 MAIN_SM_STATE == 0x29 (MainSmError) after fatal error, "
         "got 0x%x",
         sm_err);
-  LOG_INFO("=== ALL CSRNG Earlgrey v2 Consistency Checks PASSED! ===");
+  LOG_INFO("=== ALL CSRNG Earlgrey v2 Consistency Checks OK! ===");
   return true;
 }

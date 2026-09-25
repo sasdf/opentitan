@@ -358,6 +358,6 @@ bool test_main(void) {
   test_gpio_permit_subword_and_data_in_faults();
   test_gpio_level_intr_relatch_and_alert_pulse();
   test_gpio_v2_hw_straps_disabled_and_permit_asymmetry();
-  LOG_INFO("All gpio_errata_v2_test checks PASSED!");
+  LOG_INFO("All gpio_errata_v2_test checks OK!");
   return true;
 }

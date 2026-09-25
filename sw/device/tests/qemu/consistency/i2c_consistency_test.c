@@ -844,6 +844,6 @@ bool test_main(void) {
   test_i2c_permit_subword_writes_vs_reads();
   test_i2c_v2_status_vs_event_irqs_thresholds_and_fmt_overflow();
 
-  LOG_INFO("All I2C Earlgrey v2 errata checks PASSED on CW340 FPGA!");
+  LOG_INFO("All I2C Earlgrey v2 errata checks OK on CW340 FPGA!");
   return true;
 }

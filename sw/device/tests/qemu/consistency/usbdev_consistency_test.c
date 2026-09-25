@@ -662,6 +662,6 @@ bool test_main(void) {
   test_usbdev_v2_rxenable_out_preserve_inversion_and_permit();
   test_usbdev_csrs_fifos_and_alerts();
 
-  LOG_INFO("All usbdev errata-v2 checks PASSED on CW340 FPGA");
+  LOG_INFO("All usbdev errata-v2 checks OK on CW340 FPGA");
   return true;
 }

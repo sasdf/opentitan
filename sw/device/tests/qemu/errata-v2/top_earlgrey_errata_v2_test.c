@@ -448,6 +448,6 @@ bool test_main(void) {
   test_sram_ifetch_and_v2_sec_sram();
   test_reggen_wo_ro_and_xbar_decode_windows();
   test_v2_sram_ctrl_meta_and_cheriot_xbar_integration();
-  LOG_INFO("=== All top_earlgrey v2 errata checks PASSED ===");
+  LOG_INFO("=== All top_earlgrey v2 errata checks OK ===");
   return true;
 }

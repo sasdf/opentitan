@@ -317,6 +317,6 @@ bool test_main(void) {
   test_alert_handler_timeout_irq_and_clr_shadowed();
   test_alert_handler_permit_subword_and_addrmiss();
 
-  LOG_INFO("All alert_handler v2 errata checks PASSED on CW340 FPGA!");
+  LOG_INFO("All alert_handler v2 errata checks OK on CW340 FPGA!");
   return true;
 }

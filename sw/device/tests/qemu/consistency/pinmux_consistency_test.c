@@ -609,7 +609,7 @@ bool test_main(void) {
   test_filter_tracking_and_pad_attr_warl();
   test_pad_attr_subword_store_faults();
   test_v2_dif_sleep_status_unaligned_fault_and_mio_outsel();
-  LOG_INFO("=== All pinmux v2 errata checks PASSED ===");
+  LOG_INFO("=== All pinmux v2 errata checks OK ===");
   g_in_test_main = false;
   return true;
 }

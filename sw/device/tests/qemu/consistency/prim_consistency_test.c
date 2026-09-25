@@ -328,6 +328,6 @@ bool test_main(void) {
   test_prim_subreg_shadow_semantics();
   test_prim_fifo_sync_semantics();
   test_prim_mubi_and_ram_scr_chunks();
-  LOG_INFO("=== ALL PRIM V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL PRIM V2 ERRATA CHECKS OK ===");
   return true;
 }

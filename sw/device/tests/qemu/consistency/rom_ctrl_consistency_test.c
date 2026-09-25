@@ -316,6 +316,6 @@ bool test_main(void) {
   LOG_INFO("Confirmed synchronous Load Access Fault (mcause=5) at 0x%08x.",
            kTail64kBase);
 
-  LOG_INFO("All rom_ctrl Earlgrey v2 FPGA checks PASSED!");
+  LOG_INFO("All rom_ctrl Earlgrey v2 FPGA checks OK!");
   return true;
 }

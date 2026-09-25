@@ -774,6 +774,6 @@ bool test_main(void) {
       "[entropy_src_reg_pkg.sv:791-842] CONFIRMED: ENTROPY_SRC_PERMIT & "
       "addrmiss enforced");
 
-  LOG_INFO("=== ALL ENTROPY_SRC V2 ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL ENTROPY_SRC V2 ERRATA CHECKS OK ===");
   return true;
 }

@@ -682,6 +682,6 @@ bool test_main(void) {
   test_alert_handler_phase_transitions_autolock_and_regwen();
   test_alert_handler_permit_subword_and_addrmiss();
 
-  LOG_INFO("All alert_handler v2 consistency checks PASSED!");
+  LOG_INFO("All alert_handler v2 consistency checks OK!");
   return true;
 }

@@ -545,7 +545,6 @@ bool test_main(void) {
         "Expected RESET_INFO.SW_RESET cleared to 0 after RW1C write");
   abs_mmio_write32(TOP_EARLGREY_SRAM_CTRL_RET_RAM_BASE_ADDR + 4u, 0u);
   verify_post_sw_reset_errata();
-  LOG_INFO(
-      "=== ALL RSTMGR Earlgrey v2 Errata Checks PASSED on CW340 FPGA! ===");
+  LOG_INFO("=== ALL RSTMGR Earlgrey v2 Errata Checks OK on CW340 FPGA! ===");
   return true;
 }
