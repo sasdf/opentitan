@@ -2786,21 +2786,6 @@ _KMAC_APP_ROM_LIST = [
         ["//hw/top_earlgrey"],
     ),
     (
-        "//sw/device/lib/testing/test_rom:test_rom_sim_qemu_base_hashfile",
-        "sim_qemu_test_rom",
-        ["//hw/top_earlgrey"],
-    ),
-    (
-        "//sw/device/silicon_creator/rom:mask_rom_sim_qemu_base_hashfile",
-        "sim_qemu_rom_with_fake_keys",
-        ["//hw/top_earlgrey"],
-    ),
-    (
-        "//sw/device/silicon_creator/rom:mask_rom_sim_qemu_base_hashfile",
-        "sim_qemu_sival",
-        ["//hw/top_earlgrey"],
-    ),
-    (
         "//sw/device/lib/testing/test_rom:test_rom_sim_dv_hashfile",
         "sim_dv",
         [
@@ -2817,10 +2802,15 @@ _KMAC_APP_ROM_LIST = [
             "kmac_app_rom_test.c",
             hashfile,
         ],
-        exec_env = {
+        exec_env = ({
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
+        } if "fpga" in exec_env else {}) | {
             "{}:{}".format(top, exec_env): None
             for top in tops
         },
+        qemu = qemu_params(
+            rom = None if exec_env == "fpga_cw340_rom_with_fake_keys" else hashfile.replace("_hashfile", "_scr_vmem"),
+        ) if "fpga" in exec_env else None,
         deps = [
             "//hw/top/dt",
             "//sw/device/lib/base:mmio",

@@ -214,10 +214,7 @@ otp_image(
             slot_b = SLOTS["b"],
             # No longer relevant on RRAM; exclude all variants from CI entirely.
             # https://github.com/lowRISC/opentitan/issues/30897
-            tags = [
-                "broken",
-                "skip_in_ci",
-            ],
+            tags = ["skip_in_ci"],
         ),
     )
     for t in BOOT_POLICY_FLASH_ECC_ERROR_TESTS
@@ -259,10 +256,7 @@ opentitan_test(
         slot_b = SLOTS["b"],
         # No longer relevant on RRAM; exclude all variants from CI entirely.
         # https://github.com/lowRISC/opentitan/issues/30897
-        tags = [
-            "broken",
-            "skip_in_ci",
-        ],
+        tags = ["skip_in_ci"],
     ),
 )
 
