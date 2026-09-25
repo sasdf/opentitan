@@ -184,6 +184,7 @@ static uint32_t wait_op_done(void) {
     uint32_t st =
         abs_mmio_read32(kRramCoreBase + RRAM_CTRL_OP_STATUS_REG_OFFSET);
     if (bitfield_bit32_read(st, RRAM_CTRL_OP_STATUS_DONE_BIT)) {
+      LOG_INFO("wait_op_done returning %x", st);
       return st;
     }
   }
