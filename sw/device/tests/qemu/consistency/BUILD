@@ -455,6 +455,21 @@ alias(
 )
 
 alias(
+    name = "pattgen_consistency_test",
+    actual = "//sw/device/tests/consistency:pattgen_consistency_test",
+)
+
+alias(
+    name = "pattgen_consistency_test_sim_qemu_rom_with_fake_keys",
+    actual = "//sw/device/tests/consistency:pattgen_consistency_test_sim_qemu_rom_with_fake_keys",
+)
+
+alias(
+    name = "pattgen_consistency_test_fpga_cw340_rom_with_fake_keys",
+    actual = "//sw/device/tests/consistency:pattgen_consistency_test_fpga_cw340_rom_with_fake_keys",
+)
+
+alias(
     name = "sysrst_ctrl_consistency_test",
     actual = "//sw/device/tests/consistency:sysrst_ctrl_consistency_test",
 )
