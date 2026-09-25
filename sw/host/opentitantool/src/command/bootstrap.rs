@@ -20,7 +20,7 @@ pub struct BootstrapCommand {
     #[command(flatten)]
     bootstrap_options: BootstrapOptions,
     /// The size of the image to assemble (only valid with multiple FILE arguments).
-    #[arg(long, value_parser = usize::from_str, default_value = "1048576")]
+    #[arg(long, value_parser = usize::from_str, default_value = "2097152")]
     size: usize,
     /// Whether or not the assembled image is mirrored (only valid with multiple FILE arguments).
     #[arg(long, action = clap::ArgAction::Set, default_value = "true")]

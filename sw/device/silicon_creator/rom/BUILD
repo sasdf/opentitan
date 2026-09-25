@@ -15,6 +15,7 @@ load(
     "opentitan_binary",
     "opentitan_manual_test",
     "opentitan_test",
+    "qemu_params",
 )
 load("//rules/opentitan:legacy.bzl", "legacy_rom_targets")
 load("//rules:symbols.bzl", "check_elf_symbols_test")
@@ -656,5 +657,18 @@ opentitan_test(
     cw340 = STACK_UTILIZATION_FPGA_PARAMS["cw340"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": "cw340",
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
+    qemu = qemu_params(
+        binaries = {
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0": "good_a",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0": "good_b",
+            "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0_corrupted_sim_qemu_rom_with_fake_keys_signed_bin": "bad_a",
+            ":empty_flash": "empty",
+        },
+        stack_usage = "STK:[0-9A-Fa-f/]+\r\n",
+        tags = ["manual"],
+        test_cmd = STACK_UTILIZATION_FPGA_PARAMS["cw340"].test_cmd,
+        testopt_bootstrap = "False",
+    ),
 )

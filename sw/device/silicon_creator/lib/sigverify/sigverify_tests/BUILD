@@ -8,6 +8,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -26,8 +27,17 @@ opentitan_test(
     srcs = ["sigverify_cryptotest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
+        timeout = "moderate",
+        data = _TEST_VECTORS,
+        test_cmd = """
+                --bootstrap={firmware}
+            """ + _TEST_ARGS,
+        test_harness = "//sw/host/tests/crypto/ecdsa_kat:harness",
+    ),
+    qemu = qemu_params(
         timeout = "moderate",
         data = _TEST_VECTORS,
         test_cmd = """

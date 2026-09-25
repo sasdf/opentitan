@@ -115,8 +115,12 @@ opentitan_test(
     srcs = ["mod_exp_ibex_functest.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
+        timeout = "long",
+    ),
+    qemu = qemu_params(
         timeout = "long",
     ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
@@ -305,6 +309,7 @@ opentitan_test(
     exec_env = {
         # Test set is too large as ROM_EXT
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
         timeout = "long",

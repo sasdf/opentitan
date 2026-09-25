@@ -29,6 +29,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "verilator_params",
 )
 
@@ -69,8 +70,13 @@ opentitan_test(
     srcs = [":empty_test"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        otp = ":otp_img_default",
+        tags = maybe_skip_in_ci(CONST.LCV.RMA),
+    ),
+    qemu = qemu_params(
         otp = ":otp_img_default",
         tags = maybe_skip_in_ci(CONST.LCV.RMA),
     ),
@@ -316,10 +322,15 @@ opentitan_test(
     srcs = ["rom_e2e_flash_ctrl_init_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     # No longer relevant on RRAM; exclude all FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
     fpga = fpga_params(tags = [
+        "broken",
+        "skip_in_ci",
+    ]),
+    qemu = qemu_params(tags = [
         "broken",
         "skip_in_ci",
     ]),
@@ -341,6 +352,7 @@ opentitan_test(
     exec_env = {
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_verilator_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
@@ -350,6 +362,10 @@ opentitan_test(
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.INTERRUPT.INSTRUCTION_ACCESS)),
     ),
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
+    qemu = qemu_params(
+        exit_failure = "NO_FAILURE_MESSAGE",
+        exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.INTERRUPT.INSTRUCTION_ACCESS)),
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         exit_failure = "NO_FAILURE_MESSAGE",
@@ -371,6 +387,7 @@ opentitan_test(
     ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
         "//hw/top_earlgrey:silicon_creator": None,
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
@@ -397,6 +414,7 @@ opentitan_test(
         "//hw/top_earlgrey:sim_dv": None,
         "//hw/top_earlgrey:sim_verilator": None,
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     manifest = "//sw/device/silicon_creator/rom_ext:manifest",
     verilator = verilator_params(
@@ -416,8 +434,13 @@ opentitan_test(
     srcs = ["rom_e2e_c_init_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        exit_failure = CONST.SHUTDOWN.PREFIX.BFV,
+        exit_success = MSG_PASS,
+    ),
+    qemu = qemu_params(
         exit_failure = CONST.SHUTDOWN.PREFIX.BFV,
         exit_success = MSG_PASS,
     ),
@@ -444,11 +467,15 @@ opentitan_test(
     srcs = [":empty_test"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_sival": None,
+        "//hw/top_earlgrey:sim_qemu_sival": None,
     },
     fpga = fpga_params(
         otp = "//hw/top_earlgrey/data/otp:img_dev",
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
+    qemu = qemu_params(
+        otp = "//hw/top_earlgrey/data/otp:img_dev",
+    ),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//hw/top/dt",
@@ -467,12 +494,17 @@ opentitan_test(
     },
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         exit_failure = MSG_PASS,
         exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_KEY)),
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
+    qemu = qemu_params(
+        exit_failure = MSG_PASS,
+        exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_KEY)),
+    ),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//hw/top/dt",
@@ -488,6 +520,7 @@ opentitan_test(
     srcs = ["rom_ext_upgrade_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
         # Fail if we see version 3, because the test has updated twice, FAIL, version 0 twice, or PASS
@@ -495,6 +528,11 @@ opentitan_test(
         exit_success = "min_security_version_rom_ext:0(?s:.*)min_security_version_rom_ext:1(?s:.*)" + MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.BOOT_POLICY.ROLLBACK)),
     ),
     linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
+    qemu = qemu_params(
+        # Fail if we see version 3, because the test has updated twice, FAIL, version 0 twice, or PASS
+        exit_failure = "(min_security_version_rom_ext:[^01])|(FAIL)|((min_security_version_rom_ext:0(?s:.*)){2,})|(PASS)",
+        exit_success = "min_security_version_rom_ext:0(?s:.*)min_security_version_rom_ext:1(?s:.*)" + MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.BOOT_POLICY.ROLLBACK)),
+    ),
     deps = [
         "//hw/top:otp_ctrl_c_regs",
         "//hw/top/dt",
@@ -511,7 +549,9 @@ opentitan_test(
     srcs = ["chip_info_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:fpga_cw340_test_rom": None,
+        "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     deps = [
         "//sw/device/lib/testing:ret_sram_testutils",
