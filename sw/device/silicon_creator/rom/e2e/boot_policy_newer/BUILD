@@ -7,6 +7,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -61,6 +62,7 @@ SEC_VERS = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
         exec_env = [
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys",
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
         ],
         linker_script = "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_{}".format(slot),
         local_defines = [
@@ -120,6 +122,7 @@ BOOT_POLICY_NEWER_CASES = [
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
@@ -132,6 +135,17 @@ BOOT_POLICY_NEWER_CASES = [
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
+            binaries = {
+                ":empty_test_slot_a_sec_ver_{}".format(t["a"]): "fw_a",
+                ":empty_test_slot_b_sec_ver_{}".format(t["b"]): "fw_b",
+            },
+            exit_success = t["exit_success"].format(hex_digits(lc_state_val)),
+            otp = ":otp_img_boot_policy_newer_{}".format(lc_state),
+            slot_a = SLOTS["a"],
+            slot_b = SLOTS["b"],
         ),
     )
     for lc_state, lc_state_val in get_lc_items()

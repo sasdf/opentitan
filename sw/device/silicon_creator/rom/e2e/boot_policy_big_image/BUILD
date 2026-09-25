@@ -14,6 +14,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -36,12 +37,16 @@ BOOT_POLICY_BIG_IMAGE_CASES = [
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
         ),
         local_defines = ["ARRAY_SIZE={}".format(t["array_size"])],
+        qemu = qemu_params(
+            otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
+        ),
         deps = [
             "//sw/device/lib/testing/test_framework:check",
             "//sw/device/lib/testing/test_framework:ottf_ld_silicon_creator_slot_a",
