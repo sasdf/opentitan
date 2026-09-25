@@ -294,13 +294,93 @@ static void test_v2_mtime_rewind_sticky_intr_and_dif_counter_write(void) {
       "mtimecmp_update clear) PASSED");
 }
 
+// -----------------------------------------------------------------------------
+// 6. Verify all 10 CSRs (ALERT_TEST, CTRL, INTR_ENABLE0, INTR_STATE0,
+//    INTR_TEST0, CFG0, TIMER_V_LOWER0, TIMER_V_UPPER0, COMPARE_LOWER0_0,
+//    COMPARE_UPPER0_0), RV_TIMER_PERMIT (0x1, 0x7, 0xf), and CTRL 1->0 stop
+//    sticky INTR_STATE0 + RW1C clear when inactive.
+// -----------------------------------------------------------------------------
+static void test_all_10_csrs_permits_and_stop_sticky_intr(void) {
+  rv_timer_reset_clean();
+
+  // 1. Verify clean state values across all 10 CSRs:
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_CTRL_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_ENABLE0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_TEST0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_CFG0_REG_OFFSET) == 0x00010000u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET) ==
+        0xffffffffu);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_COMPARE_UPPER0_0_REG_OFFSET) ==
+        0xffffffffu);
+
+  // 2. Verify INTR_TEST0 (WO, PERMIT=0x1) sets INTR_STATE0=1 while inactive,
+  // reads back 0, and INTR_STATE0 (RW1C) clears to 0 when inactive:
+  abs_mmio_write8(kTimerBase + RV_TIMER_INTR_ENABLE0_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_ENABLE0_REG_OFFSET) == 1u);
+  abs_mmio_write8(kTimerBase + RV_TIMER_INTR_ENABLE0_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_ENABLE0_REG_OFFSET) == 0u);
+
+  abs_mmio_write8(kTimerBase + RV_TIMER_INTR_TEST0_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_TEST0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u);
+  abs_mmio_write8(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
+
+  // 3. Verify CTRL 1 -> 0 stop while mtime >= mtimecmp preserves sticky
+  // INTR_STATE0 == 1, and RW1C clears it permanently because active == 0:
+  abs_mmio_write32(kTimerBase + RV_TIMER_CFG0_REG_OFFSET, 0u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET, 50u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_COMPARE_UPPER0_0_REG_OFFSET, 0u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET, 40u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_CTRL_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u);
+
+  // Stop timer (CTRL = 0): INTR_STATE0 stays 1, then clears to 0 on RW1C!
+  abs_mmio_write32(kTimerBase + RV_TIMER_CTRL_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 1u);
+  abs_mmio_write32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET, 1u);
+  busy_spin_micros(5);
+  CHECK(abs_mmio_read32(kTimerBase + RV_TIMER_INTR_STATE0_REG_OFFSET) == 0u);
+
+  // 4. Verify RV_TIMER_PERMIT subword faults on 4'b1111 registers
+  // (TIMER_V_LOWER0, TIMER_V_UPPER0, COMPARE_LOWER0_0, COMPARE_UPPER0_0) and
+  // byte-1 fault on 4'b0001 registers (ALERT_TEST+1, CTRL+1):
+  g_store_fault_count = 0;
+  *((volatile uint16_t *)(kTimerBase + RV_TIMER_TIMER_V_LOWER0_REG_OFFSET)) =
+      0x1234u;
+  CHECK(g_store_fault_count == 1u && g_last_mcause == kIbexExcStoreAccessFault);
+  *((volatile uint16_t *)(kTimerBase + RV_TIMER_TIMER_V_UPPER0_REG_OFFSET)) =
+      0x1234u;
+  CHECK(g_store_fault_count == 2u && g_last_mcause == kIbexExcStoreAccessFault);
+  *((volatile uint16_t *)(kTimerBase + RV_TIMER_COMPARE_LOWER0_0_REG_OFFSET)) =
+      0x1234u;
+  CHECK(g_store_fault_count == 3u && g_last_mcause == kIbexExcStoreAccessFault);
+  *((volatile uint16_t *)(kTimerBase + RV_TIMER_COMPARE_UPPER0_0_REG_OFFSET)) =
+      0x1234u;
+  CHECK(g_store_fault_count == 4u && g_last_mcause == kIbexExcStoreAccessFault);
+  abs_mmio_write8(kTimerBase + RV_TIMER_ALERT_TEST_REG_OFFSET + 1u, 1u);
+  CHECK(g_store_fault_count == 5u && g_last_mcause == kIbexExcStoreAccessFault);
+  abs_mmio_write8(kTimerBase + RV_TIMER_CTRL_REG_OFFSET + 1u, 1u);
+  CHECK(g_store_fault_count == 6u && g_last_mcause == kIbexExcStoreAccessFault);
+
+  rv_timer_reset_clean();
+  LOG_INFO("Test 6 (All 10 CSRs, PERMIT masks, & stop sticky IRQ) PASSED");
+}
+
 bool test_main(void) {
-  LOG_INFO("=== OpenTitan Earlgrey v2 (trunk-v2) RV_TIMER Errata Suite ===");
+  LOG_INFO(
+      "=== OpenTitan Earlgrey v2 (trunk-v2) RV_TIMER Consistency Suite ===");
   test_cfg0_ungated_and_live_prescale_runaway();
   test_step_zero_combinational_intr();
   test_unmapped_skipto_hole_bus_error();
   test_cfg0_3byte_permit_subword_fault();
   test_v2_mtime_rewind_sticky_intr_and_dif_counter_write();
-  LOG_INFO("=== ALL RV_TIMER V2 ERRATA CHECKS PASSED ===");
+  test_all_10_csrs_permits_and_stop_sticky_intr();
+  LOG_INFO("=== ALL RV_TIMER V2 CONSISTENCY & ERRATA CHECKS PASSED ===");
   return true;
 }
