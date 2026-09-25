@@ -1927,7 +1927,6 @@ _FLASH_CTRL_INFO_ACCESS_LC_STATES = get_lc_items(
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         fpga = fpga_params(
             otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
@@ -2497,7 +2496,6 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_test_rom": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             # This test is not expected to run on silicon, as it would require a very specific OTP configuration that is only useful for this test.
         },
     ),
