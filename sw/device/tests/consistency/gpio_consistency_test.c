@@ -140,6 +140,138 @@ static void expect_store8_fault(uint32_t addr, uint8_t val) {
         "Expected mcause=7, got %u at 0x%08x", g_bus_fault_mcause, addr);
 }
 
+static void test_gpio_reset_values_masked_aliasing_and_edge_intr(void) {
+  LOG_INFO(
+      "Test 0: CSR reset values, DIRECT_*/MASKED_* hwext aliasing "
+      "(gpio.sv:122-162), edge/INTR_TEST latching, and full "
+      "GPIO_PERMIT[0..15]");
+
+  // 1. Verify reset values of all RW/RO/WO CSRs at cold boot (before any
+  // writes):
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_ENABLE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_LOWER_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_UPPER_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_CTRL_EN_LVLHIGH_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_CTRL_EN_LVLLOW_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_CTRL_EN_INPUT_FILTER_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_HW_STRAPS_DATA_IN_VALID_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_HW_STRAPS_DATA_IN_REG_OFFSET) == 0u);
+
+  // 2. Verify DIRECT_OUT & MASKED_OUT_{LOWER,UPPER} single-flop aliasing
+  // (cio_gpio_q in gpio.sv:122-141) and {16'h0, halfword} readback:
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0xa5a55a5au);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET) ==
+        0x00005a5au);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET) ==
+        0x0000a5a5u);
+
+  // Update only lower nibbles via MASKED_OUT_LOWER (mask=0x0f0f, data=0x1234):
+  // Expected lower = (0x0f0f & 0x1234) | (~0x0f0f & 0x5a5a) = 0x0204 | 0x5050 =
+  // 0x5254
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET, 0x0f0f1234u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_LOWER_REG_OFFSET) ==
+        0x00005254u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET) == 0xa5a55254u);
+
+  // Update only upper nibbles via MASKED_OUT_UPPER (mask=0xf0f0, data=0xdead):
+  // Expected upper = (0xf0f0 & 0xdead) | (~0xf0f0 & 0xa5a5) = 0xd0a0 | 0x0505 =
+  // 0xd5a5
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET, 0xf0f0deadu);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OUT_UPPER_REG_OFFSET) ==
+        0x0000d5a5u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET) == 0xd5a55254u);
+
+  // 3. Verify DIRECT_OE & MASKED_OE_{LOWER,UPPER} single-flop aliasing
+  // (cio_gpio_en_q in gpio.sv:143-162) and {16'h0, halfword} readback:
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0x3c3cc3c3u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_LOWER_REG_OFFSET) ==
+        0x0000c3c3u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_UPPER_REG_OFFSET) ==
+        0x00003c3cu);
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OE_LOWER_REG_OFFSET, 0x00ff0055u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_LOWER_REG_OFFSET) ==
+        0x0000c355u);
+  abs_mmio_write32(kGpioBase + GPIO_MASKED_OE_UPPER_REG_OFFSET, 0xff00aa00u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_MASKED_OE_UPPER_REG_OFFSET) ==
+        0x0000aa3cu);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET) == 0xaa3cc355u);
+
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OUT_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0u);
+
+  // 4. Verify INTR_TEST (WO, reads 0) and RISING/FALLING edge detection
+  // (gpio.sv:171-193):
+  abs_mmio_write32(kGpioBase + GPIO_INTR_TEST_REG_OFFSET, 0x80000005u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0x80000005u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0x00000001u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0x80000004u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0x80000004u);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0u);
+
+  dif_pinmux_t pinmux;
+  CHECK_DIF_OK(dif_pinmux_init(mmio_region_from_addr(kPinmuxBase), &pinmux));
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio1,
+                                       kTopEarlgreyPinmuxInselConstantZero));
+  busy_spin_micros(5);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 1u << 1);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET, 1u << 1);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffffffffu);
+  CHECK(abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) == 0u);
+
+  // Trigger rising edge on GPIO[1] via ConstantZero -> ConstantOne:
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio1,
+                                       kTopEarlgreyPinmuxInselConstantOne));
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & (1u << 1)) !=
+        0u);
+  // Unlike level interrupts, edge interrupts clear cleanly via RW1C while input
+  // stays 1:
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u << 1);
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & (1u << 1)) ==
+        0u);
+
+  // Trigger falling edge on GPIO[1] via ConstantOne -> ConstantZero:
+  CHECK_DIF_OK(dif_pinmux_input_select(&pinmux,
+                                       kTopEarlgreyPinmuxPeripheralInGpioGpio1,
+                                       kTopEarlgreyPinmuxInselConstantZero));
+  busy_spin_micros(5);
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & (1u << 1)) !=
+        0u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 1u << 1);
+  CHECK((abs_mmio_read32(kGpioBase + GPIO_INTR_STATE_REG_OFFSET) & (1u << 1)) ==
+        0u);
+
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 0u);
+  abs_mmio_write32(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET, 0u);
+
+  // 5. Verify GPIO_PERMIT=4'b1111 subword write faults on remaining CSRs:
+  expect_store8_fault(kGpioBase + GPIO_INTR_STATE_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_ENABLE_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_TEST_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_DIRECT_OE_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_CTRL_EN_RISING_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_CTRL_EN_FALLING_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_CTRL_EN_LVLHIGH_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_INTR_CTRL_EN_LVLLOW_REG_OFFSET, 0xffu);
+  expect_store8_fault(kGpioBase + GPIO_CTRL_EN_INPUT_FILTER_REG_OFFSET, 0xffu);
+}
+
 static void test_gpio_pad_invert_and_input_disable(void) {
   LOG_INFO(
       "Test 1: MIO_PAD_ATTR.INVERT double-XOR cancellation, Constant0/1 "
@@ -354,6 +486,7 @@ static void test_gpio_v2_hw_straps_disabled_and_permit_asymmetry(void) {
 
 bool test_main(void) {
   LOG_INFO("Starting gpio_errata_v2_test (P26) on CW340 FPGA...");
+  test_gpio_reset_values_masked_aliasing_and_edge_intr();
   test_gpio_pad_invert_and_input_disable();
   test_gpio_permit_subword_and_data_in_faults();
   test_gpio_level_intr_relatch_and_alert_pulse();
