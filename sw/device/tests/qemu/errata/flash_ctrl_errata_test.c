@@ -387,6 +387,6 @@ bool test_main(void) {
         0u);
   abs_mmio_write32(kFlashCoreBase + FLASH_CTRL_FIFO_RST_REG_OFFSET, 0u);
 
-  LOG_INFO("=== ALL FLASH_CTRL ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL FLASH_CTRL ERRATA CHECKS OK ===");
   return true;
 }

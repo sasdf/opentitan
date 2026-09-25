@@ -409,6 +409,6 @@ bool test_main(void) {
   test_lc_ctrl_unfiltered_transition_target();
   test_lc_ctrl_permit_and_addrmiss_faults();
   test_lc_ctrl_alert_test_pulse_and_regwen_lock();
-  LOG_INFO("All lc_ctrl_errata_test checks PASSED!");
+  LOG_INFO("All lc_ctrl_errata_test checks OK!");
   return true;
 }

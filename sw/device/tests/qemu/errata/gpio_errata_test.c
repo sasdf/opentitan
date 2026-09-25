@@ -310,6 +310,6 @@ bool test_main(void) {
   test_gpio_pad_invert_and_input_disable();
   test_gpio_permit_subword_and_data_in_faults();
   test_gpio_level_intr_relatch_and_alert_pulse();
-  LOG_INFO("All gpio_errata_test checks PASSED!");
+  LOG_INFO("All gpio_errata_test checks OK!");
   return true;
 }

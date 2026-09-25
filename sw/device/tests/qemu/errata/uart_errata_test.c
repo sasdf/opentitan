@@ -217,6 +217,6 @@ bool test_main(void) {
       "4'b0011 "
       "(INTR_ENABLE) enforced");
 
-  LOG_INFO("=== ALL UART ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL UART ERRATA CHECKS OK ===");
   return true;
 }

@@ -358,6 +358,6 @@ bool test_main(void) {
       "[entropy_src_reg_pkg.sv:980-1038] CONFIRMED: ENTROPY_SRC_PERMIT "
       "enforced");
 
-  LOG_INFO("=== ALL ENTROPY_SRC ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL ENTROPY_SRC ERRATA CHECKS OK ===");
   return true;
 }

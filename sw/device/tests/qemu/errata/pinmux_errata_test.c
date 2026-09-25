@@ -313,6 +313,6 @@ bool test_main(void) {
   verify_pinmux_permit_subword_faults();
   verify_pinmux_alert_and_regwen();
 
-  LOG_INFO("All PINMUX errata & security hardening checks PASSED!");
+  LOG_INFO("All PINMUX errata & security hardening checks OK!");
   return true;
 }

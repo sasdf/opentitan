@@ -344,6 +344,6 @@ bool test_main(void) {
   // [rstmgr_crash_info.sv:13-52].
   verify_post_sw_reset_regwen_and_crash_info();
 
-  LOG_INFO("All rstmgr errata checks PASSED");
+  LOG_INFO("All rstmgr errata checks OK");
   return true;
 }

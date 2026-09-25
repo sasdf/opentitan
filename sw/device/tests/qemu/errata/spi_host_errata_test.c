@@ -281,6 +281,6 @@ bool test_main(void) {
       "RXDATA/TXDATA window "
       "access checks enforced");
 
-  LOG_INFO("=== ALL SPI_HOST ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL SPI_HOST ERRATA CHECKS OK ===");
   return true;
 }

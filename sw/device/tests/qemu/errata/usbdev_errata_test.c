@@ -315,6 +315,6 @@ bool test_main(void) {
   test_usbdev_resume_link_active_no_sof_and_tx_osc();
   test_usbdev_buffer_asymmetric_subword_and_csr_faults();
 
-  LOG_INFO("All usbdev errata checks PASSED");
+  LOG_INFO("All usbdev errata checks OK");
   return true;
 }

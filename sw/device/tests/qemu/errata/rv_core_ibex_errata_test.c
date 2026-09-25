@@ -255,6 +255,6 @@ bool test_main(void) {
         unmapped_read);
   LOG_INFO("Address translation routing & 1-bit ADDR_EN_0 mask CONFIRMED");
 
-  LOG_INFO("=== ALL RV_CORE_IBEX ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL RV_CORE_IBEX ERRATA CHECKS OK ===");
   return true;
 }

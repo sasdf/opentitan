@@ -268,6 +268,6 @@ bool test_main(void) {
   test_top_earlgrey_asymmetric_sram_ifetch_tieoff();
   test_top_earlgrey_reggen_wo_read_and_ro_write();
 
-  LOG_INFO("All top_earlgrey errata checks PASSED");
+  LOG_INFO("All top_earlgrey errata checks OK");
   return true;
 }

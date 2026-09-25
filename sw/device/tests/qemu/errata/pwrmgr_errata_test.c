@@ -367,6 +367,6 @@ bool test_main(void) {
   test_pwrmgr_wake_info_relatch_and_retention();
   test_pwrmgr_permit_and_addrmiss_faults();
   test_pwrmgr_intr_alert_and_regwen_locks();
-  LOG_INFO("All pwrmgr_errata_test checks PASSED!");
+  LOG_INFO("All pwrmgr_errata_test checks OK!");
   return true;
 }

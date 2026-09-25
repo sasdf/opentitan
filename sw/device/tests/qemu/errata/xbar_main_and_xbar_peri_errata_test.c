@@ -148,6 +148,6 @@ static void test_xbar_two_stage_decode_faults(void) {
 bool test_main(void) {
   LOG_INFO("=== xbar_main_and_xbar_peri Errata Confirmation Test Suite ===");
   test_xbar_two_stage_decode_faults();
-  LOG_INFO("=== All xbar_main_and_xbar_peri Errata Checks PASSED ===");
+  LOG_INFO("=== All xbar_main_and_xbar_peri Errata Checks OK ===");
   return true;
 }

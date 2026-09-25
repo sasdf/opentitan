@@ -277,6 +277,6 @@ bool test_main(void) {
       "4'b1111 "
       "enforced");
 
-  LOG_INFO("=== ALL AON_TIMER ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL AON_TIMER ERRATA CHECKS OK ===");
   return true;
 }

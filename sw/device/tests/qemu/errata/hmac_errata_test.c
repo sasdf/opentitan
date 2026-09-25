@@ -490,6 +490,6 @@ bool test_main(void) {
   verify_hmac_permit_subword_writes_vs_msg_fifo();
   verify_hmac_empty_message_sha256_digest();
 
-  LOG_INFO("All 8 HMAC errata & security hardening checks PASSED!");
+  LOG_INFO("All 8 HMAC errata & security hardening checks OK!");
   return true;
 }

@@ -253,6 +253,6 @@ bool test_main(void) {
   verify_padring_e2_01_mio_gpio_and_sysrst_loopback();
   verify_padring_pad_type_warl_masks();
 
-  LOG_INFO("All PADRING errata & implementation checks PASSED!");
+  LOG_INFO("All PADRING errata & implementation checks OK!");
   return true;
 }

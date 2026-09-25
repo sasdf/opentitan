@@ -347,6 +347,6 @@ bool test_main(void) {
   test_i2c_readb_rcont_stop_and_nack_count();
   test_i2c_permit_subword_writes_vs_reads();
 
-  LOG_INFO("All i2c errata checks PASSED");
+  LOG_INFO("All i2c errata checks OK");
   return true;
 }

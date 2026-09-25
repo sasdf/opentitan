@@ -273,6 +273,6 @@ bool test_main(void) {
       "CTRL.INIT restored clean ECC",
       g_nmi_load_integ_count);
 
-  LOG_INFO("=== ALL SRAM_CTRL ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL SRAM_CTRL ERRATA CHECKS OK ===");
   return true;
 }

@@ -321,6 +321,6 @@ bool test_main(void) {
   test_alert_handler_timeout_irq_and_clr_shadowed();
   test_alert_handler_permit_subword_and_addrmiss();
 
-  LOG_INFO("All alert_handler errata checks PASSED");
+  LOG_INFO("All alert_handler errata checks OK");
   return true;
 }

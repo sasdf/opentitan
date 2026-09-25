@@ -267,6 +267,6 @@ bool test_main(void) {
   LOG_INFO(
       "[spi_device_reg_pkg.sv:837-911] CONFIRMED: SPI_DEVICE_PERMIT enforced");
 
-  LOG_INFO("=== ALL SPI_DEVICE ERRATA CHECKS PASSED ===");
+  LOG_INFO("=== ALL SPI_DEVICE ERRATA CHECKS OK ===");
   return true;
 }
