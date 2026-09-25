@@ -5503,6 +5503,9 @@ opentitan_test(
             "slow_test",
         ],
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     verilator = verilator_params(
         timeout = "long",
         # Broken on Verilator. See #24182.
