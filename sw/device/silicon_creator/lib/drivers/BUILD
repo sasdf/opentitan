@@ -1101,6 +1101,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
+    ),
     verilator = verilator_params(
         timeout = "long",
         tags = ["broken"],

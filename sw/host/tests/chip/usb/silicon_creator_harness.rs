@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use opentitanlib::app::TransportWrapper;
 use opentitanlib::crypto::sha256::Sha256Digest;
 use opentitanlib::execute_test;
-use opentitanlib::io::console::{ConsoleDevice, ConsoleExt};
+
 use opentitanlib::io::usb::UsbDevice as OtUsbDevice;
 use opentitanlib::test_utils::init::InitializeTest;
 use opentitanlib::uart::console::UartConsole;
