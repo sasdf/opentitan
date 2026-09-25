@@ -1076,8 +1076,8 @@ opentitan_test(
 # === BEGIN CONSISTENCY TEST: p36_xbar_main_and_xbar_peri ===
 # === BEGIN CONSISTENCY TEST: p35_tlul ===
 opentitan_test(
-    name = "tlul_consistency_test",
-    srcs = ["tlul_consistency_test.c"],
+    name = "tlul_and_prim_consistency_test",
+    srcs = ["tlul_and_prim_consistency_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
