@@ -96,6 +96,7 @@
 #include "sw/device/lib/testing/test_framework/ottf_isrs.h"
 #include "sw/device/lib/testing/test_framework/ottf_main.h"
 
+#include "hw/top/alert_handler_regs.h"
 #include "hw/top/lc_ctrl_regs.h"
 #include "hw/top/otp_ctrl_regs.h"
 #include "hw/top/rv_dm_regs.h"
@@ -108,6 +109,8 @@ enum {
   kRvDmMemBase = TOP_EARLGREY_RV_DM_MEM_BASE_ADDR,
   kOtpCtrlBase = TOP_EARLGREY_OTP_CTRL_CORE_BASE_ADDR,
   kLcCtrlBase = TOP_EARLGREY_LC_CTRL_REGS_BASE_ADDR,
+  kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
+  kRvDmAlertId = kTopEarlgreyAlertIdRvDmFatalFault,
 
   kRvDmData0Offset = RV_DM_DATAADDR_0_REG_OFFSET,
   kRvDmData1Offset = RV_DM_DATAADDR_1_REG_OFFSET,
@@ -116,6 +119,11 @@ enum {
   kMcauseLoadAccessFault = 5u,
   kMcauseStoreAccessFault = 7u,
 };
+
+static void shadow_write32(uint32_t addr, uint32_t val) {
+  abs_mmio_write32(addr, val);
+  abs_mmio_write32(addr, val);
+}
 
 static volatile uint32_t fault_count = 0;
 static volatile uint32_t last_mcause = 0;
@@ -169,14 +177,19 @@ static uint32_t probe_write8(uint32_t addr, uint8_t val) {
 
 /**
  * Test 1: `RV_DM.REGS` (`0x41200000`) `RegsAw = 4` Address Decode (`0x0c`
- * `addrmiss`) and `RV_DM_REGS_PERMIT` Byte-Enable Enforcement.
+ * `addrmiss`), `ALERT_TEST` (`0x00`) One-Shot Alert Pulse, and
+ * `RV_DM_REGS_PERMIT` Byte-Enable Enforcement.
  */
 static void test_rv_dm_regs_decode_and_permit(void) {
   LOG_INFO(
       "Test 1: RV_DM.REGS decode and RV_DM_REGS_PERMIT byte-enable checks");
 
+  uint32_t alert_test_ro = 0xffffffffu;
   uint32_t regwen = 0;
   uint32_t late_dbg = 0;
+  CHECK(probe_read32(kRvDmRegsBase + RV_DM_ALERT_TEST_REG_OFFSET,
+                     &alert_test_ro) == 0u);
+  CHECK(alert_test_ro == 0u);
   CHECK(probe_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET,
                      &regwen) == 0u);
   CHECK(regwen == 1u);
@@ -186,6 +199,32 @@ static void test_rv_dm_regs_decode_and_permit(void) {
   // Offset 0x0c within the 16-byte RegsAw=4 window is unmapped (addrmiss = 1).
   CHECK(probe_read32(kRvDmRegsBase + 0x0cu, NULL) == kMcauseLoadAccessFault);
   CHECK(probe_write32(kRvDmRegsBase + 0x0cu, 0u) == kMcauseStoreAccessFault);
+
+  // ALERT_TEST (0x00) has RV_DM_REGS_PERMIT[0] = 4'b0001: byte-1 `sb` faults
+  // with mcause = 7, whereas writing bit 0 triggers
+  // kTopEarlgreyAlertIdRvDmFatalFault (39).
+  CHECK(probe_write8(kRvDmRegsBase + RV_DM_ALERT_TEST_REG_OFFSET + 1u, 0x01u) ==
+        kMcauseStoreAccessFault);
+  uint32_t en_addr = kAlertHandlerBase +
+                     ALERT_HANDLER_ALERT_EN_SHADOWED_0_REG_OFFSET +
+                     kRvDmAlertId * sizeof(uint32_t);
+  uint32_t class_addr = kAlertHandlerBase +
+                        ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_REG_OFFSET +
+                        kRvDmAlertId * sizeof(uint32_t);
+  uint32_t cause_addr = kAlertHandlerBase +
+                        ALERT_HANDLER_ALERT_CAUSE_0_REG_OFFSET +
+                        kRvDmAlertId * sizeof(uint32_t);
+  shadow_write32(class_addr,
+                 ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSA);
+  shadow_write32(en_addr, 1u);
+  abs_mmio_write32(cause_addr, 1u);
+  CHECK(abs_mmio_read32(cause_addr) == 0u);
+  CHECK(probe_write8(kRvDmRegsBase + RV_DM_ALERT_TEST_REG_OFFSET, 0x01u) == 0u);
+  CHECK(abs_mmio_read32(cause_addr) == 1u);
+  abs_mmio_write32(cause_addr, 1u);
+  CHECK(abs_mmio_read32(cause_addr) == 0u);
+  shadow_write32(class_addr,
+                 ALERT_HANDLER_ALERT_CLASS_SHADOWED_0_CLASS_A_0_VALUE_CLASSD);
 
   // LATE_DEBUG_ENABLE (0x08) has RV_DM_REGS_PERMIT[2] = 4'b1111: sub-word
   // writes (sb/sh) must fault with Store Access Fault (mcause = 7) and leave
@@ -265,6 +304,21 @@ static void test_rv_dm_mem_late_debug_gate(void) {
   CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
         (uint32_t)kMultiBitBool32True);
   CHECK(probe_read32(kRvDmMemBase + RV_DM_WHERETO_REG_OFFSET, &whereto) == 0u);
+
+  // Verify LATE_DEBUG_ENABLE_REGWEN (0x04) RW0C lock: clearing REGWEN to 0
+  // cannot be undone by writing 1, and blocks subsequent 32-bit writes to
+  // LATE_DEBUG_ENABLE (without bus error, d_error = 0).
+  CHECK_DIF_OK(dif_rv_dm_late_debug_lock(&rv_dm));
+  CHECK(abs_mmio_read32(kRvDmRegsBase +
+                        RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET) == 0u);
+  CHECK(probe_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET,
+                      1u) == 0u);
+  CHECK(abs_mmio_read32(kRvDmRegsBase +
+                        RV_DM_LATE_DEBUG_ENABLE_REGWEN_REG_OFFSET) == 0u);
+  CHECK(probe_write32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET,
+                      (uint32_t)kMultiBitBool32False) == 0u);
+  CHECK(abs_mmio_read32(kRvDmRegsBase + RV_DM_LATE_DEBUG_ENABLE_REG_OFFSET) ==
+        (uint32_t)kMultiBitBool32True);
 }
 
 /**
