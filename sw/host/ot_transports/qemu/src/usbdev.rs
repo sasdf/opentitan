@@ -477,18 +477,6 @@ impl UsbDevice for QemuUsbDevice {
             .context("failed to send RESET")
     }
 
-    fn suspend(&self) -> anyhow::Result<()> {
-        self.host_channel
-            .send(HostChannelEvent::Suspend)
-            .context("failed to send SUSPEND")
-    }
-
-    fn resume(&self) -> anyhow::Result<()> {
-        self.host_channel
-            .send(HostChannelEvent::Resume)
-            .context("failed to send RESUME")
-    }
-
     /// Get the default timeout for operations.
     fn get_timeout(&self) -> Duration {
         self.timeout
@@ -991,13 +979,6 @@ pub struct QemuUsbdevCompletePayload {
     xfer_size: little_endian::U32,
 }
 
-/// USBDEV cancel payload, see QEMU documentation.
-#[derive(Clone, IntoBytes, KnownLayout, Immutable, Unaligned)]
-#[repr(C)]
-pub struct QemuUsbdevCancelPayload {
-    transfer_id: little_endian::U32,
-}
-
 /// Represents a packet ID.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 struct PacketId(u32);
@@ -1018,9 +999,6 @@ struct QemuUsbdevEvent {
 struct QemuUsbdevCompleteEvent {
     id: PacketId,
     status: QemuUsbdevTransferStatus,
-    // Temporary until we have a more complete stack that uses this field.
-    #[allow(dead_code)]
-    xfer_size: u32,
     data: Vec<u8>,
 }
 
@@ -1279,14 +1257,6 @@ impl QemuHostThread {
         self.send_packet(QemuUsbdevCmd::Transfer, &[xfer_cmd.as_bytes(), data])
     }
 
-    fn _send_cancel(&mut self, xfer_id: PacketId) -> UsbResult<PacketId> {
-        let cancel_cmd = QemuUsbdevCancelPayload {
-            transfer_id: xfer_id.0.into(),
-        };
-
-        self.send_packet(QemuUsbdevCmd::Cancel, &[cancel_cmd.as_bytes()])
-    }
-
     /// Helper function to send a Transfer IN command and return the ID.
     fn send_transfer_in(
         &mut self,
@@ -1473,7 +1443,6 @@ impl QemuHostThread {
                     status: QemuUsbdevTransferStatus::try_from(payload.status).with_context(
                         || format!("Unknown transfer status {} from USBDEV", payload.status),
                     )?,
-                    xfer_size: payload.xfer_size.into(),
                     data: data.to_vec(),
                 })
             }
