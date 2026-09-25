@@ -2021,6 +2021,9 @@ test_suite(
                 "skip_in_ci",
             ],
         ),
+        qemu = qemu_params(
+            otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_{}_manuf_personalized".format(lc_state),
+        ),
         deps = [
             "//hw/top:top_lib",
             "//sw/device/lib/base:mmio",
@@ -2277,6 +2280,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/gpio:gpio_pinmux",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/gpio:gpio_pinmux",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
@@ -2310,6 +2316,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/gpio:gpio_intr",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/gpio:gpio_intr",
     ),
     silicon = silicon_params(
@@ -4288,6 +4297,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_tpm_test",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_tpm_test",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4381,6 +4396,13 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/spi_device_ujson_console_test",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device_ujson_console_test",
+    ),
     deps = [
         "//hw/top:top_lib",
         "//sw/device/lib/dif:spi_device",
@@ -4410,6 +4432,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/spi_device:spi_device_sleep_test",
     ),
     silicon = silicon_params(
@@ -4533,6 +4558,13 @@ opentitan_test(
         },
     ),
     fpga = fpga_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device:spi_host_config_test",
+    ),
+    qemu = qemu_params(
         test_cmd = """
             --bootstrap="{firmware}"
             "{firmware:elf}"
@@ -6193,6 +6225,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/power_virus",
     ),
+    qemu = qemu_params(
+        otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_prod_manuf_personalized",
+    ),
     silicon = silicon_params(
         timeout = "long",
         tags = ["broken"],
@@ -6414,6 +6449,19 @@ _RV_DM_TEST_CONFIGURATIONS = [
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:csr_rw",
         ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = test_cfg["otp"],
+            rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
+            tags = [
+                "lc_{}".format(test_cfg["lc_state"]),
+            ],
+            test_cmd = """
+                --bootstrap="{firmware}"
+                {rv_dm_delayed_en}
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:csr_rw",
+        ),
         deps = [
             "//sw/device/lib/base:multibits",
             "//sw/device/lib/dif:lc_ctrl",
@@ -6459,6 +6507,19 @@ test_suite(
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:mem_access",
         ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = test_cfg["otp"],
+            rv_dm_delayed_en = test_cfg["rv_dm_delayed_en"],
+            tags = [
+                "lc_{}".format(test_cfg["lc_state"]),
+            ],
+            test_cmd = """
+                --rom={rom:binary}
+                {rv_dm_delayed_en}
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:mem_access",
+        ),
         deps = [
             "//sw/device/lib/base:multibits",
             "//sw/device/lib/dif:lc_ctrl",
@@ -6490,6 +6551,14 @@ test_suite(
             "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:jtag",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6533,6 +6602,14 @@ _RV_DM_TAP_SEL_LC_STATES = get_lc_items(
             },
         ),
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:jtag_tap_sel",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6605,6 +6682,12 @@ _LC_STATES_DEBUG_DISALLOWED = [
                 "lc_{}".format(lc_state),
             ],
         ),
+        qemu = qemu_params(
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+        ),
         deps = [
             "//hw/top:top_lib",
             "//sw/device/lib/base:mmio",
@@ -6637,6 +6720,16 @@ test_suite(
             },
         ),
         fpga = fpga_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = " --expect-fail" if lc_state_val in _LC_STATES_DEBUG_DISALLOWED else "",
+            test_harness = "//sw/host/tests/chip/rv_dm:lc_disabled",
+            testopt_bootstrap = "False",
+        ),
+        qemu = qemu_params(
             needs_jtag = True,
             otp = _SIVAL_OTP_IMAGE[lc_state],
             tags = [
@@ -6687,6 +6780,14 @@ test_suite(
             test_cmd = """
                 --bootstrap="{firmware}"
             """,
+            test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
             test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req",
         ),
         deps = [
@@ -6747,6 +6848,14 @@ test_suite(
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req_when_cpu_halted",
         ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:ndm_reset_req_when_cpu_halted",
+        ),
         deps = [
             "//hw/top/dt",
             "//sw/device/lib/dif:rstmgr",
@@ -6789,6 +6898,14 @@ test_suite(
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:dtm",
         ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_harness = "//sw/host/tests/chip/rv_dm:dtm",
+        ),
         deps = [
             "//hw/top:top_lib",
             "//sw/device/lib/dif:rstmgr",
@@ -6829,6 +6946,14 @@ test_suite(
             test_cmd = """
                 --bootstrap="{firmware}"
             """,
+            test_harness = "//sw/host/tests/chip/rv_dm:control_status",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
             test_harness = "//sw/host/tests/chip/rv_dm:control_status",
         ),
         deps = [
@@ -6875,6 +7000,17 @@ test_suite(
             ],
             test_cmd = """
                 --bootstrap="{firmware}"
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_wakeup",
+        ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
                 --firmware-elf=\"{firmware:elf}\"
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:access_after_wakeup",
@@ -6935,6 +7071,17 @@ test_suite(
             """,
             test_harness = "//sw/host/tests/chip/rv_dm:access_after_hw_reset",
         ),
+        qemu = qemu_params(
+            needs_jtag = True,
+            otp = _SIVAL_OTP_IMAGE[lc_state],
+            tags = [
+                "lc_{}".format(lc_state),
+            ],
+            test_cmd = """
+                --firmware-elf=\"{firmware:elf}\"
+            """,
+            test_harness = "//sw/host/tests/chip/rv_dm:access_after_hw_reset",
+        ),
         deps = [
             "//hw/top/dt",
             "//sw/device/lib/dif:rstmgr",
@@ -6979,6 +7126,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/jtag:openocd_test",
     ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/top_earlgrey/data/otp:img_test_unlocked0",
+        tags = ["broken"],
+        test_harness = "//sw/host/tests/chip/jtag:openocd_test",
+    ),
     deps = [
         "//sw/device/lib/runtime:log",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -6999,6 +7152,10 @@ opentitan_test(
             --bootstrap="{firmware}"
             "{firmware:elf}"
         """,
+        test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
+    ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/i2c_target:i2c_target_smbus_arp",
     ),
     deps = [
@@ -7032,6 +7189,10 @@ opentitan_test(
             --bootstrap="{firmware}"
             "{firmware:elf}"
         """,
+        test_harness = "//sw/host/tests/chip/i2c_host_override",
+    ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/i2c_host_override",
     ),
     silicon = silicon_params(
@@ -7077,6 +7238,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/i2c_target",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/i2c_target",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7120,6 +7284,10 @@ opentitan_test(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_TEST_MSG,
     ),
+    qemu = qemu_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_TEST_MSG,
+    ),
     deps = [
         "//sw/device/lib/base:status_report_unittest_c",
         "//sw/device/lib/testing/test_framework:ottf_main",
@@ -7143,6 +7311,10 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_test_rom": None,
     },
     fpga = fpga_params(
+        exit_failure = "PASS!",
+        exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
+    ),
+    qemu = qemu_params(
         exit_failure = "PASS!",
         exit_success = _STATUS_REPORT_OVERFLOW_TEST_MSG,
     ),
@@ -7171,6 +7343,10 @@ opentitan_test(
         ]),
         test_harness = "//sw/host/tests/chip/example_sival",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/example_sival",
+    ),
     # This test can take > 40 minutes, so mark it manual as it shouldn't run
     # in CI/nightlies.
     verilator = verilator_params(tags = ["manual"]),
@@ -7196,6 +7372,10 @@ opentitan_test(
             --bootstrap="{firmware}"
             "{firmware:elf}"
         """,
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
+    ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_inputs",
     ),
     silicon = silicon_params(
@@ -7236,6 +7416,10 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_outputs",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7272,6 +7456,10 @@ opentitan_test(
             --bootstrap="{firmware}"
             "{firmware:elf}"
         """,
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
+    ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_in_irq",
     ),
     silicon = silicon_params(
@@ -7313,6 +7501,9 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ec_rst_l",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -7350,6 +7541,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_ulp_z3_wakeup",
     ),
     silicon = silicon_params(
@@ -7392,6 +7586,10 @@ opentitan_test(
             --bootstrap="{firmware}"
             "{firmware:elf}"
         """,
+        test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
+    ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/sysrst_ctrl:sysrst_ctrl_reset",
     ),
     silicon = silicon_params(
@@ -8109,6 +8307,12 @@ opentitan_test(
             "--bootstrap=\"{firmware}\"",
             "--firmware-elf=\"{firmware:elf}\"",
         ]),
+        test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
+    ),
+    qemu = qemu_params(
+        needs_jtag = True,
+        otp = "//hw/top_earlgrey/data/otp/emulation:otp_img_rma_manuf_personalized",
+        test_cmd = "--firmware-elf={firmware:elf}",
         test_harness = "//sw/host/tests/chip/sram_ctrl:sram_ctrl_lc_escalation",
     ),
     deps = [
