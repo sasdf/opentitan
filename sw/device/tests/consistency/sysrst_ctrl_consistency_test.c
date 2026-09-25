@@ -141,6 +141,44 @@ bool test_main(void) {
   //   and `PIN_OUT_VALUE.FLASH_WP_L = 1` are all set does `flash_wp_l_o`
   //   release high (`PIN_IN_VALUE.FLASH_WP_L == 1`).
   // =========================================================================
+  // Verify cold-boot reset values across the 43-CSR window (0x00..0xa8):
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_ENABLE_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_EC_RST_CTL_REG_OFFSET) ==
+        0x7d0u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_ULP_AC_DEBOUNCE_CTL_REG_OFFSET) == 0x1f40u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_ULP_LID_DEBOUNCE_CTL_REG_OFFSET) ==
+        0x1f40u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_ULP_PWRB_DEBOUNCE_CTL_REG_OFFSET) ==
+        0x1f40u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_CTL_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_ULP_STATUS_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_WKUP_STATUS_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_KEY_INVERT_CTL_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_KEY_INTR_CTL_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_KEY_INTR_DEBOUNCE_CTL_REG_OFFSET) ==
+        0x7d0u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_AUTO_BLOCK_DEBOUNCE_CTL_REG_OFFSET) ==
+        0x7d0u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_AUTO_BLOCK_OUT_CTL_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase +
+                        SYSRST_CTRL_COMBO_INTR_STATUS_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_KEY_INTR_STATUS_REG_OFFSET) ==
+        0u);
+
   uint32_t pin_allowed_init =
       abs_mmio_read32(kSysrstBase + SYSRST_CTRL_PIN_ALLOWED_CTL_REG_OFFSET);
   uint32_t pin_out_ctl_init =
@@ -327,6 +365,16 @@ bool test_main(void) {
   CHECK((key_intr_status & expected_edge_bit) != 0u,
         "[sysrst_ctrl.sv:106-111] Expected software write to KEY_INVERT_CTL to "
         "synthesize KEY_INTR_STATUS edge");
+
+  // Verify INTR_STATE (.IntrT("Status") in sysrst_ctrl_intr.sv) combinational
+  // aggregation: writing 1 to INTR_STATE while KEY_INTR_STATUS != 0 does NOT
+  // clear INTR_STATE:
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 1u,
+        "Expected INTR_STATE == 1 when KEY_INTR_STATUS != 0");
+  abs_mmio_write32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kSysrstBase + SYSRST_CTRL_INTR_STATE_REG_OFFSET) == 1u,
+        "[sysrst_ctrl_intr.sv] Expected INTR_STATE to remain 1 across RW1C "
+        "while KEY_INTR_STATUS != 0");
 
   // Verify [dif_sysrst_ctrl.c:788-789]: even though ULP_CTL == 0 and
   // ULP_STATUS == 0, `dif_sysrst_ctrl_ulp_wakeup_get_status()` falsely reports
@@ -556,6 +604,19 @@ bool test_main(void) {
         "Expected PIN_OUT_VALUE writable when REGWEN == 0");
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_CTL_REG_OFFSET, 0x82u);
   abs_mmio_write32(kSysrstBase + SYSRST_CTRL_PIN_OUT_VALUE_REG_OFFSET, 0u);
+
+  // Verify unmapped offset 0xac (>= 43 * 4) raises Load/Store Access Fault
+  // (mcause=5/7):
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kSysrstBase + 0xacu);
+  CHECK(g_fault_count == 1u && g_last_mcause == 5u,
+        "Expected Load Access Fault (mcause=5) at unmapped offset 0xac");
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kSysrstBase + 0xacu, 0xdeadbeefu);
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) at unmapped offset 0xac");
 
   LOG_INFO(
       "All SYSRST_CTRL Earlgrey v2 errata & hardening items verified on "

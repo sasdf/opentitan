@@ -90,6 +90,11 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   if (g_expect_bus_fault) {
     g_bus_fault_count++;
     g_last_mcause = mcause;
+    if (mcause == kIbexExcLoadAccessFault) {
+      uint32_t mepc = ibex_mepc_read();
+      uint16_t inst16 = *(const volatile uint16_t *)mepc;
+      ibex_mepc_write(mepc + (((inst16 & 0x3u) == 0x3u) ? 4u : 2u));
+    }
     return;
   }
   CHECK(false, "Unexpected load/store fault mcause=0x%08x", mcause);
@@ -102,6 +107,101 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
  * regardless of pin polarity when `WKUP_DETECTOR_CNT_TH == 0`
  * (`pinmux_wkup.sv:48-78`).
  */
+static void test_pinmux_reset_values_regwen_and_unmapped(void) {
+  LOG_INFO(
+      "Test 0: Cold-boot CSR reset values, WKUP_DETECTOR_REGWEN W0C locking, "
+      "out-of-range PADSEL clamp, and unmapped 0x8e0 faults");
+
+  // 1. Verify cold-boot reset values across representative CSR families:
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_MIO_PERIPH_INSEL_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_MIO_OUTSEL_REGWEN_0_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_MIO_PAD_ATTR_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_DIO_PAD_ATTR_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_MIO_PAD_SLEEP_STATUS_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_MIO_PAD_SLEEP_STATUS_1_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_MIO_PAD_SLEEP_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_EN_0_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_MIO_PAD_SLEEP_MODE_0_REG_OFFSET) ==
+        2u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_DIO_PAD_SLEEP_STATUS_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_DIO_PAD_SLEEP_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_DIO_PAD_SLEEP_EN_0_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_DIO_PAD_SLEEP_MODE_0_REG_OFFSET) ==
+        2u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_WKUP_DETECTOR_REGWEN_0_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_DETECTOR_EN_0_REG_OFFSET) ==
+        0u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_DETECTOR_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase +
+                        PINMUX_WKUP_DETECTOR_PADSEL_0_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET) == 0u);
+
+  // 2. Verify out-of-range PADSEL (>= 49 for MIO, >= 16 for DIO) clamps to 0
+  // (pinmux.sv:624-649):
+  const uint32_t en6_off = PINMUX_WKUP_DETECTOR_EN_0_REG_OFFSET + 4u * 6u;
+  const uint32_t cfg6_off = PINMUX_WKUP_DETECTOR_0_REG_OFFSET + 4u * 6u;
+  const uint32_t th6_off = PINMUX_WKUP_DETECTOR_CNT_TH_0_REG_OFFSET + 4u * 6u;
+  const uint32_t padsel6_off =
+      PINMUX_WKUP_DETECTOR_PADSEL_0_REG_OFFSET + 4u * 6u;
+  const uint32_t regwen6_off =
+      PINMUX_WKUP_DETECTOR_REGWEN_0_REG_OFFSET + 4u * 6u;
+
+  abs_mmio_write32(kPinmuxBase + en6_off, 0u);
+  abs_mmio_write32(kPinmuxBase + padsel6_off, 60u);  // out-of-range MIO padsel
+  abs_mmio_write32(kPinmuxBase + th6_off, 1u);
+  abs_mmio_write32(kPinmuxBase + cfg6_off,
+                   PINMUX_WKUP_DETECTOR_0_MODE_0_VALUE_TIMEDHIGH);
+  busy_spin_micros(30);
+  abs_mmio_write32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET, 0u);
+  abs_mmio_write32(kPinmuxBase + en6_off, 1u);
+  busy_spin_micros(30);
+  CHECK((abs_mmio_read32(kPinmuxBase + PINMUX_WKUP_CAUSE_REG_OFFSET) &
+         (1u << 6)) == 0u,
+        "Out-of-range MIO PADSEL=60 must clamp to 0 and not trigger "
+        "TimedHigh(CNT_TH=1)");
+  abs_mmio_write32(kPinmuxBase + en6_off, 0u);
+
+  // 3. Verify WKUP_DETECTOR_REGWEN_6 (W0C) locks detector 6 registers:
+  abs_mmio_write32(kPinmuxBase + th6_off, 0x2au);
+  abs_mmio_write32(kPinmuxBase + regwen6_off, 0u);
+  CHECK(abs_mmio_read32(kPinmuxBase + regwen6_off) == 0u);
+  abs_mmio_write32(kPinmuxBase + th6_off, 0x55u);
+  CHECK(abs_mmio_read32(kPinmuxBase + th6_off) == 0x2au,
+        "Expected WKUP_DETECTOR_CNT_TH_6 locked when WKUP_DETECTOR_REGWEN_6 == "
+        "0");
+
+  // 4. Verify unmapped offset 0x8e0 (>= 568 * 4) raises Load/Store Access Fault
+  // (mcause=5/7):
+  uint32_t prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  (void)abs_mmio_read32(kPinmuxBase + 0x8e0u);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 5u,
+        "Expected Load Access Fault (mcause=5) at unmapped offset 0x8e0");
+
+  prev = g_bus_fault_count;
+  g_expect_bus_fault = true;
+  abs_mmio_write32(kPinmuxBase + 0x8e0u, 0xdeadbeefu);
+  g_expect_bus_fault = false;
+  CHECK(g_bus_fault_count == prev + 1 && g_last_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) at unmapped offset 0x8e0");
+}
+
 static void test_wkup_timed_cnt_th_zero_hazard(void) {
   LOG_INFO("Test 1: TimedHigh/TimedLow ungated cnt_eq_th when CNT_TH == 0");
 
@@ -498,6 +598,7 @@ static void test_v2_dif_sleep_status_unaligned_fault_and_mio_outsel(void) {
 
 bool test_main(void) {
   LOG_INFO("=== pinmux Earlgrey v2 Errata Verification Test ===");
+  test_pinmux_reset_values_regwen_and_unmapped();
   test_wkup_timed_cnt_th_zero_hazard();
   test_filter_tracking_and_pad_attr_warl();
   test_pad_attr_subword_store_faults();
