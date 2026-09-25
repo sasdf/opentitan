@@ -26,12 +26,16 @@ OTTF_DEFINE_TEST_CONFIG();
 
 static volatile uint32_t fault_count = 0;
 static volatile uint32_t last_mcause = 0;
+static volatile uint32_t last_exc_cpuctrlsts = 0;
 
 void ottf_exception_handler(uint32_t *exc_info) {
   (void)exc_info;
   uint32_t mcause = 0;
+  uint32_t cpuctrlsts = 0;
   CSR_READ(CSR_REG_MCAUSE, &mcause);
+  CSR_READ(0x7c0, &cpuctrlsts);
   last_mcause = mcause;
+  last_exc_cpuctrlsts = cpuctrlsts;
   fault_count++;
 }
 
@@ -499,6 +503,76 @@ bool test_main(void) {
   CHECK(fault_count == faults_before_ctx);
   CHECK(scontext_val == 0u);
   CHECK(mscontext_val == 0u);
+
+  // 10. Verify Ibex RV32B Bitmanip unary instructions (`orc.b` = gorci shamt=7,
+  // `brev8` = grevi shamt=7, `zip` = shfli shamt=15, `unzip` = unshfli
+  // shamt=15, `ibex_alu.sv:1250-1384`).
+  uint32_t orcb_in = 0x00800100u, orcb_out = 0u;
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x287"
+               : "=r"(orcb_out)
+               : "r"(orcb_in));
+  CHECK(orcb_out == 0x00ffff00u);
+
+  uint32_t brev8_in = 0x12345678u, brev8_out = 0u;
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x687"
+               : "=r"(brev8_out)
+               : "r"(brev8_in));
+  CHECK(brev8_out == 0x482c6a1eu);
+
+  uint32_t zip_lo = 0x0000ffffu, zip_lo_out = 0u;
+  uint32_t zip_hi = 0xffff0000u, zip_hi_out = 0u;
+  uint32_t unzip_lo_out = 0u, unzip_hi_out = 0u;
+  asm volatile(".insn i 0x13, 1, %0, %1, 0x08f"
+               : "=r"(zip_lo_out)
+               : "r"(zip_lo));
+  asm volatile(".insn i 0x13, 1, %0, %1, 0x08f"
+               : "=r"(zip_hi_out)
+               : "r"(zip_hi));
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x08f"
+               : "=r"(unzip_lo_out)
+               : "r"(zip_lo_out));
+  asm volatile(".insn i 0x13, 5, %0, %1, 0x08f"
+               : "=r"(unzip_hi_out)
+               : "r"(zip_hi_out));
+  CHECK(zip_lo_out == 0x55555555u);
+  CHECK(zip_hi_out == 0xaaaaaaaau);
+  CHECK(unzip_lo_out == 0x0000ffffu);
+  CHECK(unzip_hi_out == 0xffff0000u);
+
+  // 11. Verify CSR_CPUCTRLSTS (0x7c0) bits [7:6] (double_fault_seen = 0x80,
+  // sync_exc_seen = 0x40, `ibex_cs_registers.sv:701-704,755-765,784-785,
+  // 1656-1657`):
+  // - Outside an exception handler, bits [7:6] are 0.
+  // - On synchronous exception entry, sync_exc_seen (bit 6, 0x40) is set to 1
+  //   inside the trap handler, and automatically cleared to 0 on MRET.
+  // - Bits [7:6] are directly RW via CSR writes without asserting
+  //   double_fault_seen_o when written by software.
+  uint32_t cpuctrl_before = 0;
+  CSR_READ(0x7c0, &cpuctrl_before);
+  CHECK((cpuctrl_before & 0xc0u) == 0u);
+
+  last_exc_cpuctrlsts = 0;
+  CHECK(expect_load_fault_32(ibex_mmio, 0x64u));
+  CHECK((last_exc_cpuctrlsts & 0xc0u) == 0x40u);
+
+  uint32_t cpuctrl_after_mret = 0;
+  CSR_READ(0x7c0, &cpuctrl_after_mret);
+  CHECK((cpuctrl_after_mret & 0xc0u) == 0u);
+
+  CSR_SET_BITS(0x7c0, 0xc0u);
+  uint32_t cpuctrl_set = 0;
+  CSR_READ(0x7c0, &cpuctrl_set);
+  CHECK((cpuctrl_set & 0xc0u) == 0xc0u);
+
+  CSR_CLEAR_BITS(0x7c0, 0x40u);
+  uint32_t cpuctrl_clr6 = 0;
+  CSR_READ(0x7c0, &cpuctrl_clr6);
+  CHECK((cpuctrl_clr6 & 0xc0u) == 0x80u);
+
+  CSR_CLEAR_BITS(0x7c0, 0x80u);
+  uint32_t cpuctrl_clr7 = 0;
+  CSR_READ(0x7c0, &cpuctrl_clr7);
+  CHECK((cpuctrl_clr7 & 0xc0u) == 0u);
 
   return true;
 }
