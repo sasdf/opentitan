@@ -326,14 +326,8 @@ opentitan_test(
     },
     # No longer relevant on RRAM; exclude all FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = [
-        "broken",
-        "skip_in_ci",
-    ]),
-    qemu = qemu_params(tags = [
-        "broken",
-        "skip_in_ci",
-    ]),
+    fpga = fpga_params(tags = ["skip_in_ci"]),
+    qemu = qemu_params(tags = ["broken", "skip_in_ci"]),
     deps = [
         "//hw/top/dt",
         "//sw/device/lib/testing/test_framework:ottf_main",
