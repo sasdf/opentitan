@@ -7,6 +7,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -121,6 +122,13 @@ SHUTDOWN_WATCHDOG_CASES = [
         local_defines = [
             "HANG_SECS=2",
         ],
+        qemu = qemu_params(
+            exit_success = t["exit_success"],
+            otp = ":otp_img_shutdown_watchdog_{}_{}".format(
+                t["lc_state"],
+                t["bite_threshold"],
+            ),
+        ),
         deps = [
             "//sw/device/lib/base:memory",
             "//sw/device/lib/dif:aon_timer",

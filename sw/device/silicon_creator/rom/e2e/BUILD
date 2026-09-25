@@ -89,6 +89,7 @@ opentitan_test(
         srcs = [":empty_test"],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw340",
+            "//hw/top_earlgrey:sim_qemu_base",
             "//hw/top_earlgrey:sim_dv",
             "//hw/top_earlgrey:sim_verilator",
             "//hw/top_darjeeling:sim_dv",
@@ -129,6 +130,7 @@ opentitan_test(
         srcs = ["//sw/device/silicon_creator/rom/e2e:empty_test"],
         exec_env = [
             "//hw/top_earlgrey:fpga_cw340",
+            "//hw/top_earlgrey:sim_qemu_base",
             "//hw/top_earlgrey:sim_dv",
             "//hw/top_earlgrey:sim_verilator",
             "//hw/top_darjeeling:sim_dv",

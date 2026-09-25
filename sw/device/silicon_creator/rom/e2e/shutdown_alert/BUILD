@@ -15,6 +15,7 @@ load(
     "ecdsa_key_for_lc_state",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:otp.bzl",
@@ -65,6 +66,9 @@ ALERT_LC_STATES = get_lc_items(
         local_defines = [
             "OTP_ALERT_DIGEST=OTP_CTRL_PARAM_OWNER_SW_CFG_ROM_ALERT_DIGEST_{}_OFFSET".format(lc_state.upper()),
         ],
+        qemu = qemu_params(
+            otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
+        ),
         deps = [
             "//hw/top:otp_ctrl_c_regs",
             "//hw/top/dt",
@@ -181,6 +185,9 @@ otp_alert_digest(
         fpga = fpga_params(
             otp = ":otp_img_shutdown_alert_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            otp = ":otp_img_shutdown_alert_{}".format(lc_state),
         ),
         deps = [
             "//hw/top:uart_c_regs",
