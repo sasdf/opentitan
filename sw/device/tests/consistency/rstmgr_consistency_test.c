@@ -34,13 +34,23 @@ OTTF_DEFINE_TEST_CONFIG(.ignore_alerts = true);
 enum {
   kRstmgrBase = TOP_EARLGREY_RSTMGR_BASE_ADDR,
   kUsbdevBase = TOP_EARLGREY_USBDEV_BASE_ADDR,
+  kAlertHandlerBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR,
 };
 
+static volatile bool g_in_test_main = false;
 static volatile uint32_t g_fault_count = 0;
 static volatile uint32_t g_last_mcause = 0;
 
 void ottf_load_store_fault_handler(uint32_t *exc_info) {
   (void)exc_info;
+  if (!g_in_test_main) {
+    uint32_t mepc = 0;
+    CSR_READ(CSR_REG_MEPC, &mepc);
+    uint16_t inst16 = *(volatile uint16_t *)mepc;
+    uint32_t step = ((inst16 & 0x3u) == 0x3u) ? 4u : 2u;
+    CSR_WRITE(CSR_REG_MEPC, mepc + step);
+    return;
+  }
   uint32_t mcause = 0;
   CSR_READ(CSR_REG_MCAUSE, &mcause);
   g_last_mcause = mcause;
@@ -370,28 +380,133 @@ static void verify_post_sw_reset_errata(void) {
       k_diff, dump[0], cpu_slots[0]);
 }
 
+static void test_por_reset_defaults_and_alert_err_code(void) {
+  LOG_INFO("Verifying PoR reset values across all 28 RSTMGR CSRs (0x00..0x6c)");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET) == 0u,
+        "Expected ALERT_TEST (0x00, WO) to read as 0");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_REQ_REG_OFFSET) ==
+            kMultiBitBool4False,
+        "Expected RESET_REQ (0x04) == 0x9 at PoR");
+  CHECK((abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET) |
+         abs_mmio_read32(TOP_EARLGREY_SRAM_CTRL_RET_RAM_BASE_ADDR + 4u)) == 1u,
+        "Expected RESET_INFO (0x08) == 0x1 (POR) at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_REGWEN_REG_OFFSET) == 1u,
+        "Expected ALERT_REGWEN (0x0c) == 1 at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_CTRL_REG_OFFSET) == 0u,
+        "Expected ALERT_INFO_CTRL (0x10) == 0 at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_ATTR_REG_OFFSET) == 9u,
+        "Expected ALERT_INFO_ATTR (0x14) == 9 (CrashStoreSlot) at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_INFO_REG_OFFSET) == 0u,
+        "Expected ALERT_INFO (0x18) == 0 at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_REGWEN_REG_OFFSET) == 1u,
+        "Expected CPU_REGWEN (0x1c) == 1 at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_CTRL_REG_OFFSET) == 0u,
+        "Expected CPU_INFO_CTRL (0x20) == 0 at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_ATTR_REG_OFFSET) == 8u,
+        "Expected CPU_INFO_ATTR (0x24) == 8 (CrashStoreSlot) at PoR");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_CPU_INFO_REG_OFFSET) == 0u,
+        "Expected CPU_INFO (0x28) == 0 at PoR");
+  for (uint32_t i = 0u; i < 8u; ++i) {
+    uint32_t regwen_i = abs_mmio_read32(
+        kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET + (i * 4u));
+    uint32_t ctrl_n_i = abs_mmio_read32(
+        kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET + (i * 4u));
+    CHECK(regwen_i == 1u, "Expected SW_RST_REGWEN[%u] == 1 at PoR", i);
+    CHECK(ctrl_n_i == 1u, "Expected SW_RST_CTRL_N[%u] == 1 at PoR", i);
+  }
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET) == 0u,
+        "Expected ERR_CODE (0x6c) == 0 at PoR");
+
+  // Verify ERR_CODE (0x6c, RO, PERMIT=4'b0001) ignores 32-bit and byte-0 writes
+  // without faulting, while byte-1 sub-word store faults (mcause=7):
+  g_fault_count = 0;
+  abs_mmio_write32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET, 0x7u);
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET, 0x7u);
+  CHECK(g_fault_count == 0u &&
+            abs_mmio_read32(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET) == 0u,
+        "Expected ERR_CODE (RO) to ignore writes without bus fault");
+  g_fault_count = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ERR_CODE_REG_OFFSET + 1u, 0x1u);
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected SB to byte 1 of ERR_CODE (PERMIT=4'b0001) to fault");
+
+  // Verify ALERT_TEST (0x00, WO, PERMIT=4'b0001) sub-word access & alert
+  // firing:
+  g_fault_count = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET + 1u, 0x1u);
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Expected SB to byte 1 of ALERT_TEST (PERMIT=4'b0001) to fault");
+
+  // Enable ALERT_HANDLER alerts 22 (rstmgr_fatal_fault, 0x178) and 23
+  // (rstmgr_fatal_cnsty_fault, 0x17c) via two-write shadow commit:
+  abs_mmio_write32(kAlertHandlerBase + 0x388u, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x38cu, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x178u, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x178u, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x17cu, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x17cu, 1u);
+  CHECK(abs_mmio_read32(kAlertHandlerBase + 0x178u) == 1u &&
+            abs_mmio_read32(kAlertHandlerBase + 0x17cu) == 1u,
+        "Expected ALERT_EN_SHADOWED_22..23 == 1");
+
+  // Fire ALERT_TEST bit 0 (fatal_fault -> alert ID 22):
+  g_fault_count = 0;
+  abs_mmio_write8(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET, 0x1u);
+  busy_spin_micros(5);
+  CHECK(g_fault_count == 0u,
+        "Expected SB to byte 0 of ALERT_TEST (PERMIT=4'b0001) to succeed");
+  CHECK(abs_mmio_read32(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET) == 0u,
+        "Expected ALERT_TEST (WO) to read back 0");
+  CHECK(abs_mmio_read32(kAlertHandlerBase + 0x388u) == 1u &&
+            abs_mmio_read32(kAlertHandlerBase + 0x38cu) == 0u,
+        "Expected ALERT_TEST bit 0 to latch ALERT_CAUSE_22 (fatal_fault)");
+
+  // Fire ALERT_TEST bit 1 (fatal_cnsty_fault -> alert ID 23):
+  abs_mmio_write32(kRstmgrBase + RSTMGR_ALERT_TEST_REG_OFFSET, 0x2u);
+  busy_spin_micros(5);
+  CHECK(
+      abs_mmio_read32(kAlertHandlerBase + 0x38cu) == 1u,
+      "Expected ALERT_TEST bit 1 to latch ALERT_CAUSE_23 (fatal_cnsty_fault)");
+
+  // Clear ALERT_CAUSE_22..23 (RW1C) and disable ALERT_EN_SHADOWED_22..23:
+  abs_mmio_write32(kAlertHandlerBase + 0x178u, 0u);
+  abs_mmio_write32(kAlertHandlerBase + 0x178u, 0u);
+  abs_mmio_write32(kAlertHandlerBase + 0x17cu, 0u);
+  abs_mmio_write32(kAlertHandlerBase + 0x17cu, 0u);
+  abs_mmio_write32(kAlertHandlerBase + 0x388u, 1u);
+  abs_mmio_write32(kAlertHandlerBase + 0x38cu, 1u);
+  CHECK(abs_mmio_read32(kAlertHandlerBase + 0x388u) == 0u &&
+            abs_mmio_read32(kAlertHandlerBase + 0x38cu) == 0u,
+        "Expected ALERT_CAUSE_22..23 cleared to 0");
+}
+
 static void test_sw_rst_regwen_lock(void) {
-  LOG_INFO("Testing SW_RST_REGWEN locking...");
-  // Use index 0 (SPI_DEVICE) as an example.
-  // Verify default state
-  uint32_t ctrl_val =
-      abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET);
-  CHECK(ctrl_val == 1u, "Expected SW_RST_CTRL_N[0] to equal 1 at reset");
-
-  // Lock the register
-  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET, 0u);
-  uint32_t regwen =
-      abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_REGWEN_0_REG_OFFSET);
-  CHECK(regwen == 0u, "Expected SW_RST_REGWEN[0] to be 0 after lock");
-
-  // Attempt to write to locked register
-  abs_mmio_write32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET, 0u);
-  ctrl_val = abs_mmio_read32(kRstmgrBase + RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET);
-  CHECK(ctrl_val == 1u,
-        "Expected SW_RST_CTRL_N[0] to stay 1 after being locked");
+  LOG_INFO("Testing SW_RST_REGWEN_0..7 locking across all 8 channels...");
+  for (uint32_t i = 0u; i < 8u; ++i) {
+    uint32_t regwen_off = RSTMGR_SW_RST_REGWEN_0_REG_OFFSET + (i * 4u);
+    uint32_t ctrl_off = RSTMGR_SW_RST_CTRL_N_0_REG_OFFSET + (i * 4u);
+    CHECK(abs_mmio_read32(kRstmgrBase + ctrl_off) == 1u,
+          "Expected SW_RST_CTRL_N[%u] == 1 before lock", i);
+    // Lock SW_RST_REGWEN[i] (RW0C) by writing 0, verify writing 1 cannot
+    // unlock:
+    abs_mmio_write32(kRstmgrBase + regwen_off, 0u);
+    CHECK(abs_mmio_read32(kRstmgrBase + regwen_off) == 0u,
+          "Expected SW_RST_REGWEN[%u] == 0 after W0C", i);
+    abs_mmio_write32(kRstmgrBase + regwen_off, 1u);
+    CHECK(abs_mmio_read32(kRstmgrBase + regwen_off) == 0u,
+          "Expected SW_RST_REGWEN[%u] to remain 0 after writing 1", i);
+    // Attempt to assert reset (write 0) while locked -> SW_RST_CTRL_N[i] stays
+    // 1:
+    abs_mmio_write32(kRstmgrBase + ctrl_off, 0u);
+    CHECK(abs_mmio_read32(kRstmgrBase + ctrl_off) == 1u,
+          "Expected SW_RST_CTRL_N[%u] to stay 1 when SW_RST_REGWEN[%u] == 0", i,
+          i);
+  }
 }
 
 bool test_main(void) {
+  g_in_test_main = true;
+  g_fault_count = 0;
   LOG_INFO("=== RSTMGR Earlgrey v2 (trunk-v2) Errata Verification Test ===");
   uint32_t reset_info =
       abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET) |
@@ -399,9 +514,10 @@ bool test_main(void) {
   LOG_INFO("  Boot RESET_INFO = 0x%x", reset_info);
 
   if ((reset_info & (1u << RSTMGR_RESET_INFO_SW_RESET_BIT)) == 0u) {
-    // Assert POR reset state logic
+    // Assert POR reset state logic across all 28 CSRs + ALERT_TEST & ERR_CODE:
     CHECK(reset_info == 1u,
           "Expected initial POR Reset_Info to literally be 1");
+    test_por_reset_defaults_and_alert_err_code();
     test_v1_003_reset_req_in_flight_cancel();
     test_v1_005_permit_subword_and_addrmiss_faults();
     test_sw_rst_regwen_lock();
@@ -422,8 +538,11 @@ bool test_main(void) {
   }
 
   // Clear SW_RESET bit in RESET_INFO (rw1c) and retention SRAM, then verify
-  // post-reset errata.
+  // post-reset errata and RW1C clearing of RESET_INFO.
   abs_mmio_write32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET, reset_info);
+  CHECK((abs_mmio_read32(kRstmgrBase + RSTMGR_RESET_INFO_REG_OFFSET) &
+         (1u << RSTMGR_RESET_INFO_SW_RESET_BIT)) == 0u,
+        "Expected RESET_INFO.SW_RESET cleared to 0 after RW1C write");
   abs_mmio_write32(TOP_EARLGREY_SRAM_CTRL_RET_RAM_BASE_ADDR + 4u, 0u);
   verify_post_sw_reset_errata();
   LOG_INFO(

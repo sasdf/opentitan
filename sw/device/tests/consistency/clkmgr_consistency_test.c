@@ -67,6 +67,7 @@ enum {
 
 #include "sw/device/lib/base/csr.h"
 
+static volatile bool g_load_fault_seen = false;
 static volatile bool g_store_fault_seen = false;
 static volatile uint32_t g_store_fault_mcause = 0;
 
@@ -75,8 +76,12 @@ void ottf_exception_handler(uint32_t *exc_info) {
   uint32_t mepc = 0;
   CSR_READ(CSR_REG_MCAUSE, &mcause);
   CSR_READ(CSR_REG_MEPC, &mepc);
-  if (mcause == 7u) {
-    g_store_fault_seen = true;
+  if (mcause == 5u || mcause == 7u) {
+    if (mcause == 5u) {
+      g_load_fault_seen = true;
+    } else {
+      g_store_fault_seen = true;
+    }
     g_store_fault_mcause = mcause;
     uint16_t insn16 = *(const volatile uint16_t *)mepc;
     uint32_t step = ((insn16 & 0x3u) != 0x3u) ? 2u : 4u;
@@ -274,6 +279,156 @@ static void run_post_wakeup_checks(const dif_clkmgr_t *clkmgr,
   CHECK(abs_mmio_read32(kClkmgrBase +
                         CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) == bad_shadow,
         "Expected rejected 16-bit sh not to modify IO_MEAS_CTRL_SHADOWED");
+
+  // Also verify 16-bit sh faults (mcause = 7) on IO_DIV2_MEAS_CTRL_SHADOWED
+  // (0x34) and USB_MEAS_CTRL_SHADOWED (0x4c) which have PERMIT = 4'b0111:
+  g_store_fault_seen = false;
+  asm volatile(
+      "sh %1, 0(%0)"
+      :
+      : "r"(kClkmgrBase + CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET),
+        "r"(div4_val)
+      : "memory");
+  CHECK(g_store_fault_seen && g_store_fault_mcause == 7u,
+        "Expected sh to IO_DIV2_MEAS_CTRL_SHADOWED (0x34) to fault");
+
+  g_store_fault_seen = false;
+  asm volatile("sh %1, 0(%0)"
+               :
+               : "r"(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET),
+                 "r"(div4_val)
+               : "memory");
+  CHECK(g_store_fault_seen && g_store_fault_mcause == 7u,
+        "Expected sh to USB_MEAS_CTRL_SHADOWED (0x4c) to fault");
+
+  // -------------------------------------------------------------------------
+  // Check 7: Shadow read-clear of phase_q, SHADOW_UPDATE_ERR on mismatched
+  // write, RECOV_ERR_CODE 4'b0011 permit, CLK_HINTS / CLK_HINTS_STATUS,
+  // EXTCLK_CTRL_REGWEN lock, FATAL_ERR_CODE RO, and unmapped 0x58 addrmiss
+  // -------------------------------------------------------------------------
+  LOG_INFO(
+      "Check 7: Shadow read-clear, SHADOW_UPDATE_ERR, CLK_HINTS, EXTCLK_REGWEN "
+      "& 0x58 addrmiss");
+
+  // 7a. Intermediate read of IO_DIV2_MEAS_CTRL_SHADOWED (0x34) after 1st write
+  // clears phase_q without raising SHADOW_UPDATE_ERR:
+  CHECK_DIF_OK(dif_clkmgr_recov_err_code_clear_codes(clkmgr, ~0u));
+  uint32_t orig_div2 = abs_mmio_read32(
+      kClkmgrBase + CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00020100u);
+  // Read clears staged phase_q and returns committed orig_div2:
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        orig_div2);
+  // Now write a DIFFERENT value twice (0x00030110) -> commits cleanly with 0
+  // SHADOW_UPDATE_ERR because the intermediate read reset phase_q to 0!
+  shadow_write32(kClkmgrBase + CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                 0x00030110u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        0x00030110u);
+  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
+         (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT)) == 0u,
+        "Intermediate read must clear shadow phase_q without error");
+
+  // 7b. Mismatched 2nd write to USB_MEAS_CTRL_SHADOWED (0x4c) sets
+  // RECOV_ERR_CODE.SHADOW_UPDATE_ERR (bit 0) without modifying committed value:
+  uint32_t orig_usb =
+      abs_mmio_read32(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00011111u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET,
+                   0x00022222u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET) == orig_usb,
+        "Mismatched shadow write must not overwrite USB_MEAS_CTRL_SHADOWED");
+  uint32_t recov_code =
+      abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET);
+  CHECK(
+      (recov_code & (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT)) != 0u,
+      "Expected RECOV_ERR_CODE.SHADOW_UPDATE_ERR (bit 0) set on mismatch");
+
+  // Verify RECOV_ERR_CODE (0x50) has PERMIT = 4'b0011: 8-bit sb faults
+  // (mcause = 7) without clearing bit 0, whereas 16-bit sh clears RW1C bit 0!
+  g_store_fault_seen = false;
+  abs_mmio_write8(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET, 1u);
+  CHECK(g_store_fault_seen && g_store_fault_mcause == 7u,
+        "Expected sb to RECOV_ERR_CODE (PERMIT=4'b0011) to fault");
+  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
+         (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT)) != 0u);
+  g_store_fault_seen = false;
+  uint16_t clr_sh = (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT);
+  asm volatile("sh %1, 0(%0)"
+               :
+               : "r"(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET),
+                 "r"(clr_sh)
+               : "memory");
+  CHECK(!g_store_fault_seen, "Expected sh to RECOV_ERR_CODE to succeed");
+  CHECK((abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) &
+         (1u << CLKMGR_RECOV_ERR_CODE_SHADOW_UPDATE_ERR_BIT)) == 0u,
+        "Expected sh RW1C to clear SHADOW_UPDATE_ERR");
+
+  // 7c. Verify CLK_ENABLES (0x18), CLK_HINTS (0x1c), and CLK_HINTS_STATUS
+  // (0x20):
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET) == 0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET) == 0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET) ==
+        0xfu);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET, 0x0u);
+  busy_spin_micros(5);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET) == 0x0u);
+  CHECK(
+      abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET) == 0x0u,
+      "Expected CLK_HINTS_STATUS == 0x0 when idle and CLK_HINTS == 0x0");
+  // CLK_HINTS_STATUS (0x20) is RO and ignores writes:
+  abs_mmio_write32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET, 0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET) ==
+        0x0u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET, 0xfu);
+  busy_spin_micros(5);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET) ==
+        0xfu);
+
+  // 7d. Verify EXTCLK_CTRL_REGWEN (0x04, RW0C) locks EXTCLK_CTRL (0x08),
+  // ALERT_TEST (0x00, WO reads 0, PERMIT=0x1), and FATAL_ERR_CODE (0x54, RO):
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_ALERT_TEST_REG_OFFSET) == 0u);
+  g_store_fault_seen = false;
+  abs_mmio_write8(kClkmgrBase + CLKMGR_ALERT_TEST_REG_OFFSET, 1u);
+  CHECK(!g_store_fault_seen, "Expected sb to byte 0 of ALERT_TEST to succeed");
+  abs_mmio_write8(kClkmgrBase + CLKMGR_ALERT_TEST_REG_OFFSET + 1u, 1u);
+  CHECK(g_store_fault_seen && g_store_fault_mcause == 7u,
+        "Expected sb to byte 1 of ALERT_TEST to fault");
+
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET) ==
+        1u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET) ==
+        0u);
+  uint32_t extclk_before =
+      abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET, 0x66u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) ==
+            extclk_before,
+        "EXTCLK_CTRL must ignore writes when EXTCLK_CTRL_REGWEN == 0");
+
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_FATAL_ERR_CODE_REG_OFFSET) == 0u);
+  abs_mmio_write32(kClkmgrBase + CLKMGR_FATAL_ERR_CODE_REG_OFFSET, 0x7u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_FATAL_ERR_CODE_REG_OFFSET) == 0u,
+        "FATAL_ERR_CODE (RO) must ignore writes");
+
+  // 7e. Unmapped offset 0x58 (>= 22 * 4) asserts addrmiss = 1 (mcause = 5 on
+  // load, mcause = 7 on store):
+  g_load_fault_seen = false;
+  g_store_fault_mcause = 0;
+  (void)abs_mmio_read32(kClkmgrBase + 0x58u);
+  CHECK(g_load_fault_seen && g_store_fault_mcause == 5u,
+        "Expected Load Access Fault (mcause=5) at unmapped offset 0x58");
+  g_store_fault_seen = false;
+  g_store_fault_mcause = 0;
+  abs_mmio_write32(kClkmgrBase + 0x58u, 0u);
+  CHECK(g_store_fault_seen && g_store_fault_mcause == 7u,
+        "Expected Store Access Fault (mcause=7) at unmapped offset 0x58");
 }
 
 bool test_main(void) {
@@ -308,6 +463,45 @@ bool test_main(void) {
   CHECK(
       UNWRAP(rstmgr_testutils_reset_info_any(&rstmgr, kDifRstmgrResetInfoPor)),
       "Expected POR reset on initial entry");
+
+  // Verify cold-boot reset values across all 22 CLKMGR CSRs (0x00..0x54):
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REGWEN_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_CTRL_REG_OFFSET) == 0x99u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_EXTCLK_STATUS_REG_OFFSET) == 0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_REGWEN_REG_OFFSET) == 1u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_JITTER_ENABLE_REG_OFFSET) == 0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_ENABLES_REG_OFFSET) == 0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_REG_OFFSET) == 0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_CLK_HINTS_STATUS_REG_OFFSET) ==
+        0xfu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_MEASURE_CTRL_REGWEN_REG_OFFSET) ==
+        1u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_IO_MEAS_CTRL_EN_REG_OFFSET) ==
+        0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_MEAS_CTRL_SHADOWED_REG_OFFSET) == 0x759eau);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV2_MEAS_CTRL_EN_REG_OFFSET) ==
+        0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV2_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        0x1ccfau);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_IO_DIV4_MEAS_CTRL_EN_REG_OFFSET) ==
+        0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_IO_DIV4_MEAS_CTRL_SHADOWED_REG_OFFSET) ==
+        0x6e82u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_MAIN_MEAS_CTRL_EN_REG_OFFSET) ==
+        0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_MAIN_MEAS_CTRL_SHADOWED_REG_OFFSET) == 0x7a9feu);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_USB_MEAS_CTRL_EN_REG_OFFSET) ==
+        0x9u);
+  CHECK(abs_mmio_read32(kClkmgrBase +
+                        CLKMGR_USB_MEAS_CTRL_SHADOWED_REG_OFFSET) == 0x1ccfau);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_RECOV_ERR_CODE_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kClkmgrBase + CLKMGR_FATAL_ERR_CODE_REG_OFFSET) == 0u);
 
   LOG_INFO("Phase 1: Testing Earlgrey v2 JITTER_ENABLE & JITTER_REGWEN fix");
   bool jitter_locked = true;
