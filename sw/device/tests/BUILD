@@ -1750,6 +1750,10 @@ opentitan_test(
         ]),
         test_harness = "//sw/host/tests/chip/mem",
     ),
+    qemu = qemu_params(
+        test_cmd = "{firmware:elf}",
+        test_harness = "//sw/host/tests/chip/mem",
+    ),
     verilator = verilator_params(
         timeout = "eternal",
         tags = ["manual"],
@@ -4817,6 +4821,12 @@ opentitan_test(
         EARLGREY_TEST_ENVS,
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4855,6 +4865,18 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        globals = {
+            # We do not need a full host for this test so just drive VBUS
+            # in override mode.
+            "ot-usbdev.vbus-override": "true",
+        },
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -4887,6 +4909,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -4957,6 +4985,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5003,6 +5037,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_aon_wake",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --wake=reset
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_aon_wake",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5036,6 +5076,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5074,6 +5120,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5118,6 +5170,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
     ),
     silicon = silicon_params(
@@ -5180,6 +5235,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5217,6 +5278,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --exec=$(rootpath :usbdev_stream_host_harness)
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5262,6 +5329,12 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --exec=$(rootpath :usbdev_stream_host_harness)
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5296,6 +5369,12 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --no-wait-for-usb-device
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usb_harness",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5402,6 +5481,14 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --fin-phase=suspend
+            --init-phase=suspend
+            --logging-duration=0s
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5436,6 +5523,13 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --fin-phase=sleep-resume
+            --init-phase=sleep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --fin-phase=sleep-resume
             --init-phase=sleep-resume
         """,
@@ -5477,6 +5571,13 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --fin-phase=sleep-reset
+            --init-phase=sleep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --fin-phase=sleep-reset
             --init-phase=sleep-resume
         """,
@@ -5527,6 +5628,15 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+            --vbus-sense-wait=10ms
+            --fin-phase=deep-resume
+            --init-phase=sleep-disconnect
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5563,6 +5673,13 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --fin-phase=deep-resume
+            --init-phase=deep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
             --fin-phase=deep-resume
             --init-phase=deep-resume
         """,
@@ -5611,6 +5728,13 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --fin-phase=deep-reset
+            --init-phase=deep-resume
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap="{firmware}"
@@ -5645,6 +5769,15 @@ opentitan_test(
     fpga = fpga_params(
         test_cmd = """
             --bootstrap="{firmware}"
+            --fin-phase=shutdown
+            --init-phase=deep-disconnect
+        """,
+        test_harness = "//sw/host/tests/chip/usb:usbdev_suspend",
+    ),
+    qemu = qemu_params(
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+            --vbus-sense-wait=10ms
             --fin-phase=shutdown
             --init-phase=deep-disconnect
         """,

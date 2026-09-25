@@ -130,7 +130,6 @@ fn find_device(hub: &UsbHub, port: u8) -> Result<rusb::Device<rusb::Context>> {
 
 fn reset(hub: &UsbHub, port: u8) -> Result<()> {
     log::info!("resetting device on port {}", port);
-    let device = find_device(hub, port)?;
     // Resetting the device is a tricky: if we send a hub operation, the kernel will
     // not be aware of the reset and it will not try to configure the device afterwards.
     // On the other hand, since we mess with the suspend/resume state of the device directly
@@ -138,12 +137,12 @@ fn reset(hub: &UsbHub, port: u8) -> Result<()> {
     // a reset. Experimentally, we have observed however that requesting a reset from the
     // kernel seems to work anyway and it at least trigger a re-enumeration.
 
-    let res = device
-        .open()
-        .context("could not find device under test")
+    let res = find_device(hub, port)
+        .and_then(|device| device.open().context("could not find device under test"))
         .and_then(|dev| dev.reset().context("could not reset device via the kernel"));
     if res.is_err() {
         log::info!("Ignoring failed reset via the kernel: {:?}", res);
+        hub.op(UsbHubOp::Reset, port, Duration::from_millis(1000), false)?;
     }
 
     delay_millis(TIME_RESETTING);
@@ -193,7 +192,9 @@ fn usbdev_suspend(
     }
 
     // Wait for device to appear.
-    let (hub, port) = opts.usb.wait_for_device_and_get_parent(opts.timeout)?;
+    let (hub, port) = opts
+        .usb
+        .wait_for_device_and_get_parent(transport, opts.timeout)?;
 
     // Collect test phases.
     let init_phase = opts.init_phase.clone();
@@ -202,13 +203,13 @@ fn usbdev_suspend(
     // The full suspend-sleep-resume testing is decomposed into a number of shorter sequences to
     // make chip-level simulation feasible. Most of the top-level tests that this harness supports
     // expects to run through a short sub-sequence of these test phases.
-    log::info!("Phase sequence - {} to {} inclusive", init_phase, fin_phase);
+    log::info!("Phase sequence - {init_phase} to {fin_phase} inclusive");
 
     for iter in 1..=opts.num_iters {
         log::info!("Iteration {} of {}", iter, opts.num_iters);
         let mut phase = init_phase.clone();
         loop {
-            log::info!("Test phase {}", phase);
+            log::info!("Test phase {phase}");
 
             // Synchronize with the device-side code; it shall always emit this message at the point
             // of being ready to receive the stimulus within a given test phase, because we have
@@ -288,11 +289,7 @@ fn usbdev_suspend(
                         connect(&opts.usb, transport)?;
                     } else {
                         log::info!("Skipping VBUS Disconnection because support unavailable");
-                        // When VBUS control is not available (e.g. on FPGA), the device will prepare
-                        // everything to go to sleep but it will not actually sleep and go on with
-                        // the next phase immediately. Since the next phase is to shutdown, the device
-                        // will then disconnect from the bus. This means that at this point, the device
-                        // may or may not be connected.
+                        resume(&hub, port, !opts.usb.relaxed_hub_op)?;
                     }
                     next_phase = SuspendPhase::Shutdown;
                 }
@@ -339,7 +336,7 @@ fn main() -> Result<()> {
 
     // Wait until test is running.
     let uart = transport.uart("console")?;
-    UartConsole::wait_for(&*uart, r"Running ", opts.timeout)?;
+    UartConsole::wait_for(&*uart, r"Running [^\r\n]*", opts.timeout)?;
 
     execute_test!(usbdev_suspend_and_drain, &opts, &transport, &*uart);
     Ok(())

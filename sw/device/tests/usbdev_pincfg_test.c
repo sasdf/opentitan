@@ -106,6 +106,7 @@ bool test_main(void) {
 
   unsigned ntests;
   switch (kDeviceType) {
+    case kDeviceSimQemu:
     case kDeviceSimDV:
       // DV simulation can exercise pin-flipping and differential rcvr on/off
       // but there's no point wasting simulation time trying both tx modes;
