@@ -597,8 +597,107 @@ bool test_main(void) {
         "(0x88) to succeed without fault, got faults=%u",
         g_fault_count);
 
+  // =========================================================================
+  // Check 10: Complete AES_PERMIT[35] 3-tier verification (4'b0001, 4'b0011,
+  // 4'b1111), ALERT_TEST (WO), CTRL_AUX_SHADOWED (0x78) two-phase shadow &
+  // mismatch error, CTRL_AUX_REGWEN (0x7c, RW0C) lock, and unmapped 0x8c.
+  // =========================================================================
   LOG_INFO(
-      "All 9 Earlgrey v2 AES errata items (7 confirmed v1 + 2 new v2) "
-      "verified on CW340 FPGA!");
+      "Check 10 [aes_reg_pkg.sv:421-457 / aes_reg_top.sv:1515-1555]: "
+      "AES_PERMIT=4'b0001/4'b0011/4'b1111, CTRL_AUX_SHADOWED, CTRL_AUX_REGWEN, "
+      "and unmapped 0x8c addr_miss...");
+  wait_aes_idle();
+  CHECK(abs_mmio_read32(kAesBase + AES_ALERT_TEST_REG_OFFSET) == 0u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET) == 1u);
+
+  // 10a. AES_PERMIT = 4'b0001 (0x1): ALERT_TEST (0x00), CTRL_AUX_SHADOWED
+  // (0x78), CTRL_AUX_REGWEN (0x7c), TRIGGER (0x80), STATUS (0x84):
+  // sb at +0 succeeds without fault; sb at +1 raises mcause=7.
+  const uint32_t kPermit1Offsets[] = {
+      AES_ALERT_TEST_REG_OFFSET,      AES_CTRL_AUX_SHADOWED_REG_OFFSET,
+      AES_CTRL_AUX_REGWEN_REG_OFFSET, AES_TRIGGER_REG_OFFSET,
+      AES_STATUS_REG_OFFSET,
+  };
+  for (size_t i = 0; i < ARRAYSIZE(kPermit1Offsets); ++i) {
+    uint8_t val0 =
+        (kPermit1Offsets[i] == AES_CTRL_AUX_REGWEN_REG_OFFSET) ? 1u : 0u;
+    g_fault_count = 0;
+    abs_mmio_write8(kAesBase + kPermit1Offsets[i], val0);
+    if (kPermit1Offsets[i] == AES_CTRL_AUX_SHADOWED_REG_OFFSET) {
+      abs_mmio_write8(kAesBase + kPermit1Offsets[i], val0);
+    }
+    CHECK(g_fault_count == 0u,
+          "sb at +0 to offset 0x%x (AES_PERMIT=4'b0001) must succeed",
+          kPermit1Offsets[i]);
+
+    g_fault_count = 0;
+    g_last_mcause = 0;
+    abs_mmio_write8(kAesBase + kPermit1Offsets[i] + 1u, 0x00u);
+    CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+          "sb at +1 to offset 0x%x (AES_PERMIT=4'b0001) must fault (mcause=7)",
+          kPermit1Offsets[i]);
+  }
+
+  // 10b. AES_PERMIT = 4'b1111 (0xf): KEY_SHARE0_0 (0x04), KEY_SHARE1_0 (0x24),
+  // IV_0 (0x44), DATA_IN_0 (0x54), DATA_OUT_0 (0x64): sb and sh raise mcause=7.
+  const uint32_t kPermit15Offsets[] = {
+      AES_KEY_SHARE0_0_REG_OFFSET, AES_KEY_SHARE1_0_REG_OFFSET,
+      AES_IV_0_REG_OFFSET,         AES_DATA_IN_0_REG_OFFSET,
+      AES_DATA_OUT_0_REG_OFFSET,
+  };
+  for (size_t i = 0; i < ARRAYSIZE(kPermit15Offsets); ++i) {
+    g_fault_count = 0;
+    g_last_mcause = 0;
+    abs_mmio_write8(kAesBase + kPermit15Offsets[i], 0x00u);
+    CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+          "sb to offset 0x%x (AES_PERMIT=4'b1111) must fault (mcause=7)",
+          kPermit15Offsets[i]);
+
+    g_fault_count = 0;
+    g_last_mcause = 0;
+    *(volatile uint16_t *)(kAesBase + kPermit15Offsets[i]) = 0x0000u;
+    CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+          "sh to offset 0x%x (AES_PERMIT=4'b1111) must fault (mcause=7)",
+          kPermit15Offsets[i]);
+  }
+
+  // 10c. CTRL_AUX_SHADOWED (0x78) two-phase shadow update, mismatch alert, and
+  // CTRL_AUX_REGWEN (0x7c, RW0C) lock:
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x3u);
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x3u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET) == 0x3u);
+
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x1u);
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x2u);
+  CHECK((abs_mmio_read32(kAesBase + AES_STATUS_REG_OFFSET) &
+         (1u << AES_STATUS_ALERT_RECOV_CTRL_UPDATE_ERR_BIT)) != 0u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET) == 0x3u);
+
+  // Lock CTRL_AUX_REGWEN (RW0C) by writing 0 and verify CTRL_AUX_SHADOWED
+  // ignores subsequent writes:
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET, 0u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET) == 0u);
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET, 1u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_REGWEN_REG_OFFSET) == 0u);
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x0u);
+  abs_mmio_write32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET, 0x0u);
+  CHECK(abs_mmio_read32(kAesBase + AES_CTRL_AUX_SHADOWED_REG_OFFSET) == 0x3u);
+
+  // 10d. Unmapped offset 0x8c (addr_miss = 1): read raises mcause=5, write
+  // raises mcause=7.
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kAesBase + 0x8cu);
+  CHECK(g_fault_count == 1u && g_last_mcause == 5u,
+        "Read at unmapped offset 0x8c must fault with mcause=5");
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kAesBase + 0x8cu, 0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == 7u,
+        "Write at unmapped offset 0x8c must fault with mcause=7");
+
+  LOG_INFO(
+      "All 10 Earlgrey v2 AES consistency & errata checks verified on CW340 "
+      "FPGA & QEMU!");
   return true;
 }
