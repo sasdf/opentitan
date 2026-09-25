@@ -631,6 +631,109 @@ bool test_main(void) {
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
   (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
 
-  LOG_INFO("=== All rram_ctrl_errata_v2_test checks PASSED on CW340 FPGA! ===");
+  // ---------------------------------------------------------------------------
+  // 9. [rram_ctrl.sv:1087-1114] & [rram_ctrl_mp.sv:202-238]:
+  //    Verify all 8 Info Pages (`INFO_PAGE_CFG_0..7`, spanning `0x000..0xfff`,
+  //    512 bytes per page) by testing Info Page 7 (`0xe00`, `INFO_PAGE_CFG_7`
+  //    at `0xe0`):
+  //    - When `INFO_PAGE_CFG_7` is disabled, reading `0xe00` faults with
+  //      `ERR_CODE.MP_ERR = 1` and `OP_STATUS.ERR = 1`.
+  //    - When `INFO_PAGE_CFG_7` has `EN_0 = True`, `RD_EN_0 = True`, and
+  //      `WR_EN_0 = True`, writing 2 words (`0xa5a55a5au`, `0x5a5aa5a5u`) at
+  //      `0xe00` and reading them back via `RD_FIFO` succeeds with `ERR = 0`.
+  // ---------------------------------------------------------------------------
+  LOG_INFO(
+      "Verifying [rram_ctrl_mp.sv:202-238]: Info Page 7 (0xe00, "
+      "INFO_PAGE_CFG_7) MP_ERR and write/read roundtrip");
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_INFO_PAGE_CFG_7_REG_OFFSET,
+                   kInfoCfgDisabled);
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_start(kTopEarlgreyAlertIdRramCtrlRecovErr));
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, rd2_ctrl);
+  CHECK(wait_op_done() == ((1u << RRAM_CTRL_OP_STATUS_DONE_BIT) |
+                           (1u << RRAM_CTRL_OP_STATUS_ERR_BIT)));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) ==
+        (1u << RRAM_CTRL_ERR_CODE_MP_ERR_BIT));
+  (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
+  (void)abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET);
+  clear_rram_status();
+  CHECK_STATUS_OK(
+      ottf_alerts_expect_alert_finish(kTopEarlgreyAlertIdRramCtrlRecovErr));
+
+  const uint32_t kInfoCfgAllowRw =
+      bitfield_field32_write(0u, RRAM_CTRL_INFO_PAGE_CFG_0_EN_0_FIELD,
+                             kMultiBitBool4True) |
+      bitfield_field32_write(0u, RRAM_CTRL_INFO_PAGE_CFG_0_RD_EN_0_FIELD,
+                             kMultiBitBool4True) |
+      bitfield_field32_write(0u, RRAM_CTRL_INFO_PAGE_CFG_0_WR_EN_0_FIELD,
+                             kMultiBitBool4True) |
+      bitfield_field32_write(0u, RRAM_CTRL_INFO_PAGE_CFG_0_SCRAMBLE_EN_0_FIELD,
+                             kMultiBitBool4False) |
+      bitfield_field32_write(0u, RRAM_CTRL_INFO_PAGE_CFG_0_ECC_EN_0_FIELD,
+                             kMultiBitBool4False);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_INFO_PAGE_CFG_7_REG_OFFSET,
+                   kInfoCfgAllowRw);
+  // First write a full 128-bit RRAM word (`NUM = 3`, 4 bus words) of known
+  // baseline values (`0x11111111u`, `0x22222222u`, `0x33333333u`,
+  // `0x44444444u`)
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, wr4_ctrl);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x11111111u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x22222222u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x33333333u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x44444444u);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  clear_rram_status();
+
+  // Per [rram_phy_wr.sv:22], the minimum transfer length of a write operation
+  // is one RRAM word (128b = 4 bus words, `word_sel == 2'h3` -> `pack_valid`).
+  // Verify that a 2-word write (`NUM = 1`, 64b) completes `OP_STATUS.DONE = 1`
+  // without reaching `pack_valid`, leaving `0xe00` at `0x11111111u` /
+  // `0x22222222u`:
+  uint32_t wr2_ctrl =
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_START_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_OP_FIELD,
+                             RRAM_CTRL_CONTROL_OP_VALUE_WRITE) |
+      bitfield_bit32_write(0u, RRAM_CTRL_CONTROL_PARTITION_BIT, true) |
+      bitfield_field32_write(0u, RRAM_CTRL_CONTROL_NUM_FIELD, 1u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, wr2_ctrl);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0xdeadbeefu);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0xcafebabeu);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  clear_rram_status();
+
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, rd2_ctrl);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
+        0x11111111u);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
+        0x22222222u);
+  clear_rram_status();
+
+  // Now write a full 128-bit RRAM word (`NUM = 3`, 4 bus words) and verify
+  // that `0xe00` updates to `0xa5a55a5au`, `0x5a5aa5a5u`:
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, wr4_ctrl);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0xa5a55a5au);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x5a5aa5a5u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x12345678u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_WR_FIFO_REG_OFFSET, 0x87654321u);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_ERR_CODE_REG_OFFSET) == 0u);
+  clear_rram_status();
+
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_ADDR_REG_OFFSET, 0xe00u);
+  abs_mmio_write32(kRramCoreBase + RRAM_CTRL_CONTROL_REG_OFFSET, rd2_ctrl);
+  CHECK(wait_op_done() == (1u << RRAM_CTRL_OP_STATUS_DONE_BIT));
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
+        0xa5a55a5au);
+  CHECK(abs_mmio_read32(kRramCoreBase + RRAM_CTRL_RD_FIFO_REG_OFFSET) ==
+        0x5a5aa5a5u);
+  clear_rram_status();
+
+  LOG_INFO("=== All rram_ctrl_consistency_test checks PASSED! ===");
   return true;
 }
