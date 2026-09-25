@@ -80,6 +80,7 @@ def gen_cfg(ctx, **kwargs):
 
     otp_sv = get_override(ctx, "file.otp_sv", kwargs)
     lc_sv = get_override(ctx, "file.lc_sv", kwargs)
+    lc_token_sv = get_override(ctx, "file.lc_token_sv", kwargs)
     top_hjson = get_override(ctx, "file.top_hjson", kwargs)
     top_secrets = get_override(ctx, "file.top_secrets", kwargs)
 
@@ -88,6 +89,8 @@ def gen_cfg(ctx, **kwargs):
     out = ctx.actions.declare_file(name + ".ini")
 
     inputs = [otp_sv, lc_sv, top_hjson]
+    if lc_token_sv:
+        inputs.append(lc_token_sv)
     arguments = [
         "--out",
         out.path,
@@ -122,6 +125,10 @@ qemu_cfg = rule(
         "top_secrets": attr.label(allow_single_file = True),
         "otp_sv": attr.label(allow_single_file = True),
         "lc_sv": attr.label(allow_single_file = True),
+        "lc_token_sv": attr.label(
+            allow_single_file = True,
+            default = Label("//hw/top_earlgrey:rtl/autogen/testing/lc_ctrl_token_pkg.sv"),
+        ),
         "cfggen": attr.label(
             executable = True,
             cfg = "exec",
@@ -246,6 +253,7 @@ def _sim_qemu(ctx):
         flashgen = ctx.attr.flashgen,
         otp_sv = ctx.file.otp_sv,
         lc_sv = ctx.file.lc_sv,
+        lc_token_sv = ctx.file.lc_token_sv,
         top_hjson = ctx.file.top_hjson,
         top_secrets = ctx.file.top_secrets,
         test_script = ctx.file._test_script,
@@ -297,6 +305,10 @@ sim_qemu = rule(
         "lc_sv": attr.label(
             allow_single_file = True,
             default = Label("//hw/ip/lc_ctrl:rtl/lc_ctrl_state_pkg.sv"),
+        ),
+        "lc_token_sv": attr.label(
+            allow_single_file = True,
+            default = Label("//hw/top_earlgrey:rtl/autogen/testing/lc_ctrl_token_pkg.sv"),
         ),
         "top_hjson": attr.label(
             allow_single_file = True,
@@ -401,6 +413,7 @@ def _test_dispatch(ctx, exec_env, firmware):
         cfggen = exec_env.cfggen,
         otp_sv = exec_env.otp_sv,
         lc_sv = exec_env.lc_sv,
+        lc_token_sv = exec_env.lc_token_sv,
         top_hjson = exec_env.top_hjson,
         top_secrets = exec_env.top_secrets,
         top_name = exec_env.design,

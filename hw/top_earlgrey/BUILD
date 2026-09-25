@@ -23,6 +23,10 @@ load("//rules/opentitan:qemu.bzl", "qemu_cfg", "qemu_flash", "qemu_otp")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files([
+    "rtl/autogen/testing/lc_ctrl_token_pkg.sv",
+])
+
 filegroup(
     name = "rtl_files",
     srcs = glob(["**"]) + [
