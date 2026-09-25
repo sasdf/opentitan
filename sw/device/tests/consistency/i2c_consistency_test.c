@@ -350,11 +350,29 @@ static void test_i2c_ovrd_interference_when_enabled(void) {
   CHECK(bitfield_bit32_read(intr_ovrd_host, I2C_INTR_STATE_CONTROLLER_HALT_BIT),
         "Expected INTR_STATE.CONTROLLER_HALT == 1 on arbitration lost");
 
-  // Clean up OVRD, CONTROLLER_EVENTS, CTRL, and FIFOs.
+  // Disable CTRL.ENABLEHOST, OVRD, and flush FIFOs first so the Controller FSM
+  // does not immediately re-enter SetupStart and re-trigger ARBITRATION_LOST in
+  // the 10ns after CONTROLLER_EVENTS is cleared, then verify status-type
+  // CONTROLLER_HALT (bit 4) cannot be cleared by RW1C on INTR_STATE while
+  // CONTROLLER_EVENTS != 0, and clears when CONTROLLER_EVENTS is cleared:
   abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0u);
   abs_mmio_write32(kI2c0Base + I2C_OVRD_REG_OFFSET, 0u);
   abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET,
+                   1u << I2C_INTR_STATE_CONTROLLER_HALT_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_CONTROLLER_HALT_BIT),
+        "Expected status-type CONTROLLER_HALT to remain 1 while "
+        "CONTROLLER_EVENTS != 0");
   abs_mmio_write32(kI2c0Base + I2C_CONTROLLER_EVENTS_REG_OFFSET, 0xFFFFFFFFu);
+  CHECK_EQ(abs_mmio_read32(kI2c0Base + I2C_CONTROLLER_EVENTS_REG_OFFSET), 0u,
+           "Expected CONTROLLER_EVENTS == 0 after RW1C");
+  CHECK(!bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_CONTROLLER_HALT_BIT),
+        "Expected CONTROLLER_HALT == 0 after clearing CONTROLLER_EVENTS");
+
   abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
   precharge_i2c0_pads_high(&pinmux);
 }
@@ -711,6 +729,110 @@ static void test_i2c_permit_subword_writes_vs_reads(void) {
   abs_mmio_write32(kI2c0Base + I2C_OVRD_REG_OFFSET, 0u);
 }
 
+static void test_i2c_v2_status_vs_event_irqs_thresholds_and_fmt_overflow(void) {
+  LOG_INFO(
+      "Verifying [i2c_reg_top.sv:725-1010 & i2c_core.sv:282-322]: "
+      "v2 status-type FMT_THRESHOLD / TX_THRESHOLD via HOST_FIFO_CONFIG / "
+      "TARGET_FIFO_CONFIG & 64-entry FMT_FIFO overflow...");
+
+  uint32_t fifo_rst =
+      (1u << I2C_FIFO_CTRL_RXRST_BIT) | (1u << I2C_FIFO_CTRL_FMTRST_BIT) |
+      (1u << I2C_FIFO_CTRL_ACQRST_BIT) | (1u << I2C_FIFO_CTRL_TXRST_BIT);
+  abs_mmio_write32(kI2c0Base + I2C_CTRL_REG_OFFSET, 0u);
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+  abs_mmio_write32(kI2c0Base + I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0u);
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_FIFO_CONFIG_REG_OFFSET, 0u);
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET, 0xFFFFFFFFu);
+
+  // 1. Set HOST_FIFO_CONFIG.FMT_THRESH = 2 while FMTLVL == 0 (0 < 2):
+  // Status-type FMT_THRESHOLD (bit 0) asserts to 1 and ignores RW1C on
+  // INTR_STATE, then deasserts to 0 when FMTLVL reaches 2!
+  abs_mmio_write32(kI2c0Base + I2C_HOST_FIFO_CONFIG_REG_OFFSET,
+                   2u << I2C_HOST_FIFO_CONFIG_FMT_THRESH_OFFSET);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_FMT_THRESHOLD_BIT),
+        "Expected status-type FMT_THRESHOLD == 1 when FMTLVL (0) < 2");
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET,
+                   1u << I2C_INTR_STATE_FMT_THRESHOLD_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_FMT_THRESHOLD_BIT),
+        "Expected RW1C on status-type FMT_THRESHOLD to remain 1 while "
+        "FMTLVL < 2");
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, 0x11u);
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, 0x22u);
+  CHECK(!bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_FMT_THRESHOLD_BIT),
+        "Expected status-type FMT_THRESHOLD == 0 when FMTLVL (2) >= 2");
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET,
+                   1u << I2C_FIFO_CTRL_FMTRST_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_FMT_THRESHOLD_BIT),
+        "Expected FMT_THRESHOLD == 1 immediately after FIFO_CTRL.FMTRST");
+  abs_mmio_write32(kI2c0Base + I2C_HOST_FIFO_CONFIG_REG_OFFSET, 0u);
+
+  // 2. Set TARGET_FIFO_CONFIG.TX_THRESH = 2 while TXLVL == 0 (0 < 2):
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_FIFO_CONFIG_REG_OFFSET,
+                   2u << I2C_TARGET_FIFO_CONFIG_TX_THRESH_OFFSET);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_TX_THRESHOLD_BIT),
+        "Expected status-type TX_THRESHOLD == 1 when TXLVL (0) < 2");
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET,
+                   1u << I2C_INTR_STATE_TX_THRESHOLD_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_TX_THRESHOLD_BIT),
+        "Expected RW1C on status-type TX_THRESHOLD to remain 1");
+  abs_mmio_write32(kI2c0Base + I2C_TXDATA_REG_OFFSET, 0xAAu);
+  abs_mmio_write32(kI2c0Base + I2C_TXDATA_REG_OFFSET, 0xBBu);
+  CHECK(!bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_TX_THRESHOLD_BIT),
+        "Expected status-type TX_THRESHOLD == 0 when TXLVL (2) >= 2");
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET,
+                   1u << I2C_FIFO_CTRL_TXRST_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_TX_THRESHOLD_BIT),
+        "Expected TX_THRESHOLD == 1 immediately after FIFO_CTRL.TXRST");
+  abs_mmio_write32(kI2c0Base + I2C_TARGET_FIFO_CONFIG_REG_OFFSET, 0u);
+
+  // 3. Verify 64-entry FMT_FIFO boundary (65th entry dropped, FMTLVL stays 64)
+  // and event-type RX_OVERFLOW (bit 3) latching via INTR_TEST & RW1C clearance:
+  for (uint32_t i = 0; i < 64u; ++i) {
+    abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, i);
+  }
+  CHECK_EQ(bitfield_field32_read(
+               abs_mmio_read32(kI2c0Base + I2C_HOST_FIFO_STATUS_REG_OFFSET),
+               I2C_HOST_FIFO_STATUS_FMTLVL_FIELD),
+           64u, "Expected FMTLVL == 64 after 64 FDATA pushes");
+  CHECK(bitfield_bit32_read(abs_mmio_read32(kI2c0Base + I2C_STATUS_REG_OFFSET),
+                            I2C_STATUS_FMTFULL_BIT),
+        "Expected STATUS.FMTFULL == 1 at FMTLVL == 64");
+  abs_mmio_write32(kI2c0Base + I2C_FDATA_REG_OFFSET, 0x99u);
+  CHECK_EQ(bitfield_field32_read(
+               abs_mmio_read32(kI2c0Base + I2C_HOST_FIFO_STATUS_REG_OFFSET),
+               I2C_HOST_FIFO_STATUS_FMTLVL_FIELD),
+           64u, "Expected 65th FDATA push to be dropped (FMTLVL stays 64)");
+  abs_mmio_write32(kI2c0Base + I2C_INTR_TEST_REG_OFFSET,
+                   1u << I2C_INTR_TEST_RX_OVERFLOW_BIT);
+  CHECK(bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_RX_OVERFLOW_BIT),
+        "Expected INTR_TEST to latch event-type RX_OVERFLOW (bit 3)");
+  abs_mmio_write32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET,
+                   1u << I2C_INTR_STATE_RX_OVERFLOW_BIT);
+  CHECK(!bitfield_bit32_read(
+            abs_mmio_read32(kI2c0Base + I2C_INTR_STATE_REG_OFFSET),
+            I2C_INTR_STATE_RX_OVERFLOW_BIT),
+        "Expected RW1C to clear event-type RX_OVERFLOW");
+  abs_mmio_write32(kI2c0Base + I2C_FIFO_CTRL_REG_OFFSET, fifo_rst);
+}
+
 bool test_main(void) {
   LOG_INFO("Starting I2C Earlgrey v2 CW340 FPGA Errata Test (trunk-v2)...");
 
@@ -720,6 +842,7 @@ bool test_main(void) {
   test_i2c_acqfull_at_266_threshold();
   test_i2c_ovrd_interference_when_enabled();
   test_i2c_permit_subword_writes_vs_reads();
+  test_i2c_v2_status_vs_event_irqs_thresholds_and_fmt_overflow();
 
   LOG_INFO("All I2C Earlgrey v2 errata checks PASSED on CW340 FPGA!");
   return true;
