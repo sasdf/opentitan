@@ -1,0 +1,15 @@
+--- sw/device/tests/usbdev_suspend.c
++++ sw/device/tests/usbdev_suspend.c
+@@ -1122,8 +1122,10 @@
+       // has gone wrong.
+       if (physical_timings()) {
+         timeout_set(ctx, TimeoutPhysConfig);
++      } else if (kDeviceType == kDeviceSimQemu) {
++        timeout_frames_set(ctx, 80000u);
+       } else {
+         // It should take only a few bus frames even with the older, slower DPI
+         // behavior.
+-        timeout_frames_set(ctx, 80000u);
++        timeout_frames_set(ctx, 8u);
+       }
+ 

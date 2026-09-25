@@ -1,0 +1,12 @@
+--- sw/device/tests/usbdev_suspend.c
++++ sw/device/tests/usbdev_suspend.c
+@@ -1799,6 +1799,10 @@
+   // Override any of the above switches according to the build target.
+   switch (kDeviceType) {
++    case kDeviceSimQemu:
++      verbose = true;
++      break;
++
+     case kDeviceSimVerilator:
+       // steal the UART output and send it via a faster mechanism
+       base_set_stdout(base_stdout);

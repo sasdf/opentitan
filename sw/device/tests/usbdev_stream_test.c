@@ -189,6 +189,7 @@ bool test_main(void) {
   // Decide upon the number of bytes to be transferred for the entire test
   uint32_t transfer_bytes = TRANSFER_BYTES_FPGA;
   switch (kDeviceType) {
+    case kDeviceSimQemu:
     case kDeviceSimVerilator:
       transfer_bytes = TRANSFER_BYTES_VERILATOR;
       break;

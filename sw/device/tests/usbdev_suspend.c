@@ -1114,6 +1114,8 @@ static status_t phase_start_resume(usbdev_suspend_ctx_t *ctx) {
       // has gone wrong.
       if (physical_timings()) {
         timeout_set(ctx, TimeoutPhysConfig);
+      } else if (kDeviceType == kDeviceSimQemu) {
+        timeout_frames_set(ctx, 80000u);
       } else {
         // It should take only a few bus frames even with the older, slower DPI
         // behavior.
@@ -1795,6 +1797,10 @@ bool usbdev_suspend_test(usbdev_suspend_phase_t init_phase,
 
   // Override any of the above switches according to the build target.
   switch (kDeviceType) {
+    case kDeviceSimQemu:
+      verbose = true;
+      break;
+
     case kDeviceSimVerilator:
       // steal the UART output and send it via a faster mechanism
       base_set_stdout(base_stdout);

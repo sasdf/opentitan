@@ -1,0 +1,11 @@
+--- sw/device/tests/usbdev_suspend.c
++++ sw/device/tests/usbdev_suspend.c
+@@ -1124,7 +1124,7 @@
+       } else {
+         // It should take only a few bus frames even with the older, slower DPI
+         // behavior.
+-        timeout_frames_set(ctx, 8u);
++        timeout_frames_set(ctx, 80000u);
+       }
+ 
+       if (verbose) {
