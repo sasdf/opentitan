@@ -176,8 +176,7 @@ status_t alert_handler_testutils_get_cycles_from_us(uint64_t microseconds,
 }
 
 uint32_t alert_handler_testutils_cycle_rescaling_factor(void) {
-  return (kDeviceType == kDeviceSimDV || kDeviceType == kDeviceSimQemu) ? 1
-                                                                        : 10;
+  return kDeviceType == kDeviceSimDV || kDeviceType == kDeviceSimQemu ? 1 : 10;
 }
 
 static status_t alert_handler_class_info_log(
