@@ -1093,15 +1093,15 @@ opentitan_test(
         """,
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
+    qemu = qemu_params(
+        test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
+    ),
     silicon = silicon_params(
         test_cmd = """
             --bootstrap={firmware}
             --vbus-sense-en=VBUS_SENSE_EN
             --vbus-sense=VBUS_SENSE
         """,
-        test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
-    ),
-    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
     verilator = verilator_params(

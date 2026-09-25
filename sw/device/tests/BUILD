@@ -4716,6 +4716,13 @@ opentitan_test(
         test_cmd = "{firmware:elf}",
         test_harness = "//sw/host/tests/chip/ottf_console_with_gpio_tx_indicator",
     ),
+    qemu = qemu_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/ottf_console_with_gpio_tx_indicator",
+    ),
     deps = [
         "//hw/top:top_lib",
         "//sw/device/lib/runtime:hart",
@@ -4739,6 +4746,13 @@ opentitan_test(
         EARLGREY_CW340_TEST_ENVS,
     ),
     fpga = fpga_params(
+        test_cmd = """
+            --bootstrap="{firmware}"
+            "{firmware:elf}"
+        """,
+        test_harness = "//sw/host/tests/chip/spi_device_ottf_console",
+    ),
+    qemu = qemu_params(
         test_cmd = """
             --bootstrap="{firmware}"
             "{firmware:elf}"
@@ -4770,6 +4784,9 @@ opentitan_test(
         test_cmd = """
             --bootstrap="{firmware}"
         """,
+        test_harness = "//sw/host/tests/chip/ottf_dual_console",
+    ),
+    qemu = qemu_params(
         test_harness = "//sw/host/tests/chip/ottf_dual_console",
     ),
     deps = [
