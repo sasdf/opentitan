@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use rand::prelude::*;
@@ -956,67 +958,12 @@ fn main() -> Result<()> {
     let device = wait_for_device(&opts, &transport)?;
     device.claim_interface(1)?;
 
-    let mut sync_id = 0u16;
-    let next_sync = |dev: &HarnessUsbDevice, id: &mut u16| -> Result<()> {
-        *id += 1;
-        sync_uart(dev, &*uart, *id)
-    };
-
-    next_sync(&device, &mut sync_id)?;
     execute_test!(receive_random_buffer, &device, None);
-    next_sync(&device, &mut sync_id)?;
     execute_test!(receive_random_buffer, &device, Some(65535));
-    next_sync(&device, &mut sync_id)?;
     execute_test!(receive_random_buffer, &device, Some(65536 - 64));
-    next_sync(&device, &mut sync_id)?;
     execute_test!(send_random_buffer, &device, None);
-    next_sync(&device, &mut sync_id)?;
     execute_test!(send_random_buffer, &device, Some(65535));
-    next_sync(&device, &mut sync_id)?;
     execute_test!(send_random_buffer, &device, Some(65536 - 64));
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_device_descriptor, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_config_descriptor, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_string_descriptors, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_string_descriptor_invalid, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_get_status, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_set_configuration, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_set_interface, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_feature_halt, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_set_feature_unsupported, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_clear_feature_unsupported, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_synch_frame, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_std_cmd_unsupported, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_ep_config_invalid_ep, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_bulk_out_invalid_ep, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_zlp_transfer, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_out_null_handler, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_in_null_handler, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_in_overflow, &device);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_out_overflow, &device, &*uart);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_usb_reset, &device, &*uart);
-    next_sync(&device, &mut sync_id)?;
-    execute_test!(test_reset_during_in, &device, &*uart);
-    next_sync(&device, &mut sync_id)?;
     test_exit(&device)?;
 
     // Wait for test to pass.

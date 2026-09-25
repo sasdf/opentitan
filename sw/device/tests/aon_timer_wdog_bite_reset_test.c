@@ -111,19 +111,13 @@ bool test_main(void) {
   dif_pwrmgr_t pwrmgr;
   CHECK_DIF_OK(dif_pwrmgr_init_from_dt(kPwrmgrDt, &pwrmgr));
 
-  // Find wakeup and reset sources. Choose a wakeup source different from
-  // aon_timer (since aon_timer wdog bark asserts wkup_req_o before wdog bite).
+  // Find wakeup and reset sources.
   CHECK_DIF_OK(dif_pwrmgr_find_request_source(
       &pwrmgr, kDifPwrmgrReqTypeReset, dt_aon_timer_instance_id(kAonTimerDt),
       kDtAonTimerResetReqAonTimer, &reset_sources));
-  dif_pwrmgr_request_sources_t all_wakeups = 0;
-  dif_pwrmgr_request_sources_t aon_timer_wakeup = 0;
-  CHECK_DIF_OK(dif_pwrmgr_get_all_request_sources(
-      &pwrmgr, kDifPwrmgrReqTypeWakeup, &all_wakeups));
   CHECK_DIF_OK(dif_pwrmgr_find_request_source(
       &pwrmgr, kDifPwrmgrReqTypeWakeup, dt_aon_timer_instance_id(kAonTimerDt),
-      kDtAonTimerWakeupWkupReq, &aon_timer_wakeup));
-  wakeup_sources = all_wakeups & ~aon_timer_wakeup;
+      kDtAonTimerWakeupWkupReq, &wakeup_sources));
 
   // Initialize rstmgr to check the reset reason.
   dif_rstmgr_t rstmgr;
