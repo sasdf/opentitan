@@ -1797,10 +1797,6 @@ bool usbdev_suspend_test(usbdev_suspend_phase_t init_phase,
 
   // Override any of the above switches according to the build target.
   switch (kDeviceType) {
-    case kDeviceSimQemu:
-      verbose = true;
-      break;
-
     case kDeviceSimVerilator:
       // steal the UART output and send it via a faster mechanism
       base_set_stdout(base_stdout);
