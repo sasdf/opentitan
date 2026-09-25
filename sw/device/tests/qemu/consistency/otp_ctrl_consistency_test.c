@@ -240,6 +240,32 @@ static void test_core_subword_write_faults(void) {
   CHECK(abs_mmio_read32(kWdata0Addr) == kSentinel,
         "16-bit CSR write must not mutate WDATA_0");
 
+  // PARTITION_STATUS_0 (0x14) has OTP_CTRL_CORE_PERMIT[5] == 4'b0011 (0x3) and
+  // is R/O: 32-bit (`sw`) and 16-bit (`sh`) writes are accepted without TL-UL
+  // fault and ignored, while an 8-bit (`sb`) write raises a Store Access Fault.
+  const uint32_t kPartStatus0Addr =
+      kOtpCoreBase + OTP_CTRL_PARTITION_STATUS_0_REG_OFFSET;
+  access_fault_count = 0;
+  expect_access_fault = false;
+  abs_mmio_write32(kPartStatus0Addr, 0x7ffu);
+  *(volatile uint16_t *)kPartStatus0Addr = 0x7ffu;
+  asm volatile("" ::: "memory");
+  CHECK(access_fault_count == 0,
+        "32-bit and 16-bit writes to PARTITION_STATUS_0 must not fault");
+  CHECK(abs_mmio_read32(kPartStatus0Addr) == 0u,
+        "R/O PARTITION_STATUS_0 must ignore writes");
+
+  access_fault_count = 0;
+  expect_access_fault = true;
+  *(volatile uint8_t *)kPartStatus0Addr = 0x55u;
+  asm volatile("" ::: "memory");
+  expect_access_fault = false;
+  CHECK(
+      access_fault_count == 1 && last_fault_mcause == kRiscvExcStoreAccessFault,
+      "Expected Store Access Fault (mcause=7) on 8-bit write to "
+      "PARTITION_STATUS_0, got count=%u mcause=%u",
+      access_fault_count, last_fault_mcause);
+
   uint32_t status = abs_mmio_read32(kOtpCoreBase + OTP_CTRL_STATUS_REG_OFFSET);
   CHECK(!bitfield_bit32_read(status, OTP_CTRL_STATUS_BUS_INTEG_ERROR_BIT),
         "Sub-word CSR write must not set STATUS.BUS_INTEG_ERROR (0x%08x)",
