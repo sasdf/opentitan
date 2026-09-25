@@ -139,13 +139,16 @@ void set_serialnumber(void) {
 
 rom_error_t my_control(usb_setup_data_t *setup) {
   switch (setup->request) {
-    case kTestReqRandomize:
+    case kTestReqRandomize: {
+      uint32_t seed = rnd_uint32();
       base_printf("Randomize\r\n");
       for (size_t i = 0; i < ARRAYSIZE(work_buffer); ++i) {
-        work_buffer[i] = rnd_uint32();
+        seed = seed * 1664525 + 1013904223;
+        work_buffer[i] = seed;
       }
       usb_ep_transfer(kUsbDirIn | 0, NULL, 0, 0);
       break;
+    }
 
     case kTestReqDigest: {
       base_printf("Digest sz=%u\r\n", (size_t)setup->value + 1);
