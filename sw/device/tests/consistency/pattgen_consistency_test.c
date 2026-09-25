@@ -51,6 +51,8 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
 }
 
 bool test_main(void) {
+  g_load_faults = 0;
+  g_store_faults = 0;
   LOG_INFO(
       "=== Earlgrey v2 PATTGEN Exclusion & xbar_peri Consistency Test ===");
 
