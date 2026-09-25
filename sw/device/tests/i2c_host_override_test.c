@@ -101,6 +101,7 @@ static status_t i2c_configure_instance(uint8_t i2c_instance) {
   i2c_pinmux_platform_id_t platform = I2cPinmuxPlatformIdHyper310;
   switch (kDeviceType) {
     case kDeviceFpgaCw310:
+    case kDeviceSimQemu:
       platform = I2cPinmuxPlatformIdHyper310;
       break;
     case kDeviceFpgaCw340:

@@ -299,6 +299,7 @@ static status_t test_init(void) {
   i2c_pinmux_platform_id_t platform = I2cPinmuxPlatformIdHyper310;
   switch (kDeviceType) {
     case kDeviceFpgaCw310:
+    case kDeviceSimQemu:
       platform = I2cPinmuxPlatformIdHyper310;
       break;
     case kDeviceFpgaCw340:
