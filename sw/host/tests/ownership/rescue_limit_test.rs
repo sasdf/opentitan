@@ -101,9 +101,11 @@ fn flash_limit_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
         HybridPair::load(opts.next_unlock_key.as_deref(), None)?,
         &opts.next_application_key,
         opts.config_kind,
-        /*customize=*/ |owner| {
+        /*customize=*/
+        |owner| {
             for item in &mut owner.data {
-                if let opentitanlib::ownership::owner::OwnerConfigItem::RescueConfig(rescue) = item {
+                if let opentitanlib::ownership::owner::OwnerConfigItem::RescueConfig(rescue) = item
+                {
                     rescue.size = 200;
                     log::info!("Set rescue size to {}", rescue.size);
                 }
@@ -149,20 +151,24 @@ fn flash_limit_test(opts: &Opts, transport: &TransportWrapper) -> Result<()> {
     let rom_ext_bytes = 65536;
     let firmware_end = 0x30000000 + rom_ext_bytes + firmware_bytes as u32;
     let firmware_last_page = firmware_end - 512;
-    
-    log::info!("Expecting to see 0 before offset 0x{:08x} and 0xffffffff at/after offset 0x{:08x}.", firmware_end, firmware_end);
+
+    log::info!(
+        "Expecting to see 0 before offset 0x{:08x} and 0xffffffff at/after offset 0x{:08x}.",
+        firmware_end,
+        firmware_end
+    );
 
     transport.reset_with_delay(UartRx::Clear, Duration::from_millis(50))?;
     let re1 = format!(r"flash 0x{:08x} = (\w+)\r", firmware_last_page);
     let cap1 = UartConsole::wait_for_bytes(&*uart, &re1, opts.timeout)?;
     assert_eq!(&cap1[1], "0");
-    
+
     let re2 = format!(r"flash 0x{:08x} = (\w+)\r", firmware_end);
     let cap2 = UartConsole::wait_for_bytes(&*uart, &re2, opts.timeout)?;
     assert_eq!(&cap2[1], "ffffffff");
-    
+
     UartConsole::wait_for_bytes(&*uart, r"PASS!", opts.timeout)?;
-    
+
     Ok(())
 }
 
