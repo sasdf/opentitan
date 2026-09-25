@@ -5,7 +5,8 @@
 load("//rules:const.bzl", "CONST", "hex")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_binary", "opentitan_test", "qemu_params")
+load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_binary", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "qemu_params")
 
 package(default_visibility = ["//visibility:public"])
 

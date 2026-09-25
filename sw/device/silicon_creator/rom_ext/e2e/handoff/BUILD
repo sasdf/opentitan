@@ -5,7 +5,8 @@
 load("//rules:const.bzl", "CONST", "hex")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_test", "qemu_params")
+load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "qemu_params")
 load("//hw/top:defs.bzl", "opentitan_require_top")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",

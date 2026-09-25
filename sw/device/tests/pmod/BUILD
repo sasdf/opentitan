@@ -27,10 +27,8 @@ opentitan_test(
     srcs = ["spi_host_macronix1Gb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -69,10 +67,8 @@ opentitan_test(
     srcs = ["spi_host_macronix128Mb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -111,10 +107,8 @@ opentitan_test(
     srcs = ["spi_host_gigadevice256Mb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -154,10 +148,8 @@ opentitan_test(
     srcs = ["spi_host_gigadevice1Gb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -197,10 +189,8 @@ opentitan_test(
     srcs = ["spi_host_issi256Mb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -240,10 +230,8 @@ opentitan_test(
     srcs = ["spi_host_micron512Mb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -283,10 +271,8 @@ opentitan_test(
     srcs = ["spi_host_winbond1Gb_flash_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -326,10 +312,8 @@ opentitan_test(
     srcs = ["i2c_host_accelerometer_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -360,10 +344,8 @@ opentitan_test(
     srcs = ["i2c_host_ambient_light_detector_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -394,10 +376,8 @@ opentitan_test(
     srcs = ["i2c_host_hdc1080_humidity_temp_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -428,10 +408,8 @@ opentitan_test(
     srcs = ["i2c_host_clock_stretching_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -464,10 +442,8 @@ opentitan_test(
     srcs = ["i2c_host_compass_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -499,10 +475,8 @@ opentitan_test(
     srcs = ["i2c_host_eeprom_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -533,10 +507,8 @@ opentitan_test(
     srcs = ["i2c_host_fram_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -570,10 +542,8 @@ opentitan_test(
     srcs = ["i2c_host_gas_sensor_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -604,10 +574,8 @@ opentitan_test(
     srcs = ["i2c_host_power_monitor_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [
@@ -638,10 +606,8 @@ opentitan_test(
     srcs = ["i2c_host_irq_test.c"],
     exec_env = dicts.add(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
-        {
-            "//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
-        },
+        {"//hw/top_earlgrey:fpga_cw340_sival_rom_ext": None},
+        {"//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None},
     ),
     fpga = fpga_params(
         tags = [

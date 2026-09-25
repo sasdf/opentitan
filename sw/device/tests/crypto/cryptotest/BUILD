@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-load(":cryptotest.bzl", "CRYPTOTEST_ROM_EXT_EXEC_ENVS", "cryptotest")
+load(":cryptotest.bzl", "cryptotest")
+load(":cryptotest.bzl", "CRYPTOTEST_ROM_EXT_EXEC_ENVS")
 
 package(default_visibility = ["//visibility:public"])
 

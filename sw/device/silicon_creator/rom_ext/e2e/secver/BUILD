@@ -6,13 +6,8 @@ load("//rules:const.bzl", "CONST", "hex", "hex_digits")
 load("//rules:cross_platform.bzl", "dual_cc_library", "dual_inputs")
 load("//rules:linker.bzl", "ld_library")
 load("//rules:manifest.bzl", "manifest")
-load(
-    "//rules/opentitan:defs.bzl",
-    "fpga_params",
-    "opentitan_binary",
-    "opentitan_test",
-    "qemu_params",
-)
+load("//rules/opentitan:defs.bzl", "fpga_params", "opentitan_binary", "opentitan_test")
+load("//rules/opentitan:defs.bzl", "qemu_params")
 load(
     "//sw/device/silicon_creator/rom_ext:defs.bzl",
     "ROM_EXT_VARIATIONS",

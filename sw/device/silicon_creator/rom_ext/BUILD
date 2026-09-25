@@ -353,6 +353,7 @@ ROM_EXT_FEATURES = [
         testonly = True,
         # TODO(#22780): Integrate real keys for A1 flows.
         ecdsa_key = {"//sw/device/silicon_creator/rom/keys/fake/ecdsa:ecdsa_keyset": "prod_key_0"},
+        # "virtual" slot is only supported for FPGA targets.
         exec_env = [
             "//hw/top_earlgrey:fpga_cw340",
             "//hw/top_earlgrey:sim_qemu_base",

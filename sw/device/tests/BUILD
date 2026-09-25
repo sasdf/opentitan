@@ -1857,10 +1857,7 @@ opentitan_test(
         },
     ),
     fpga_skip_ci = fpga_params(
-        tags = [
-            "broken",
-            "skip_in_ci",
-        ],
+        tags = ["skip_in_ci"],
     ),
     qemu = qemu_params(
         tags = [
@@ -1896,10 +1893,7 @@ opentitan_test(
     ),
     # No longer relevant on RRAM; exclude all FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = [
-        "broken",
-        "skip_in_ci",
-    ]),
+    fpga = fpga_params(tags = ["skip_in_ci"]),
     qemu = qemu_params(tags = [
         "broken",
         "skip_in_ci",
@@ -1962,16 +1956,12 @@ _FLASH_CTRL_INFO_ACCESS_LC_STATES = get_lc_items(
         ),
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_qemu_sival": None,
         },
         fpga = fpga_params(
             otp = "//hw/top_earlgrey/data/otp:img_{}".format(lc_state),
-            tags = [
-                "broken",
-                "skip_in_ci",
-            ],
         ),
         qemu = qemu_params(
             tags = [
@@ -2069,10 +2059,7 @@ opentitan_test(
     # No longer relevant on RRAM (no flash clock domain to test); exclude all
     # FPGA variants from CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = [
-        "broken",
-        "skip_in_ci",
-    ]),
+    fpga = fpga_params(tags = ["skip_in_ci"]),
     qemu = qemu_params(tags = [
         "broken",
         "skip_in_ci",
@@ -2105,10 +2092,7 @@ opentitan_test(
     # No longer relevant on RRAM; exclude all FPGA and verilator variants from
     # CI entirely.
     # https://github.com/lowRISC/opentitan/issues/30897
-    fpga = fpga_params(tags = [
-        "broken",
-        "skip_in_ci",
-    ]),
+    fpga = fpga_params(tags = ["skip_in_ci"]),
     qemu = qemu_params(tags = [
         "broken",
         "skip_in_ci",
@@ -2555,8 +2539,8 @@ opentitan_test(
             "//hw/top_earlgrey:fpga_cw340_test_rom": None,
             "//hw/top_earlgrey:sim_qemu_test_rom": None,
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
-            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:fpga_cw340_sival": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
             "//hw/top_earlgrey:sim_qemu_sival": None,
             # This test is not expected to run on silicon, as it would require a very specific OTP configuration that is only useful for this test.
         },
@@ -4700,10 +4684,14 @@ opentitan_test(
 opentitan_test(
     name = "sram_ctrl_execution_test",
     srcs = ["sram_ctrl_execution_test.c"],
-    exec_env = dicts.add(
-        EARLGREY_TEST_ENVS,
-        DARJEELING_TEST_ENVS,
-        EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+    exec_env = dicts.omit(
+        dicts.add(
+            EARLGREY_TEST_ENVS,
+            DARJEELING_TEST_ENVS,
+            EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
+        ),
+        # TODO (#26100): QEMU's `flashgen.py` script does not like this test.
+        [],
     ),
     deps = [
         "//hw/top/dt",
@@ -8468,7 +8456,7 @@ opentitan_test(
     kind = "rom",
     linker_script = "//sw/device/lib/testing/test_rom:linker_script",
     qemu = qemu_params(
-        # This test doesn't print `PASS!`, just writes the test status.
+        # This test doesn't print `PASS!`, just check the exit code.
         test_harness = "//sw/host/tests/qemu:test_status",
     ),
     deps = [":rom_exit_immediately_lib"],
