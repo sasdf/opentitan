@@ -452,6 +452,43 @@ static void verify_edn_reset_defaults_and_sw_port_mode(void) {
   CHECK(abs_mmio_read32(kEdn0Base + EDN_MAIN_SM_STATE_REG_OFFSET) == 0x0c1u);
 }
 
+static void verify_edn_sw_cmd_req_busy_write(void) {
+  LOG_INFO(
+      "Verifying EDN SW_CMD_REQ busy write is dropped without fatal alert...");
+  reset_entropy_complex_enable_csrng();
+
+  // Enable EDN in SWPortMode
+  abs_mmio_write32(kEdn1Base + EDN_CTRL_REG_OFFSET, 0x9996u);
+
+  // Verify CMD_REG_RDY
+  uint32_t sw_sts = abs_mmio_read32(kEdn1Base + EDN_SW_CMD_STS_REG_OFFSET);
+  CHECK((sw_sts & (1u << EDN_SW_CMD_STS_CMD_REG_RDY_BIT)) != 0u,
+        "Expected CMD_REG_RDY");
+
+  // Write INSTANTIATE command
+  abs_mmio_write32(kEdn1Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
+
+  // Immediately write another command while the first is presumably executing /
+  // busying the FIFO Since we haven't waited, the state machine or FIFO might
+  // be busy (in RTL CMD_REG_RDY goes to 0 instantly)
+  abs_mmio_write32(kEdn1Base + EDN_SW_CMD_REQ_REG_OFFSET, 0x00000601u);
+
+  // Allow time
+  busy_spin_micros(100);
+
+  // Verify no fatal EDN_MAIN_SM_ERR is raised
+  uint32_t err_code = abs_mmio_read32(kEdn1Base + EDN_ERR_CODE_REG_OFFSET);
+  CHECK((err_code & (1u << EDN_ERR_CODE_EDN_MAIN_SM_ERR_BIT)) == 0u,
+        "Expected EDN_MAIN_SM_ERR to NOT be set when writing while busy");
+  IBEX_SPIN_FOR((abs_mmio_read32(kEdn1Base + EDN_INTR_STATE_REG_OFFSET) &
+                 (1u << EDN_INTR_STATE_EDN_CMD_REQ_DONE_BIT)) != 0u,
+                10000);
+  abs_mmio_write32(kEdn1Base + EDN_INTR_STATE_REG_OFFSET, 0x3u);
+
+  // Restore
+  abs_mmio_write32(kEdn1Base + EDN_CTRL_REG_OFFSET, 0x9999u);
+}
+
 bool test_main(void) {
   irq_external_ctrl(false);
   irq_global_ctrl(false);
@@ -459,6 +496,7 @@ bool test_main(void) {
   reset_entropy_complex_enable_csrng();
 
   verify_edn_reset_defaults_and_sw_port_mode();
+  verify_edn_sw_cmd_req_busy_write();
   verify_edn_permit_and_addrmiss_faults();
   verify_edn_recov_alert_sts_rw0c_mubi_preserve();
   verify_edn_cmd_fifo_rst_continuous_clear();
