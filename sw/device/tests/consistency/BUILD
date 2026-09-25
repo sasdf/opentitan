@@ -42,6 +42,7 @@ opentitan_test(
         "//sw/device/lib/testing:kmac_testutils",
         "//sw/device/lib/testing:rstmgr_testutils",
         "//sw/device/lib/testing/test_framework:check",
+        "//sw/device/lib/testing/test_framework:ottf_alerts",
         "//sw/device/lib/testing/test_framework:ottf_isrs",
         "//sw/device/lib/testing/test_framework:ottf_main",
     ],
