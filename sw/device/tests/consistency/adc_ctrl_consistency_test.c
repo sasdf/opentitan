@@ -658,13 +658,136 @@ static void test_intr_ctl_gates_status_while_chn_val_and_fsm_rst_behave(void) {
   sync_aon();
 }
 
+static void test_por_reset_defaults_and_oob_fault(void) {
+  LOG_INFO(
+      "Test 0: POR reset defaults across all 32 CSRs (0x00..0x7c) & OOB fault");
+
+  for (uint32_t i = 0; i < 32u; ++i) {
+    uint32_t off = i * 4u;
+    uint32_t val = abs_mmio_read32(kAdcCtrlBase + off);
+    uint32_t exp = 0u;
+    if (off == ADC_CTRL_ADC_PD_CTL_REG_OFFSET) {
+      exp = 0x00064070u;
+    } else if (off == ADC_CTRL_ADC_LP_SAMPLE_CTL_REG_OFFSET) {
+      exp = 0x00000004u;
+    } else if (off == ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET) {
+      exp = 0x0000009bu;
+    }
+    CHECK(val == exp,
+          "ADC_CTRL CSR 0x%02x reset default mismatch: got 0x%08x, expected "
+          "0x%08x",
+          off, val, exp);
+  }
+
+  // Verify out-of-bounds offset 0x80 (reg index 32) raises Load Access Fault
+  // (mcause = 5) and Store Access Fault (mcause = 7).
+  g_fault_seen = false;
+  g_fault_mcause = 0;
+  (void)abs_mmio_read32(kAdcCtrlBase + 0x80u);
+  CHECK(g_fault_seen && g_fault_mcause == (uint32_t)kIbexExcLoadAccessFault,
+        "Expected Load Access Fault (mcause=5) at OOB offset 0x80");
+
+  g_fault_seen = false;
+  g_fault_mcause = 0;
+  abs_mmio_write32(kAdcCtrlBase + 0x80u, 0xffffffffu);
+  CHECK(g_fault_seen && g_fault_mcause == (uint32_t)kIbexExcStoreAccessFault,
+        "Expected Store Access Fault (mcause=7) at OOB offset 0x80");
+}
+
+static void test_status_type_intr_state_and_filter_cond_out_of_range(void) {
+  LOG_INFO(
+      "Test 7: Status-type INTR_STATE aggregation & COND=1 out-of-range "
+      "filter");
+  adc_ctrl_full_reset_and_clean();
+
+  // 1. Verify Status-type INTR_TEST (prim_intr_hw.sv:76-84: test_q latches
+  //    reg2hw_intr_test_q_i on reg2hw_intr_test_qe_i and drives
+  //    hw2reg_intr_state_de_o = 1'b1):
+  //    - Writing 1 to INTR_TEST sets test_q = 1 -> INTR_STATE = 1 (while
+  //      reading INTR_TEST returns 0).
+  //    - Writing 1 to INTR_STATE does NOT clear INTR_STATE while test_q == 1.
+  //    - Writing 0 to INTR_TEST clears test_q = 0 -> INTR_STATE = 0.
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_INTR_TEST_REG_OFFSET, 0x1u);
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_TEST_REG_OFFSET) == 0u,
+        "Expected INTR_TEST (WO) to read back 0");
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0x1u,
+        "Expected INTR_TEST=1 to set Status-type INTR_STATE=1");
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET, 0x1u);
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0x1u,
+        "Expected Status-type INTR_STATE to stay 1 while test_q == 1");
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_INTR_TEST_REG_OFFSET, 0x0u);
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0u,
+        "Expected writing INTR_TEST=0 to clear test_q and INTR_STATE");
+
+  // 2. Verify COND=1 (out-of-range: val < min_v || val > max_v) with
+  //    [min_v=0x100, max_v=0x200] matches ADC sample ~0, setting
+  //    ADC_INTR_STATUS.MATCH[0] and driving Status-type INTR_STATE = 1 such
+  //    that writing 1 to INTR_STATE does NOT clear INTR_STATE until
+  //    ADC_INTR_STATUS is cleared!
+  uint32_t pd_ctl =
+      bitfield_field32_write(0u, ADC_CTRL_ADC_PD_CTL_PWRUP_TIME_FIELD, 1u);
+  pd_ctl =
+      bitfield_field32_write(pd_ctl, ADC_CTRL_ADC_PD_CTL_WAKEUP_TIME_FIELD, 2u);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_PD_CTL_REG_OFFSET, pd_ctl);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_SAMPLE_CTL_REG_OFFSET, 1u);
+
+  // Filter 0: COND=1 (out-of-range) [0x100, 0x200] -> matches 0 (< 0x100).
+  // Filter 1: COND=0 (in-range)     [0x100, 0x200] -> does NOT match 0.
+  uint32_t f_out_of_range = pack_filter(true, true, 0x100u, 0x200u);
+  uint32_t f_in_range_no_match = pack_filter(true, false, 0x100u, 0x200u);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_0_REG_OFFSET,
+                   f_out_of_range);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_0_REG_OFFSET,
+                   f_out_of_range);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN0_FILTER_CTL_1_REG_OFFSET,
+                   f_in_range_no_match);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_CHN1_FILTER_CTL_1_REG_OFFSET,
+                   f_in_range_no_match);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_INTR_CTL_REG_OFFSET, 0xFFu);
+  sync_aon();
+
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET,
+                   1u << ADC_CTRL_ADC_EN_CTL_ADC_ENABLE_BIT);
+  CHECK(wait_for_intr_status_mask(0x01u, kPollTimeoutUs),
+        "Expected COND=1 out-of-range Filter 0 to match");
+
+  // Stop ADC so no new match pulses occur while testing Status-type INTR_STATE.
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_EN_CTL_REG_OFFSET, 0u);
+  sync_aon();
+
+  uint32_t fst =
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_FILTER_STATUS_REG_OFFSET);
+  CHECK((fst & 0x03u) == 0x01u,
+        "Expected Filter 0 (COND=1) to match and Filter 1 (COND=0) not to "
+        "match, got 0x%x",
+        fst);
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0x1u,
+        "Expected Status-type INTR_STATE == 1 while ADC_INTR_STATUS != 0");
+
+  // Writing 1 to INTR_STATE must NOT clear INTR_STATE while ADC_INTR_STATUS !=
+  // 0!
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET, 0x1u);
+  CHECK(
+      abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0x1u,
+      "Expected Status-type INTR_STATE to remain 1 while ADC_INTR_STATUS != 0");
+
+  // Clearing ADC_INTR_STATUS (RW1C) and INTR_STATE (RW1C) clears INTR_STATE to
+  // 0.
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_ADC_INTR_STATUS_REG_OFFSET, 0x3FFu);
+  abs_mmio_write32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET, 0x1u);
+  CHECK(abs_mmio_read32(kAdcCtrlBase + ADC_CTRL_INTR_STATE_REG_OFFSET) == 0u,
+        "Expected INTR_STATE == 0 after clearing ADC_INTR_STATUS");
+}
+
 bool test_main(void) {
+  test_por_reset_defaults_and_oob_fault();
   test_oneshot_sticky_enable_and_retrigger();
   test_chn_val_intr_overwrite_and_oneshot_latch();
   test_fsm_rst_level_hold_and_release_retrigger();
   test_subword_write_permit_faults();
   test_sample_cnt_zero_underflow_and_inflight_reduction();
   test_intr_ctl_gates_status_while_chn_val_and_fsm_rst_behave();
+  test_status_type_intr_state_and_filter_cond_out_of_range();
   adc_ctrl_full_reset_and_clean();
   LOG_INFO("All adc_ctrl trunk-v2 errata tests passed on CW340 FPGA!");
   return true;
