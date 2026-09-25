@@ -443,11 +443,146 @@ static void test_v2_sram_ctrl_meta_and_cheriot_xbar_integration(void) {
         "fault with mcause=7");
 }
 
+/**
+ * Test 4 (Part B - NEW IN V2 Top-Level Memory Map, PLIC 184 IRQs, Alert Handler
+ * 66 Alerts, and KeymgrDpe / RRAM / LC_CTRL DMI Integration):
+ * Verify `top_earlgrey_pkg.sv`, `rv_plic_reg_pkg.sv`, and
+ * `alert_handler_reg_pkg.sv`:
+ * 1. `ROM_CTRL__ROM` is relocated and expanded in v2 to
+ * `0x00040000..0x0006ffff`
+ *    (`192 KiB`, `TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR = 0x40000`,
+ *    `TOP_EARLGREY_ROM_CTRL_ROM_SIZE_BYTES = 0x30000`, where the top 32 bytes
+ *    `0x0006ffe0..0x0006ffff` hold the unscrambled KMAC digest). Reads at
+ *    `0x00040000` and `0x0006ffdc` (last non-digest ROM word) succeed
+ *    (`mcause = 0`), whereas `0x00070000` (beyond the `192 KiB` window) and
+ *    `0x00008000` (removed v1 ROM base) fault with `mcause = 5`.
+ * 2. `RV_PLIC` (`0x48000000`) has `TopEarlgreyPlicIrqIdCount = 184` (`0..183`,
+ *    last peripheral IRQ `183` = `TopEarlgreyPlicIrqIdEdn1EdnFatalErr`).
+ *    `PRIO_183` (`0x480002dc`, `PERMIT = 0x1`) and `IE0_5` (`0x48002014`,
+ *    `PERMIT = 0x7`) are mapped and RW, whereas `0x480002e0` (`PRIO_184`,
+ *    unmapped) and `0x48002018` (`IE0_6`, unmapped) fault with `mcause = 5 /
+ * 7`, and an 8-bit subword write (`be = 0x1`) to `IE0_5` (`PERMIT = 0x7`,
+ *    `(0x1 & 0x7) != 0x7`) faults with `mcause = 7` (`wr_err`).
+ * 3. `ALERT_HANDLER` (`0x40150000`) has `TopEarlgreyAlertIdCount = 66`
+ *    (`0..65`, where `64` = `CheriotFatalFault` and `65` =
+ *    `SramCtrlMetaFatalError`). `ALERT_REGWEN_64` (`0x40150118`) and
+ *    `ALERT_REGWEN_65` (`0x4015011c`) read `0x1`, and the final mapped CSR
+ *    `CLASSD_STATE` (`0x40150584`) reads `0x0` (`mcause = 0`), whereas
+ *    `0x40150588` (first unmapped offset in the `0x800` window) faults with
+ *    `mcause = 5 / 7`.
+ * 4. New v2 top-level `xbar_main` peripherals `KEYMGR_DPE` (`0x41140000`),
+ *    `RRAM_CTRL__CORE` (`0x41010000`), and `RRAM_MACRO__PRIM` (`0x41018000`)
+ *    respond to CSR reads without bus fault (`mcause = 0`).
+ */
+static void test_v2_rom_plic_alert_and_rram_integration(void) {
+  LOG_INFO(
+      "Test 4 [NEW_IN_V2]: 192KiB ROM (0x40000..0x6ffff), RV_PLIC 184 IRQs, "
+      "ALERT_HANDLER 66 alerts, and KEYMGR_DPE/RRAM apertures");
+
+  // 4a. ROM_CTRL__ROM (0x00040000..0x0006ffff, 192 KiB; top 32 bytes
+  // 0x0006ffe0..0x0006ffff are raw digest words without ECC).
+  g_fault_count = 0;
+  (void)abs_mmio_read32(TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR);
+  (void)abs_mmio_read32(TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR +
+                        TOP_EARLGREY_ROM_CTRL_ROM_SIZE_BYTES - 36u);
+  CHECK(g_fault_count == 0u,
+        "Expected reads at 0x00040000 and 0x0006ffdc in 192KiB ROM to succeed");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(TOP_EARLGREY_ROM_CTRL_ROM_BASE_ADDR +
+                        TOP_EARLGREY_ROM_CTRL_ROM_SIZE_BYTES);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
+        "Expected load at 0x00070000 (past 192KiB ROM) to fault with mcause=5");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(0x00008000u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
+        "Expected load at 0x00008000 (removed v1 ROM base) to fault with "
+        "mcause=5");
+
+  // 4b. RV_PLIC (0x48000000): PRIO_183 (0x2dc, PERMIT=0x1) is mapped; 0x2e0
+  // (PRIO_184) and 0x2018 (IE0_6) are unmapped; IE0_5 (0x2014) has PERMIT=0x7
+  // (24 bits for IRQs 160..183), so a 32-bit write (be=0xf) succeeds while an
+  // 8-bit subword write (be=0x1, (0x1 & 0x7) != 0x7) faults with mcause=7.
+  const uintptr_t kPlicBase = TOP_EARLGREY_RV_PLIC_BASE_ADDR;
+  g_fault_count = 0;
+  uint32_t orig_prio183 = abs_mmio_read32(kPlicBase + 0x2dcu);
+  abs_mmio_write8(kPlicBase + 0x2dcu, 0x3u);
+  CHECK(abs_mmio_read32(kPlicBase + 0x2dcu) == 0x3u,
+        "Expected RV_PLIC.PRIO_183 (0x2dc) == 0x3 after 8-bit write");
+  abs_mmio_write32(kPlicBase + 0x2dcu, orig_prio183);
+  CHECK(g_fault_count == 0u, "RV_PLIC.PRIO_183 access must not fault");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kPlicBase + 0x2e0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
+        "Expected unmapped RV_PLIC.PRIO_184 (0x2e0) load to fault (mcause=5)");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kPlicBase + 0x2e0u, 0x1u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected unmapped RV_PLIC.PRIO_184 (0x2e0) store to fault (mcause=7)");
+
+  g_fault_count = 0;
+  abs_mmio_write32(kPlicBase + 0x2014u, 0x0u);
+  CHECK(g_fault_count == 0u,
+        "Expected 32-bit write (be=0xf) to RV_PLIC.IE0_5 (PERMIT=0x7) to "
+        "succeed");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write8(kPlicBase + 0x2014u, 0x0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected 8-bit subword write (be=0x1) to RV_PLIC.IE0_5 (PERMIT=0x7) "
+        "to fault with mcause=7");
+
+  // 4c. ALERT_HANDLER (0x40150000): 66 alerts (0..65). ALERT_REGWEN_64
+  // (0x118), ALERT_REGWEN_65 (0x11c), and final CSR CLASSD_STATE (0x584)
+  // succeed, whereas 0x588 faults with mcause=5/7.
+  const uintptr_t kAlertBase = TOP_EARLGREY_ALERT_HANDLER_BASE_ADDR;
+  g_fault_count = 0;
+  CHECK(abs_mmio_read32(kAlertBase + 0x118u) == 1u,
+        "Expected ALERT_HANDLER.ALERT_REGWEN_64 (CheriotFatalFault) == 1");
+  CHECK(abs_mmio_read32(kAlertBase + 0x11cu) == 1u,
+        "Expected ALERT_HANDLER.ALERT_REGWEN_65 (SramCtrlMetaFatalError) == 1");
+  CHECK(abs_mmio_read32(kAlertBase + 0x584u) == 0u,
+        "Expected ALERT_HANDLER.CLASSD_STATE (0x584) == 0");
+  CHECK(g_fault_count == 0u,
+        "Mapped ALERT_HANDLER CSRs 0x118, 0x11c, 0x584 must not fault");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  (void)abs_mmio_read32(kAlertBase + 0x588u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvLoadAccessFault,
+        "Expected unmapped ALERT_HANDLER+0x588 load to fault (mcause=5)");
+
+  g_fault_count = 0;
+  g_last_mcause = 0;
+  abs_mmio_write32(kAlertBase + 0x588u, 0u);
+  CHECK(g_fault_count == 1u && g_last_mcause == kRiscvStoreAccessFault,
+        "Expected unmapped ALERT_HANDLER+0x588 store to fault (mcause=7)");
+
+  // 4d. New v2 top-level peripherals on xbar_main: KEYMGR_DPE (0x41140000),
+  // RRAM_CTRL_CORE (0x41010000), RRAM_MACRO_PRIM (0x41018000).
+  g_fault_count = 0;
+  (void)abs_mmio_read32(TOP_EARLGREY_KEYMGR_DPE_BASE_ADDR);
+  (void)abs_mmio_read32(TOP_EARLGREY_RRAM_CTRL_CORE_BASE_ADDR);
+  (void)abs_mmio_read32(TOP_EARLGREY_RRAM_MACRO_PRIM_BASE_ADDR);
+  CHECK(g_fault_count == 0u,
+        "Expected KEYMGR_DPE, RRAM_CTRL_CORE, and RRAM_MACRO_PRIM CSR reads to "
+        "succeed without bus fault");
+}
+
 bool test_main(void) {
   LOG_INFO("=== top_earlgrey Earlgrey v2 Errata Verification Test (P37) ===");
   test_sram_ifetch_and_v2_sec_sram();
   test_reggen_wo_ro_and_xbar_decode_windows();
   test_v2_sram_ctrl_meta_and_cheriot_xbar_integration();
+  test_v2_rom_plic_alert_and_rram_integration();
   LOG_INFO("=== All top_earlgrey v2 errata checks PASSED ===");
   return true;
 }
