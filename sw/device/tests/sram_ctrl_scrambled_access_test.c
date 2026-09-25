@@ -152,6 +152,7 @@ static bool expect_ecc_errors(void) {
     case kDeviceFpgaCw340:
     case kDeviceSilicon:
     case kDeviceSimDV:
+    case kDeviceSimQemu:
     case kDeviceSimVerilator:
       return true;
     default:

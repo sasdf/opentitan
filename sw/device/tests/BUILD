@@ -7170,6 +7170,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_isa_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_isa",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         tags = ["manual"],
@@ -7198,6 +7208,7 @@ opentitan_binary(
     ],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     kind = "ram",
     linker_script = "//sw/device/silicon_creator/manuf/lib:sram_program_linker_script",
@@ -7276,6 +7287,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_epmp_test": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         needs_jtag = True,
         test_cmd = "--elf={firmware}",
@@ -7302,6 +7323,7 @@ opentitan_binary(
     exec_env = dicts.add(
         {
             "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+            "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         },
         DARJEELING_TEST_ENVS,
     ),
@@ -7409,6 +7431,16 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
         testopt_bootstrap = "False",
     ),
+    qemu = qemu_params(
+        binaries = {
+            ":rv_core_ibex_mem_test_sram": "sram_program",
+        },
+        needs_jtag = True,
+        otp = "//sw/device/silicon_creator/manuf/tests:otp_img_rom_exec_disabled_test_unlocked0",
+        test_cmd = "--elf={sram_program}",
+        test_harness = "//sw/host/tests/chip/rv_core_ibex_epmp",
+        testopt_bootstrap = "False",
+    ),
     silicon = silicon_params(
         binaries = {
             ":rv_core_ibex_mem_test_sram": "sram_program",
@@ -7434,6 +7466,7 @@ opentitan_binary(
     srcs = ["rv_core_ibex_mem_test.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys": None,
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
         "//hw/top_earlgrey:silicon_creator": None,
     },
     kind = "ram",
@@ -7908,8 +7941,8 @@ opentitan_test(
     kind = "rom",
     linker_script = "//sw/device/lib/testing/test_rom:linker_script",
     qemu = qemu_params(
-        # This test doesn't print `PASS!`, just check the exit code.
-        test_harness = "//third_party/qemu:qemu-system-riscv32",
+        # This test doesn't print `PASS!`, just writes the test status.
+        test_harness = "//sw/host/tests/qemu:test_status",
     ),
     deps = [":rom_exit_immediately_lib"],
 )
@@ -8029,6 +8062,10 @@ opentitan_test(
         EARLGREY_SILICON_OWNER_ROM_EXT_ENVS,
     ),
     fpga = fpga_params(
+        exit_failure = "FAIL!",
+        exit_success = "Alert 3 is asserted",
+    ),
+    qemu = qemu_params(
         exit_failure = "FAIL!",
         exit_success = "Alert 3 is asserted",
     ),
