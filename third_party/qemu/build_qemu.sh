@@ -12,7 +12,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 QEMU_ROOT="$1"
-OUT_ARCHIVE="$(realpath "$2")"
+OUT_ARCHIVE="$(realpath $2)"
 
 # Go to the QEMU source directory.
 cd "$QEMU_ROOT"

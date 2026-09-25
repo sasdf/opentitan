@@ -182,8 +182,10 @@ def _default_kind_for_top(top):
 def _qemu_kind_unsupported(env, kind):
     """True if `env` is a QEMU exec_env and QEMU doesn't support `kind` yet.
 
-    QEMU supports "rom", "ram", "flash", and "rram" kind binaries (see
-    qemu.bzl).
+    QEMU only knows how to boot "rom", "ram", and "flash" kind binaries (see
+    qemu.bzl); rather than let bazel discover this the hard way at analysis
+    time when a broad build/test wildcard sweeps up the target, mark it
+    target_compatible_with incompatible so it's simply skipped.
     """
     _ = (env, kind)
     return False
