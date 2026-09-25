@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 
 def ownership_transfer_test(
@@ -13,11 +14,13 @@ def ownership_transfer_test(
         srcs = ["//sw/device/silicon_creator/rom_ext/e2e/verified_boot:boot_test"],
         exec_env = {
             "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
+            "//hw/top_earlgrey:sim_qemu_rom_ext": None,
         },
         ecdsa_key = {
             "//sw/device/silicon_creator/lib/ownership/keys/dummy:ecdsa_keyset": "app_prod_0",
         },
         fpga = None,
+        qemu = None,
         manifest = None,
         data = [
             "//sw/device/silicon_creator/lib/ownership/keys/dummy:activate_key",
@@ -51,6 +54,12 @@ def ownership_transfer_test(
             "//sw/device/silicon_creator/lib/ownership:datatypes",
         ],
         **kwargs):
+    qemu_dict = {
+        "testopt_bootstrap": "True",
+        "icount": 5,
+    } | (fpga or {}) | (qemu or {})
+    qemu = qemu_params(**qemu_dict)
+
     # FPGA should always bootstrap first, so enable this on every FPGA test unless overridden
     fpga = {
         "testopt_bootstrap": "True",
@@ -67,5 +76,6 @@ def ownership_transfer_test(
         defines = defines,
         deps = deps,
         fpga = fpga,
+        qemu = qemu,
         **kwargs
     )
