@@ -70,6 +70,7 @@ enum {
   kAonTimerBase = TOP_EARLGREY_AON_TIMER_BASE_ADDR,
 };
 
+static volatile bool g_in_test_main = false;
 static volatile bool g_expect_bus_fault = false;
 static volatile uint32_t g_bus_fault_count = 0;
 static volatile uint32_t g_last_mcause = 0;
@@ -85,6 +86,9 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   if (g_expect_bus_fault) {
     g_bus_fault_count++;
     g_last_mcause = mcause;
+    return;
+  }
+  if (!g_in_test_main) {
     return;
   }
 
@@ -121,6 +125,7 @@ void ottf_load_store_fault_handler(uint32_t *exc_info) {
   }
 
   OT_DISCARD(exc_info);
+  g_in_test_main = false;
   CHECK(false, "Unexpected load/store fault mcause=0x%08x", mcause);
 }
 
@@ -694,6 +699,7 @@ static void test_v2_cheriot_switch_and_desync_readback(void) {
 }
 
 bool test_main(void) {
+  g_in_test_main = true;
   LOG_INFO("=== rv_core_ibex Earlgrey v2 Errata Verification Test ===");
   test_window_gap_and_subword_permits();
   test_nmi_w1s_and_mstack_clobber();
@@ -701,5 +707,6 @@ bool test_main(void) {
   test_v2_mcounteren_writable_and_csr();
   test_v2_cheriot_switch_and_desync_readback();
   LOG_INFO("=== All rv_core_ibex v2 errata checks PASSED ===");
+  g_in_test_main = false;
   return true;
 }
