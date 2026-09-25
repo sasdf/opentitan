@@ -6,6 +6,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -98,6 +99,28 @@ SIGVERIFY_BAD_CASES = [
             ),
             otp = ":otp_img_sigverify_always_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            assemble = " ".join([
+                "{{slot_{}}}@{}".format(slot, addr)
+                for (slot, addr) in SLOTS.items()
+                if case[slot] == "bad"
+            ]),
+            binaries = {
+                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_{}_{}_corrupted_fpga_cw340_rom_with_fake_keys_signed_bin"
+                    .format(
+                    slot,
+                    filter_key_structs_for_lc_state(ECDSA_ONLY_KEY_STRUCTS, lc_state_val)[0].ecdsa.name,
+                ): "slot_{}".format(slot)
+                for (slot, addr) in SLOTS.items()
+                if case[slot] == "bad"
+            },
+            exit_failure = MSG_PASS,
+            exit_success = MSG_TEMPLATE_BFV_LCV.format(
+                case["expected_bfv"],
+                hex_digits(lc_state_val),
+            ),
+            otp = ":otp_img_sigverify_always_{}".format(lc_state),
         ),
     )
     for case in SIGVERIFY_BAD_CASES

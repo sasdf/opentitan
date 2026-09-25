@@ -7,6 +7,7 @@ load(
     "DEFAULT_TEST_FAILURE_MSG",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -108,6 +109,18 @@ otp_json(
             slot_a = SLOTS["a"],
             slot_b = SLOTS["b"],
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            assemble = "{fw_a}@{slot_a} {fw_b}@{slot_b}",
+            binaries = {
+                "//sw/device/silicon_creator/rom/e2e/boot_policy_newer:empty_test_slot_a_sec_ver_{}".format(t["a"]): "fw_a",
+                "//sw/device/silicon_creator/rom/e2e/boot_policy_newer:empty_test_slot_b_sec_ver_{}".format(t["b"]): "fw_b",
+            },
+            exit_failure = t["exit_failure"],
+            exit_success = t["exit_success"],
+            otp = ":otp_img_boot_policy_rollback_{}".format(lc_state),
+            slot_a = SLOTS["a"],
+            slot_b = SLOTS["b"],
         ),
     )
     for lc_state, lc_state_val in get_lc_items()

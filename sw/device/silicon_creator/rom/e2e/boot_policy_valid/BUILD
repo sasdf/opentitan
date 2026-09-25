@@ -7,6 +7,7 @@ load(
     "DEFAULT_TEST_FAILURE_MSG",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -77,6 +78,20 @@ BOOT_POLICY_VALID_CASES = [
             exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_SIGNATURE)) if a["desc"] == b["desc"] and a["desc"] == "bad" else MSG_PASS,
             otp = ":otp_img_boot_policy_valid_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            assemble = "{{slot_a}}@{} {{slot_b}}@{}".format(
+                SLOTS["a"],
+                SLOTS["b"],
+            ),
+            binaries = {
+                # PROD keys can sign binaries able to run across all life cycle states.
+                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_a_prod_key_0{}".format(a["suffix"]): "slot_a",
+                "//sw/device/silicon_creator/rom/e2e:empty_test_slot_b_prod_key_0{}".format(b["suffix"]): "slot_b",
+            },
+            exit_failure = MSG_PASS if a["desc"] == b["desc"] and a["desc"] == "bad" else DEFAULT_TEST_FAILURE_MSG,
+            exit_success = MSG_TEMPLATE_BFV.format(hex_digits(CONST.BFV.SIGVERIFY.BAD_ECDSA_SIGNATURE)) if a["desc"] == b["desc"] and a["desc"] == "bad" else MSG_PASS,
+            otp = ":otp_img_boot_policy_valid_{}".format(lc_state),
         ),
     )
     for lc_state, lc_state_val in get_lc_items()
