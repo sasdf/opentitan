@@ -8,6 +8,7 @@ load(
     "//rules/opentitan:defs.bzl",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:otp.bzl",
@@ -151,6 +152,11 @@ otp_json(
             exit_success = test["exit_success"][lc_state],
             otp = "otp_img_sigverify_key_type_{}".format(lc_state),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            exit_failure = test["exit_failure"][lc_state],
+            exit_success = test["exit_success"][lc_state],
+            otp = "otp_img_sigverify_key_type_{}".format(lc_state),
         ),
         spx_key = test["spx_key"],
         deps = [

@@ -8,6 +8,7 @@ load(
     "fpga_params",
     "opentitan_binary",
     "opentitan_test",
+    "qemu_params",
     "spx_key_for_lc_state",
 )
 load("//rules:const.bzl", "CONST", "get_lc_items")
@@ -95,6 +96,7 @@ opentitan_binary(
     ),
     exec_env = [
         "//hw/top_earlgrey:fpga_cw340_rom_with_fake_keys",
+        "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys",
         "//hw/top_earlgrey:sim_dv",
         "//hw/top_earlgrey:sim_verilator",
     ],
@@ -167,6 +169,13 @@ opentitan_binary(
             ),
             tags = maybe_skip_in_ci(lc_state_val),
         ),
+        qemu = qemu_params(
+            exit_success = t["exit_success"][lc_state],
+            otp = ":otp_img_sigverify_spx_{}_{}".format(
+                lc_state,
+                t["name"],
+            ),
+        ),
         spx_key = spx_key_for_lc_state(
             ECDSA_SPX_KEY_STRUCTS,
             lc_state_val,
@@ -208,6 +217,9 @@ opentitan_test(
         "//hw/top_earlgrey:sim_qemu_rom_with_fake_keys": None,
     },
     fpga = fpga_params(
+        otp = ":otp_img_sigverify_spx_prod_enabled_true",
+    ),
+    qemu = qemu_params(
         otp = ":otp_img_sigverify_spx_prod_enabled_true",
     ),
     spx_key = {

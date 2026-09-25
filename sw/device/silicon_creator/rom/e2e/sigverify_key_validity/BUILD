@@ -7,6 +7,7 @@ load(
     "DEFAULT_TEST_FAILURE_MSG",
     "fpga_params",
     "opentitan_test",
+    "qemu_params",
 )
 load(
     "//rules:const.bzl",
@@ -227,6 +228,14 @@ KEY_VALIDITY_TESTS = [
                 lc_state,
             ),
             tags = maybe_skip_in_ci(lc_state_val),
+        ),
+        qemu = qemu_params(
+            exit_failure = test["exit_failure"][lc_state],
+            exit_success = test["exit_success"][lc_state],
+            otp = ":otp_img_sigverify_key_validity_{}_{}".format(
+                test["name"],
+                lc_state,
+            ),
         ),
         spx_key = {key.spx.label: key.spx.name},
         deps = [
