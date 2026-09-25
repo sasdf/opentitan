@@ -44,7 +44,6 @@ opentitan_test(
     srcs = ["otp_dai_lockdown.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         exit_failure = "PASS|FAIL|BFV:.*\r\n",
@@ -75,7 +74,6 @@ opentitan_test(
     srcs = ["sram_lockdown.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         tags = ["broken"],
@@ -93,7 +91,6 @@ opentitan_test(
     srcs = ["epmp_rlb_lockdown.c"],
     exec_env = {
         "//hw/top_earlgrey:fpga_cw340_rom_ext": None,
-        "//hw/top_earlgrey:sim_qemu_rom_ext": None,
     },
     fpga = fpga_params(
         tags = ["broken"],
