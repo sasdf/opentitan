@@ -203,6 +203,21 @@ bool test_main(void) {
         "Expected RESEED_COUNTER_2 == 1 after 1 GENERATE cmd, got %u",
         rc2_before);
 
+  uint32_t ctrl_read_int_on =
+      (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
+      (kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
+      (kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
+      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
+  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_on);
+  // In Earlgrey v1 (csrng_state_db.sv:84, 171-174), int_st_dump_id_q is 4 bits
+  // (StateId = 4), so INT_STATE_NUM = 6u latches 6 (>= NumApps=3) and reads 0.
+  abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 6u);
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET) == 0u,
+        "Expected INT_STATE_VAL == 0 for out-of-range 4-bit INT_STATE_NUM=6");
+  abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 2u);
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET) == 1u,
+        "Expected INT_STATE_VAL word 0 (rs_ctr) == 1 for INT_STATE_NUM=2");
+
   CHECK_DIF_OK(dif_csrng_uninstantiate(&csrng));
   CHECK_STATUS_OK(csrng_testutils_cmd_ready_wait(&csrng));
 
@@ -212,12 +227,6 @@ bool test_main(void) {
         "Expected RESEED_COUNTER_2 == 0 after UNINSTANTIATE, got %u",
         rc2_after);
 
-  uint32_t ctrl_read_int_on =
-      (kMultiBitBool4True << CSRNG_CTRL_ENABLE_OFFSET) |
-      (kMultiBitBool4True << CSRNG_CTRL_SW_APP_ENABLE_OFFSET) |
-      (kMultiBitBool4True << CSRNG_CTRL_READ_INT_STATE_OFFSET) |
-      (kMultiBitBool4False << CSRNG_CTRL_FIPS_FORCE_ENABLE_OFFSET);
-  abs_mmio_write32(kCsrngBase + CSRNG_CTRL_REG_OFFSET, ctrl_read_int_on);
   abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 2u);
   for (uint32_t i = 0; i < 14; ++i) {
     uint32_t st_word =
