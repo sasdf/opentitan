@@ -853,6 +853,68 @@ static void test_bitmanip_and_cpuctrlsts(void) {
   uint32_t cpuctrl_clr7 = 0;
   CSR_READ(0x7c0, &cpuctrl_clr7);
   CHECK((cpuctrl_clr7 & 0xc0u) == 0u);
+
+  // Verify PMU CSRs (mcountinhibit, mcycle/mcycleh, minstret/minstreth) and
+  // Debug Trigger Context CSRs (scontext 0x5a8, mscontext 0x7aa) on Earlgrey
+  // v2.
+  uint32_t saved_mcountinhibit = 0;
+  uint32_t saved_mcycleh = 0, saved_mcycle = 0;
+  uint32_t saved_minstreth = 0, saved_minstret = 0;
+  CSR_READ(CSR_REG_MCOUNTINHIBIT, &saved_mcountinhibit);
+  CSR_READ(CSR_REG_MCYCLEH, &saved_mcycleh);
+  CSR_READ(CSR_REG_MCYCLE, &saved_mcycle);
+  CSR_READ(CSR_REG_MINSTRETH, &saved_minstreth);
+  CSR_READ(CSR_REG_MINSTRET, &saved_minstret);
+
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, 0x7u);
+  uint32_t mcountinhibit_val = 0;
+  CSR_READ(CSR_REG_MCOUNTINHIBIT, &mcountinhibit_val);
+  CHECK((mcountinhibit_val & 0x7u) == 0x5u);
+
+  CSR_WRITE(CSR_REG_MCYCLEH, 0x00000042u);
+  CSR_WRITE(CSR_REG_MCYCLE, 0x12345678u);
+  CSR_WRITE(CSR_REG_MINSTRETH, 0x00000024u);
+  CSR_WRITE(CSR_REG_MINSTRET, 0x87654321u);
+  asm volatile("nop; nop; nop; nop");
+
+  uint32_t cyc_lo_inh = 0, cyc_hi_inh = 0;
+  uint32_t inst_lo_inh = 0, inst_hi_inh = 0;
+  CSR_READ(CSR_REG_MCYCLE, &cyc_lo_inh);
+  CSR_READ(CSR_REG_MCYCLEH, &cyc_hi_inh);
+  CSR_READ(CSR_REG_MINSTRET, &inst_lo_inh);
+  CSR_READ(CSR_REG_MINSTRETH, &inst_hi_inh);
+  CHECK(cyc_lo_inh == 0x12345678u);
+  CHECK(cyc_hi_inh == 0x00000042u);
+  CHECK(inst_lo_inh == 0x87654321u);
+  CHECK(inst_hi_inh == 0x00000024u);
+
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, 0u);
+  asm volatile("nop; nop; nop; nop");
+  uint32_t cyc_lo_run = 0, cyc_hi_run = 0;
+  uint32_t inst_lo_run = 0, inst_hi_run = 0;
+  CSR_READ(CSR_REG_MCYCLE, &cyc_lo_run);
+  CSR_READ(CSR_REG_MCYCLEH, &cyc_hi_run);
+  CSR_READ(CSR_REG_MINSTRET, &inst_lo_run);
+  CSR_READ(CSR_REG_MINSTRETH, &inst_hi_run);
+  CHECK(cyc_hi_run == 0x00000042u);
+  CHECK(cyc_lo_run > 0x12345678u);
+  CHECK(inst_hi_run == 0x00000024u);
+  CHECK(inst_lo_run > 0x87654321u);
+
+  CSR_WRITE(CSR_REG_MCYCLEH, saved_mcycleh);
+  CSR_WRITE(CSR_REG_MCYCLE, saved_mcycle);
+  CSR_WRITE(CSR_REG_MINSTRETH, saved_minstreth);
+  CSR_WRITE(CSR_REG_MINSTRET, saved_minstret);
+  CSR_WRITE(CSR_REG_MCOUNTINHIBIT, saved_mcountinhibit);
+
+  uint32_t scontext_val = 0xffffffffu;
+  uint32_t mscontext_val = 0xffffffffu;
+  CSR_WRITE(0x5a8, 0xdeadbeefu);
+  CSR_READ(0x5a8, &scontext_val);
+  CSR_WRITE(0x7aa, 0xdeadbeefu);
+  CSR_READ(0x7aa, &mscontext_val);
+  CHECK(scontext_val == 0u);
+  CHECK(mscontext_val == 0u);
 }
 
 bool test_main(void) {
