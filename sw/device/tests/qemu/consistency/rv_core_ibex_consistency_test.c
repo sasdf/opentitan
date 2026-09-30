@@ -489,6 +489,13 @@ bool test_main(void) {
   CSR_WRITE(CSR_REG_MINSTRET, saved_minstret);
   CSR_WRITE(CSR_REG_MCOUNTINHIBIT, saved_mcountinhibit);
 
+  // 8. Verify CSR_MCOUNTEREN (0x306, ibex_cs_registers.sv:371-374,706) is
+  // hardwired to 0 and ignores writes on Earlgrey v1.
+  uint32_t mcounteren_val = 0xffffffffu;
+  CSR_WRITE(0x306, 0xffffffffu);
+  CSR_READ(0x306, &mcounteren_val);
+  CHECK(mcounteren_val == 0u);
+
   // 9. Verify Debug Trigger Context CSRs (`scontext` 0x5a8 and `mscontext`
   // 0x7aa, `ibex_cs_registers.sv:523-530` with `DbgTriggerEn = 1`):
   // Both CSRs are accessible in M-mode without raising an illegal instruction
