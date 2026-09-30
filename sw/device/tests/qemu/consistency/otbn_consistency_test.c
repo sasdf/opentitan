@@ -183,7 +183,7 @@ static inline void mmio_write16(uint32_t addr, uint16_t val) {
 }
 
 #define OTBN_BN_ADDVM(wrd, wrs1, wrs2)                 \
-  ((1u << 30) | (((uint32_t)(wrs2) & 0x1fu) << 20) |   \
+  ((1u << 28) | (((uint32_t)(wrs2) & 0x1fu) << 20) |   \
    (((uint32_t)(wrs1) & 0x1fu) << 15) | (0x0u << 12) | \
    (((uint32_t)(wrd) & 0x1fu) << 7) | 0x5bu)
 
@@ -330,6 +330,23 @@ bool test_main(void) {
   uint32_t addm_res = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
   CHECK(addm_res == 0u, "BN.ADDM (60 + 40 == 100 == MOD) expected 0, got %u",
         addm_res);
+
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0xdeadbeefu);
+  const uint32_t prog_bn_addvm[] = {
+      OTBN_BN_XOR(0, 0, 0),        // w0 = 0
+      OTBN_BN_ADDI(1, 0, 100),     // w1 = 100
+      OTBN_BN_WSRW(0, 1),          // MOD = w1 (100)
+      OTBN_BN_ADDI(2, 0, 60),      // w2 = 60
+      OTBN_BN_ADDI(3, 0, 40),      // w3 = 40
+      OTBN_BN_ADDVM(4, 2, 3),      // w4[31:0] = (60 + 40) mod 100 == 0
+      OTBN_ADDI(2, 0, 4),          // x2 = 4 (index of w4)
+      OTBN_BN_SID_ZERO_OFF(2, 0),  // DMEM[0..31] = w4
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_bn_addvm, ARRAYSIZE(prog_bn_addvm));
+  uint32_t addvm_res = abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET);
+  CHECK(addvm_res == 0u, "BN.ADDVM (60 + 40 == 100 == MOD) expected 0, got %u",
+        addvm_res);
 
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0u);
   const uint32_t prog_x1_dual_read[] = {
