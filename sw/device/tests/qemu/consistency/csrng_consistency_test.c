@@ -431,6 +431,17 @@ static void test_v2_new_001_002_int_state_num_desync_and_ptr_15_shift(void) {
           i, w_shifted[i], i - 1, w_true[i - 1]);
   }
 
+  // In Earlgrey v2 (csrng_state_db.sv:57, 84, 151), reg_rd_id_q is 2 bits
+  // (NumAppsLg = 2), so INT_STATE_NUM = 6u reads back 6u from the reggen FF
+  // while reg_rd_id_q latches 6 & 0x3 = 2u (selecting SW instance 2).
+  abs_mmio_write32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET, 6u);
+  CHECK(abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_NUM_REG_OFFSET) == 6u,
+        "Expected INT_STATE_NUM register FF to read back 6");
+  CHECK(
+      abs_mmio_read32(kCsrngBase + CSRNG_INT_STATE_VAL_REG_OFFSET) == w_true[0],
+      "Expected INT_STATE_VAL word 0 == 1 when INT_STATE_NUM=6 truncates to "
+      "reg_rd_id_q=2 in Earlgrey v2");
+
   csrng_disable_and_clear();
 }
 
