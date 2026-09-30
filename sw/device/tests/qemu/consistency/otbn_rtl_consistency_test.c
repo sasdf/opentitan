@@ -387,6 +387,7 @@ bool test_main(void) {
              "Earlgrey v1 execution of v2 opcode 0x5b must set "
              "ERR_BITS.ILLEGAL_INSN (got 0x%08x)",
              err_bits);
+  abs_mmio_write32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET, 0xffffffffu);
 
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
