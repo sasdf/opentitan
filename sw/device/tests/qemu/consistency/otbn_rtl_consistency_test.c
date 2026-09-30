@@ -353,8 +353,11 @@ bool test_main(void) {
           abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u,
       "Earlgrey v1 CMD.RESUME (0xa6) must be ignored");
 
-  // Earlgrey v2-only CSR (INSN_CNT=0xfc3), WSR (URND_STATE=0x10), and vector
-  // bignum opcode (0x5b: bn.addv.8S) must raise ERR_BITS.ILLEGAL_INSN on v1.
+  // Earlgrey v2-only CSR (INSN_CNT=0xfc3) and vector bignum opcode
+  // (0x5b: bn.addv.8S) must raise ERR_BITS.ILLEGAL_INSN on v1.
+  // Conversely, WSR address decoding on v1 uses WsrNumWidth=3
+  // (otbn_pkg.sv:333-334, otbn_controller.sv:1388), so WSR 0x10 wraps to
+  // 0x10 & 0x7 == 0x0 (WsrMod) without raising ERR_BITS.ILLEGAL_INSN.
   const uint32_t prog_v2_csr[] = {
       OTBN_CSRRS(2, 0xfc3, 0),
       OTBN_ECALL(),
@@ -372,9 +375,9 @@ bool test_main(void) {
   };
   otbn_run_program(prog_v2_wsr, ARRAYSIZE(prog_v2_wsr));
   err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
-  EXPECT_RTL(err_bits == (1u << OTBN_ERR_BITS_ILLEGAL_INSN_BIT),
-             "Earlgrey v1 read of v2 WSR 0x10 must set ERR_BITS.ILLEGAL_INSN "
-             "(got 0x%08x)",
+  EXPECT_RTL(err_bits == 0u,
+             "Earlgrey v1 read of WSR 0x10 wraps to WSR 0x0 (WsrNumWidth=3) "
+             "and must not set ERR_BITS (got 0x%08x)",
              err_bits);
 
   const uint32_t prog_v2_vec[] = {
