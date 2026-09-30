@@ -403,6 +403,24 @@ bool test_main(void) {
       abs_mmio_read32(kUsbdevBase + USBDEV_BUFFER_REG_OFFSET) == 0x11223344u,
       "sb to USBDEV_BUFFER must not modify word");
 
+  // On Earlgrey v1 (usbdev_reg_pkg.sv:1017, usbdev.sv:483-504), RXENABLE_OUT
+  // has USBDEV_PERMIT[12] = 4'b0011 (0x3) and no [27:16] preserve field:
+  // 16-bit sh succeeds, and writing 0x0fff05a5 updates all [11:0] bits to
+  // 0x5a5.
+  g_fault_seen = false;
+  *(volatile uint16_t *)(uintptr_t)(kUsbdevBase +
+                                    USBDEV_RXENABLE_OUT_REG_OFFSET) = 0x0a5au;
+  EXPECT_RTL(!g_fault_seen &&
+                 abs_mmio_read32(kUsbdevBase +
+                                 USBDEV_RXENABLE_OUT_REG_OFFSET) == 0x0a5au,
+             "sh to RXENABLE_OUT (PERMIT=0x3 on v1) must succeed and write "
+             "0x0a5a");
+  abs_mmio_write32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET, 0x0fff05a5u);
+  EXPECT_RTL(
+      abs_mmio_read32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET) == 0x05a5u,
+      "RXENABLE_OUT on v1 has no [27:16] preserve field; expected 0x05a5");
+  abs_mmio_write32(kUsbdevBase + USBDEV_RXENABLE_OUT_REG_OFFSET, 0u);
+
   // 11. Status-type interrupts (PKT_RECEIVED, PKT_SENT, AV_OUT_EMPTY, RX_FULL,
   // AV_SETUP_EMPTY) in INTR_STATE reflect (live_status | INTR_TEST).
   abs_mmio_write32(kUsbdevBase + USBDEV_USBCTRL_REG_OFFSET, 0u);
