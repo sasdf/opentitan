@@ -272,6 +272,25 @@ static void verify_otbn_csrs_and_permits(void) {
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusIdle);
   CHECK(abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 1u);
   abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
+
+  // 0f. Verify Earlgrey v2 16 KiB IMEM (+0x2000 and +0x3ffc mapped) and
+  // 16 KiB public DMEM (+0xc00 and +0x3ffc mapped, +0x4000 faults).
+  abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x2000u, 0xfeedfaceu);
+  abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x3ffcu, 0x13579bdfu);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x2000u) ==
+        0xfeedfaceu);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x3ffcu) ==
+        0x13579bdfu);
+
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0xc00u, 0x11223344u);
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0x3ffcu, 0x2468ace0u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0xc00u) ==
+        0x11223344u);
+  CHECK(abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0x3ffcu) ==
+        0x2468ace0u);
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0x4000u);
+  CHECK(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault);
 }
 
 bool test_main(void) {
