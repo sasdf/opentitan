@@ -353,6 +353,41 @@ bool test_main(void) {
           abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u,
       "Earlgrey v1 CMD.RESUME (0xa6) must be ignored");
 
+  // Earlgrey v2-only CSR (INSN_CNT=0xfc3), WSR (URND_STATE=0x10), and vector
+  // bignum opcode (0x5b: bn.addv.8S) must raise ERR_BITS.ILLEGAL_INSN on v1.
+  const uint32_t prog_v2_csr[] = {
+      OTBN_CSRRS(2, 0xfc3, 0),
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_v2_csr, ARRAYSIZE(prog_v2_csr));
+  err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
+  EXPECT_RTL(err_bits == (1u << OTBN_ERR_BITS_ILLEGAL_INSN_BIT),
+             "Earlgrey v1 read of v2 CSR 0xfc3 must set ERR_BITS.ILLEGAL_INSN "
+             "(got 0x%08x)",
+             err_bits);
+
+  const uint32_t prog_v2_wsr[] = {
+      OTBN_BN_WSRR(0, 0x10),
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_v2_wsr, ARRAYSIZE(prog_v2_wsr));
+  err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
+  EXPECT_RTL(err_bits == (1u << OTBN_ERR_BITS_ILLEGAL_INSN_BIT),
+             "Earlgrey v1 read of v2 WSR 0x10 must set ERR_BITS.ILLEGAL_INSN "
+             "(got 0x%08x)",
+             err_bits);
+
+  const uint32_t prog_v2_vec[] = {
+      0x0000005bu,  // bn.addv.8S w0, w0, w0 (opcode 0x5b)
+      OTBN_ECALL(),
+  };
+  otbn_run_program(prog_v2_vec, ARRAYSIZE(prog_v2_vec));
+  err_bits = abs_mmio_read32(kOtbnBase + OTBN_ERR_BITS_REG_OFFSET);
+  EXPECT_RTL(err_bits == (1u << OTBN_ERR_BITS_ILLEGAL_INSN_BIT),
+             "Earlgrey v1 execution of v2 opcode 0x5b must set "
+             "ERR_BITS.ILLEGAL_INSN (got 0x%08x)",
+             err_bits);
+
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   g_fault_seen = false;
