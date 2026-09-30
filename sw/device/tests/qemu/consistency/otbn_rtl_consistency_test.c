@@ -304,6 +304,55 @@ bool test_main(void) {
   EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
              "addrmiss write at 0x2c must fault with MCAUSE=7");
 
+  // Earlgrey v1 version-specific OTBN_CONFIG checks:
+  // - CTRL has 1-bit mask (0x1: SOFTWARE_ERRS_FATAL only; WFI_ENABLED and
+  //   URND_CTRL_ENABLED do not exist on v1).
+  // - SCRATCH_0..3 at 0x2000..0x200c do not exist on v1 (fault with
+  // MCAUSE=5/7).
+  // - IMEM is 8 KiB (0x1ffc mapped, 0x2000 faults) and public DMEM is 3 KiB
+  //   (0xbfc mapped, 0xc00 faults).
+  // - CMD.RESUME (0xa6) does not exist on v1 and is ignored while IDLE.
+  abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0xffffffffu);
+  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_CTRL_REG_OFFSET) == 0x1u,
+             "Earlgrey v1 CTRL mask must be 0x1");
+  abs_mmio_write32(kOtbnBase + OTBN_CTRL_REG_OFFSET, 0u);
+
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + 0x2000u);
+  EXPECT_RTL(
+      g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+      "Earlgrey v1 read at 0x2000 (v2 SCRATCH_0) must fault with MCAUSE=5");
+  g_fault_seen = false;
+  abs_mmio_write32(kOtbnBase + 0x2000u, 0u);
+  EXPECT_RTL(
+      g_fault_seen && g_fault_mcause == kIbexExcStoreAccessFault,
+      "Earlgrey v1 write at 0x2000 (v2 SCRATCH_0) must fault with MCAUSE=7");
+
+  abs_mmio_write32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x1ffcu, 0x13579bdfu);
+  EXPECT_RTL(abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x1ffcu) ==
+                 0x13579bdfu,
+             "Earlgrey v1 IMEM last word (0x1ffc) must be accessible");
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + OTBN_IMEM_REG_OFFSET + 0x2000u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+             "Earlgrey v1 IMEM + 0x2000 must fault with MCAUSE=5");
+
+  abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0xbfcu, 0x2468ace0u);
+  EXPECT_RTL(
+      abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0xbfcu) == 0x2468ace0u,
+      "Earlgrey v1 public DMEM last word (0xbfc) must be accessible");
+  g_fault_seen = false;
+  (void)abs_mmio_read32(kOtbnBase + OTBN_DMEM_REG_OFFSET + 0xc00u);
+  EXPECT_RTL(g_fault_seen && g_fault_mcause == kIbexExcLoadAccessFault,
+             "Earlgrey v1 public DMEM + 0xc00 must fault with MCAUSE=5");
+
+  abs_mmio_write32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET, 1u);
+  abs_mmio_write32(kOtbnBase + OTBN_CMD_REG_OFFSET, 0xa6u);
+  EXPECT_RTL(
+      abs_mmio_read32(kOtbnBase + OTBN_STATUS_REG_OFFSET) == kStatusIdle &&
+          abs_mmio_read32(kOtbnBase + OTBN_INTR_STATE_REG_OFFSET) == 0u,
+      "Earlgrey v1 CMD.RESUME (0xa6) must be ignored");
+
   abs_mmio_write32(kOtbnBase + OTBN_DMEM_REG_OFFSET, 0x89abcdefu);
   abs_mmio_write32(kOtbnBase + OTBN_LOAD_CHECKSUM_REG_OFFSET, 0u);
   g_fault_seen = false;
