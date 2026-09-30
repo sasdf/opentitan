@@ -197,12 +197,21 @@ bool test_main(void) {
                 KEYMGR_DPE_CONTROL_SHADOWED_DEST_SEL_VALUE_NONE, false));
   run_op_expect_error(kBase, 1u << KEYMGR_DPE_ERR_CODE_INVALID_OP_BIT, 0);
 
-  // 3c. GENERATE_SW_OUTPUT on uninitialized Slot 3 (valid=0, key=0) ->
-  // INVALID_OP | INVALID_KMAC_INPUT (0x3) and DEBUG.INVALID_KEY
+  // 3c. GENERATE_SW_OUTPUT and ADVANCE on uninitialized Slot 3 (valid=0,
+  // key=0) -> INVALID_OP | INVALID_KMAC_INPUT (0x3) and DEBUG.INVALID_KEY
   abs_mmio_write32_shadowed(
       kBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET,
       make_ctrl(KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_VALUE_GENERATE_SW_OUTPUT,
                 3, 0, KEYMGR_DPE_CONTROL_SHADOWED_DEST_SEL_VALUE_NONE, false));
+  run_op_expect_error(kBase,
+                      (1u << KEYMGR_DPE_ERR_CODE_INVALID_OP_BIT) |
+                          (1u << KEYMGR_DPE_ERR_CODE_INVALID_KMAC_INPUT_BIT),
+                      1u << KEYMGR_DPE_DEBUG_INVALID_KEY_BIT);
+
+  abs_mmio_write32_shadowed(
+      kBase + KEYMGR_DPE_CONTROL_SHADOWED_REG_OFFSET,
+      make_ctrl(KEYMGR_DPE_CONTROL_SHADOWED_OPERATION_VALUE_ADVANCE, 3, 3,
+                KEYMGR_DPE_CONTROL_SHADOWED_DEST_SEL_VALUE_NONE, false));
   run_op_expect_error(kBase,
                       (1u << KEYMGR_DPE_ERR_CODE_INVALID_OP_BIT) |
                           (1u << KEYMGR_DPE_ERR_CODE_INVALID_KMAC_INPUT_BIT),
