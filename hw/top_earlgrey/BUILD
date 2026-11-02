@@ -146,7 +146,6 @@ sim_qemu(
         "--logging=info",
         "--interface={interface}",
         "--qemu-monitor-socket=qemu-monitor",
-        "--qemu-quit",
     ],
     design = "earlgrey",
     exec_env = "sim_qemu_base",
@@ -163,12 +162,7 @@ sim_qemu(
     },
     rom_scramble_config = "//hw/top_earlgrey/data:autogen/top_earlgrey.gen.hjson",
     slot_spec = EARLGREY_SLOTS,
-    test_cmd = """
-        --exec="transport init"
-        {bootstrap_cmd}
-        --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
-        no-op
-    """,
+    test_cmd = CLEAR_TEST_CMD,
 )
 
 sim_qemu(

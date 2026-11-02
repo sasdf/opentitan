@@ -336,6 +336,67 @@ def _transform(ctx, exec_env, name, elf, binary, signed_bin, disassembly, mapfil
         "hashfile": None,
     }
 
+def _get_bool(param, name, default = "False"):
+    value = param.get(name, default).lower()
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    fail("expected boolean value for {}".format(name))
+
+def _get_flash_binary(ctx, exec_env, data_files, param):
+    """Determine the binary to place in the QEMU flash backend image.
+
+    Returns:
+      File: The binary file to place in flash, or None if flash should be empty
+            (e.g., when bootstrapping is disabled or for RAM/ROM tests).
+    """
+    if not _get_bool(param, "testopt_bootstrap", default = "True"):
+        return None
+
+    if ctx.attr.kind in ["ram", "rom"]:
+        return None
+
+    short_path = param.get("firmware", None)
+    if short_path != None:
+        for bin in data_files:
+            if bin.short_path == short_path:
+                return bin
+        fail("Firmware {} not found in data_files".format(short_path))
+
+    return None
+
+def _get_test_commands(ctx, param, exec_env):
+    """Process the test parameters to generate test commands.
+
+    Common Param Fields:
+      exit_success: The console output for test success.
+      exit_failure: The console output for test failure.
+
+    Args:
+      ctx: The rule context.
+      param: A dictionary of key-value test parameters.
+      exec_env: The ExecEnvInfo for this environment.
+
+    Returns:
+      (string, string): A tuple of (test_setup_cmd, test_cmd).
+    """
+    test_setup_cmd = [
+        '--exec="transport init -g RESET"',
+    ]
+    if _get_bool(param, "bootstrap", default = "False"):
+        test_setup_cmd.append('--exec="bootstrap --leave-in-reset --clear-uart=true {firmware}"')
+    test_setup_cmd = "\n".join(test_setup_cmd)
+
+    test_cmd = get_fallback(ctx, "attr.test_cmd", exec_env)
+    if not test_cmd.strip() and not ctx.attr.test_harness:
+        test_cmd = """
+          --exec="console --non-interactive --exit-success='{exit_success}' --exit-failure='{exit_failure}'"
+          no-op
+        """
+
+    return test_setup_cmd, test_cmd
+
 def _test_dispatch(ctx, exec_env, firmware):
     """Dispatch a test for the sim_qemu environment.
 
@@ -355,25 +416,22 @@ def _test_dispatch(ctx, exec_env, firmware):
         assemble = param.get("assemble")
         assemble = recursive_format(assemble, action_param)
         assemble = ctx.expand_location(assemble, data_labels)
-        image = assemble_for_test(
+        assembled_image = assemble_for_test(
             ctx,
             name = ctx.attr.name,
             spec = assemble.strip().split(" "),
             data_files = data_files,
             opentitantool = exec_env._opentitantool,
         )
-        data_files.append(image)
-    elif firmware:
-        image = firmware.signed_bin or firmware.default
-    else:
-        image = None
+        data_files.append(assembled_image)
+        param["firmware"] = assembled_image.short_path
+        action_param["firmware"] = assembled_image.path
 
-    # Replace the firmware param with the newly assembled image.
-    if image:
-        param["firmware"] = image.short_path
-        action_param["firmware"] = image.path
-
-    data_files += [exec_env.qemu, exec_env.qemu_start]
+    data_files += [
+        exec_env.qemu,
+        exec_env.qemu_start,
+        exec_env._opentitantool.executable,
+    ]
 
     # Add arguments to pass directly to QEMU.
     test_script_fmt = {}
@@ -404,18 +462,16 @@ def _test_dispatch(ctx, exec_env, firmware):
     # to prepare a QEMU drive containing flash contents.
     # Ideally, relevant info pages would be spliced in at this step, but that is
     # not yet supported by either flashgen or by Bazel.
-    if param["bootstrap"] and json.decode(param["bootstrap"]):
+    if _get_bool(param, "bootstrap", default = "False"):
         if ctx.attr.test_harness:
             fail("cannot specify both `bootstrap = True` and a test harness (harnesses bootstrap manually)")
         test_script_fmt |= {"flash": ""}
-        bootstrap_cmd = "bootstrap --clear-uart=true {firmware}".format(**param)
-        param["bootstrap_cmd"] = '--exec="{}"'.format(bootstrap_cmd)
     else:
-        # Generate the flash backend image for QEMU emulation
+        flash_bin = _get_flash_binary(ctx, exec_env, data_files, param)
         flash_image = gen_flash(
             ctx,
             flashgen = exec_env.flashgen,
-            firmware_bin = image,
+            firmware_bin = flash_bin,
             # TODO: no support for convenience debug symbols from ELFs for now
             firmware_elf = None,
             # Do not sanity check ELFs, because we do not expect the binary to
@@ -427,7 +483,6 @@ def _test_dispatch(ctx, exec_env, firmware):
         test_script_fmt |= {
             "flash": flash_image.short_path,
         }
-        param["bootstrap_cmd"] = '--exec="no-op" # SKIPPING BOOTSTRAP'
 
     # Get the pre-test_cmd args.
     args = get_fallback(ctx, "attr.args", exec_env)
@@ -456,26 +511,26 @@ def _test_dispatch(ctx, exec_env, firmware):
     # Construct the test script
     script = ctx.actions.declare_file(ctx.attr.name + ".bash")
 
-    # Pair the `test_cmd` with the test harness - if overridden, don't use the
-    # default `test_cmd`.
-    if ctx.attr.test_harness:
-        test_cmd = ctx.attr.test_cmd
-    else:
-        test_cmd = exec_env.test_cmd
-    test_cmd = test_cmd.format(**param)
-    test_cmd = ctx.expand_location(test_cmd, data_labels)
+    # Perform all relevant substitutions on the test_setup_cmd and test_cmd.
+    test_setup_commands, test_commands = _get_test_commands(ctx, param, exec_env)
+    test_setup_commands = test_setup_commands.format(**param)
+    test_setup_commands = ctx.expand_location(test_setup_commands, data_labels)
+    test_commands = test_commands.format(**param)
+    test_commands = ctx.expand_location(test_commands, data_labels)
 
     # Pass relevant files through to the test script via templating
     test_script_fmt.update({
         "args": args,
         "config": qemu_cfg.short_path,
         "icount": param["icount"],
+        "opentitantool": exec_env._opentitantool.executable.short_path,
         "qemu_args": qemu_args,
         "qemu_bin": exec_env.qemu.short_path,
         "qemu_start": exec_env.qemu_start.short_path,
         "rom": param["rom"],
-        "test_cmd": test_cmd,
+        "test_cmd": test_commands,
         "test_harness": test_harness.executable.short_path,
+        "test_setup_cmd": test_setup_commands,
     })
     ctx.actions.expand_template(
         template = exec_env.test_script,

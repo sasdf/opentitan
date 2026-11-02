@@ -20,6 +20,9 @@ export QEMU_ICOUNT="__icount__"
 qemu_start="__qemu_start__"
 qemu_args=( __qemu_args__  )
 
+opentitantool="__opentitantool__"
+test_setup_cmd=( __test_setup_cmd__ )
+
 test_harness="__test_harness__"
 test_cmd=( __test_cmd__ )
 args=( __args__ )
@@ -116,6 +119,12 @@ mkfifo "$QEMU_LOG" && cat "$QEMU_LOG" &
 "$qemu_start" "${qemu_test_args[@]}" "${qemu_args[@]}"
 qemu_pid=$(cat "$QEMU_PIDFILE")
 
-# Start the test harness to interact with QEMU
-echo "Invoking test: ${test_harness} ${args[*]} ${harness_test_args[*]} ${test_cmd[*]}"
-"${test_harness}" "${args[@]}" "${harness_test_args[@]}" "${test_cmd[@]}"
+# Stage 1: Setup (if test_setup_cmd is non-empty)
+if [ ${#test_setup_cmd[@]} -gt 0 ]; then
+    echo "Invoking test setup: ${opentitantool} ${args[*]} ${test_setup_cmd[*]} no-op"
+    "${opentitantool}" "${args[@]}" "${test_setup_cmd[@]}" no-op
+fi
+
+# Stage 2: Test execution
+echo "Invoking test: ${test_harness} ${args[*]} --drop-reset --qemu-quit ${harness_test_args[*]} ${test_cmd[*]}"
+"${test_harness}" "${args[@]}" --drop-reset --qemu-quit "${harness_test_args[@]}" "${test_cmd[@]}"

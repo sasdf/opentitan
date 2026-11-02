@@ -30,15 +30,21 @@ struct Opts {
 
     #[arg(long, default_value_t)]
     interface: String,
+
+    #[arg(long)]
+    drop_reset: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     let qemu = Qemu::from_options(opts.qemu_opts)?;
 
-    let mut monitor = qemu.monitor.borrow_mut();
-
-    monitor.cont()?;
+    if opts.drop_reset {
+        qemu.gpio_pin("255")?.write(true)?;
+    } else {
+        let mut monitor = qemu.monitor.borrow_mut();
+        monitor.cont()?;
+    }
 
     let log = qemu.uart("LOG")?;
     let res = UartConsole::wait_for(&*log, "PASSED|FAILED", Duration::from_secs(60))?;
