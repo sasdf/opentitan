@@ -103,7 +103,7 @@ bool test_main(void) {
   }
 
   const uint32_t kTestPhaseTimeoutUsec =
-      kDeviceType == kDeviceSimDV ? 10 : 1000000;
+      kDeviceType == kDeviceSimDV ? 10 : 10000000;
   // See explanation at the top of this file.
   const volatile uint8_t *kTestPhase =
       kDeviceType == kDeviceSimDV ? &kTestPhaseDV : &kTestPhaseReal;

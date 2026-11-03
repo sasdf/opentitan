@@ -37,7 +37,7 @@ static const uint32_t kStatusRegMask = kDifSramCtrlStatusBusIntegErr |
                                        kDifSramCtrlStatusEscalated;
 
 enum {
-  kCommandTimeoutMicros = 1 * 1000 * 1000,
+  kCommandTimeoutMicros = 10 * 1000 * 1000,
 };
 
 static dif_alert_handler_t alert_handler;

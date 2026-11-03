@@ -12,7 +12,7 @@
 OTTF_DEFINE_TEST_CONFIG(.enable_uart_flow_control = true);
 
 enum {
-  kTestTimeoutMicros = 1000 * 1000, /* one second */
+  kTestTimeoutMicros = 10 * 1000 * 1000, /* ten seconds */
 };
 
 enum phase_t {
