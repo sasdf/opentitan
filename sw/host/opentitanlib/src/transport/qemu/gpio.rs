@@ -22,14 +22,67 @@ const QEMU_GPIO_CLEAR: char = 'C';
 const QEMU_GPIO_DIRECTION: char = 'D';
 const QEMU_GPIO_OUTPUT: char = 'O';
 const QEMU_GPIO_PULL: char = 'P';
-const QEMU_GPIO_HOST_PULL: char = 'H';
-const QEMU_GPIO_QUERY: char = 'Q';
 const QEMU_GPIO_FLOATING: char = 'Z';
-const QEMU_GPIO_INPUT: char = 'I';
-const QEMU_GPIO_MASK: char = 'M';
 const QEMU_GPIO_INPUT_FORWARD: char = 'Y';
 const QEMU_GPIO_REPEAT: char = 'R';
 const QEMU_GPIO_TIME: char = 'T';
+const QEMU_GPIO_QUERY: char = 'Q';
+
+const QEMU_GPIO_HOST_DIRECTION: char = 'd';
+const QEMU_GPIO_HOST_OUTPUT: char = 'o';
+const QEMU_GPIO_HOST_FLOATING: char = 'z';
+const QEMU_GPIO_HOST_PULL: char = 'p';
+
+const QEMU_GPIO_LEGACY_MASK: char = 'M';
+const QEMU_GPIO_LEGACY_INPUT: char = 'I';
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct GpioSideState {
+    /// Mask of which pins have output driver enabled ('D' / 'd', or !'M')
+    pub output_enable: u32,
+    /// Output data driven on pins ('O' / 'o', or 'I')
+    pub output_data: u32,
+    /// Mask of which pins are floating / Hi-Z ('Z' / 'z')
+    /// 1 indicates floating (no pull resistor), 0 indicates pull is active.
+    pub floating: u32,
+    /// Pull direction on pins ('P' / 'p')
+    /// 1 indicates pull-up, 0 indicates pull-down.
+    pub pull: u32,
+}
+
+impl GpioSideState {
+    #[inline]
+    pub fn is_driving(&self, pin: u8) -> bool {
+        pin_bit(self.output_enable, pin)
+    }
+
+    #[inline]
+    pub fn output_level(&self, pin: u8) -> bool {
+        pin_bit(self.output_data, pin)
+    }
+
+    #[inline]
+    pub fn is_pulled(&self, pin: u8) -> bool {
+        !pin_bit(self.floating, pin)
+    }
+
+    #[inline]
+    pub fn pull_level(&self, pin: u8) -> bool {
+        pin_bit(self.pull, pin)
+    }
+
+    pub fn pull_mode(&self, pin: u8) -> PullMode {
+        if self.is_pulled(pin) {
+            if self.pull_level(pin) {
+                PullMode::PullUp
+            } else {
+                PullMode::PullDown
+            }
+        } else {
+            PullMode::None
+        }
+    }
+}
 
 #[inline]
 fn pin_bit(val: u32, idx: u8) -> bool {
@@ -62,48 +115,13 @@ pub struct QemuGpio {
     stream: BufReader<UnixStream>,
     pub pins: HashMap<u8, Rc<dyn GpioPin>>,
 
-    /// Current outputs being driven from host to QEMU when pins are in an
-    /// outputting mode (ignored for inputs).
-    pub host_to_qemu: u32,
+    /// Device (QEMU) side state.
+    pub device: GpioSideState,
 
-    /// Current mask of which host pins are connected to QEMU inputs.
-    ///
-    /// - 0 indicates QEMU should ignore this pin as a host -> device input.
-    /// - 1 indicates QEMU should treat this pin as a host -> device input.
-    pub host_output_enable: u32,
-
-    /// Current host weak pull up/down configuration:
-    ///
-    /// - 0 indicates host pull down / none.
-    /// - 1 indicates host pull up.
-    pub host_pull_up: u32,
-
-    /// Current outputs being driven from QEMU to host (if pin in output mode).
-    pub qemu_to_host: u32,
-
-    /// Last reported input/output directions from QEMU:
-    ///
-    /// - 0 indicates input into QEMU.
-    /// - 1 indicates output from QEMU.
-    pub qemu_outputting: u32,
-
-    /// Last reported pull up/down from QEMU:
-    ///
-    /// - 0 indicates QEMU is pulling down.
-    /// - 1 indicates QEMU is pulling up.
-    pub qemu_pull: u32,
-
-    /// Last reported high impedance mode from QEMU:
-    ///
-    /// - 0 indicates QEMU is pulling up/down (see `qemu_pull`).
-    /// - 1 indicates the pins are floating (high impedance / HiZ).
-    pub qemu_floating: u32,
+    /// Host side state.
+    pub host: GpioSideState,
 
     /// QEMU also forwards to us the last input values that it read.
-    /// Last reported input from QEMU.
-    ///
-    /// - 0 indicates QEMU last read a 0.
-    /// - 1 indicates QEMU last read a 1.
     pub qemu_input_fwd: u32,
 
     pub epoch: Instant,
@@ -127,13 +145,8 @@ impl QemuGpio {
         let mut qemu_gpio = QemuGpio {
             stream,
             pins: HashMap::default(),
-            host_to_qemu: 0x0,
-            host_output_enable: 0x0,
-            host_pull_up: 0x0,
-            qemu_to_host: 0x0,
-            qemu_outputting: 0x0,
-            qemu_pull: 0x0,
-            qemu_floating: 0x0,
+            device: GpioSideState::default(),
+            host: GpioSideState::default(),
             qemu_input_fwd: 0x0,
             epoch: Instant::now(),
             monitored_pins: Vec::new(),
@@ -157,12 +170,17 @@ impl QemuGpio {
 
     #[inline]
     pub fn is_host_pull_up(&self, idx: u8) -> bool {
-        pin_bit(self.host_pull_up, idx)
+        self.host.is_pulled(idx) && self.host.pull_level(idx)
+    }
+
+    #[inline]
+    pub fn is_host_pull_down(&self, idx: u8) -> bool {
+        self.host.is_pulled(idx) && !self.host.pull_level(idx)
     }
 
     #[inline]
     pub fn is_host_output_enabled(&self, idx: u8) -> bool {
-        pin_bit(self.host_output_enable, idx)
+        self.host.is_driving(idx)
     }
 
     fn process_single_frame(&mut self, line: &str) -> anyhow::Result<()> {
@@ -183,31 +201,32 @@ impl QemuGpio {
         match cmd_char {
             // QEMU wants us to clear / reset what we know about its pins.
             QEMU_GPIO_CLEAR => {
-                self.qemu_to_host = 0;
-                self.qemu_outputting = 0;
-                self.qemu_pull = 0;
-                self.qemu_floating = 0;
+                self.device = GpioSideState::default();
             }
-            // The direction of one or more pins has changed between input/output.
-            QEMU_GPIO_DIRECTION => self.qemu_outputting = value,
-            // The output of one or more pins has changed.
-            QEMU_GPIO_OUTPUT => self.qemu_to_host = value,
-            // The pull up/down of one or more pins has changed.
-            QEMU_GPIO_PULL => self.qemu_pull = value,
-            // QEMU reports the host input mask (!host_output_enable).
-            QEMU_GPIO_MASK => self.host_output_enable = !value,
-            // QEMU reports the host driven values (host_to_qemu).
-            QEMU_GPIO_INPUT => self.host_to_qemu = value,
-            // QEMU reports the host pull-up mask (host_pull_up).
-            QEMU_GPIO_HOST_PULL => self.host_pull_up = value,
+            // Device (QEMU) side frames:
+            QEMU_GPIO_DIRECTION => self.device.output_enable = value,
+            QEMU_GPIO_OUTPUT => self.device.output_data = value,
+            QEMU_GPIO_FLOATING => self.device.floating = value,
+            QEMU_GPIO_PULL => self.device.pull = value,
+
+            // Host side symmetric frames:
+            QEMU_GPIO_HOST_DIRECTION => self.host.output_enable = value,
+            QEMU_GPIO_HOST_OUTPUT => self.host.output_data = value,
+            QEMU_GPIO_HOST_FLOATING => self.host.floating = value,
+            QEMU_GPIO_HOST_PULL => self.host.pull = value,
+
+            // Legacy host frame aliases from QEMU:
+            QEMU_GPIO_LEGACY_MASK => self.host.output_enable = !value,
+            QEMU_GPIO_LEGACY_INPUT => self.host.output_data = value,
+
             // QEMU is querying our inputs to its pins (kept for backward compatibility).
             QEMU_GPIO_QUERY => {
-                self.send_frame(QEMU_GPIO_MASK, !self.host_output_enable)?;
-                self.send_frame(QEMU_GPIO_INPUT, self.host_to_qemu)?;
-                self.send_frame(QEMU_GPIO_PULL, self.host_pull_up)?;
+                self.send_frame(QEMU_GPIO_LEGACY_MASK, !self.host.output_enable)?;
+                self.send_frame(QEMU_GPIO_LEGACY_INPUT, self.host.output_data)?;
+                self.send_frame(QEMU_GPIO_HOST_FLOATING, self.host.floating)?;
+                self.send_frame(QEMU_GPIO_HOST_PULL, self.host.pull)?;
             }
-            // The hi-Z value of one or more pins has changed.
-            QEMU_GPIO_FLOATING => self.qemu_floating = value,
+
             // QEMU is telling us what its last GPIO input values were
             QEMU_GPIO_INPUT_FORWARD => self.qemu_input_fwd = value,
             QEMU_GPIO_TIME => self.update_qemu_time(value),
@@ -244,31 +263,45 @@ impl QemuGpio {
         }
     }
 
-    pub fn pin_level(&self, idx: u8, pull_mode: PullMode) -> bool {
-        let qemu_outputting = pin_bit(self.qemu_outputting, idx);
-        let host_outputting = pin_bit(self.host_output_enable, idx);
-        let qemu_to_host = pin_bit(self.qemu_to_host, idx);
-        let host_to_qemu = pin_bit(self.host_to_qemu, idx);
+    pub fn pin_level(&self, idx: u8, pull_override: PullMode) -> bool {
+        let dev_driving = self.device.is_driving(idx);
+        let host_driving = self.host.is_driving(idx);
+        let dev_level = self.device.output_level(idx);
+        let host_level = self.host.output_level(idx);
 
-        match (qemu_outputting, host_outputting) {
+        match (dev_driving, host_driving) {
             (true, true) => {
-                if pull_mode == PullMode::PullUp {
-                    qemu_to_host && host_to_qemu
+                let host_pull = if pull_override != PullMode::None {
+                    pull_override
                 } else {
-                    qemu_to_host
+                    self.host.pull_mode(idx)
+                };
+                if host_pull == PullMode::PullUp {
+                    dev_level && host_level
+                } else {
+                    dev_level
                 }
             }
-            (true, false) => qemu_to_host,
-            (false, true) => host_to_qemu,
+            (true, false) => dev_level,
+            (false, true) => host_level,
             (false, false) => {
-                if pin_bit(self.qemu_floating, idx) {
-                    match pull_mode {
-                        PullMode::PullUp => true,
-                        PullMode::PullDown => false,
-                        PullMode::None => pin_bit(self.qemu_pull, idx),
-                    }
+                let host_pull = if pull_override != PullMode::None {
+                    pull_override
                 } else {
-                    pin_bit(self.qemu_pull, idx)
+                    self.host.pull_mode(idx)
+                };
+
+                let dev_pulled = self.device.is_pulled(idx);
+                let host_is_pulled = host_pull != PullMode::None;
+
+                if dev_pulled {
+                    // Device internal pull takes priority over host weak pull
+                    self.device.pull_level(idx)
+                } else if host_is_pulled {
+                    host_pull == PullMode::PullUp
+                } else {
+                    // Completely floating pin: return random bit
+                    rand::random::<bool>()
                 }
             }
         }
@@ -426,11 +459,11 @@ impl QemuGpio {
         let last_wval = wbuf[num_samples - 1];
         for (bit_idx, &pad) in pin_indices.iter().enumerate() {
             let mask = 1u32 << pad;
-            if (self.host_output_enable & mask) != 0 {
+            if (self.host.output_enable & mask) != 0 {
                 if ((last_wval >> bit_idx) & 1) != 0 {
-                    self.host_to_qemu |= mask;
+                    self.host.output_data |= mask;
                 } else {
-                    self.host_to_qemu &= !mask;
+                    self.host.output_data &= !mask;
                 }
             }
         }
@@ -517,22 +550,18 @@ impl GpioPin for QemuGpioPin {
             log::warn!("attempting to read from output pin {}", self.idx);
         }
 
-        let pull_mode = if gpio.is_host_pull_up(self.idx) {
-            PullMode::PullUp
-        } else {
-            self.pull_mode.get()
-        };
+        let pull_mode = gpio.host.pull_mode(self.idx);
 
         Ok(gpio.pin_level(self.idx, pull_mode))
     }
 
     fn write(&self, value: bool) -> anyhow::Result<()> {
         let mut gpio = self.qemu_gpio.borrow_mut();
-        let new_value = update_bit(gpio.host_to_qemu, self.idx, value);
+        let new_value = update_bit(gpio.host.output_data, self.idx, value);
 
-        if new_value != gpio.host_to_qemu {
-            gpio.host_to_qemu = new_value;
-            gpio.send_frame_sync(QEMU_GPIO_INPUT, new_value)?;
+        if new_value != gpio.host.output_data {
+            gpio.host.output_data = new_value;
+            gpio.send_frame_sync(QEMU_GPIO_HOST_OUTPUT, new_value)?;
         }
 
         Ok(())
@@ -543,22 +572,20 @@ impl GpioPin for QemuGpioPin {
 
         if mode == PinMode::OpenDrain
             && !gpio.is_host_output_enabled(self.idx)
-            && !pin_bit(gpio.host_to_qemu, self.idx)
+            && !pin_bit(gpio.host.output_data, self.idx)
         {
-            let val = update_bit(gpio.host_to_qemu, self.idx, true);
-            gpio.host_to_qemu = val;
-            gpio.send_frame(QEMU_GPIO_INPUT, val)?;
+            let val = update_bit(gpio.host.output_data, self.idx, true);
+            gpio.host.output_data = val;
+            gpio.send_frame(QEMU_GPIO_HOST_OUTPUT, val)?;
         }
 
         let is_output =
             [PinMode::PushPull, PinMode::OpenDrain, PinMode::AnalogOutput].contains(&mode);
-        let new_value = update_bit(gpio.host_output_enable, self.idx, is_output);
+        let new_value = update_bit(gpio.host.output_enable, self.idx, is_output);
 
-        if new_value != gpio.host_output_enable {
-            // Note: the protocol inverts this mask so that `1` means ignored
-            // and `0` means connected.
-            gpio.host_output_enable = new_value;
-            gpio.send_frame_sync(QEMU_GPIO_MASK, !new_value)?;
+        if new_value != gpio.host.output_enable {
+            gpio.host.output_enable = new_value;
+            gpio.send_frame_sync(QEMU_GPIO_HOST_DIRECTION, new_value)?;
         }
 
         self.mode.set(mode);
@@ -568,12 +595,22 @@ impl GpioPin for QemuGpioPin {
 
     fn set_pull_mode(&self, mode: PullMode) -> anyhow::Result<()> {
         let mut gpio = self.qemu_gpio.borrow_mut();
-        let is_pull_up = mode == PullMode::PullUp;
-        let new_value = update_bit(gpio.host_pull_up, self.idx, is_pull_up);
+        let (is_pulled, pull_val) = match mode {
+            PullMode::None => (false, false),
+            PullMode::PullUp => (true, true),
+            PullMode::PullDown => (true, false),
+        };
 
-        if new_value != gpio.host_pull_up {
-            gpio.host_pull_up = new_value;
-            gpio.send_frame_sync(QEMU_GPIO_PULL, new_value)?;
+        let new_pull = update_bit(gpio.host.pull, self.idx, pull_val);
+        if new_pull != gpio.host.pull {
+            gpio.host.pull = new_pull;
+            gpio.send_frame_sync(QEMU_GPIO_HOST_PULL, new_pull)?;
+        }
+
+        let new_floating = update_bit(gpio.host.floating, self.idx, !is_pulled);
+        if new_floating != gpio.host.floating {
+            gpio.host.floating = new_floating;
+            gpio.send_frame_sync(QEMU_GPIO_HOST_FLOATING, new_floating)?;
         }
 
         self.pull_mode.set(mode);
@@ -725,11 +762,7 @@ impl GpioMonitoring for QemuGpioMonitoring {
 
         let mut initial_levels = Vec::with_capacity(pin_indices.len());
         for &idx in &pin_indices {
-            let pull_mode = if gpio.is_host_pull_up(idx) {
-                PullMode::PullUp
-            } else {
-                PullMode::None
-            };
+            let pull_mode = gpio.host.pull_mode(idx);
             let lvl = gpio.pin_level(idx, pull_mode);
             gpio.monitored_pins.push((idx, pull_mode));
             gpio.monitored_levels.push(lvl);
@@ -756,5 +789,151 @@ impl GpioMonitoring for QemuGpioMonitoring {
             gpio.monitored_levels.clear();
         }
         Ok(MonitoringReadResponse { events, timestamp })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_side_state_helpers() {
+        let state = GpioSideState {
+            output_enable: 0b0001,
+            output_data: 0b0001,
+            floating: 0b0010, // pin 1 is floating (not pulled), pins 0, 2, 3 are pulled
+            pull: 0b0100,     // pin 2 is pull-up, pin 0, 1, 3 are pull-down
+        };
+
+        // Pin 0: driving 1, pulled down
+        assert!(state.is_driving(0));
+        assert!(state.output_level(0));
+        assert!(state.is_pulled(0));
+        assert!(!state.pull_level(0));
+        assert_eq!(state.pull_mode(0), PullMode::PullDown);
+
+        // Pin 1: not driving, floating
+        assert!(!state.is_driving(1));
+        assert!(!state.output_level(1));
+        assert!(!state.is_pulled(1));
+        assert_eq!(state.pull_mode(1), PullMode::None);
+
+        // Pin 2: not driving, pulled up
+        assert!(!state.is_driving(2));
+        assert!(state.is_pulled(2));
+        assert!(state.pull_level(2));
+        assert_eq!(state.pull_mode(2), PullMode::PullUp);
+
+        // Pin 3: not driving, pulled down
+        assert!(!state.is_driving(3));
+        assert!(state.is_pulled(3));
+        assert!(!state.pull_level(3));
+        assert_eq!(state.pull_mode(3), PullMode::PullDown);
+    }
+
+    fn make_test_gpio() -> QemuGpio {
+        let (s1, _s2) = UnixStream::pair().unwrap();
+        QemuGpio {
+            stream: BufReader::new(s1),
+            pins: HashMap::default(),
+            device: GpioSideState {
+                output_enable: 0,
+                output_data: 0,
+                floating: u32::MAX,
+                pull: 0,
+            },
+            host: GpioSideState {
+                output_enable: 0,
+                output_data: 0,
+                floating: u32::MAX,
+                pull: 0,
+            },
+            qemu_input_fwd: 0,
+            epoch: Instant::now(),
+            monitored_pins: Vec::new(),
+            monitored_levels: Vec::new(),
+            monitored_events: Vec::new(),
+            sync_seq: 0,
+            last_qemu_us32: None,
+            qemu_time_us64: 0,
+        }
+    }
+
+    #[test]
+    fn test_process_frames_symmetric_and_legacy() {
+        let mut gpio = make_test_gpio();
+
+        // Host frames: d, o, z, p
+        gpio.process_single_frame("d:00000003").unwrap();
+        assert_eq!(gpio.host.output_enable, 3);
+
+        gpio.process_single_frame("o:00000001").unwrap();
+        assert_eq!(gpio.host.output_data, 1);
+
+        gpio.process_single_frame("z:00000004").unwrap();
+        assert_eq!(gpio.host.floating, 4);
+
+        gpio.process_single_frame("p:00000002").unwrap();
+        assert_eq!(gpio.host.pull, 2);
+
+        // Device frames: D, O, Z, P
+        gpio.process_single_frame("D:00000005").unwrap();
+        assert_eq!(gpio.device.output_enable, 5);
+
+        gpio.process_single_frame("O:00000004").unwrap();
+        assert_eq!(gpio.device.output_data, 4);
+
+        gpio.process_single_frame("Z:00000001").unwrap();
+        assert_eq!(gpio.device.floating, 1);
+
+        gpio.process_single_frame("P:00000002").unwrap();
+        assert_eq!(gpio.device.pull, 2);
+
+        // Legacy host aliases: M, I
+        gpio.process_single_frame("M:fffffff0").unwrap();
+        assert_eq!(gpio.host.output_enable, 0x0f);
+
+        gpio.process_single_frame("I:00000007").unwrap();
+        assert_eq!(gpio.host.output_data, 7);
+    }
+
+    #[test]
+    fn test_pin_level_pull_and_drive() {
+        let mut gpio = make_test_gpio();
+
+        // Pin 0: Host driving high, device floating
+        gpio.host.output_enable = 1 << 0;
+        gpio.host.output_data = 1 << 0;
+        assert!(gpio.pin_level(0, PullMode::None));
+
+        // Pin 1: Device driving low, host driving high (open drain pull-up case)
+        gpio.device.output_enable = 1 << 1;
+        gpio.device.output_data = 0;
+        gpio.host.output_enable = 1 << 1;
+        gpio.host.output_data = 1 << 1;
+        assert!(!gpio.pin_level(1, PullMode::PullUp));
+
+        // Pin 2: Host weak pull-up (device floating)
+        gpio.host.floating &= !(1 << 2);
+        gpio.host.pull |= 1 << 2;
+        assert!(gpio.pin_level(2, PullMode::None));
+
+        // Pin 3: Host weak pull-down (device floating)
+        gpio.host.floating &= !(1 << 3);
+        gpio.host.pull &= !(1 << 3);
+        assert!(!gpio.pin_level(3, PullMode::None));
+
+        // Pin 4: Device pull overrides host pull
+        // Host has pull-up
+        gpio.host.floating &= !(1 << 4);
+        gpio.host.pull |= 1 << 4;
+        // Device has pull-down
+        gpio.device.floating &= !(1 << 4);
+        gpio.device.pull &= !(1 << 4);
+        // Result must be false (device pull-down wins)
+        assert!(!gpio.pin_level(4, PullMode::None));
+
+        // Pin 5: Floating pin produces a bool without panic
+        let _ = gpio.pin_level(5, PullMode::None);
     }
 }
