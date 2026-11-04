@@ -28,8 +28,8 @@ extern "C" {
  *    9:[MU_EXT     TOR LX-R]
  *   10: VIRTUAL  NAPOT L--R
  *   11: STACK      NA4 L---
- *   12: RvDM     NAPOT LXWR
- *   13: FLASH    NAPOT L--R
+ *   12: FLASH    NAPOT L--R
+ *   13: RvDM     NAPOT LXWR
  *   14: MMIO     NAPOT L-WR
  *   15: RAM      NAPOT L-WR
  *
