@@ -2,11 +2,9 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod gpio;
 pub mod i2c;
 pub mod jtag;
 pub mod monitor;
-pub mod reset;
 pub mod spi;
 pub mod uart;
 pub mod usbdev;
@@ -15,27 +13,24 @@ use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 
 use crate::backend::qemu::QemuOpts;
 use crate::io::gpio::{GpioBitbanging, GpioMonitoring};
-use crate::io::gpio::{GpioError, GpioPin};
+use crate::io::gpio::GpioPin;
 use crate::io::jtag::{JtagChain, JtagParams};
 use crate::io::uart::Uart;
 use crate::io::usb::UsbContext;
 use crate::transport::Bus;
 use crate::transport::Target;
 use crate::transport::common::uart::SerialPortUart;
-use crate::transport::qemu::gpio::{QemuGpio, QemuGpioPin};
-use crate::transport::qemu::gpio::{QemuGpioBitbanging, QemuGpioMonitoring};
+use crate::transport::proxy::Proxy;
 use crate::transport::qemu::i2c::QemuI2c;
 use crate::transport::qemu::jtag::QemuJtag;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
-use crate::transport::qemu::reset::QemuReset;
 use crate::transport::qemu::spi::QemuSpi;
 use crate::transport::qemu::uart::QemuUart;
 use crate::transport::qemu::usbdev::{QemuUsbHost, QemuVbusSense};
@@ -43,11 +38,9 @@ use crate::transport::{
     Capabilities, Capability, Transport, TransportError, TransportInterfaceType,
 };
 
-/// ID of the fake pin we use to model resets.
-const QEMU_RESET_PIN_IDX: u8 = u8::MAX;
 /* Until we have a more complete model of the pinmux, we need to model this
  * MIO directly. */
-const QEMU_VBUS_SENSE_PIN_IDX: u8 = u8::MAX - 1;
+const QEMU_VBUS_SENSE_PIN_IDX: &str = "254";
 
 /// Baudrate for QEMU's consoles. These are PTYs so it currently doesn't matter,
 /// but we must use a non-zero value because the pacing calculations divide by
@@ -59,9 +52,6 @@ pub struct Qemu {
     /// Connection to the QEMU monitor which can control the emulator.
     pub monitor: Rc<RefCell<Monitor>>,
 
-    /// Reset pin (actually goes via the `monitor`).
-    reset: Rc<dyn GpioPin>,
-
     /// Console UART.
     uarts: HashMap<String, Rc<dyn Uart>>,
 
@@ -71,8 +61,8 @@ pub struct Qemu {
     /// I2C devices.
     i2cs: HashMap<String, Rc<dyn Bus>>,
 
-    /// GPIO pins (not including reset pin).
-    gpio: Option<Rc<RefCell<QemuGpio>>>,
+    /// Proxy client connected to QEMU Pad Ring socket for GPIO, monitoring, and bitbanging.
+    proxy: Option<Rc<Proxy>>,
 
     /// VBUS sense pin (actually goes via the `usbdev-cmd` chardev).
     vbus_sense: Option<Rc<dyn GpioPin>>,
@@ -237,13 +227,13 @@ impl Qemu {
             );
         }
 
-        // If there's a chardev called `gpio`, configure it as a PTY and use as the GPIO pins.
-        let gpio = match find_chardev(&chardevs, "gpio") {
+        // If there's a chardev called `gpio`, connect via Proxy over the Unix domain socket.
+        let proxy = match find_chardev(&chardevs, "gpio") {
             Some(ChardevKind::Socket { path }) => {
                 let path = options.device_path("gpio").unwrap_or(path.to_path_buf());
-                let gpio = QemuGpio::new(path).context("failed to connect to QEMU GPIO Socket")?;
-                let gpio = Rc::new(RefCell::new(gpio));
-                Some(gpio)
+                let proxy = Proxy::open_unix(&path)
+                    .context("failed to connect to QEMU Pad Ring socket")?;
+                Some(Rc::new(proxy))
             }
             _ => {
                 log::info!("could not find socket chardev with id=gpio, GPIO support disabled");
@@ -277,17 +267,12 @@ impl Qemu {
             }
         };
 
-        // Resetting is done over the monitor, but we model it like a pin to enable strapping it.
-        let reset = QemuReset::new(Rc::clone(&monitor));
-        let reset = Rc::new(reset);
-
         // QEMU polls once per second to see if PTYs have been connected to. We must wait that
         // full second to be sure that QEMU is watching all of them.
         thread::sleep(Duration::from_secs(1));
 
         Ok(Qemu {
             monitor,
-            reset,
             uarts,
             vbus_sense,
             usb_host_tty,
@@ -295,7 +280,7 @@ impl Qemu {
             log,
             spi,
             i2cs,
-            gpio,
+            proxy,
             jtag_rv_dm_sock,
             jtag_lc_ctrl_sock,
         })
@@ -304,11 +289,10 @@ impl Qemu {
 
 impl Transport for Qemu {
     fn capabilities(&self) -> anyhow::Result<Capabilities> {
-        // We have to unconditionally claim to support GPIO because of the reset
-        // pin which actually goes via the monitor. Attempting to use a non-reset
-        // GPIO pin in `.gpio_pin` will cause an error if GPIO isn't connected.
-        let mut cap = Capability::GPIO;
-        cap |= Capability::GPIO_BITBANGING | Capability::GPIO_MONITORING;
+        let mut cap = Capability::empty();
+        if self.proxy.is_some() {
+            cap |= Capability::GPIO | Capability::GPIO_BITBANGING | Capability::GPIO_MONITORING;
+        }
 
         if !self.uarts.is_empty() || self.log.is_some() {
             cap |= Capability::UART;
@@ -363,41 +347,28 @@ impl Transport for Qemu {
     }
 
     fn gpio_pin(&self, instance: &str) -> anyhow::Result<Rc<dyn GpioPin>> {
-        let pin = u8::from_str(instance).with_context(|| format!("can't convert {instance:?}"))?;
-
-        if pin < 32 {
-            let Some(ref gpio) = self.gpio else {
-                bail!("GPIO interface not connected");
-            };
-
-            let mut gpio = gpio.borrow_mut();
-            let gpio = gpio
-                .pins
-                .entry(pin)
-                .or_insert_with(|| QemuGpioPin::new(Rc::clone(self.gpio.as_ref().unwrap()), pin));
-
-            Ok(Rc::clone(gpio))
-        } else if pin == QEMU_RESET_PIN_IDX {
-            Ok(Rc::clone(&self.reset))
-        } else if pin == QEMU_VBUS_SENSE_PIN_IDX && self.vbus_sense.is_some() {
-            Ok(Rc::clone(self.vbus_sense.as_ref().unwrap()))
-        } else {
-            Err(GpioError::InvalidPinNumber(pin).into())
+        if instance == QEMU_VBUS_SENSE_PIN_IDX && self.vbus_sense.is_some() {
+            return Ok(Rc::clone(self.vbus_sense.as_ref().unwrap()));
         }
+        let pin_id = if instance == "255" { "POR_N" } else { instance };
+        self.proxy
+            .as_ref()
+            .context("GPIO interface not connected")?
+            .gpio_pin(pin_id)
     }
 
     fn gpio_bitbanging(&self) -> anyhow::Result<Rc<dyn GpioBitbanging>> {
-        let Some(ref gpio) = self.gpio else {
-            bail!("GPIO interface not connected");
-        };
-        Ok(Rc::new(QemuGpioBitbanging::new(Rc::clone(gpio))))
+        self.proxy
+            .as_ref()
+            .context("GPIO interface not connected")?
+            .gpio_bitbanging()
     }
 
     fn gpio_monitoring(&self) -> anyhow::Result<Rc<dyn GpioMonitoring>> {
-        let Some(ref gpio) = self.gpio else {
-            bail!("GPIO interface not connected");
-        };
-        Ok(Rc::new(QemuGpioMonitoring::new(Rc::clone(gpio))))
+        self.proxy
+            .as_ref()
+            .context("GPIO interface not connected")?
+            .gpio_monitoring()
     }
 
     fn spi(&self, _instance: &str) -> anyhow::Result<Rc<dyn Target>> {
@@ -414,7 +385,7 @@ impl Transport for Qemu {
             .clone()
             .context("LC_CTRL JTAG socket not connected")?;
 
-        let jtag = QemuJtag::new(opts.clone(), rv_dm_sock, lc_ctrl_sock, self.gpio.clone());
+        let jtag = QemuJtag::new(opts.clone(), rv_dm_sock, lc_ctrl_sock, self.proxy.clone());
 
         Ok(Box::new(jtag))
     }

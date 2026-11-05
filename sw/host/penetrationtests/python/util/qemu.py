@@ -18,10 +18,17 @@ import serial
 class QemuMonitor:
     """QMP monitor and GPIO socket controller for OpenTitan QEMU."""
 
-    # SW_STRAP_MASK = bits 24..22 (0x01c00000); invert for data_bi = 0xfe3fffff
-    # SW_STRAP_RMA_ENTRY = GPIO24=1, GPIO23=1, GPIO22=0 (0x01800000)
-    GPIO_RMA_STRAP_SET_CMD = b"M:fe3fffff\nI:01800000\n"
-    GPIO_RMA_STRAP_CLR_CMD = b"M:ffffffff\nI:00000000\n"
+    # SW_STRAP_RMA_ENTRY = IOC2=1, IOC1=1, IOC0=0 via Proxy MultiSet
+    GPIO_RMA_STRAP_SET_CMD = (
+        b'{"Req":{"Gpio":{"id":"IOC0","command":{"MultiSet":{"mode":"PushPull","value":false,"pull":null,"analog_value":null}}}}}\n'
+        b'{"Req":{"Gpio":{"id":"IOC1","command":{"MultiSet":{"mode":"PushPull","value":true,"pull":null,"analog_value":null}}}}}\n'
+        b'{"Req":{"Gpio":{"id":"IOC2","command":{"MultiSet":{"mode":"PushPull","value":true,"pull":null,"analog_value":null}}}}}\n'
+    )
+    GPIO_RMA_STRAP_CLR_CMD = (
+        b'{"Req":{"Gpio":{"id":"IOC0","command":{"MultiSet":{"mode":"Input","value":false,"pull":null,"analog_value":null}}}}}\n'
+        b'{"Req":{"Gpio":{"id":"IOC1","command":{"MultiSet":{"mode":"Input","value":false,"pull":null,"analog_value":null}}}}}\n'
+        b'{"Req":{"Gpio":{"id":"IOC2","command":{"MultiSet":{"mode":"Input","value":false,"pull":null,"analog_value":null}}}}}\n'
+    )
 
     def __init__(self, monitor_path=None, gpio_path=None):
         self.monitor_path = monitor_path or os.environ.get("QEMU_MONITOR", "qemu-monitor")

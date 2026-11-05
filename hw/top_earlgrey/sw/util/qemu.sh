@@ -163,7 +163,7 @@ qemu_args+=(
 
   # Connect GPIO interface to a socket.
   "-chardev" "socket,id=gpio,path=${QEMU_GPIO},server=on,wait=off"
-  "-global" "ot-gpio-eg.chardev=gpio"
+  "-global" "ot-pad-ring.chardev=gpio"
 
   # Connect USB command & protocol interfaces to PTYs.
   "-chardev" "pty,id=usbdev-cmd"

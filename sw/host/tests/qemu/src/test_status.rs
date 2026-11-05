@@ -40,7 +40,7 @@ fn main() -> anyhow::Result<()> {
     let qemu = Qemu::from_options(opts.qemu_opts)?;
 
     if opts.drop_reset {
-        qemu.gpio_pin("255")?.write(true)?;
+        qemu.gpio_pin("RESET")?.write(true)?;
     } else {
         let mut monitor = qemu.monitor.borrow_mut();
         monitor.cont()?;

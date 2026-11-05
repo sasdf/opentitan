@@ -10,6 +10,8 @@ use std::io;
 use std::io::{BufWriter, ErrorKind, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::os::unix::io::AsRawFd;
+use std::os::unix::net::UnixStream;
+use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
 use thiserror::Error;
@@ -44,6 +46,62 @@ pub enum ProxyError {
 }
 impl_serializable_error!(ProxyError);
 
+/// Underlying stream for Proxy connection (TCP or Unix domain socket).
+enum ProxyStream {
+    Tcp(TcpStream),
+    Unix(UnixStream),
+}
+
+impl Read for ProxyStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Tcp(s) => s.read(buf),
+            Self::Unix(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for ProxyStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Tcp(s) => s.write(buf),
+            Self::Unix(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::Tcp(s) => s.flush(),
+            Self::Unix(s) => s.flush(),
+        }
+    }
+}
+
+impl AsRawFd for ProxyStream {
+    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+        match self {
+            Self::Tcp(s) => s.as_raw_fd(),
+            Self::Unix(s) => s.as_raw_fd(),
+        }
+    }
+}
+
+impl ProxyStream {
+    fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        match self {
+            Self::Tcp(s) => s.set_read_timeout(timeout),
+            Self::Unix(s) => s.set_read_timeout(timeout),
+        }
+    }
+
+    fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        match self {
+            Self::Tcp(s) => s.set_nonblocking(nonblocking),
+            Self::Unix(s) => s.set_nonblocking(nonblocking),
+        }
+    }
+}
+
 /// Implementation of the Transport trait backed by connection to a remote OpenTitan tool
 /// session process.
 pub struct Proxy {
@@ -51,7 +109,7 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    /// Establish connection with a running session process.
+    /// Establish connection with a running session process over TCP.
     pub fn open(host: Option<&str>, port: u16) -> Result<Self> {
         let host = host.unwrap_or("localhost");
         let addr = ToSocketAddrs::to_socket_addrs(&(host, port))
@@ -62,7 +120,24 @@ impl Proxy {
             .map_err(|e| TransportError::ProxyConnectError(addr.to_string(), e.to_string()))?;
         Ok(Self {
             inner: Rc::new(Inner {
-                conn: RefCell::new(conn),
+                conn: RefCell::new(ProxyStream::Tcp(conn)),
+                uarts: RefCell::new(HashMap::new()),
+                uart_channel_map: RefCell::new(HashMap::new()),
+                recv_buf: RefCell::new(Vec::new()),
+                nonblocking_help_enabled: Cell::new(false),
+            }),
+        })
+    }
+
+    /// Establish connection with a running session process or QEMU pad ring over a Unix domain socket.
+    pub fn open_unix(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let conn = UnixStream::connect(path).map_err(|e| {
+            TransportError::ProxyConnectError(path.display().to_string(), e.to_string())
+        })?;
+        Ok(Self {
+            inner: Rc::new(Inner {
+                conn: RefCell::new(ProxyStream::Unix(conn)),
                 uarts: RefCell::new(HashMap::new()),
                 uart_channel_map: RefCell::new(HashMap::new()),
                 recv_buf: RefCell::new(Vec::new()),
@@ -79,7 +154,7 @@ struct UartRecord {
 }
 
 struct Inner {
-    conn: RefCell<TcpStream>,
+    conn: RefCell<ProxyStream>,
     pub uarts: RefCell<HashMap<String, UartRecord>>,
     uart_channel_map: RefCell<HashMap<u32, String>>,
     recv_buf: RefCell<Vec<u8>>,
@@ -133,8 +208,8 @@ impl Inner {
 
     /// Send a one-line JSON encoded requests, terminated with one newline.
     fn send_json_request(&self, req: Request) -> Result<()> {
-        let conn: &mut std::net::TcpStream = &mut self.conn.borrow_mut();
-        let mut writer = BufWriter::new(conn);
+        let mut conn = self.conn.borrow_mut();
+        let mut writer = BufWriter::new(&mut *conn);
         serde_json::to_writer(&mut writer, &Message::Req(req))?;
         writer.write_all(b"\n")?;
         writer.flush()?;
@@ -376,7 +451,7 @@ pub struct ProxyNonblockingHelp {
 
 impl NonblockingHelp for ProxyNonblockingHelp {
     fn register_nonblocking_help(&self, registry: &mio::Registry, token: mio::Token) -> Result<()> {
-        let conn: &mut std::net::TcpStream = &mut self.inner.conn.borrow_mut();
+        let conn = self.inner.conn.borrow();
         registry.register(
             &mut mio::unix::SourceFd(&conn.as_raw_fd()),
             token,
@@ -388,5 +463,48 @@ impl NonblockingHelp for ProxyNonblockingHelp {
     fn nonblocking_help(&self) -> Result<()> {
         self.inner
             .poll_for_async_data(Some(Duration::from_millis(0)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::BufRead;
+    use std::os::unix::net::UnixListener;
+
+    #[test]
+    fn test_proxy_open_unix() -> Result<()> {
+        let sock_path = std::env::temp_dir().join(format!(
+            "opentitanlib_test_proxy_{}_{}.sock",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_file(&sock_path);
+        let listener = UnixListener::bind(&sock_path)?;
+
+        let server_thread = std::thread::spawn(move || -> Result<()> {
+            let (stream, _) = listener.accept()?;
+            let mut reader = std::io::BufReader::new(stream);
+            let mut line = String::new();
+            reader.read_line(&mut line)?;
+            let mut stream = reader.into_inner();
+            let resp = Message::Res(Ok(Response::GetCapabilities(Capabilities::new(
+                Capability::empty(),
+            ))));
+            let mut writer = std::io::BufWriter::new(&mut stream);
+            serde_json::to_writer(&mut writer, &resp)?;
+            writer.write_all(b"\n")?;
+            writer.flush()?;
+            Ok(())
+        });
+
+        let proxy = Proxy::open_unix(&sock_path)?;
+        let caps = proxy.capabilities()?;
+        assert!(caps.capabilities.contains(Capability::PROXY));
+        server_thread.join().unwrap()?;
+        let _ = std::fs::remove_file(&sock_path);
+        Ok(())
     }
 }

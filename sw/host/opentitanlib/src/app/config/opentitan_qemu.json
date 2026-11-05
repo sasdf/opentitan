@@ -6,12 +6,16 @@
   // like the SPI before the ROM has set them up.
   "reset_delay": "100ms",
   "pins": [
-    // Resetting is done through the monitor on QEMU, but OpenTitanTool
-    // expects a pin. We map a pin-like interface to ID 255 which can be used
-    // to send reset commands to QEMU when pulled up and down.
+    // Resetting is done through the POR_N pin via ot_rstmgr.
     {
       "name": "RESET",
-      "alias_of": "255",
+      "alias_of": "POR_N",
+      "mode": "PushPull",
+      "level": true,
+    },
+    {
+      "name": "POR_N",
+      "mode": "PushPull",
       "level": true,
     },
     // VBUS control currently has to go through a special QEMU chardev because
@@ -21,254 +25,258 @@
       "alias_of": "254",
       "level": false,
     },
-    // NOTE: these pins are actually going directly to GPIOs, not through pins.
-    // This is okay for straps which have a fixed GPIO, but should not be used
-    // for muxed GPIOs.
     {
       "name": "SW_STRAP0",
       "mode": "PushPull",
       "level": false,
       "pull_mode": "None",
-      "alias_of": "22"
+      "alias_of": "IOC0"
     },
     {
       "name": "SW_STRAP1",
       "mode": "PushPull",
       "level": false,
       "pull_mode": "None",
-      "alias_of": "23"
+      "alias_of": "IOC1"
     },
     {
       "name": "SW_STRAP2",
       "mode": "PushPull",
       "level": false,
       "pull_mode": "None",
-      "alias_of": "24"
+      "alias_of": "IOC2"
     },
     {
       "name": "TAP_STRAP0",
       "mode": "PushPull",
       "level": false,
       "pull_mode": "None",
-      "alias_of": "30"
+      "alias_of": "IOC8"
     },
     {
       "name": "TAP_STRAP1",
       "mode": "PushPull",
       "level": false,
       "pull_mode": "None",
-      "alias_of": "27"
+      "alias_of": "IOC5"
     },
     {
       "name": "Ioc0",
-      "mode": "PushPull",
-      "level": false,
-      "pull_mode": "None",
-      "alias_of": "22"
+      "alias_of": "IOC0"
     },
     {
       "name": "IOC0",
       "mode": "PushPull",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "22"
+      "pull_mode": "None"
     },
     {
       "name": "IOC1",
-      "alias_of": "23"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC2",
-      "alias_of": "24"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC3",
-      "alias_of": "25"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC4",
-      "alias_of": "26"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC5",
-      "alias_of": "27"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC6",
-      "alias_of": "28"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC7",
-      "alias_of": "29"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC8",
-      "alias_of": "30"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOC9",
-      "alias_of": "31"
+      "mode": "PushPull",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA0",
-      "alias_of": "0"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA1",
-      "alias_of": "1"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA2",
-      "alias_of": "2"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA3",
-      "alias_of": "3"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA4",
-      "alias_of": "4"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA5",
-      "alias_of": "5"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "IOA6",
-      "alias_of": "6"
+      "mode": "Input",
+      "level": false,
+      "pull_mode": "None"
     },
     {
       "name": "Ioa7",
-      "mode": "Input",
-      "level": false,
-      "pull_mode": "PullUp",
-      "alias_of": "7"
+      "alias_of": "IOA7"
     },
     {
       "name": "IOA7",
       "mode": "Input",
-      "level": false,
-      "pull_mode": "PullUp",
-      "alias_of": "7"
+      "level": true,
+      "pull_mode": "PullUp"
     },
     {
       "name": "Ioa8",
-      "mode": "PushPull",
-      "level": false,
-      "pull_mode": "None",
-      "alias_of": "8"
+      "alias_of": "IOA8"
     },
     {
       "name": "IOA8",
-      "mode": "PushPull",
-      "level": false,
-      "pull_mode": "None",
-      "alias_of": "8"
+      "mode": "Input",
+      "level": true,
+      "pull_mode": "PullUp"
     },
     {
       "name": "IOB0",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "0"
+      "pull_mode": "None"
     },
     {
       "name": "IOB1",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "1"
+      "pull_mode": "None"
     },
     {
       "name": "IOB2",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "2"
+      "pull_mode": "None"
     },
     {
       "name": "IOB3",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "3"
+      "pull_mode": "None"
     },
     {
       "name": "IOR5",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "5"
+      "pull_mode": "None"
     },
     {
       "name": "IOR6",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "6"
+      "pull_mode": "None"
     },
     {
       "name": "IOR7",
       "mode": "Input",
       "level": false,
-      "pull_mode": "PullUp",
-      "alias_of": "7"
+      "pull_mode": "PullUp"
     },
     {
       "name": "IOR10",
       "mode": "PushPull",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "10"
+      "pull_mode": "None"
     },
     {
       "name": "IOR11",
       "mode": "PushPull",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "8"
+      "pull_mode": "None"
     },
     {
       "name": "IOR12",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "12"
+      "pull_mode": "None"
     },
     {
       "name": "IOR13",
       "mode": "Input",
       "level": false,
-      "pull_mode": "None",
-      "alias_of": "13"
+      "pull_mode": "None"
     },
     {
       "name": "IOR8",
       "mode": "OpenDrain",
       "level": true,
-      "pull_mode": "PullUp",
-      "alias_of": "14"
+      "pull_mode": "PullUp"
     },
     {
       "name": "IOR9",
       "mode": "OpenDrain",
       "level": true,
-      "pull_mode": "PullUp",
-      "alias_of": "15"
+      "pull_mode": "PullUp"
     },
     {
       "name": "SYSRST_CTRL_EC_RST_L",
       "mode": "OpenDrain",
       "level": true,
       "pull_mode": "PullUp",
-      "alias_of": "14"
+      "alias_of": "IOR8"
     },
     {
       "name": "SYSRST_CTRL_FLASH_WP_L",
       "mode": "OpenDrain",
       "level": true,
       "pull_mode": "PullUp",
-      "alias_of": "15"
+      "alias_of": "IOR9"
     }
   ],
   "strappings": [
@@ -277,6 +285,7 @@
       "pins": [
         {
           "name": "RESET",
+          "mode": "PushPull",
           "level": false
         }
       ]

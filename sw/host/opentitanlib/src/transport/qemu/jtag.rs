@@ -2,13 +2,13 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::debug::openocd::{OpenOcd, OpenOcdJtagChain};
 use crate::io::jtag::{Jtag, JtagChain, JtagParams, JtagTap};
-use crate::transport::qemu::gpio::QemuGpio;
+use crate::transport::Transport;
+use crate::transport::proxy::Proxy;
 
 /// Proxy between the two available JTAG TAPs in QEMU.
 ///
@@ -25,8 +25,8 @@ pub struct QemuJtag {
     /// Remote bitbang socket for the lifecycle controller.
     lc_ctrl_sock: PathBuf,
 
-    /// Optional reference to QEMU GPIO state to inspect TAP strap pins.
-    gpio: Option<Rc<RefCell<QemuGpio>>>,
+    /// Optional reference to QEMU Proxy / Pad Ring state to inspect TAP strap pins.
+    proxy: Option<Rc<Proxy>>,
 }
 
 impl QemuJtag {
@@ -34,14 +34,14 @@ impl QemuJtag {
         mut params: JtagParams,
         rv_dm_sock: PathBuf,
         lc_ctrl_sock: PathBuf,
-        gpio: Option<Rc<RefCell<QemuGpio>>>,
+        proxy: Option<Rc<Proxy>>,
     ) -> QemuJtag {
         params.log_stdio = true;
         QemuJtag {
             params,
             rv_dm_sock,
             lc_ctrl_sock,
-            gpio,
+            proxy,
         }
     }
 }
@@ -74,10 +74,9 @@ impl JtagChain for QemuJtag {
     }
 
     fn into_raw(self: Box<Self>) -> anyhow::Result<OpenOcd> {
-        let (strap0, strap1) = if let Some(ref gpio) = self.gpio {
-            let gpio = gpio.borrow();
-            let s0 = gpio.host.is_driving(30) && gpio.host.output_level(30);
-            let s1 = gpio.host.is_driving(27) && gpio.host.output_level(27);
+        let (strap0, strap1) = if let Some(ref proxy) = self.proxy {
+            let s0 = proxy.gpio_pin("IOC8").and_then(|p| p.read()).unwrap_or(false);
+            let s1 = proxy.gpio_pin("IOC5").and_then(|p| p.read()).unwrap_or(true);
             (s0, s1)
         } else {
             (false, true)
