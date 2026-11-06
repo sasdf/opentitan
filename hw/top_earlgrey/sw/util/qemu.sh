@@ -165,8 +165,7 @@ qemu_args+=(
   "-chardev" "socket,id=gpio,path=${QEMU_GPIO},server=on,wait=off"
   "-global" "ot-pad-ring.chardev=gpio"
 
-  # Connect USB command & protocol interfaces to PTYs.
-  "-chardev" "pty,id=usbdev-cmd"
+  # Connect USB protocol interface to PTY.
   "-chardev" "pty,id=usbdev-host"
 
   # Connect JTAG remote bit-bang for RV_DM & LC_CTRL TAPs to sockets.

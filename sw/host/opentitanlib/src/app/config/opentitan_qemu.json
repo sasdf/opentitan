@@ -18,12 +18,16 @@
       "mode": "PushPull",
       "level": true,
     },
-    // VBUS control currently has to go through a special QEMU chardev because
-    // QEMU does not yet implement a real pinmux.
     {
       "name": "VBUS_SENSE_EN",
-      "alias_of": "254",
+      "alias_of": "IOC7",
+      "mode": "PushPull",
       "level": false,
+      "pull_mode": "PullDown"
+    },
+    {
+      "name": "VBUS_SENSE",
+      "alias_of": "IOC7"
     },
     {
       "name": "SW_STRAP0",
@@ -110,7 +114,7 @@
       "name": "IOC7",
       "mode": "PushPull",
       "level": false,
-      "pull_mode": "None"
+      "pull_mode": "PullDown"
     },
     {
       "name": "IOC8",

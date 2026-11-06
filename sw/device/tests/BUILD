@@ -4673,6 +4673,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -4715,11 +4716,6 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     qemu = qemu_params(
-        globals = {
-            # We do not need a full host for this test so just drive VBUS
-            # in override mode.
-            "ot-usbdev.vbus-override": "true",
-        },
         test_cmd = """
             --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
@@ -4763,6 +4759,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -4834,6 +4831,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -4885,6 +4883,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --wake=reset
         """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_aon_wake",
@@ -4927,6 +4926,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -4970,6 +4970,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5014,6 +5015,9 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
     ),
     qemu = qemu_params(
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+        """,
         test_harness = "//sw/host/tests/chip/usb:usbdev_smoketest",
     ),
     silicon = silicon_params(
@@ -5078,6 +5082,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --exec=$(rootpath :usbdev_stream_host_harness)
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5124,6 +5129,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --exec=$(rootpath :usbdev_stream_host_harness)
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5170,6 +5176,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --exec=$(rootpath :usbdev_stream_host_harness)
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5213,6 +5220,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --no-wait-for-usb-device
         """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
@@ -5252,6 +5260,9 @@ opentitan_test(
     ),
     qemu = qemu_params(
         rom = "//sw/device/lib/testing/test_rom:test_rom",
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+        """,
         test_harness = "//sw/host/tests/chip/usb:usb_harness",
     ),
     verilator = verilator_params(
@@ -5326,6 +5337,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --fin-phase=suspend
             --init-phase=suspend
             --logging-duration=0s
@@ -5376,6 +5388,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --fin-phase=sleep-resume
             --init-phase=sleep-resume
         """,
@@ -5427,6 +5440,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --fin-phase=sleep-reset
             --init-phase=sleep-resume
         """,
@@ -5528,6 +5542,7 @@ opentitan_test(
     ),
     qemu = qemu_params(
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --fin-phase=deep-resume
             --init-phase=deep-resume
         """,
@@ -5581,6 +5596,7 @@ opentitan_test(
     qemu = qemu_params(
         tags = ["broken"],
         test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
             --fin-phase=deep-reset
             --init-phase=deep-resume
         """,

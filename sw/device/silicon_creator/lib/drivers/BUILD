@@ -1008,6 +1008,9 @@ opentitan_test(
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
     qemu = qemu_params(
+        test_cmd = """
+            --vbus-sense-en=VBUS_SENSE_EN
+        """,
         test_harness = "//sw/host/tests/chip/usb:silicon_creator_harness",
     ),
     qemu_broken = qemu_params(tags = ["broken"]),

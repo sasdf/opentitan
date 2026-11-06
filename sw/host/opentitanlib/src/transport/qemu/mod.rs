@@ -33,14 +33,10 @@ use crate::transport::qemu::jtag::QemuJtag;
 use crate::transport::qemu::monitor::{Chardev, ChardevKind, Monitor};
 use crate::transport::qemu::spi::QemuSpi;
 use crate::transport::qemu::uart::QemuUart;
-use crate::transport::qemu::usbdev::{QemuUsbHost, QemuVbusSense};
+use crate::transport::qemu::usbdev::QemuUsbHost;
 use crate::transport::{
     Capabilities, Capability, Transport, TransportError, TransportInterfaceType,
 };
-
-/* Until we have a more complete model of the pinmux, we need to model this
- * MIO directly. */
-const QEMU_VBUS_SENSE_PIN_IDX: &str = "254";
 
 /// Baudrate for QEMU's consoles. These are PTYs so it currently doesn't matter,
 /// but we must use a non-zero value because the pacing calculations divide by
@@ -63,9 +59,6 @@ pub struct Qemu {
 
     /// Proxy client connected to QEMU Pad Ring socket for GPIO, monitoring, and bitbanging.
     proxy: Option<Rc<Proxy>>,
-
-    /// VBUS sense pin (actually goes via the `usbdev-cmd` chardev).
-    vbus_sense: Option<Rc<dyn GpioPin>>,
 
     /// USB host TTY port name (`usbdev-host` chardev).
     usb_host_tty: Option<String>,
@@ -138,28 +131,6 @@ impl Qemu {
                 "could not find pty chardevs with ids starting with `uart`, UART support disabled"
             );
         }
-
-        // USBDEV control:
-        let vbus_sense = match find_chardev(&chardevs, "usbdev-cmd") {
-            Some(ChardevKind::Pty { path }) => {
-                let path = options
-                    .device_path("usbdev-cmd")
-                    .unwrap_or(path.to_path_buf());
-                let tty = serialport::new(
-                    path.to_str().context("TTY path not UTF8")?,
-                    CONSOLE_BAUDRATE,
-                )
-                .open_native()
-                .context("failed to open QEMU usbdev-cmd PTY")?;
-
-                let vbus_sense: Rc<dyn GpioPin> = Rc::new(QemuVbusSense::new(tty));
-                Some(vbus_sense)
-            }
-            _ => {
-                log::info!("could not find pty chardev with id=usbdev, skipping USBDEV");
-                None
-            }
-        };
 
         // USBDEV host:
         let usb_host_tty = match find_chardev(&chardevs, "usbdev-host") {
@@ -274,7 +245,6 @@ impl Qemu {
         Ok(Qemu {
             monitor,
             uarts,
-            vbus_sense,
             usb_host_tty,
             usb_host: RefCell::new(None),
             log,
@@ -347,14 +317,10 @@ impl Transport for Qemu {
     }
 
     fn gpio_pin(&self, instance: &str) -> anyhow::Result<Rc<dyn GpioPin>> {
-        if instance == QEMU_VBUS_SENSE_PIN_IDX && self.vbus_sense.is_some() {
-            return Ok(Rc::clone(self.vbus_sense.as_ref().unwrap()));
-        }
-        let pin_id = if instance == "255" { "POR_N" } else { instance };
         self.proxy
             .as_ref()
             .context("GPIO interface not connected")?
-            .gpio_pin(pin_id)
+            .gpio_pin(instance)
     }
 
     fn gpio_bitbanging(&self) -> anyhow::Result<Rc<dyn GpioBitbanging>> {
